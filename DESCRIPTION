@@ -1,0 +1,96 @@
+Package: tidylearn
+Title: A Unified Tidy Approach to Machine Learning
+Version: 0.1.0
+Authors@R:
+    person("Cesaire", "Tobias", email = "cesaire@sheetsolved.com", role = c("aut", "cre"),
+           comment = c(ORCID = ""))
+Description: A comprehensive machine learning package that unifies supervised and
+    unsupervised learning under a consistent tidy interface. Seamlessly integrates
+    classification, regression, clustering, dimensionality reduction, and feature
+    engineering. Built on tidyverse principles with extensive support for model
+    pipelines, cross-validation, visualization, and interpretation. Enables powerful
+    workflows that combine multiple learning paradigms for advanced analytics.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Depends:
+    R (>= 3.6.0)
+Imports:
+    dplyr (>= 1.0.0),
+    ggplot2 (>= 3.3.0),
+    tibble (>= 3.0.0),
+    tidyr (>= 1.0.0),
+    purrr (>= 0.3.0),
+    rlang (>= 0.4.0),
+    magrittr,
+    stats,
+    e1071,
+    gbm,
+    glmnet,
+    nnet,
+    randomForest,
+    rpart,
+    rsample,
+    ROCR,
+    yardstick,
+    cluster (>= 2.1.0),
+    dbscan (>= 1.1.0),
+    factoextra (>= 1.0.0),
+    MASS
+Suggests:
+    car,
+    caret,
+    keras,
+    lmtest,
+    moments,
+    pmml,
+    recipes,
+    reticulate,
+    rpart.plot,
+    shiny,
+    shinydashboard,
+    tensorflow,
+    testthat (>= 3.0.0),
+    workflows,
+    xgboost,
+    GGally,
+    gridExtra,
+    onnx,
+    parsnip,
+    knitr,
+    rmarkdown,
+    mclust,
+    arules,
+    arulesViz,
+    smacof
+Config/testthat/edition: 3
+URL: https://github.com/ces0491/tidylearn
+BugReports: https://github.com/ces0491/tidylearn/issues
+VignetteBuilder: knitr
+Collate:
+    'utils.R'
+    'core.R'
+    'preprocessing.R'
+    'supervised-classification.R'
+    'supervised-regression.R'
+    'supervised-regularization.R'
+    'supervised-trees.R'
+    'supervised-svm.R'
+    'supervised-neural-networks.R'
+    'supervised-deep-learning.R'
+    'supervised-xgboost.R'
+    'unsupervised-pca.R'
+    'unsupervised-mds.R'
+    'unsupervised-clustering.R'
+    'unsupervised-dbscan.R'
+    'unsupervised-market-basket.R'
+    'integration.R'
+    'pipeline.R'
+    'model-selection.R'
+    'tuning.R'
+    'interactions.R'
+    'diagnostics.R'
+    'metrics.R'
+    'visualization.R'
+    'workflows.R'
