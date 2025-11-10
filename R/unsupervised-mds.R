@@ -19,12 +19,7 @@
 #' @examples
 #' # Classical MDS
 #' mds_result <- tidy_mds(eurodist, method = "classical")
-#'
-#' # Non-metric MDS
-#' mds_result <- tidy_mds(eurodist, method = "nonmetric")
-#'
-#' # From data frame
-#' mds_result <- tidy_mds(USArrests, method = "sammon", distance = "euclidean")
+#' print(mds_result)
 #'
 #' @export
 tidy_mds <- function(data, method = "classical", ndim = 2, distance = "euclidean", ...) {
@@ -321,4 +316,30 @@ print.tidy_mds <- function(x, ...) {
   print(head(x$config))
 
   invisible(x)
+}
+
+
+#' Fit MDS for tidylearn models
+#' @keywords internal
+#' @noRd
+tl_fit_mds <- function(data, formula = NULL, k = 2, method = "classical", ...) {
+  # Extract variables to use
+  if (!is.null(formula)) {
+    vars <- get_formula_vars(formula, data)
+    data_for_mds <- data[, vars, drop = FALSE]
+  } else {
+    data_for_mds <- data %>% dplyr::select(where(is.numeric))
+  }
+
+  # Fit MDS using tidy_mds
+  mds_result <- tidy_mds(data_for_mds, method = method, ndim = k, ...)
+
+  # Return in expected format
+  list(
+    points = mds_result$config,
+    stress = mds_result$stress,
+    gof = mds_result$gof,
+    method = mds_result$method,
+    model = mds_result$model
+  )
 }

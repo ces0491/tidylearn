@@ -319,6 +319,6 @@ tidylearn/
 
 ## Conclusion
 
-tidylearn represents a **paradigm shift** in how we think about machine learning in R. Instead of treating supervised and unsupervised learning as separate domains, it recognizes them as complementary techniques that work better together.
+Instead of treating supervised and unsupervised learning as separate domains, tidylearn recognizes them as complementary techniques that work better together.
 
-The package doesn't just combine tidysl and tidyul—it **reimagines** them as part of a unified, intelligent machine learning ecosystem.
+The package doesn't just combine tidysl and tidyul—it **reimagines** them as part of a unified machine learning ecosystem.

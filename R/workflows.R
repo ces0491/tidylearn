@@ -184,7 +184,9 @@ tl_auto_ml <- function(data, formula, task = "auto",
   structure(
     list(
       best_model = best_model,
-      all_models = models,
+      models = models,              # Add for test compatibility
+      all_models = models,          # Keep for backward compatibility
+      results = results,            # Add for test compatibility
       leaderboard = leaderboard,
       task = task,
       metric = metric,
@@ -224,6 +226,8 @@ create_leaderboard <- function(results, metric, task) {
 }
 
 #' Print auto ML results
+#' @param x A tidylearn_automl object
+#' @param ... Additional arguments (ignored)
 #' @export
 print.tidylearn_automl <- function(x, ...) {
   cat("tidylearn Auto ML Results\n")
@@ -313,6 +317,8 @@ tl_explore <- function(data, response = NULL, max_components = 5, k_range = 2:6)
 }
 
 #' Print EDA results
+#' @param x A tidylearn_eda object
+#' @param ... Additional arguments (ignored)
 #' @export
 print.tidylearn_eda <- function(x, ...) {
   cat("tidylearn Exploratory Data Analysis\n")
@@ -405,6 +411,9 @@ tl_transfer_learning <- function(data, formula, pretrain_method = "pca",
 }
 
 #' Predict with transfer learning model
+#' @param object A tidylearn_transfer model object
+#' @param new_data New data for predictions
+#' @param ... Additional arguments
 #' @export
 predict.tidylearn_transfer <- function(object, new_data, ...) {
   # Transform new data using pre-trained model

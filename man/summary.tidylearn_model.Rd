@@ -6,6 +6,11 @@
 \usage{
 \method{summary}{tidylearn_model}(object, ...)
 }
+\arguments{
+\item{object}{A tidylearn model object}
+
+\item{...}{Additional arguments (ignored)}
+}
 \description{
 Summary method for tidylearn models
 }

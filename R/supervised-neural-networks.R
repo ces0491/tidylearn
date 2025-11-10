@@ -83,7 +83,7 @@ tl_predict_nn <- function(model, new_data, type = "response", ...) {
 
     if (type == "prob") {
       # Get class probabilities
-      probs <- as.data.frame(nnet::predict.nnet(fit, newdata = new_data, type = "raw", ...))
+      probs <- as.data.frame(predict(fit, newdata = new_data, type = "raw", ...))
 
       # For binary classification
       if (length(levels) == 2) {
@@ -108,7 +108,7 @@ tl_predict_nn <- function(model, new_data, type = "response", ...) {
       return(prob_df)
     } else if (type == "class") {
       # Get probabilities first
-      probs <- as.data.frame(nnet::predict.nnet(fit, newdata = new_data, type = "raw", ...))
+      probs <- as.data.frame(predict(fit, newdata = new_data, type = "raw", ...))
 
       # For binary classification
       if (length(levels) == 2) {
@@ -136,7 +136,7 @@ tl_predict_nn <- function(model, new_data, type = "response", ...) {
     }
   } else {
     # Regression predictions
-    preds <- as.vector(nnet::predict.nnet(fit, newdata = new_data, type = "raw", ...))
+    preds <- as.vector(predict(fit, newdata = new_data, type = "raw", ...))
     return(preds)
   }
 }
@@ -219,7 +219,7 @@ tl_tune_nn <- function(data, formula, is_classification = FALSE,
       )
 
       # Make predictions
-      preds <- nnet::predict.nnet(nn, newdata = test_data, type = "raw")
+      preds <- predict(nn, newdata = test_data, type = "raw")
 
       # Calculate error
       if (is_classification) {

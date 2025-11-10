@@ -6,6 +6,11 @@
 \usage{
 \method{print}{tidylearn_model}(x, ...)
 }
+\arguments{
+\item{x}{A tidylearn model object}
+
+\item{...}{Additional arguments (ignored)}
+}
 \description{
 Print method for tidylearn models
 }

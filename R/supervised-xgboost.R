@@ -159,7 +159,7 @@ tl_predict_xgboost <- function(model, new_data, type = "response", ntreelimit = 
 
       if (n_classes == 2) {
         # Binary classification
-        prob <- xgboost::predict(xgb_model, newdata = dtest, ntreelimit = ntreelimit)
+        prob <- predict(xgb_model, newdata = dtest, ntreelimit = ntreelimit)
 
         # Create data frame with probabilities for both classes
         prob_df <- data.frame(
@@ -171,7 +171,7 @@ tl_predict_xgboost <- function(model, new_data, type = "response", ntreelimit = 
         return(prob_df)
       } else {
         # Multiclass classification
-        probs <- xgboost::predict(xgb_model, newdata = dtest, ntreelimit = ntreelimit,
+        probs <- predict(xgb_model, newdata = dtest, ntreelimit = ntreelimit,
                                   reshape = TRUE)
         colnames(probs) <- response_levels
 
@@ -184,11 +184,11 @@ tl_predict_xgboost <- function(model, new_data, type = "response", ntreelimit = 
 
       if (n_classes == 2) {
         # Binary classification
-        prob <- xgboost::predict(xgb_model, newdata = dtest, ntreelimit = ntreelimit)
+        prob <- predict(xgb_model, newdata = dtest, ntreelimit = ntreelimit)
         pred_classes <- ifelse(prob > 0.5, response_levels[2], response_levels[1])
       } else {
         # Multiclass classification
-        probs <- xgboost::predict(xgb_model, newdata = dtest, ntreelimit = ntreelimit,
+        probs <- predict(xgb_model, newdata = dtest, ntreelimit = ntreelimit,
                                   reshape = TRUE)
         pred_idx <- max.col(probs)
         pred_classes <- response_levels[pred_idx]
@@ -204,7 +204,7 @@ tl_predict_xgboost <- function(model, new_data, type = "response", ntreelimit = 
     }
   } else {
     # Regression predictions
-    pred <- xgboost::predict(xgb_model, newdata = dtest, ntreelimit = ntreelimit)
+    pred <- predict(xgb_model, newdata = dtest, ntreelimit = ntreelimit)
     return(pred)
   }
 }
@@ -499,7 +499,7 @@ tl_xgboost_shap <- function(model, data = NULL, n_samples = 100, trees_idx = NUL
   dmatrix <- xgboost::xgb.DMatrix(data = as.matrix(X))
 
   # Calculate SHAP values
-  shap_values <- xgboost::predict(xgb_model, dmatrix, predcontrib = TRUE,
+  shap_values <- predict(xgb_model, dmatrix, predcontrib = TRUE,
                                   approxcontrib = FALSE, trees_idx = trees_idx)
 
   # Remove BIAS column (last column) if present

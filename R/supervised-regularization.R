@@ -477,3 +477,48 @@ tl_plot_importance_regularized <- function(model, lambda = "1se", top_n = 20, ..
 
   return(p)
 }
+
+
+#' Predict using a glmnet model
+#' @keywords internal
+#' @noRd
+tl_predict_glmnet <- function(model, new_data, type = "response", ...) {
+  fit <- model$fit
+  is_classification <- model$spec$is_classification
+
+  # Create model matrix for new data
+  formula <- model$spec$formula
+  response_var <- all.vars(formula)[1]
+
+  # Get predictor variables from original formula
+  all_vars <- all.vars(formula)
+  predictor_vars <- all_vars[-1]  # Remove response
+
+  # Create formula manually without using update()
+  if (length(predictor_vars) == 0 || (length(predictor_vars) == 1 && predictor_vars[1] == ".")) {
+    # Use all predictors except response
+    predictor_names <- setdiff(names(new_data), response_var)
+    predictor_formula <- as.formula(paste("~", paste(predictor_names, collapse = " + "), "- 1"))
+  } else {
+    predictor_formula <- as.formula(paste("~", paste(predictor_vars, collapse = " + "), "- 1"))
+  }
+
+  # Create model matrix
+  X_new <- stats::model.matrix(predictor_formula, data = new_data)
+
+  # Get optimal lambda value from model
+  lambda_val <- attr(fit, "lambda_min")
+  if (is.null(lambda_val)) {
+    # If no cv was used, use the first lambda
+    lambda_val <- fit$lambda[1]
+  }
+
+  # Make predictions
+  if (is_classification) {
+    preds <- predict(fit, newx = X_new, type = "class", s = lambda_val)
+    return(as.vector(preds))
+  } else {
+    preds <- predict(fit, newx = X_new, type = "response", s = lambda_val)
+    return(as.vector(preds))
+  }
+}

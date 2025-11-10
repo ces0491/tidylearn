@@ -6,6 +6,13 @@
 \usage{
 \method{predict}{tidylearn_transfer}(object, new_data, ...)
 }
+\arguments{
+\item{object}{A tidylearn_transfer model object}
+
+\item{new_data}{New data for predictions}
+
+\item{...}{Additional arguments}
+}
 \description{
 Predict with transfer learning model
 }

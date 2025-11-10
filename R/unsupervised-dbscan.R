@@ -319,3 +319,31 @@ print.tidy_dbscan <- function(x, ...) {
 
   invisible(x)
 }
+
+
+#' Fit DBSCAN for tidylearn models
+#' @keywords internal
+#' @noRd
+tl_fit_dbscan <- function(data, formula = NULL, eps = 0.5, minPts = 5, ...) {
+  tl_check_packages("dbscan")
+
+  # Extract variables to use
+  if (!is.null(formula)) {
+    vars <- get_formula_vars(formula, data)
+    data_for_db <- data[, vars, drop = FALSE]
+  } else {
+    data_for_db <- data %>% dplyr::select(where(is.numeric))
+  }
+
+  # Fit DBSCAN using tidy_dbscan
+  db_result <- tidy_dbscan(data_for_db, eps = eps, minPts = minPts, ...)
+
+  # Return in expected format
+  list(
+    clusters = db_result$clusters,
+    core_points = db_result$core_points,
+    n_clusters = db_result$n_clusters,
+    n_noise = db_result$n_noise,
+    model = db_result$model
+  )
+}

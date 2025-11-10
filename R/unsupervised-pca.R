@@ -22,8 +22,6 @@
 #' # Basic PCA
 #' pca_result <- tidy_pca(USArrests)
 #'
-#' # PCA on selected columns
-#' pca_result <- tidy_pca(mtcars, cols = c(mpg, hp, wt, qsec))
 #'
 #' # Access components
 #' pca_result$scores
@@ -352,4 +350,29 @@ print.tidy_pca <- function(x, ...) {
   cat("  $model     - Original PCA model object\n")
 
   invisible(x)
+}
+
+#' Fit PCA for tidylearn models
+#' @keywords internal
+#' @noRd
+tl_fit_pca <- function(data, formula = NULL, scale = TRUE, center = TRUE, ...) {
+  # Extract variables to use
+  if (!is.null(formula)) {
+    vars <- get_formula_vars(formula, data)
+    data_for_pca <- data[, vars, drop = FALSE]
+  } else {
+    data_for_pca <- data %>% dplyr::select(where(is.numeric))
+  }
+
+  # Fit PCA using tidy_pca
+  pca_result <- tidy_pca(data_for_pca, scale = scale, center = center, ...)
+
+  # Return in expected format
+  list(
+    scores = pca_result$scores,
+    loadings = get_pca_loadings(pca_result),
+    variance_explained = pca_result$variance,
+    model = pca_result$model,
+    settings = pca_result$settings
+  )
 }

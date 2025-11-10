@@ -6,6 +6,13 @@
 \usage{
 \method{plot}{tidylearn_model}(x, type = "auto", ...)
 }
+\arguments{
+\item{x}{A tidylearn model object}
+
+\item{type}{Plot type (default: "auto")}
+
+\item{...}{Additional arguments passed to plotting functions}
+}
 \description{
 Plot method for tidylearn models
 }

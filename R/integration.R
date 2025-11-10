@@ -257,8 +257,18 @@ tl_anomaly_aware <- function(data, formula, response,
   } else if (action == "flag") {
     data_flagged <- data %>%
       dplyr::mutate(is_anomaly = is_anomaly)
-    # Include anomaly flag as a feature
-    formula_updated <- update(formula, ~ . + is_anomaly)
+    # Include anomaly flag as a feature - manually construct formula
+    response_var <- all.vars(formula)[1]
+    all_vars <- all.vars(formula)
+    predictor_vars <- all_vars[-1]
+
+    if (length(predictor_vars) == 1 && predictor_vars[1] == ".") {
+      # Formula was response ~ .
+      formula_updated <- as.formula(paste(response_var, "~ . + is_anomaly"))
+    } else {
+      # Explicit predictors
+      formula_updated <- as.formula(paste(response_var, "~", paste(c(predictor_vars, "is_anomaly"), collapse = " + ")))
+    }
     model <- tl_model(data_flagged, formula_updated, method = supervised_method)
   } else if (action == "downweight") {
     # Create weights (anomalies get lower weight)
@@ -331,6 +341,9 @@ tl_stratified_models <- function(data, formula, cluster_method = "kmeans",
 }
 
 #' Predict from stratified models
+#' @param object A tidylearn_stratified model object
+#' @param new_data New data for predictions
+#' @param ... Additional arguments
 #' @export
 predict.tidylearn_stratified <- function(object, new_data = NULL, ...) {
   if (is.null(new_data)) {

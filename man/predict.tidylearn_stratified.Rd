@@ -6,6 +6,13 @@
 \usage{
 \method{predict}{tidylearn_stratified}(object, new_data = NULL, ...)
 }
+\arguments{
+\item{object}{A tidylearn_stratified model object}
+
+\item{new_data}{New data for predictions}
+
+\item{...}{Additional arguments}
+}
 \description{
 Predict from stratified models
 }

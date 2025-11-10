@@ -21,9 +21,6 @@
 #' # Basic k-means
 #' km_result <- tidy_kmeans(iris, k = 3)
 #'
-#' # Specify columns
-#' km_result <- tidy_kmeans(mtcars, k = 3, cols = c(mpg, hp, wt))
-#'
 #' @export
 tidy_kmeans <- function(data, k, cols = NULL, nstart = 25, iter_max = 100,
                         algorithm = "Hartigan-Wong") {
@@ -215,8 +212,12 @@ augment_pam <- function(pam_obj, data) {
 #' @return A list of class "tidy_clara" containing clustering results
 #'
 #' @examples
+#' \donttest{
 #' # CLARA for large datasets
-#' clara_result <- tidy_clara(large_data, k = 5, samples = 100)
+#' large_data <- iris[rep(1:nrow(iris), 10), 1:4]
+#' clara_result <- tidy_clara(large_data, k = 3, samples = 50)
+#' print(clara_result)
+#' }
 #'
 #' @export
 tidy_clara <- function(data, k, metric = "euclidean", samples = 50, sampsize = NULL) {
@@ -226,6 +227,12 @@ tidy_clara <- function(data, k, metric = "euclidean", samples = 50, sampsize = N
     data_numeric <- data %>% dplyr::select(where(is.numeric))
   } else {
     data_numeric <- data
+  }
+
+  # Set default sampsize if not provided
+  if (is.null(sampsize)) {
+    n <- nrow(data_numeric)
+    sampsize <- min(n, 40 + 2 * k)
   }
 
   # Perform CLARA
@@ -366,4 +373,80 @@ print.tidy_pam <- function(x, ...) {
   print(table(x$clusters$cluster))
 
   invisible(x)
+}
+
+#' Fit K-means for tidylearn models
+#' @keywords internal
+#' @noRd
+tl_fit_kmeans <- function(data, formula = NULL, k = 3, ...) {
+  # Extract variables to use
+  if (!is.null(formula)) {
+    vars <- get_formula_vars(formula, data)
+    data_for_km <- data[, vars, drop = FALSE]
+  } else {
+    data_for_km <- data %>% dplyr::select(where(is.numeric))
+  }
+
+  # Fit k-means using tidy_kmeans
+  km_result <- tidy_kmeans(data_for_km, k = k, ...)
+
+  # Return in expected format
+  list(
+    clusters = km_result$clusters,
+    centers = km_result$centers,
+    metrics = km_result$metrics,
+    model = km_result$model
+  )
+}
+
+#' Fit PAM for tidylearn models
+#' @keywords internal
+#' @noRd
+tl_fit_pam <- function(data, formula = NULL, k = 3, ...) {
+  tl_check_packages("cluster")
+
+  # Extract variables to use
+  if (!is.null(formula)) {
+    vars <- get_formula_vars(formula, data)
+    data_for_pam <- data[, vars, drop = FALSE]
+  } else {
+    data_for_pam <- data
+  }
+
+  # Fit PAM using tidy_pam
+  pam_result <- tidy_pam(data_for_pam, k = k, ...)
+
+  # Return in expected format
+  list(
+    clusters = pam_result$clusters,
+    medoids = pam_result$medoids,
+    silhouette_avg = pam_result$silhouette_avg,
+    model = pam_result$model
+  )
+}
+
+#' Fit CLARA for tidylearn models
+#' @keywords internal
+#' @noRd
+tl_fit_clara <- function(data, formula = NULL, k = 3, ...) {
+  tl_check_packages("cluster")
+
+  # Extract variables to use
+  if (!is.null(formula)) {
+    vars <- get_formula_vars(formula, data)
+    data_for_clara <- data[, vars, drop = FALSE]
+  } else {
+    data_for_clara <- data
+  }
+
+  # Fit CLARA using tidy_clara
+  clara_result <- tidy_clara(data_for_clara, k = k, ...)
+
+  # Return in expected format
+  list(
+    clusters = clara_result$clusters,
+    medoids = clara_result$medoids,
+    silhouette_avg = clara_result$silhouette_avg,
+    model = clara_result$model
+  )
 }

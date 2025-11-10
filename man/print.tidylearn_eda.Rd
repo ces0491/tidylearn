@@ -6,6 +6,11 @@
 \usage{
 \method{print}{tidylearn_eda}(x, ...)
 }
+\arguments{
+\item{x}{A tidylearn_eda object}
+
+\item{...}{Additional arguments (ignored)}
+}
 \description{
 Print EDA results
 }

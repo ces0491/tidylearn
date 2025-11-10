@@ -246,3 +246,27 @@ print.tidy_hclust <- function(x, ...) {
 
   invisible(x)
 }
+
+
+#' Fit hierarchical clustering for tidylearn models
+#' @keywords internal
+#' @noRd
+tl_fit_hclust <- function(data, formula = NULL, method = "average", distance = "euclidean", ...) {
+  # Extract variables to use
+  if (!is.null(formula)) {
+    vars <- get_formula_vars(formula, data)
+    data_for_hc <- data[, vars, drop = FALSE]
+  } else {
+    data_for_hc <- data %>% dplyr::select(where(is.numeric))
+  }
+
+  # Fit hierarchical clustering using tidy_hclust
+  hc_result <- tidy_hclust(data_for_hc, method = method, distance = distance, ...)
+
+  # Return in expected format
+  list(
+    model = hc_result$model,
+    dist = hc_result$dist,
+    method = hc_result$method
+  )
+}

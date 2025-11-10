@@ -258,7 +258,7 @@ summarize_rules <- function(rules_obj) {
 #' @param rules_obj A tidy_apriori object, rules object, or rules tibble
 #' @param method Visualization method: "scatter" (default), "graph", "grouped", "paracoord"
 #' @param top_n Number of top rules to visualize (default: 50)
-#' @param ... Additional arguments passed to arulesViz::plot
+#' @param ... Additional arguments passed to plot() for rules visualization
 #'
 #' @return Visualization (side effect) or ggplot object
 #' @export
@@ -300,7 +300,11 @@ visualize_rules <- function(rules_obj, method = "scatter", top_n = 50, ...) {
 
   } else {
     # Use arulesViz for other methods
-    arulesViz::plot(rules, method = method, ...)
+    # Check if arulesViz is available
+    if (!requireNamespace("arulesViz", quietly = TRUE)) {
+      stop("Package 'arulesViz' is required for this visualization method.", call. = FALSE)
+    }
+    plot(rules, method = method, ...)
   }
 }
 

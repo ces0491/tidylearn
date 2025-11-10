@@ -32,11 +32,6 @@ Unified interface for MDS methods with tidy output
 \examples{
 # Classical MDS
 mds_result <- tidy_mds(eurodist, method = "classical")
-
-# Non-metric MDS
-mds_result <- tidy_mds(eurodist, method = "nonmetric")
-
-# From data frame
-mds_result <- tidy_mds(USArrests, method = "sammon", distance = "euclidean")
+print(mds_result)
 
 }

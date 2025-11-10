@@ -809,7 +809,7 @@ plot_clusters <- function(data, cluster_col = "cluster", x_col = NULL, y_col = N
   # Color noise points black if requested
   if (color_noise_black && "0" %in% unique(plot_data[[cluster_col]])) {
     p <- p + ggplot2::scale_color_manual(
-      values = c("0" = "black", setNames(scales::hue_pal()(length(unique(plot_data[[cluster_col]])) - 1),
+      values = c("0" = "black", setNames(grDevices::rainbow(length(unique(plot_data[[cluster_col]])) - 1),
                                          setdiff(unique(plot_data[[cluster_col]]), "0")))
     )
   }
@@ -939,7 +939,7 @@ plot_variance_explained <- function(variance_tbl, threshold = 0.8) {
       x = "Principal Component",
       y = "Proportion of Variance Explained"
     ) +
-    ggplot2::scale_y_continuous(labels = scales::percent) +
+    ggplot2::scale_y_continuous(labels = function(x) paste0(round(x * 100, 1), "%")) +
     ggplot2::theme_minimal()
 
   p1

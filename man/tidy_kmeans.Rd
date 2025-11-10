@@ -42,7 +42,4 @@ Performs k-means clustering with tidy output
 # Basic k-means
 km_result <- tidy_kmeans(iris, k = 3)
 
-# Specify columns
-km_result <- tidy_kmeans(mtcars, k = 3, cols = c(mpg, hp, wt))
-
 }

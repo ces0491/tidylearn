@@ -5,7 +5,7 @@
 
 ## Overview
 
-`tidylearn` is a comprehensive machine learning package for R that **thoughtfully unifies supervised and unsupervised learning** under a consistent, tidy interface. Unlike packages that simply combine functionalities, tidylearn is designed from the ground up to enable seamless integration between different learning paradigms.
+`tidylearn` is a comprehensive machine learning package for R that **unifies supervised and unsupervised learning** under a consistent, tidy interface. Unlike packages that simply combine functionalities, tidylearn is designed to enable seamless integration between different learning paradigms.
 
 The package brings together:
 - **Supervised Learning** (classification & regression)
@@ -267,8 +267,6 @@ tidylearn builds upon and integrates:
 - **tidysl**: Tidy supervised learning
 - **tidyul**: Tidy unsupervised learning
 - The tidyverse ecosystem
-- Excellent machine learning packages: glmnet, randomForest, xgboost, cluster, dbscan, and many more
+- Machine learning packages: glmnet, randomForest, xgboost, cluster, dbscan, and many more
 
 ---
-
-**tidylearn**: Where supervised meets unsupervised in perfect harmony.

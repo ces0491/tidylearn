@@ -212,7 +212,99 @@ predict.tidylearn_model <- function(object, new_data = NULL, type = "response", 
   }
 }
 
+#' Predict using supervised models
+#' @keywords internal
+#' @noRd
+predict_supervised <- function(object, new_data, type = "response", ...) {
+  method <- object$spec$method
+
+  # Route to method-specific prediction
+  preds <- switch(
+    method,
+    "linear" = predict(object$fit, newdata = new_data, ...),
+    "polynomial" = predict(object$fit, newdata = new_data, ...),
+    "logistic" = tl_predict_logistic(object, new_data, type, ...),
+    "tree" = tl_predict_tree(object, new_data, type, ...),
+    "forest" = tl_predict_forest(object, new_data, type, ...),
+    "ridge" = tl_predict_glmnet(object, new_data, type, ...),
+    "lasso" = tl_predict_glmnet(object, new_data, type, ...),
+    "elastic_net" = tl_predict_glmnet(object, new_data, type, ...),
+    stop("Unsupported supervised method for prediction: ", method, call. = FALSE)
+  )
+
+  # Ensure tibble output
+  if (is.data.frame(preds) || inherits(preds, "tbl")) {
+    return(preds)
+  } else {
+    return(tibble::tibble(.pred = preds))
+  }
+}
+
+#' Predict using unsupervised models
+#' @keywords internal
+#' @noRd
+predict_unsupervised <- function(object, new_data, type = "response", ...) {
+  method <- object$spec$method
+
+  result <- switch(
+    method,
+    "pca" = {
+      # For PCA, transform the new data
+      if (is.null(new_data) || nrow(new_data) == nrow(object$data)) {
+        object$fit$scores
+      } else {
+        # Transform new data using the PCA rotation
+        X <- as.matrix(new_data %>% dplyr::select(where(is.numeric)))
+        if (object$fit$settings$center) {
+          X <- scale(X, center = object$fit$model$center, scale = FALSE)
+        }
+        if (object$fit$settings$scale) {
+          X <- scale(X, center = FALSE, scale = object$fit$model$scale)
+        }
+        scores <- X %*% object$fit$model$rotation
+        colnames(scores) <- paste0("PC", 1:ncol(scores))
+        tibble::as_tibble(scores) %>%
+          dplyr::mutate(.obs_id = as.character(seq_len(nrow(.))), .before = 1)
+      }
+    },
+    "kmeans" = {
+      if (is.null(new_data) || nrow(new_data) == nrow(object$data)) {
+        object$fit$clusters
+      } else {
+        # Assign to nearest center
+        X <- as.matrix(new_data %>% dplyr::select(where(is.numeric)))
+        centers <- object$fit$model$centers
+        dists <- apply(X, 1, function(x) {
+          apply(centers, 1, function(c) sum((x - c)^2))
+        })
+        clusters <- apply(dists, 2, which.min)
+        tibble::tibble(cluster = as.integer(clusters))
+      }
+    },
+    "mds" = {
+      # MDS doesn't naturally support new data prediction
+      object$fit$points
+    },
+    "hclust" = {
+      # Hierarchical clustering doesn't support standard prediction
+      warning("Hierarchical clustering does not support standard out-of-sample prediction.")
+      object$fit$clusters
+    },
+    "dbscan" = {
+      # DBSCAN doesn't support standard prediction
+      warning("DBSCAN does not support standard out-of-sample prediction.")
+      object$fit$clusters
+    },
+    stop("Unsupervised unsupervised method for prediction: ", method, call. = FALSE)
+  )
+
+  result
+}
+
+
 #' Print method for tidylearn models
+#' @param x A tidylearn model object
+#' @param ... Additional arguments (ignored)
 #' @export
 print.tidylearn_model <- function(x, ...) {
   cat("tidylearn Model\n")
@@ -232,6 +324,8 @@ print.tidylearn_model <- function(x, ...) {
 }
 
 #' Summary method for tidylearn models
+#' @param object A tidylearn model object
+#' @param ... Additional arguments (ignored)
 #' @export
 summary.tidylearn_model <- function(object, ...) {
   print(object)
@@ -252,6 +346,9 @@ summary.tidylearn_model <- function(object, ...) {
 }
 
 #' Plot method for tidylearn models
+#' @param x A tidylearn model object
+#' @param type Plot type (default: "auto")
+#' @param ... Additional arguments passed to plotting functions
 #' @export
 plot.tidylearn_model <- function(x, type = "auto", ...) {
   if (inherits(x, "tidylearn_supervised")) {

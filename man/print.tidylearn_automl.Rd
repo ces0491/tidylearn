@@ -6,6 +6,11 @@
 \usage{
 \method{print}{tidylearn_automl}(x, ...)
 }
+\arguments{
+\item{x}{A tidylearn_automl object}
+
+\item{...}{Additional arguments (ignored)}
+}
 \description{
 Print auto ML results
 }

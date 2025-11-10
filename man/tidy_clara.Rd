@@ -24,7 +24,11 @@ A list of class "tidy_clara" containing clustering results
 Performs CLARA clustering (scalable version of PAM)
 }
 \examples{
+\donttest{
 # CLARA for large datasets
-clara_result <- tidy_clara(large_data, k = 5, samples = 100)
+large_data <- iris[rep(1:nrow(iris), 10), 1:4]
+clara_result <- tidy_clara(large_data, k = 3, samples = 50)
+print(clara_result)
+}
 
 }

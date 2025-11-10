@@ -13,7 +13,7 @@ visualize_rules(rules_obj, method = "scatter", top_n = 50, ...)
 
 \item{top_n}{Number of top rules to visualize (default: 50)}
 
-\item{...}{Additional arguments passed to arulesViz::plot}
+\item{...}{Additional arguments passed to plot() for rules visualization}
 }
 \value{
 Visualization (side effect) or ggplot object

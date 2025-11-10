@@ -35,8 +35,6 @@ containing scores, loadings, variance explained, and the original model.
 # Basic PCA
 pca_result <- tidy_pca(USArrests)
 
-# PCA on selected columns
-pca_result <- tidy_pca(mtcars, cols = c(mpg, hp, wt, qsec))
 
 # Access components
 pca_result$scores

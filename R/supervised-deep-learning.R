@@ -152,7 +152,7 @@ tl_predict_deep <- function(model, new_data, type = "response", ...) {
   X_new_scaled <- scale(X_new, center = fit$X_means, scale = fit$X_sds)
 
   # Make predictions
-  raw_preds <- keras::predict(fit$model, X_new_scaled)
+  raw_preds <- predict(fit$model, X_new_scaled)
 
   if (is_classification) {
     if (length(fit$levels) == 2) {
@@ -280,7 +280,7 @@ tl_plot_deep_architecture <- function(model, ...) {
   tl_check_packages("keras")
 
   # Plot model architecture
-  keras::plot_model(
+  getFromNamespace("plot_model", "keras")(
     model$fit$model,
     show_shapes = TRUE,
     show_layer_names = TRUE,

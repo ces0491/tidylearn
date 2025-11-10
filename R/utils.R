@@ -1,6 +1,27 @@
 #' Utility functions for tidylearn
 #' @keywords internal
+#' @importFrom stats aov coef cor fitted median qqnorm reorder residuals runif sd setNames terms update var
+#' @importFrom utils combn getFromNamespace head packageVersion
 #' @noRd
+
+# Suppress R CMD check notes about global variables from tidyverse NSE
+utils::globalVariables(c(
+  ".", ".id", ".obs_id", ".row_id", ":=", "Actual", "Assumption", "Details", "Freq", "Predicted",
+  "SE.sim", "Status", "abs_shap_value", "actual", "all_of", "avg_sil_width", "cluster",
+  "cluster_label", "coefficient", "component", "conf_lower", "conf_upper",
+  "confidence", "cooks_distance", "cost", "cum_variance", "decay", "decile", "distance",
+  "epoch", "error", "feature", "feature_value", "fold", "fpr", "frac_pos", "gap",
+  "id1", "id2", "interaction_value", "is_best", "is_cook_influential", "is_core",
+  "is_influential", "is_noise", "is_outlier", "is_top", "k", "knn_dist", "label", "lambda",
+  "leverage", "lhs", "lift", "loading", "mean_pred_prob", "mean_value", "metric",
+  "model", "n", "neighbor", "obs_id", "observation", "pc_num", "percentage",
+  "pred", "pred_lower", "pred_upper", "predicted", "prop_variance",
+  "residuals", "rhs", "score", "shap_value", "sil_width", "size",
+  "sqrt_abs_residuals", "std_residual", "support", "tl_plot_model",
+  "tl_plot_unsupervised", "tl_prediction_intervals", "tot_withinss", "tpr",
+  "value", "var_value", "variable", "variance", "where", "x", "x_end", "y", "y_end"
+))
+
 
 # Null-coalescing operator
 `%||%` <- function(x, y) {
@@ -90,4 +111,21 @@ get_formula_vars <- function(formula, data) {
     vars <- all.vars(formula)
     return(vars[-1])  # Exclude response
   }
+}
+
+#' Check if required packages are installed
+#' @keywords internal
+#' @noRd
+tl_check_packages <- function(...) {
+  packages <- c(...)
+
+  for (pkg in packages) {
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+      stop("Package '", pkg, "' is required but not installed. ",
+           "Please install it with: install.packages('", pkg, "')",
+           call. = FALSE)
+    }
+  }
+
+  invisible(TRUE)
 }

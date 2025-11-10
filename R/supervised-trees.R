@@ -60,7 +60,7 @@ tl_predict_tree <- function(model, new_data, type = "response", ...) {
   if (is_classification) {
     if (type == "prob") {
       # Get class probabilities
-      probs <- rpart::predict.rpart(fit, newdata = new_data, type = "prob")
+      probs <- predict(fit, newdata = new_data, type = "prob")
 
       # Convert to tibble with appropriate column names
       class_levels <- colnames(probs)
@@ -70,18 +70,18 @@ tl_predict_tree <- function(model, new_data, type = "response", ...) {
       return(tibble::as_tibble(prob_df))
     } else if (type == "class") {
       # Get predicted classes
-      preds <- rpart::predict.rpart(fit, newdata = new_data, type = "class")
+      preds <- predict(fit, newdata = new_data, type = "class")
       return(preds)
     } else if (type == "response") {
       # Get predicted classes (same as "class" for classification)
-      preds <- rpart::predict.rpart(fit, newdata = new_data, type = "class")
+      preds <- predict(fit, newdata = new_data, type = "class")
       return(preds)
     } else {
       stop("Invalid prediction type for classification trees. Use 'prob', 'class', or 'response'.", call. = FALSE)
     }
   } else {
     # Regression predictions
-    preds <- rpart::predict.rpart(fit, newdata = new_data)
+    preds <- predict(fit, newdata = new_data)
     return(preds)
   }
 }
@@ -146,7 +146,7 @@ tl_predict_forest <- function(model, new_data, type = "response", ...) {
   if (is_classification) {
     if (type == "prob") {
       # Get class probabilities
-      probs <- randomForest::predict.randomForest(fit, newdata = new_data, type = "prob")
+      probs <- predict(fit, newdata = new_data, type = "prob")
 
       # Convert to tibble with appropriate column names
       class_levels <- colnames(probs)
@@ -156,14 +156,14 @@ tl_predict_forest <- function(model, new_data, type = "response", ...) {
       return(tibble::as_tibble(prob_df))
     } else if (type == "class" || type == "response") {
       # Get predicted classes
-      preds <- randomForest::predict.randomForest(fit, newdata = new_data, type = "response")
+      preds <- predict(fit, newdata = new_data, type = "response")
       return(preds)
     } else {
       stop("Invalid prediction type for random forests. Use 'prob', 'class', or 'response'.", call. = FALSE)
     }
   } else {
     # Regression predictions
-    preds <- randomForest::predict.randomForest(fit, newdata = new_data)
+    preds <- predict(fit, newdata = new_data)
     return(preds)
   }
 }
