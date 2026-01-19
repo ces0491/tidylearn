@@ -7,7 +7,7 @@
 tl_predict_forest(model, new_data, type = "response", ...)
 }
 \arguments{
-\item{model}{A tidysl forest model object}
+\item{model}{A tidylearn forest model object}
 
 \item{new_data}{A data frame containing the new data}
 

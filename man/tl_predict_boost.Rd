@@ -7,7 +7,7 @@
 tl_predict_boost(model, new_data, type = "response", n.trees = NULL, ...)
 }
 \arguments{
-\item{model}{A tidysl boost model object}
+\item{model}{A tidylearn boost model object}
 
 \item{new_data}{A data frame containing the new data}
 

@@ -13,7 +13,7 @@ tl_diagnostic_dashboard(
 )
 }
 \arguments{
-\item{model}{A tidysl model object}
+\item{model}{A tidylearn model object}
 
 \item{include_influence}{Logical; whether to include influence diagnostics}
 

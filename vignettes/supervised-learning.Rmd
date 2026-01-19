@@ -22,8 +22,21 @@ library(dplyr)
 ```
 
 ## Introduction
+This vignette demonstrates supervised learning capabilities in tidylearn. All
+methods shown here wrap established R packages - the algorithms are unchanged,
+tidylearn simply provides a consistent interface and tidy output.
 
-This vignette demonstrates supervised learning capabilities in tidylearn, covering both classification and regression tasks with various algorithms.
+**Wrapped packages include:**
+
+- stats (`lm()`, `glm()`) for linear and logistic regression
+- rpart for decision trees
+- randomForest for random forests
+- gbm and xgboost for gradient boosting
+- glmnet for regularization (ridge, lasso, elastic net)
+- e1071 for support vector machines
+- nnet for neural networks
+
+Access raw model objects via `model$fit` for package-specific functionality.
 
 ## Classification
 

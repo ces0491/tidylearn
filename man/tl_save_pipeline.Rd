@@ -7,7 +7,7 @@
 tl_save_pipeline(pipeline, file)
 }
 \arguments{
-\item{pipeline}{A tidysl pipeline object}
+\item{pipeline}{A tidylearn pipeline object}
 
 \item{file}{Path to save the pipeline}
 }

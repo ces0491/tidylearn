@@ -7,7 +7,7 @@
 tl_plot_importance(model, top_n = 20, ...)
 }
 \arguments{
-\item{model}{A tidysl tree-based model object}
+\item{model}{A tidylearn tree-based model object}
 
 \item{top_n}{Number of top features to display (default: 20)}
 

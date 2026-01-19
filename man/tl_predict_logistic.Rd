@@ -7,7 +7,7 @@
 tl_predict_logistic(model, new_data, type = "prob", ...)
 }
 \arguments{
-\item{model}{A tidysl logistic model object}
+\item{model}{A tidylearn logistic model object}
 
 \item{new_data}{A data frame containing the new data}
 

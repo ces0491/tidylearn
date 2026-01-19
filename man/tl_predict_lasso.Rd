@@ -7,7 +7,7 @@
 tl_predict_lasso(model, new_data, type = "response", ...)
 }
 \arguments{
-\item{model}{A tidysl Lasso model object}
+\item{model}{A tidylearn Lasso model object}
 
 \item{new_data}{A data frame containing the new data}
 

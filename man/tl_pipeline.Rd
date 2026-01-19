@@ -27,7 +27,7 @@ tl_pipeline(
 \item{...}{Additional arguments}
 }
 \value{
-A tidysl pipeline object
+A tidylearn pipeline object
 }
 \description{
 Create a modeling pipeline

@@ -10,7 +10,7 @@ utils::globalVariables(c(
   "SE.sim", "Status", "abs_shap_value", "actual", "all_of", "avg_sil_width", "cluster",
   "cluster_label", "coefficient", "component", "conf_lower", "conf_upper",
   "confidence", "cooks_distance", "cost", "cum_variance", "decay", "decile", "distance",
-  "epoch", "error", "feature", "feature_value", "fold", "fpr", "frac_pos", "gap",
+  "epoch", "error", "error_lower", "error_upper", "feature", "feature_value", "fold", "fpr", "frac_pos", "gap",
   "id1", "id2", "interaction_value", "is_best", "is_cook_influential", "is_core",
   "is_influential", "is_noise", "is_outlier", "is_top", "k", "knn_dist", "label", "lambda",
   "leverage", "lhs", "lift", "loading", "mean_pred_prob", "mean_value", "metric",

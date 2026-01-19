@@ -1,5 +1,5 @@
-#' @title Regression Functions for tidysl
-#' @name tidysl-regression
+#' @title Regression Functions for tidylearn
+#' @name tidylearn-regression
 #' @description Linear and polynomial regression functionality
 #' @importFrom stats lm predict poly model.matrix
 #' @importFrom tibble tibble
@@ -15,12 +15,12 @@ NULL
 #' @keywords internal
 tl_fit_linear <- function(data, formula, ...) {
   lm_model <- stats::lm(formula, data = data, ...)
-  return(lm_model)
+  lm_model
 }
 
 #' Predict using a linear regression model
 #'
-#' @param model A tidysl linear model object
+#' @param model A tidylearn linear model object
 #' @param new_data A data frame containing the new data
 #' @param type Type of prediction: "response" (default), "confidence", "prediction"
 #' @param level Confidence level for intervals (default: 0.95)
@@ -30,13 +30,13 @@ tl_fit_linear <- function(data, formula, ...) {
 tl_predict_linear <- function(model, new_data, type = "response", level = 0.95, ...) {
   if (type == "response") {
     preds <- stats::predict(model$fit, newdata = new_data, ...)
-    return(preds)
+    preds
   } else if (type == "confidence") {
     pred_obj <- stats::predict(model$fit, newdata = new_data, interval = "confidence", level = level, ...)
-    return(as.data.frame(pred_obj))
+    as.data.frame(pred_obj)
   } else if (type == "prediction") {
     pred_obj <- stats::predict(model$fit, newdata = new_data, interval = "prediction", level = level, ...)
-    return(as.data.frame(pred_obj))
+    as.data.frame(pred_obj)
   } else {
     stop("Invalid prediction type. Use 'response', 'confidence', or 'prediction'.", call. = FALSE)
   }
@@ -80,12 +80,12 @@ tl_fit_polynomial <- function(data, formula, degree = 2, ...) {
   attr(poly_model, "original_formula") <- formula
   attr(poly_model, "poly_degree") <- degree
 
-  return(poly_model)
+  poly_model
 }
 
 #' Predict using a polynomial regression model
 #'
-#' @param model A tidysl polynomial model object
+#' @param model A tidylearn polynomial model object
 #' @param new_data A data frame containing the new data
 #' @param type Type of prediction: "response" (default), "confidence", "prediction"
 #' @param level Confidence level for intervals (default: 0.95)
@@ -100,13 +100,13 @@ tl_predict_polynomial <- function(model, new_data, type = "response", level = 0.
   # Call the underlying prediction function
   if (type == "response") {
     preds <- stats::predict(model$fit, newdata = new_data, ...)
-    return(preds)
+    preds
   } else if (type == "confidence") {
     pred_obj <- stats::predict(model$fit, newdata = new_data, interval = "confidence", level = level, ...)
-    return(as.data.frame(pred_obj))
+    as.data.frame(pred_obj)
   } else if (type == "prediction") {
     pred_obj <- stats::predict(model$fit, newdata = new_data, interval = "prediction", level = level, ...)
-    return(as.data.frame(pred_obj))
+    as.data.frame(pred_obj)
   } else {
     stop("Invalid prediction type. Use 'response', 'confidence', or 'prediction'.", call. = FALSE)
   }
@@ -114,7 +114,7 @@ tl_predict_polynomial <- function(model, new_data, type = "response", level = 0.
 
 #' Plot diagnostics for a regression model
 #'
-#' @param model A tidysl regression model object
+#' @param model A tidylearn regression model object
 #' @param which Which plots to create (1:4)
 #' @param ... Additional arguments
 #' @return A ggplot object (or list of ggplot objects)
@@ -179,7 +179,7 @@ tl_plot_diagnostics <- function(model, which = 1:4, ...) {
       ggplot2::labs(
         title = "Scale-Location",
         x = "Fitted values",
-        y = "√|Standardized residuals|"
+        y = "sqrt(|Standardized residuals|)"
       ) +
       ggplot2::theme_minimal()
 
@@ -206,15 +206,15 @@ tl_plot_diagnostics <- function(model, which = 1:4, ...) {
 
   # Return a single plot or list of plots
   if (length(plots) == 1) {
-    return(plots[[1]])
+    plots[[1]]
   } else {
-    return(plots)
+    plots
   }
 }
 
 #' Plot actual vs predicted values for a regression model
 #'
-#' @param model A tidysl regression model object
+#' @param model A tidylearn regression model object
 #' @param new_data Optional data frame for evaluation (if NULL, uses training data)
 #' @param ... Additional arguments
 #' @return A ggplot object
@@ -245,18 +245,18 @@ tl_plot_actual_predicted <- function(model, new_data = NULL, ...) {
     ggplot2::geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
     ggplot2::labs(
       title = "Actual vs Predicted Values",
-      subtitle = paste0("Correlation: ", corr, ", R²: ", r_squared),
+      subtitle = paste0("Correlation: ", corr, ", R-squared: ", r_squared),
       x = "Actual values",
       y = "Predicted values"
     ) +
     ggplot2::theme_minimal()
 
-  return(p)
+  p
 }
 
 #' Plot residuals for a regression model
 #'
-#' @param model A tidysl regression model object
+#' @param model A tidylearn regression model object
 #' @param type Type of residual plot: "fitted" (default), "histogram", "predicted"
 #' @param ... Additional arguments
 #' @return A ggplot object
@@ -313,12 +313,12 @@ tl_plot_residuals <- function(model, type = "fitted", ...) {
     stop("Invalid plot type. Use 'fitted', 'histogram', or 'predicted'.", call. = FALSE)
   }
 
-  return(p)
+  p
 }
 
 #' Create confidence and prediction interval plots
 #'
-#' @param model A tidysl regression model object
+#' @param model A tidylearn regression model object
 #' @param new_data Optional data frame for prediction (if NULL, uses training data)
 #' @param level Confidence level (default: 0.95)
 #' @param ... Additional arguments
@@ -375,5 +375,5 @@ tl_plot_intervals <- function(model, new_data = NULL, level = 0.95, ...) {
     ) +
     ggplot2::theme_minimal()
 
-  return(p)
+  p
 }

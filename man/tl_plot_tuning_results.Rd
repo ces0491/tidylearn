@@ -13,7 +13,7 @@ tl_plot_tuning_results(
 )
 }
 \arguments{
-\item{model}{A tidysl model object with tuning results}
+\item{model}{A tidylearn model object with tuning results}
 
 \item{top_n}{Number of top parameter sets to highlight}
 

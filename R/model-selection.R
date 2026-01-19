@@ -1,5 +1,5 @@
-#' @title Model Selection Functions for tidysl
-#' @name tidysl-model-selection
+#' @title Model Selection Functions for tidylearn
+#' @name tidylearn-model-selection
 #' @description Functions for stepwise model selection, cross-validation, and hyperparameter tuning
 #' @importFrom stats AIC BIC step
 #' @importFrom dplyr %>% filter select mutate
@@ -55,11 +55,11 @@ tl_step_selection <- function(data, formula, direction = "backward",
     ...
   )
 
-  # Create tidysl model wrapper
+  # Create tidylearn model wrapper
   is_classification <- is.factor(data[[all.vars(formula)[1]]]) ||
     is.character(data[[all.vars(formula)[1]]])
 
-  # Return selected model as a tidysl model
+  # Return selected model as a tidylearn model
   model <- structure(
     list(
       spec = list(
@@ -75,7 +75,7 @@ tl_step_selection <- function(data, formula, direction = "backward",
       fit = selected_model,
       data = data
     ),
-    class = c("tidysl_linear", "tidysl_model")
+    class = c("tidylearn_linear", "tidylearn_model")
   )
 
   return(model)
@@ -84,17 +84,17 @@ tl_step_selection <- function(data, formula, direction = "backward",
 #' Compare models using cross-validation
 #'
 #' @param data A data frame containing the training data
-#' @param models A list of tidysl model objects
+#' @param models A list of tidylearn model objects
 #' @param folds Number of cross-validation folds
 #' @param metrics Character vector of metrics to compute
 #' @param ... Additional arguments
 #' @return A tibble with cross-validation results for all models
 #' @export
 tl_compare_cv <- function(data, models, folds = 5, metrics = NULL, ...) {
-  # Check if all models are tidysl models
-  is_tl_model <- sapply(models, inherits, "tidysl_model")
+  # Check if all models are tidylearn models
+  is_tl_model <- sapply(models, inherits, "tidylearn_model")
   if (!all(is_tl_model)) {
-    stop("All models must be tidysl model objects", call. = FALSE)
+    stop("All models must be tidylearn model objects", call. = FALSE)
   }
 
   # Get model names if not provided

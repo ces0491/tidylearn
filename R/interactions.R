@@ -1,5 +1,5 @@
-#' @title Interaction Analysis Functions for tidysl
-#' @name tidysl-interactions
+#' @title Interaction Analysis Functions for tidylearn
+#' @name tidylearn-interactions
 #' @description Functions for testing, visualizing, and analyzing interactions
 #' @importFrom stats lm anova
 #' @importFrom dplyr %>% filter select mutate
@@ -108,7 +108,7 @@ tl_test_interactions <- function(data, formula, var1 = NULL, var2 = NULL,
 
 #' Plot interaction effects
 #'
-#' @param model A tidysl model object
+#' @param model A tidylearn model object
 #' @param var1 First variable in the interaction
 #' @param var2 Second variable in the interaction
 #' @param n_points Number of points to use for continuous variables
@@ -285,7 +285,7 @@ tl_plot_interaction <- function(model, var1, var2, n_points = 100, fixed_values 
 #' @param min_r2_change Minimum change in R-squared to consider
 #' @param max_p_value Maximum p-value for significance
 #' @param exclude_vars Character vector of variables to exclude from interaction testing
-#' @return A tidysl model with important interactions
+#' @return A tidylearn model with important interactions
 #' @export
 tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
                                  max_p_value = 0.05, exclude_vars = NULL) {
@@ -339,7 +339,7 @@ tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
 
 #' Calculate partial effects based on a model with interactions
 #'
-#' @param model A tidysl model object
+#' @param model A tidylearn model object
 #' @param var Variable to calculate effects for
 #' @param by_var Variable to calculate effects by (interaction variable)
 #' @param at_values Named list of values at which to hold other variables

@@ -17,7 +17,8 @@ tl_detect_outliers(
 
 \item{variables}{Character vector of variables to check for outliers}
 
-\item{method}{Method for outlier detection: "boxplot", "z-score", "cook", "iqr", "mahalanobis"}
+\item{method}{Method for outlier detection: "boxplot", "z-score", "cook",
+"iqr", "mahalanobis"}
 
 \item{threshold}{Threshold for outlier detection}
 

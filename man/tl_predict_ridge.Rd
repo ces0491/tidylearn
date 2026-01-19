@@ -7,7 +7,7 @@
 tl_predict_ridge(model, new_data, type = "response", ...)
 }
 \arguments{
-\item{model}{A tidysl Ridge model object}
+\item{model}{A tidylearn Ridge model object}
 
 \item{new_data}{A data frame containing the new data}
 

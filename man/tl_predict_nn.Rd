@@ -7,7 +7,7 @@
 tl_predict_nn(model, new_data, type = "response", ...)
 }
 \arguments{
-\item{model}{A tidysl neural network model object}
+\item{model}{A tidylearn neural network model object}
 
 \item{new_data}{A data frame containing the new data}
 

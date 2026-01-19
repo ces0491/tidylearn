@@ -39,7 +39,7 @@ tidy_kmeans <- function(data, k, cols = NULL, nstart = 25, iter_max = 100,
 
   # Create clusters tibble
   clusters_tbl <- tibble::tibble(
-    .id = rownames(data) %||% as.character(seq_len(nrow(data))),
+    .obs_id = rownames(data) %||% as.character(seq_len(nrow(data))),
     cluster = as.integer(km_model$cluster)
   )
 
@@ -146,7 +146,7 @@ tidy_pam <- function(data, k, metric = "euclidean", cols = NULL) {
 
   # Create clusters tibble
   clusters_tbl <- tibble::tibble(
-    .id = names(pam_model$clustering),
+    .obs_id = names(pam_model$clustering) %||% as.character(seq_along(pam_model$clustering)),
     cluster = as.integer(pam_model$clustering)
   )
 
@@ -246,7 +246,7 @@ tidy_clara <- function(data, k, metric = "euclidean", samples = 50, sampsize = N
 
   # Create clusters tibble
   clusters_tbl <- tibble::tibble(
-    .id = names(clara_model$clustering) %||% as.character(seq_along(clara_model$clustering)),
+    .obs_id = names(clara_model$clustering) %||% as.character(seq_along(clara_model$clustering)),
     cluster = as.integer(clara_model$clustering)
   )
 

@@ -1,5 +1,5 @@
-#' @title Support Vector Machines for tidysl
-#' @name tidysl-svm
+#' @title Support Vector Machines for tidylearn
+#' @name tidylearn-svm
 #' @description SVM functionality for classification and regression
 #' @importFrom e1071 svm tune
 #' @importFrom stats predict
@@ -102,7 +102,7 @@ tl_fit_svm <- function(data, formula, is_classification = FALSE,
 
 #' Predict using a support vector machine model
 #'
-#' @param model A tidysl SVM model object
+#' @param model A tidylearn SVM model object
 #' @param new_data A data frame containing the new data
 #' @param type Type of prediction: "response" (default), "prob" (for classification)
 #' @param ... Additional arguments
@@ -148,7 +148,7 @@ tl_predict_svm <- function(model, new_data, type = "response", ...) {
 
 #' Plot SVM decision boundary
 #'
-#' @param model A tidysl SVM model object
+#' @param model A tidylearn SVM model object
 #' @param x_var Name of the x-axis variable
 #' @param y_var Name of the y-axis variable
 #' @param grid_size Number of points in each dimension for the grid (default: 100)
@@ -285,7 +285,7 @@ tl_plot_svm_boundary <- function(model, x_var = NULL, y_var = NULL, grid_size = 
 
 #' Plot SVM tuning results
 #'
-#' @param model A tidysl SVM model object
+#' @param model A tidylearn SVM model object
 #' @param ... Additional arguments
 #' @return A ggplot object with tuning results
 #' @importFrom ggplot2 ggplot aes geom_tile scale_fill_gradient2 labs theme_minimal

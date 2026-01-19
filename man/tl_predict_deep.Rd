@@ -7,7 +7,7 @@
 tl_predict_deep(model, new_data, type = "response", ...)
 }
 \arguments{
-\item{model}{A tidysl deep learning model object}
+\item{model}{A tidylearn deep learning model object}
 
 \item{new_data}{A data frame containing the new data}
 

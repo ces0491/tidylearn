@@ -7,7 +7,7 @@
 tl_extract_importance(model)
 }
 \arguments{
-\item{model}{A tidysl model object}
+\item{model}{A tidylearn model object}
 }
 \value{
 A data frame with feature importance values

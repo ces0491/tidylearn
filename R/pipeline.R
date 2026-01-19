@@ -1,5 +1,5 @@
-#' @title Model Pipeline Functions for tidysl
-#' @name tidysl-pipeline
+#' @title Model Pipeline Functions for tidylearn
+#' @name tidylearn-pipeline
 #' @description Functions for creating end-to-end model pipelines
 #' @importFrom stats formula
 #' @importFrom dplyr %>% filter select mutate
@@ -13,7 +13,7 @@ NULL
 #' @param models A list of models to train
 #' @param evaluation A list of evaluation criteria
 #' @param ... Additional arguments
-#' @return A tidysl pipeline object
+#' @return A tidylearn pipeline object
 #' @export
 tl_pipeline <- function(data, formula, preprocessing = NULL, models = NULL, evaluation = NULL, ...) {
   # Create default preprocessing if not provided
@@ -83,21 +83,21 @@ tl_pipeline <- function(data, formula, preprocessing = NULL, models = NULL, eval
     results = NULL
   )
 
-  class(pipeline) <- "tidysl_pipeline"
+  class(pipeline) <- "tidylearn_pipeline"
 
-  return(pipeline)
+  pipeline
 }
 
-#' Run a tidysl pipeline
+#' Run a tidylearn pipeline
 #'
-#' @param pipeline A tidysl pipeline object
+#' @param pipeline A tidylearn pipeline object
 #' @param verbose Logical; whether to print progress
-#' @return A tidysl pipeline with results
+#' @return A tidylearn pipeline with results
 #' @export
 tl_run_pipeline <- function(pipeline, verbose = TRUE) {
   # Check if pipeline is valid
-  if (!inherits(pipeline, "tidysl_pipeline")) {
-    stop("Input must be a tidysl pipeline object", call. = FALSE)
+  if (!inherits(pipeline, "tidylearn_pipeline")) {
+    stop("Input must be a tidylearn pipeline object", call. = FALSE)
   }
 
   # Extract components
@@ -282,7 +282,7 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
           sd_val <- avg_metrics$sd_value[i]
 
           message("    ", metric, ": ", round(mean_val, 4),
-                  " (±", round(sd_val, 4), ")")
+                  " (+/-", round(sd_val, 4), ")")
         }
       }
     } else if (evaluation$validation == "split") {
@@ -377,26 +377,29 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
     metric_values = metric_values
   )
 
-  return(pipeline)
+  pipeline
 }
 
 #' Get the best model from a pipeline
 #'
-#' @param pipeline A tidysl pipeline object with results
-#' @return The best tidysl model
+#' @param pipeline A tidylearn pipeline object with results
+#' @return The best tidylearn model
 #' @export
 tl_get_best_model <- function(pipeline) {
   # Check if pipeline has results
   if (is.null(pipeline$results)) {
-    stop("Pipeline has not been run yet. Use tl_run_pipeline() first.", call. = FALSE)
+    stop(
+      "Pipeline has not been run yet. Use tl_run_pipeline() first.",
+      call. = FALSE
+    )
   }
 
-  return(pipeline$results$best_model)
+  pipeline$results$best_model
 }
 
 #' Compare models from a pipeline
 #'
-#' @param pipeline A tidysl pipeline object with results
+#' @param pipeline A tidylearn pipeline object with results
 #' @param metrics Character vector of metrics to compare (if NULL, uses all available)
 #' @return A comparison plot of model performance
 #' @importFrom ggplot2 ggplot aes geom_col facet_wrap labs theme_minimal
@@ -404,7 +407,10 @@ tl_get_best_model <- function(pipeline) {
 tl_compare_pipeline_models <- function(pipeline, metrics = NULL) {
   # Check if pipeline has results
   if (is.null(pipeline$results)) {
-    stop("Pipeline has not been run yet. Use tl_run_pipeline() first.", call. = FALSE)
+    stop(
+      "Pipeline has not been run yet. Use tl_run_pipeline() first.",
+      call. = FALSE
+    )
   }
 
   # Extract model results
@@ -495,22 +501,29 @@ tl_compare_pipeline_models <- function(pipeline, metrics = NULL) {
       legend.position = "bottom"
     )
 
-  return(p)
+  p
 }
 
 #' Make predictions using a pipeline
 #'
-#' @param pipeline A tidysl pipeline object with results
+#' @param pipeline A tidylearn pipeline object with results
 #' @param new_data A data frame containing the new data
 #' @param type Type of prediction (default: "response")
 #' @param model_name Name of model to use (if NULL, uses the best model)
 #' @param ... Additional arguments passed to predict
 #' @return Predictions
 #' @export
-tl_predict_pipeline <- function(pipeline, new_data, type = "response", model_name = NULL, ...) {
+tl_predict_pipeline <- function(pipeline,
+                                new_data,
+                                type = "response",
+                                model_name = NULL,
+                                ...) {
   # Check if pipeline has results
   if (is.null(pipeline$results)) {
-    stop("Pipeline has not been run yet. Use tl_run_pipeline() first.", call. = FALSE)
+    stop(
+      "Pipeline has not been run yet. Use tl_run_pipeline() first.",
+      call. = FALSE
+    )
   }
 
   # Determine which model to use
@@ -594,53 +607,51 @@ tl_predict_pipeline <- function(pipeline, new_data, type = "response", model_nam
   }
 
   # Make predictions
-  preds <- predict(model, processed_new_data, type = type, ...)
-
-  return(preds)
+  predict(model, processed_new_data, type = type, ...)
 }
 
 #' Save a pipeline to disk
 #'
-#' @param pipeline A tidysl pipeline object
+#' @param pipeline A tidylearn pipeline object
 #' @param file Path to save the pipeline
 #' @return Invisible NULL
 #' @export
 tl_save_pipeline <- function(pipeline, file) {
   # Validate input
-  if (!inherits(pipeline, "tidysl_pipeline")) {
-    stop("Input must be a tidysl pipeline object", call. = FALSE)
+  if (!inherits(pipeline, "tidylearn_pipeline")) {
+    stop("Input must be a tidylearn pipeline object", call. = FALSE)
   }
 
   # Save as RDS
   saveRDS(pipeline, file = file)
 
-  return(invisible(NULL))
+  invisible(NULL)
 }
 
 #' Load a pipeline from disk
 #'
 #' @param file Path to the pipeline file
-#' @return A tidysl pipeline object
+#' @return A tidylearn pipeline object
 #' @export
 tl_load_pipeline <- function(file) {
   # Load RDS
   pipeline <- readRDS(file)
 
   # Validate
-  if (!inherits(pipeline, "tidysl_pipeline")) {
-    stop("Loaded object is not a tidysl pipeline", call. = FALSE)
+  if (!inherits(pipeline, "tidylearn_pipeline")) {
+    stop("Loaded object is not a tidylearn pipeline", call. = FALSE)
   }
 
-  return(pipeline)
+  pipeline
 }
 
-#' Print a tidysl pipeline
+#' Print a tidylearn pipeline
 #'
-#' @param x A tidysl pipeline object
+#' @param x A tidylearn pipeline object
 #' @param ... Additional arguments (not used)
 #' @return Invisibly returns the pipeline
 #' @export
-print.tidysl_pipeline <- function(x, ...) {
+print.tidylearn_pipeline <- function(x, ...) {
   # Extract pipeline components
   formula <- x$formula
   data_dims <- dim(x$data)
@@ -678,26 +689,28 @@ print.tidysl_pipeline <- function(x, ...) {
     # Print metric values
     cat("Performance:\n")
     for (i in seq_along(x$results$metric_values)) {
-      model_name <- names(x$results$metric_values)[i]
+      m_name <- names(x$results$metric_values)[i]
       metric_value <- x$results$metric_values[i]
+      is_best <- if (m_name == x$results$best_model_name) " (best)" else ""
 
-      cat("  ", model_name, ": ", x$evaluation$best_metric, " = ",
-          round(metric_value, 4),
-          if (model_name == x$results$best_model_name) " (best)" else "",
-          "\n", sep = "")
+      cat(
+        "  ", m_name, ": ", x$evaluation$best_metric, " = ",
+        round(metric_value, 4), is_best, "\n",
+        sep = ""
+      )
     }
   }
 
-  return(invisible(x))
+  invisible(x)
 }
 
-#' Summarize a tidysl pipeline
+#' Summarize a tidylearn pipeline
 #'
-#' @param object A tidysl pipeline object
+#' @param object A tidylearn pipeline object
 #' @param ... Additional arguments (not used)
 #' @return Invisibly returns the pipeline
 #' @export
-summary.tidysl_pipeline <- function(object, ...) {
+summary.tidylearn_pipeline <- function(object, ...) {
   # If no results, just print the pipeline
   if (is.null(object$results)) {
     print(object)
@@ -725,7 +738,7 @@ summary.tidysl_pipeline <- function(object, ...) {
         sd_val <- result$avg_metrics$sd_value[i]
 
         cat("  ", metric, ": ", round(mean_val, 4),
-            " (±", round(sd_val, 4), ")", "\n", sep = "")
+            " (+/-", round(sd_val, 4), ")", "\n", sep = "")
       }
     } else {
       # Print test metrics
@@ -744,5 +757,5 @@ summary.tidysl_pipeline <- function(object, ...) {
   cat("=================\n")
   print(summary(object$results$best_model))
 
-  return(invisible(object))
+  invisible(object)
 }

@@ -7,7 +7,7 @@
 tl_plot_tree(model, ...)
 }
 \arguments{
-\item{model}{A tidysl tree model object}
+\item{model}{A tidylearn tree model object}
 
 \item{...}{Additional arguments to pass to rpart.plot()}
 }

@@ -13,7 +13,7 @@ tl_plot_xgboost_shap_dependence(
 )
 }
 \arguments{
-\item{model}{A tidysl XGBoost model object}
+\item{model}{A tidylearn XGBoost model object}
 
 \item{feature}{Feature name to plot}
 

@@ -11,31 +11,45 @@ tl_model(data, formula = NULL, method = "linear", ...)
 
 \item{formula}{A formula specifying the model. For unsupervised methods, use \code{~ vars} or NULL.}
 
-\item{method}{The modeling method. Supervised: "linear", "logistic", "tree", "forest", "boost",
-"ridge", "lasso", "elastic_net", "svm", "nn", "deep", "xgboost".
-Unsupervised: "pca", "mds", "kmeans", "pam", "clara", "hclust", "dbscan".}
+\item{method}{The modeling method. Supervised: "linear" (stats::lm), "logistic" (stats::glm),
+"tree" (rpart), "forest" (randomForest), "boost" (gbm), "ridge"/"lasso"/"elastic_net" (glmnet),
+"svm" (e1071), "nn" (nnet), "deep" (keras), "xgboost" (xgboost).
+Unsupervised: "pca" (stats::prcomp), "mds" (stats/MASS/smacof), "kmeans" (stats::kmeans),
+"pam"/"clara" (cluster), "hclust" (stats::hclust), "dbscan" (dbscan).}
 
-\item{...}{Additional arguments to pass to the underlying model function}
+\item{...}{Additional arguments passed to the underlying model function}
 }
 \value{
-A tidylearn model object
+A tidylearn model object containing the fitted model (\code{$fit}), specification,
+and training data
 }
 \description{
-Unified interface for creating both supervised and unsupervised machine learning models.
-This function automatically detects the learning paradigm based on the method and formula.
+Unified interface for creating machine learning models by wrapping established R packages.
+This function dispatches to the appropriate underlying package based on the method specified.
+}
+\details{
+The wrapped packages include: stats (lm, glm, prcomp, kmeans, hclust), glmnet, randomForest,
+xgboost, gbm, e1071, nnet, rpart, cluster, and dbscan. The underlying algorithms are unchanged -
+this function provides a consistent interface and returns tidy output.
+
+Access the raw model object from the underlying package via \code{model$fit}.
 }
 \examples{
 \dontrun{
-# Supervised: Classification
+# Classification -> wraps randomForest::randomForest()
 model <- tl_model(iris, Species ~ ., method = "forest")
+model$fit  # Access the raw randomForest object
 
-# Supervised: Regression
+# Regression -> wraps stats::lm()
 model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+model$fit  # Access the raw lm object
 
-# Unsupervised: PCA
+# PCA -> wraps stats::prcomp()
 model <- tl_model(iris, ~ ., method = "pca")
+model$fit  # Access the raw prcomp object
 
-# Unsupervised: Clustering
+# Clustering -> wraps stats::kmeans()
 model <- tl_model(iris, method = "kmeans", k = 3)
+model$fit  # Access the raw kmeans object
 }
 }

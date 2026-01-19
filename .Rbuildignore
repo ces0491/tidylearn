@@ -6,3 +6,8 @@
 ^_pkgdown\.yml$
 ^docs$
 ^pkgdown$
+^\.claude$
+^PACKAGE_ARCHITECTURE\.md$
+^cran-comments\.md$
+^doc$
+^Meta$

@@ -93,7 +93,7 @@ tidy_cutree <- function(hclust_obj, k = NULL, h = NULL) {
 
   # Create tibble
   tibble::tibble(
-    .id = names(clusters),
+    .obs_id = names(clusters) %||% as.character(seq_along(clusters)),
     cluster = as.integer(clusters)
   )
 }
@@ -122,10 +122,10 @@ augment_hclust <- function(hclust_obj, data, k = NULL, h = NULL) {
   data %>%
     dplyr::mutate(.row_id = dplyr::row_number()) %>%
     dplyr::left_join(
-      cluster_assignments %>% dplyr::mutate(.row_id = as.integer(.id)),
+      cluster_assignments %>% dplyr::mutate(.row_id = dplyr::row_number()),
       by = ".row_id"
     ) %>%
-    dplyr::select(-.row_id, -.id)
+    dplyr::select(-.row_id, -.obs_id)
 }
 
 

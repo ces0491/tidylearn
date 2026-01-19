@@ -7,7 +7,7 @@
 tl_xgboost_shap(model, data = NULL, n_samples = 100, trees_idx = NULL)
 }
 \arguments{
-\item{model}{A tidysl XGBoost model object}
+\item{model}{A tidylearn XGBoost model object}
 
 \item{data}{Data for SHAP value calculation (default: NULL, uses training data)}
 

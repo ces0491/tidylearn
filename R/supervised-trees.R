@@ -1,5 +1,5 @@
-#' @title Tree-based Methods for tidysl
-#' @name tidysl-trees
+#' @title Tree-based Methods for tidylearn
+#' @name tidylearn-trees
 #' @description Decision trees, random forests, and boosting functionality
 #' @importFrom rpart rpart rpart.control
 #' @importFrom stats predict
@@ -41,12 +41,12 @@ tl_fit_tree <- function(data, formula, is_classification = FALSE,
     )
   )
 
-  return(tree_model)
+  tree_model
 }
 
 #' Predict using a decision tree model
 #'
-#' @param model A tidysl tree model object
+#' @param model A tidylearn tree model object
 #' @param new_data A data frame containing the new data
 #' @param type Type of prediction: "response" (default), "prob" (for classification), "class" (for classification)
 #' @param ... Additional arguments
@@ -67,22 +67,22 @@ tl_predict_tree <- function(model, new_data, type = "response", ...) {
       prob_df <- as.data.frame(probs)
       names(prob_df) <- class_levels
 
-      return(tibble::as_tibble(prob_df))
+      tibble::as_tibble(prob_df)
     } else if (type == "class") {
       # Get predicted classes
       preds <- predict(fit, newdata = new_data, type = "class")
-      return(preds)
+      preds
     } else if (type == "response") {
       # Get predicted classes (same as "class" for classification)
       preds <- predict(fit, newdata = new_data, type = "class")
-      return(preds)
+      preds
     } else {
       stop("Invalid prediction type for classification trees. Use 'prob', 'class', or 'response'.", call. = FALSE)
     }
   } else {
     # Regression predictions
     preds <- predict(fit, newdata = new_data)
-    return(preds)
+    preds
   }
 }
 
@@ -127,12 +127,12 @@ tl_fit_forest <- function(data, formula, is_classification = FALSE,
     ...
   )
 
-  return(forest_model)
+  forest_model
 }
 
 #' Predict using a random forest model
 #'
-#' @param model A tidysl forest model object
+#' @param model A tidylearn forest model object
 #' @param new_data A data frame containing the new data
 #' @param type Type of prediction: "response" (default), "prob" (for classification)
 #' @param ... Additional arguments
@@ -153,18 +153,18 @@ tl_predict_forest <- function(model, new_data, type = "response", ...) {
       prob_df <- as.data.frame(probs)
       names(prob_df) <- class_levels
 
-      return(tibble::as_tibble(prob_df))
+      tibble::as_tibble(prob_df)
     } else if (type == "class" || type == "response") {
       # Get predicted classes
       preds <- predict(fit, newdata = new_data, type = "response")
-      return(preds)
+      preds
     } else {
       stop("Invalid prediction type for random forests. Use 'prob', 'class', or 'response'.", call. = FALSE)
     }
   } else {
     # Regression predictions
     preds <- predict(fit, newdata = new_data)
-    return(preds)
+    preds
   }
 }
 
@@ -220,12 +220,12 @@ tl_fit_boost <- function(data, formula, is_classification = FALSE,
     ...
   )
 
-  return(boost_model)
+  boost_model
 }
 
 #' Predict using a gradient boosting model
 #'
-#' @param model A tidysl boost model object
+#' @param model A tidylearn boost model object
 #' @param new_data A data frame containing the new data
 #' @param type Type of prediction: "response" (default), "prob" (for classification)
 #' @param n.trees Number of trees to use for prediction (if NULL, uses optimal number)
@@ -266,7 +266,7 @@ tl_predict_boost <- function(model, new_data, type = "response", n.trees = NULL,
           !!class_levels[2] := probs
         )
 
-        return(prob_df)
+        prob_df
       } else if (type == "class" || type == "response") {
         # Get probabilities
         probs <- gbm::predict.gbm(fit, newdata = new_data, n.trees = n.trees, type = "response", ...)
@@ -279,7 +279,7 @@ tl_predict_boost <- function(model, new_data, type = "response", n.trees = NULL,
         pred_classes <- ifelse(probs > 0.5, class_levels[2], class_levels[1])
         pred_classes <- factor(pred_classes, levels = class_levels)
 
-        return(pred_classes)
+        pred_classes
       } else {
         stop("Invalid prediction type for boosting. Use 'prob', 'class', or 'response'.", call. = FALSE)
       }
@@ -303,7 +303,7 @@ tl_predict_boost <- function(model, new_data, type = "response", n.trees = NULL,
           names(prob_df) <- class_levels
         }
 
-        return(tibble::as_tibble(prob_df))
+        tibble::as_tibble(prob_df)
       } else if (type == "class" || type == "response") {
         # Get class probabilities
         probs <- gbm::predict.gbm(fit, newdata = new_data, n.trees = n.trees, type = "response", ...)
@@ -322,7 +322,7 @@ tl_predict_boost <- function(model, new_data, type = "response", n.trees = NULL,
           pred_classes <- factor(class_levels[class_idx], levels = class_levels)
         }
 
-        return(pred_classes)
+        pred_classes
       } else {
         stop("Invalid prediction type for boosting. Use 'prob', 'class', or 'response'.", call. = FALSE)
       }
@@ -330,13 +330,13 @@ tl_predict_boost <- function(model, new_data, type = "response", n.trees = NULL,
   } else {
     # Regression predictions
     preds <- gbm::predict.gbm(fit, newdata = new_data, n.trees = n.trees, type = "response", ...)
-    return(preds)
+    preds
   }
 }
 
 #' Plot variable importance for tree-based models
 #'
-#' @param model A tidysl tree-based model object
+#' @param model A tidylearn tree-based model object
 #' @param top_n Number of top features to display (default: 20)
 #' @param ... Additional arguments
 #' @return A ggplot object
@@ -406,12 +406,12 @@ tl_plot_importance <- function(model, top_n = 20, ...) {
     ) +
     ggplot2::theme_minimal()
 
-  return(p)
+  p
 }
 
 #' Plot a decision tree
 #'
-#' @param model A tidysl tree model object
+#' @param model A tidylearn tree model object
 #' @param ... Additional arguments to pass to rpart.plot()
 #' @return A plot of the decision tree
 #' @export
@@ -429,7 +429,7 @@ tl_plot_tree <- function(model, ...) {
 
 #' Plot partial dependence for tree-based models
 #'
-#' @param model A tidysl tree-based model object
+#' @param model A tidylearn tree-based model object
 #' @param var Variable name to plot
 #' @param n.pts Number of points for continuous variables (default: 20)
 #' @param ... Additional arguments
@@ -499,7 +499,7 @@ tl_plot_partial_dependence <- function(model, var, n.pts = 20, ...) {
       )
     }
 
-    return(result)
+    result
   })
 
   # Create the plot
@@ -527,5 +527,5 @@ tl_plot_partial_dependence <- function(model, var, n.pts = 20, ...) {
       ggplot2::theme_minimal()
   }
 
-  return(p)
+  p
 }

@@ -101,7 +101,7 @@ tidy_pca <- function(data, cols = NULL, scale = TRUE, center = TRUE, method = "p
   )
 
   class(result) <- c("tidy_pca", "list")
-  return(result)
+  result
 }
 
 
@@ -191,7 +191,10 @@ tidy_pca_screeplot <- function(pca_obj, type = "proportion", add_line = TRUE) {
   var_data <- pca_obj$variance
 
   if (type == "proportion") {
-    p <- ggplot2::ggplot(var_data, ggplot2::aes(x = seq_along(component), y = prop_variance)) +
+    p <- ggplot2::ggplot(
+      var_data,
+      ggplot2::aes(x = seq_along(component), y = prop_variance)
+    ) +
       ggplot2::geom_line(color = "steelblue", size = 1) +
       ggplot2::geom_point(color = "steelblue", size = 3) +
       ggplot2::labs(
@@ -200,7 +203,10 @@ tidy_pca_screeplot <- function(pca_obj, type = "proportion", add_line = TRUE) {
         y = "Proportion of Variance"
       )
   } else {
-    p <- ggplot2::ggplot(var_data, ggplot2::aes(x = seq_along(component), y = variance)) +
+    p <- ggplot2::ggplot(
+      var_data,
+      ggplot2::aes(x = seq_along(component), y = variance)
+    ) +
       ggplot2::geom_line(color = "steelblue", size = 1) +
       ggplot2::geom_point(color = "steelblue", size = 3) +
       ggplot2::labs(
@@ -210,7 +216,11 @@ tidy_pca_screeplot <- function(pca_obj, type = "proportion", add_line = TRUE) {
       )
 
     if (add_line && pca_obj$settings$scale) {
-      p <- p + ggplot2::geom_hline(yintercept = 1, linetype = "dashed", color = "red")
+      p <- p + ggplot2::geom_hline(
+        yintercept = 1,
+        linetype = "dashed",
+        color = "red"
+      )
     }
   }
 
@@ -254,7 +264,9 @@ tidy_pca_biplot <- function(pca_obj, pc_x = 1, pc_y = 2, color_by = NULL,
 
   # Scale factor for arrows
   score_range <- max(abs(c(scores[[pc_x_name]], scores[[pc_y_name]])))
-  loading_range <- max(abs(c(loadings_wide[[pc_x_name]], loadings_wide[[pc_y_name]])))
+  loading_range <- max(
+    abs(c(loadings_wide[[pc_x_name]], loadings_wide[[pc_y_name]]))
+  )
   arrow_scale_factor <- (score_range / loading_range) * 0.8 * arrow_scale
 
   loadings_wide <- loadings_wide %>%
@@ -275,14 +287,21 @@ tidy_pca_biplot <- function(pca_obj, pc_x = 1, pc_y = 2, color_by = NULL,
   if (!is.null(color_by)) {
     p <- p + ggplot2::geom_point(
       data = scores,
-      ggplot2::aes(x = .data[[pc_x_name]], y = .data[[pc_y_name]], color = .data[[color_by]]),
-      alpha = 0.7, size = 2
+      ggplot2::aes(
+        x = .data[[pc_x_name]],
+        y = .data[[pc_y_name]],
+        color = .data[[color_by]]
+      ),
+      alpha = 0.7,
+      size = 2
     )
   } else {
     p <- p + ggplot2::geom_point(
       data = scores,
       ggplot2::aes(x = .data[[pc_x_name]], y = .data[[pc_y_name]]),
-      alpha = 0.7, size = 2, color = "steelblue"
+      alpha = 0.7,
+      size = 2,
+      color = "steelblue"
     )
   }
 
@@ -290,8 +309,13 @@ tidy_pca_biplot <- function(pca_obj, pc_x = 1, pc_y = 2, color_by = NULL,
   if (label_obs) {
     p <- p + ggplot2::geom_text(
       data = scores,
-      ggplot2::aes(x = .data[[pc_x_name]], y = .data[[pc_y_name]], label = .obs_id),
-      size = 2.5, vjust = -0.5
+      ggplot2::aes(
+        x = .data[[pc_x_name]],
+        y = .data[[pc_y_name]],
+        label = .obs_id
+      ),
+      size = 2.5,
+      vjust = -0.5
     )
   }
 
@@ -338,7 +362,10 @@ print.tidy_pca <- function(x, ...) {
   cat("Number of observations:", nrow(x$scores), "\n")
   cat("Number of variables:", length(unique(x$loadings$variable)), "\n")
   cat("Number of components:", nrow(x$variance), "\n")
-  cat("Settings: scale =", x$settings$scale, ", center =", x$settings$center, "\n\n")
+  cat(
+    "Settings: scale =", x$settings$scale,
+    ", center =", x$settings$center, "\n\n"
+  )
 
   cat("Variance Explained:\n")
   print(x$variance, n = 5)

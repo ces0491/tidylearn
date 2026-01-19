@@ -1,6 +1,6 @@
-#' @title Visualization Functions for tidysl
-#' @name tidysl-visualization
-#' @description General visualization functions for tidysl models
+#' @title Visualization Functions for tidylearn
+#' @name tidylearn-visualization
+#' @description General visualization functions for tidylearn models
 #' @importFrom ggplot2 ggplot aes geom_line geom_point geom_bar geom_boxplot
 #' @importFrom ggplot2 geom_histogram geom_density geom_jitter scale_color_gradient
 #' @importFrom ggplot2 labs theme_minimal
@@ -10,7 +10,7 @@ NULL
 
 #' Plot feature importance across multiple models
 #'
-#' @param ... tidysl model objects to compare
+#' @param ... tidylearn model objects to compare
 #' @param top_n Number of top features to display (default: 10)
 #' @param names Optional character vector of model names
 #' @return A ggplot object with feature importance comparison
@@ -36,7 +36,7 @@ tl_plot_importance_comparison <- function(..., top_n = 10, names = NULL) {
       # Add model name
       imp_data$model <- name
 
-      return(imp_data)
+      imp_data
     } else if (model$spec$method %in% c("ridge", "lasso", "elastic_net")) {
       # Regularized regression
       imp_data <- tl_extract_importance_regularized(model)
@@ -44,32 +44,44 @@ tl_plot_importance_comparison <- function(..., top_n = 10, names = NULL) {
       # Add model name
       imp_data$model <- name
 
-      return(imp_data)
+      imp_data
     } else {
-      warning("Importance extraction not implemented for model type: ", model$spec$method, call. = FALSE)
-      return(NULL)
+      warning(
+        "Importance extraction not implemented for model type: ",
+        model$spec$method,
+        call. = FALSE
+      )
+      NULL
     }
   })
 
+
   # If no importances could be extracted, return NULL
   if (is.null(all_importance) || nrow(all_importance) == 0) {
-    return(NULL)
+    NULL
   }
 
   # Find top features across all models
   top_features <- all_importance %>%
-    dplyr::group_by(.data$feature) %>%
-    dplyr::summarize(avg_importance = mean(.data$importance), .groups = "drop") %>%
-    dplyr::arrange(dplyr::desc(.data$avg_importance)) %>%
+    dplyr::group_by(.data[["feature"]]) %>%
+    dplyr::summarize(avg_importance = mean(.data[["importance"]]), .groups = "drop") %>%
+    dplyr::arrange(dplyr::desc(.data[["avg_importance"]])) %>%
     dplyr::slice_head(n = top_n) %>%
-    dplyr::pull(.data$feature)
+    dplyr::pull(.data[["feature"]])
 
   # Filter to only top features
   plot_data <- all_importance %>%
-    dplyr::filter(.data$feature %in% top_features)
+    dplyr::filter(.data[["feature"]] %in% top_features)
 
   # Create the plot
-  p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = stats::reorder(feature, importance), y = importance, fill = model)) +
+  p <- ggplot2::ggplot(
+    plot_data,
+    ggplot2::aes(
+      x = stats::reorder(feature, importance),
+      y = importance,
+      fill = model
+    )
+  ) +
     ggplot2::geom_col(position = "dodge") +
     ggplot2::coord_flip() +
     ggplot2::labs(
@@ -80,12 +92,12 @@ tl_plot_importance_comparison <- function(..., top_n = 10, names = NULL) {
     ) +
     ggplot2::theme_minimal()
 
-  return(p)
+  p
 }
 
 #' Extract importance from a tree-based model
 #'
-#' @param model A tidysl model object
+#' @param model A tidylearn model object
 #' @return A data frame with feature importance values
 #' @keywords internal
 tl_extract_importance <- function(model) {
@@ -133,19 +145,25 @@ tl_extract_importance <- function(model) {
       importance = imp$rel.inf
     )
   } else {
-    stop("Variable importance extraction not implemented for method: ", method, call. = FALSE)
+    stop(
+    "Variable importance extraction not implemented for method: ",
+    method,
+    call. = FALSE
+  )
   }
 
   # Normalize importance to 0-100 scale
   importance_df <- importance_df %>%
-    dplyr::mutate(importance = 100 * .data$importance / max(.data$importance))
+    dplyr::mutate(
+      importance = 100 * .data[["importance"]] / max(.data[["importance"]])
+    )
 
-  return(importance_df)
+  importance_df
 }
 
 #' Extract importance from a regularized regression model
 #'
-#' @param model A tidysl regularized model object
+#' @param model A tidylearn regularized model object
 #' @param lambda Which lambda to use ("1se" or "min", default: "1se")
 #' @return A data frame with feature importance values
 #' @keywords internal
@@ -161,7 +179,10 @@ tl_extract_importance_regularized <- function(model, lambda = "1se") {
   } else if (is.numeric(lambda)) {
     lambda_val <- lambda
   } else {
-    stop("Invalid lambda specification. Use '1se', 'min', or a numeric value.", call. = FALSE)
+    stop(
+      "Invalid lambda specification. Use '1se', 'min', or a numeric value.",
+      call. = FALSE
+    )
   }
 
   # Get coefficients at selected lambda
@@ -176,18 +197,20 @@ tl_extract_importance_regularized <- function(model, lambda = "1se") {
     feature = rownames(coefs),
     importance = abs(as.vector(coefs))
   ) %>%
-    dplyr::filter(.data$importance > 0)
+    dplyr::filter(.data[["importance"]] > 0)
 
   # Normalize importance to 0-100 scale
   importance_df <- importance_df %>%
-    dplyr::mutate(importance = 100 * .data$importance / max(.data$importance))
+    dplyr::mutate(
+      importance = 100 * .data[["importance"]] / max(.data[["importance"]])
+    )
 
-  return(importance_df)
+  importance_df
 }
 
 #' Plot model comparison
 #'
-#' @param ... tidysl model objects to compare
+#' @param ... tidylearn model objects to compare
 #' @param new_data Optional data frame for evaluation (if NULL, uses training data)
 #' @param metrics Character vector of metrics to compute
 #' @param names Optional character vector of model names
@@ -200,16 +223,27 @@ tl_plot_model_comparison <- function(..., new_data = NULL, metrics = NULL, names
   # Get model names if not provided
   if (is.null(names)) {
     names <- purrr::map_chr(models, function(model) {
-      paste0(model$spec$method, " (", ifelse(model$spec$is_classification, "classification", "regression"), ")")
+      task <- ifelse(
+        model$spec$is_classification,
+        "classification",
+        "regression"
+      )
+      paste0(model$spec$method, " (", task, ")")
     })
   } else if (length(names) != length(models)) {
     stop("Length of 'names' must match the number of models", call. = FALSE)
   }
 
   # Check if all models are of the same type (classification or regression)
-  is_classifications <- purrr::map_lgl(models, function(model) model$spec$is_classification)
+  is_classifications <- purrr::map_lgl(
+    models,
+    function(model) model$spec$is_classification
+  )
   if (length(unique(is_classifications)) > 1) {
-    stop("All models must be of the same type (classification or regression)", call. = FALSE)
+    stop(
+      "All models must be of the same type (classification or regression)",
+      call. = FALSE
+    )
   }
 
   is_classification <- is_classifications[1]
@@ -217,7 +251,10 @@ tl_plot_model_comparison <- function(..., new_data = NULL, metrics = NULL, names
   # Use first model's training data if new_data not provided
   if (is.null(new_data)) {
     new_data <- models[[1]]$data
-    message("Evaluating on training data. For model validation, provide separate test data.")
+    message(
+      "Evaluating on training data. ",
+      "For model validation, provide separate test data."
+    )
   }
 
   # Default metrics based on problem type
@@ -237,11 +274,14 @@ tl_plot_model_comparison <- function(..., new_data = NULL, metrics = NULL, names
     # Add model name
     eval_results$model <- name
 
-    return(eval_results)
+    eval_results
   })
 
   # Create the plot
-  p <- ggplot2::ggplot(model_results, ggplot2::aes(x = model, y = value, fill = metric)) +
+  p <- ggplot2::ggplot(
+    model_results,
+    ggplot2::aes(x = model, y = value, fill = metric)
+  ) +
     ggplot2::geom_col(position = "dodge") +
     ggplot2::facet_wrap(~ metric, scales = "free_y") +
     ggplot2::labs(
@@ -251,9 +291,11 @@ tl_plot_model_comparison <- function(..., new_data = NULL, metrics = NULL, names
       fill = "Metric"
     ) +
     ggplot2::theme_minimal() +
-    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+    ggplot2::theme(
+      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)
+    )
 
-  return(p)
+  p
 }
 
 #' Plot cross-validation results
@@ -269,17 +311,27 @@ tl_plot_cv_results <- function(cv_results, metrics = NULL) {
   # Filter metrics if specified
   if (!is.null(metrics)) {
     fold_metrics <- fold_metrics %>%
-      dplyr::filter(.data$metric %in% metrics)
+      dplyr::filter(.data[["metric"]] %in% metrics)
   }
 
   # Create the plot
-  p <- ggplot2::ggplot(fold_metrics, ggplot2::aes(x = factor(fold), y = value, group = metric, color = metric)) +
+  p <- ggplot2::ggplot(
+    fold_metrics,
+    ggplot2::aes(
+      x = factor(fold),
+      y = value,
+      group = metric,
+      color = metric
+    )
+  ) +
     ggplot2::geom_line() +
     ggplot2::geom_point() +
     ggplot2::facet_wrap(~ metric, scales = "free_y") +
-    ggplot2::geom_hline(data = cv_results$summary,
-                        ggplot2::aes(yintercept = mean_value, color = metric),
-                        linetype = "dashed") +
+    ggplot2::geom_hline(
+      data = cv_results$summary,
+      ggplot2::aes(yintercept = mean_value, color = metric),
+      linetype = "dashed"
+    ) +
     ggplot2::labs(
       title = "Cross-Validation Results",
       subtitle = "Dashed lines represent mean values across folds",
@@ -289,12 +341,12 @@ tl_plot_cv_results <- function(cv_results, metrics = NULL) {
     ) +
     ggplot2::theme_minimal()
 
-  return(p)
+  p
 }
 
 #' Create interactive visualization dashboard for a model
 #'
-#' @param model A tidysl model object
+#' @param model A tidylearn model object
 #' @param new_data Optional data frame for evaluation (if NULL, uses training data)
 #' @param ... Additional arguments
 #' @return A Shiny app object
@@ -309,7 +361,7 @@ tl_dashboard <- function(model, new_data = NULL, ...) {
 
   # Define UI
   ui <- shinydashboard::dashboardPage(
-    shinydashboard::dashboardHeader(title = "tidysl Model Dashboard"),
+    shinydashboard::dashboardHeader(title = "tidylearn Model Dashboard"),
 
     shinydashboard::dashboardSidebar(
       shinydashboard::sidebarMenu(
@@ -432,7 +484,7 @@ tl_dashboard <- function(model, new_data = NULL, ...) {
   server <- function(input, output, session) {
     # Flag for classification or regression
     output$is_classification <- shiny::reactive({
-      return(model$spec$is_classification)
+      model$spec$is_classification
     })
     shiny::outputOptions(output, "is_classification", suspendWhenHidden = FALSE)
 
@@ -548,7 +600,7 @@ tl_dashboard <- function(model, new_data = NULL, ...) {
 
 #' Plot lift chart for a classification model
 #'
-#' @param model A tidysl classification model object
+#' @param model A tidylearn classification model object
 #' @param new_data Optional data frame for evaluation (if NULL, uses training data)
 #' @param bins Number of bins for grouping predictions (default: 10)
 #' @param ... Additional arguments
@@ -586,7 +638,7 @@ tl_plot_lift <- function(model, new_data = NULL, bins = 10, ...) {
       prob = pos_probs,
       actual = binary_actuals
     ) %>%
-      dplyr::arrange(dplyr::desc(.data$prob))
+      dplyr::arrange(dplyr::desc(.data[["prob"]]))
 
     # Calculate cumulative metrics
     decile_size <- ceiling(nrow(ordered_data) / bins)
@@ -647,15 +699,18 @@ tl_plot_lift <- function(model, new_data = NULL, bins = 10, ...) {
       ggplot2::scale_x_continuous(breaks = 1:bins) +
       ggplot2::theme_minimal()
 
-    return(p)
+    p
   } else {
-    stop("Lift chart is currently only implemented for binary classification", call. = FALSE)
+    stop(
+      "Lift chart is currently only implemented for binary classification",
+      call. = FALSE
+    )
   }
 }
 
 #' Plot gain chart for a classification model
 #'
-#' @param model A tidysl classification model object
+#' @param model A tidylearn classification model object
 #' @param new_data Optional data frame for evaluation (if NULL, uses training data)
 #' @param bins Number of bins for grouping predictions (default: 10)
 #' @param ... Additional arguments
@@ -693,7 +748,7 @@ tl_plot_gain <- function(model, new_data = NULL, bins = 10, ...) {
       prob = pos_probs,
       actual = binary_actuals
     ) %>%
-      dplyr::arrange(dplyr::desc(.data$prob))
+      dplyr::arrange(dplyr::desc(.data[["prob"]]))
 
     # Calculate cumulative metrics
     decile_size <- ceiling(nrow(ordered_data) / bins)
@@ -741,10 +796,21 @@ tl_plot_gain <- function(model, new_data = NULL, bins = 10, ...) {
     )
 
     # Create the plot
-    p <- ggplot2::ggplot(gain_data, ggplot2::aes(x = cumulative_pct_population, y = cumulative_pct_responders)) +
+    p <- ggplot2::ggplot(
+      gain_data,
+      ggplot2::aes(
+        x = cumulative_pct_population,
+        y = cumulative_pct_responders
+      )
+    ) +
       ggplot2::geom_line(color = "blue", size = 1) +
       ggplot2::geom_point(color = "blue", size = 3) +
-      ggplot2::geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "red") +
+      ggplot2::geom_abline(
+        intercept = 0,
+        slope = 1,
+        linetype = "dashed",
+        color = "red"
+      ) +
       ggplot2::labs(
         title = "Cumulative Gain Chart",
         subtitle = "Cumulative % of responders by % of population",
@@ -756,9 +822,12 @@ tl_plot_gain <- function(model, new_data = NULL, bins = 10, ...) {
       ggplot2::scale_y_continuous(breaks = seq(0, 100, by = 10)) +
       ggplot2::theme_minimal()
 
-    return(p)
+    p
   } else {
-    stop("Gain chart is currently only implemented for binary classification", call. = FALSE)
+    stop(
+      "Gain chart is currently only implemented for binary classification",
+      call. = FALSE
+    )
   }
 }
 #' Plot Clusters in 2D Space
@@ -771,12 +840,17 @@ tl_plot_gain <- function(model, new_data = NULL, bins = 10, ...) {
 #' @param y_col Y-axis variable (if NULL, uses second numeric column)
 #' @param centers Optional data frame of cluster centers
 #' @param title Plot title
-#' @param color_noise_black If TRUE, color noise points (cluster 0) as black (default: TRUE)
+#' @param color_noise_black If TRUE, color noise points (cluster 0) black
 #'
 #' @return A ggplot object
 #' @export
-plot_clusters <- function(data, cluster_col = "cluster", x_col = NULL, y_col = NULL,
-                          centers = NULL, title = "Cluster Plot", color_noise_black = TRUE) {
+plot_clusters <- function(data,
+                          cluster_col = "cluster",
+                          x_col = NULL,
+                          y_col = NULL,
+                          centers = NULL,
+                          title = "Cluster Plot",
+                          color_noise_black = TRUE) {
 
   # Find numeric columns if not specified
   numeric_cols <- names(data)[sapply(data, is.numeric)]
@@ -786,7 +860,11 @@ plot_clusters <- function(data, cluster_col = "cluster", x_col = NULL, y_col = N
   }
 
   if (is.null(y_col)) {
-    y_col <- if (length(numeric_cols) > 1) numeric_cols[2] else numeric_cols[1]
+    y_col <- if (length(numeric_cols) > 1) {
+      numeric_cols[2]
+    } else {
+      numeric_cols[1]
+    }
   }
 
   # Ensure cluster column is factor
@@ -808,9 +886,11 @@ plot_clusters <- function(data, cluster_col = "cluster", x_col = NULL, y_col = N
 
   # Color noise points black if requested
   if (color_noise_black && "0" %in% unique(plot_data[[cluster_col]])) {
+    n_clusters <- length(unique(plot_data[[cluster_col]])) - 1
+    other_clusters <- setdiff(unique(plot_data[[cluster_col]]), "0")
+    cluster_colors <- setNames(grDevices::rainbow(n_clusters), other_clusters)
     p <- p + ggplot2::scale_color_manual(
-      values = c("0" = "black", setNames(grDevices::rainbow(length(unique(plot_data[[cluster_col]])) - 1),
-                                         setdiff(unique(plot_data[[cluster_col]]), "0")))
+      values = c("0" = "black", cluster_colors)
     )
   }
 
@@ -853,9 +933,19 @@ plot_elbow <- function(wss_data, add_line = FALSE, suggested_k = NULL) {
 
   if (add_line && !is.null(suggested_k)) {
     p <- p +
-      ggplot2::geom_vline(xintercept = suggested_k, linetype = "dashed", color = "red") +
-      ggplot2::annotate("text", x = suggested_k, y = max(wss_data$tot_withinss) * 0.9,
-                       label = sprintf("k = %d", suggested_k), color = "red", hjust = -0.2)
+      ggplot2::geom_vline(
+        xintercept = suggested_k,
+        linetype = "dashed",
+        color = "red"
+      ) +
+      ggplot2::annotate(
+        "text",
+        x = suggested_k,
+        y = max(wss_data$tot_withinss) * 0.9,
+        label = sprintf("k = %d", suggested_k),
+        color = "red",
+        hjust = -0.2
+      )
   }
 
   p
@@ -881,7 +971,10 @@ plot_cluster_comparison <- function(data, cluster_cols, x_col, y_col) {
   })
 
   # Combine plots
-  gridExtra::grid.arrange(grobs = plots, ncol = ceiling(sqrt(length(plots))))
+  gridExtra::grid.arrange(
+    grobs = plots,
+    ncol = ceiling(sqrt(length(plots)))
+  )
 }
 
 
@@ -928,18 +1021,40 @@ plot_variance_explained <- function(variance_tbl, threshold = 0.8) {
     dplyr::mutate(pc_num = seq_len(dplyr::n()))
 
   # Create dual-axis plot
+  subtitle_text <- sprintf(
+    "Red line: cumulative variance | Green line: %.0f%% threshold",
+    threshold * 100
+  )
   p1 <- ggplot2::ggplot(plot_data, ggplot2::aes(x = pc_num)) +
-    ggplot2::geom_col(ggplot2::aes(y = prop_variance), fill = "steelblue", alpha = 0.7) +
-    ggplot2::geom_line(ggplot2::aes(y = cum_variance), color = "red", size = 1) +
-    ggplot2::geom_point(ggplot2::aes(y = cum_variance), color = "red", size = 2) +
-    ggplot2::geom_hline(yintercept = threshold, linetype = "dashed", color = "darkgreen") +
+    ggplot2::geom_col(
+      ggplot2::aes(y = prop_variance),
+      fill = "steelblue",
+      alpha = 0.7
+    ) +
+    ggplot2::geom_line(
+      ggplot2::aes(y = cum_variance),
+      color = "red",
+      size = 1
+    ) +
+    ggplot2::geom_point(
+      ggplot2::aes(y = cum_variance),
+      color = "red",
+      size = 2
+    ) +
+    ggplot2::geom_hline(
+      yintercept = threshold,
+      linetype = "dashed",
+      color = "darkgreen"
+    ) +
     ggplot2::labs(
       title = "Variance Explained by Principal Components",
-      subtitle = sprintf("Red line: cumulative variance | Green line: %.0f%% threshold", threshold * 100),
+      subtitle = subtitle_text,
       x = "Principal Component",
       y = "Proportion of Variance Explained"
     ) +
-    ggplot2::scale_y_continuous(labels = function(x) paste0(round(x * 100, 1), "%")) +
+    ggplot2::scale_y_continuous(
+      labels = function(x) paste0(round(x * 100, 1), "%")
+    ) +
     ggplot2::theme_minimal()
 
   p1
@@ -956,7 +1071,9 @@ plot_variance_explained <- function(variance_tbl, threshold = 0.8) {
 #'
 #' @return Invisibly returns hclust object (plots as side effect)
 #' @export
-plot_dendrogram <- function(hclust_obj, k = NULL, title = "Hierarchical Clustering Dendrogram") {
+plot_dendrogram <- function(hclust_obj,
+                            k = NULL,
+                            title = "Hierarchical Clustering Dendrogram") {
 
   if (inherits(hclust_obj, "tidy_hclust")) {
     hc <- hclust_obj$model
@@ -984,7 +1101,9 @@ plot_dendrogram <- function(hclust_obj, k = NULL, title = "Hierarchical Clusteri
 #'
 #' @return Combined plot grid
 #' @export
-create_cluster_dashboard <- function(data, cluster_col = "cluster", validation_metrics = NULL) {
+create_cluster_dashboard <- function(data,
+                                     cluster_col = "cluster",
+                                     validation_metrics = NULL) {
 
   plots <- list()
 
@@ -1033,7 +1152,9 @@ create_cluster_dashboard <- function(data, cluster_col = "cluster", validation_m
 #'
 #' @return A ggplot object
 #' @export
-plot_distance_heatmap <- function(dist_mat, cluster_order = NULL, title = "Distance Heatmap") {
+plot_distance_heatmap <- function(dist_mat,
+                                  cluster_order = NULL,
+                                  title = "Distance Heatmap") {
 
   # Convert to matrix
   dist_matrix <- as.matrix(dist_mat)

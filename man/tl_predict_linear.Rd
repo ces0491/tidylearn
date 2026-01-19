@@ -7,7 +7,7 @@
 tl_predict_linear(model, new_data, type = "response", level = 0.95, ...)
 }
 \arguments{
-\item{model}{A tidysl linear model object}
+\item{model}{A tidylearn linear model object}
 
 \item{new_data}{A data frame containing the new data}
 

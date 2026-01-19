@@ -18,7 +18,23 @@ knitr::opts_chunk$set(
 
 ## Introduction
 
-`tidylearn` is a comprehensive machine learning package for R that unifies supervised and unsupervised learning under a consistent, tidy interface. Unlike packages that simply combine functionalities, tidylearn enables seamless integration between different learning paradigms.
+`tidylearn` provides a **unified tidyverse-compatible interface** to R's machine
+learning ecosystem. It wraps proven packages like glmnet, randomForest, xgboost,
+e1071, cluster, and dbscan - you get the reliability of established
+implementations with the convenience of a consistent, tidy API.
+
+**What tidylearn does:**
+
+- Provides one consistent interface (`tl_model()`) to 20+ ML algorithms
+- Returns tidy tibbles instead of varied output formats
+- Offers unified ggplot2-based visualization across all methods
+- Enables pipe-friendly workflows
+
+**What tidylearn is NOT:**
+
+- A reimplementation of ML algorithms (uses established packages under the hood)
+- A replacement for the underlying packages (you can access the raw model via
+  `model$fit`)
 
 ## Installation
 
@@ -37,7 +53,10 @@ library(dplyr)
 
 ## The Unified Interface
 
-The core of tidylearn is the `tl_model()` function, which works with both supervised and unsupervised methods.
+The core of tidylearn is the `tl_model()` function, which dispatches to the
+appropriate underlying package based on the method you specify. The wrapped
+packages include stats, glmnet, randomForest, xgboost, gbm, e1071, nnet, rpart,
+cluster, and dbscan.
 
 ### Supervised Learning
 
@@ -153,39 +172,50 @@ prop.table(table(split_strat$test$Species))
 prop.table(table(iris$Species))
 ```
 
-## Available Methods
+## Wrapped Packages
+
+tidylearn provides a unified interface to these established R packages:
 
 ### Supervised Methods
 
-**Classification & Regression:**
-- `"linear"` - Linear regression
-- `"polynomial"` - Polynomial regression
-- `"logistic"` - Logistic regression
-- `"tree"` - Decision trees
-- `"forest"` - Random forests
-- `"boost"` - Gradient boosting
-- `"xgboost"` - XGBoost
-- `"svm"` - Support vector machines
-- `"nn"` - Neural networks
-- `"deep"` - Deep learning
-
-**Regularization:**
-- `"ridge"` - Ridge regression
-- `"lasso"` - LASSO
-- `"elastic_net"` - Elastic net
+| Method | Underlying Package | Function Called |
+|--------|-------------------|-----------------|
+| `"linear"` | stats | `lm()` |
+| `"polynomial"` | stats | `lm()` with `poly()` |
+| `"logistic"` | stats | `glm(..., family = binomial)` |
+| `"ridge"`, `"lasso"`, `"elastic_net"` | glmnet | `glmnet()` |
+| `"tree"` | rpart | `rpart()` |
+| `"forest"` | randomForest | `randomForest()` |
+| `"boost"` | gbm | `gbm()` |
+| `"xgboost"` | xgboost | `xgb.train()` |
+| `"svm"` | e1071 | `svm()` |
+| `"nn"` | nnet | `nnet()` |
+| `"deep"` | keras | `keras_model_sequential()` |
 
 ### Unsupervised Methods
 
-**Dimensionality Reduction:**
-- `"pca"` - Principal Component Analysis
-- `"mds"` - Multidimensional Scaling
+| Method | Underlying Package | Function Called |
+|--------|-------------------|-----------------|
+| `"pca"` | stats | `prcomp()` |
+| `"mds"` | stats, MASS, smacof | `cmdscale()`, `isoMDS()`, etc. |
+| `"kmeans"` | stats | `kmeans()` |
+| `"pam"` | cluster | `pam()` |
+| `"clara"` | cluster | `clara()` |
+| `"hclust"` | stats | `hclust()` |
+| `"dbscan"` | dbscan | `dbscan()` |
 
-**Clustering:**
-- `"kmeans"` - K-means
-- `"pam"` - K-medoids (PAM)
-- `"clara"` - CLARA (for large datasets)
-- `"hclust"` - Hierarchical clustering
-- `"dbscan"` - Density-based clustering
+### Accessing the Underlying Model
+
+You always have access to the raw model from the underlying package via `$fit`:
+
+```{r}
+# Example: Access the raw randomForest object
+model_forest <- tl_model(iris, Species ~ ., method = "forest")
+class(model_forest$fit)  # This is the randomForest object
+
+# Use package-specific functions if needed
+# randomForest::varImpPlot(model_forest$fit)
+```
 
 ## Next Steps
 
@@ -198,11 +228,19 @@ Now that you understand the basics, explore:
 
 ## Summary
 
-tidylearn provides:
-- **Unified Interface**: One function (`tl_model()`) for all methods
-- **Flexible Preprocessing**: Comprehensive data preparation tools
-- **Easy Integration**: Seamlessly combine different learning paradigms
-- **Tidy Output**: All results are tibbles for easy manipulation
+tidylearn is a **wrapper package** that provides:
+
+- **Unified Interface**: One function (`tl_model()`) that dispatches to proven
+  packages like glmnet, randomForest, xgboost, e1071, and others
+- **Transparency**: Access raw model objects via `model$fit` for package-specific
+  functionality
+- **Tidy Output**: All results are tibbles for easy manipulation with dplyr and
+  ggplot2
+- **Consistent Visualization**: Unified ggplot2-based plots regardless of model
+  type
+
+The underlying algorithms are unchanged - tidylearn simply makes them easier to
+use together.
 
 ```{r}
 # Quick example combining everything

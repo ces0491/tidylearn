@@ -7,7 +7,7 @@
 tl_plot_xgboost_shap_summary(model, data = NULL, top_n = 10, n_samples = 100)
 }
 \arguments{
-\item{model}{A tidysl XGBoost model object}
+\item{model}{A tidylearn XGBoost model object}
 
 \item{data}{Data for SHAP value calculation (default: NULL, uses training data)}
 

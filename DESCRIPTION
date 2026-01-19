@@ -1,15 +1,15 @@
 Package: tidylearn
-Title: A Unified Tidy Approach to Machine Learning
+Title: A Unified Tidy Interface to R's Machine Learning Ecosystem
 Version: 0.1.0
 Authors@R:
-    person("Cesaire", "Tobias", email = "cesaire@sheetsolved.com", role = c("aut", "cre"),
-           comment = c(ORCID = ""))
-Description: A comprehensive machine learning package that unifies supervised and
-    unsupervised learning under a consistent tidy interface. Seamlessly integrates
-    classification, regression, clustering, dimensionality reduction, and feature
-    engineering. Built on tidyverse principles with extensive support for model
-    pipelines, cross-validation, visualization, and interpretation. Enables powerful
-    workflows that combine multiple learning paradigms for advanced analytics.
+    person("Cesaire", "Tobias", email = "cesaire@sheetsolved.com", role = c("aut", "cre"))
+Description: Provides a unified tidyverse-compatible interface to R's machine
+    learning packages. Wraps established implementations from 'glmnet',
+    'randomForest', 'xgboost', 'e1071', 'rpart', 'gbm', 'nnet', 'cluster',
+    'dbscan', and others - providing consistent function signatures, tidy tibble
+    output, and unified 'ggplot2'-based visualization. The underlying algorithms
+    are unchanged; 'tidylearn' simply makes them easier to use together. Access
+    raw model objects via the $fit slot for package-specific functionality.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
@@ -36,7 +36,8 @@ Imports:
     yardstick,
     cluster (>= 2.1.0),
     dbscan (>= 1.1.0),
-    MASS
+    MASS,
+    smacof (>= 2.1.0)
 Suggests:
     arules,
     arulesViz,
@@ -62,7 +63,6 @@ Suggests:
     scales,
     shiny,
     shinydashboard,
-    smacof,
     tensorflow,
     testthat (>= 3.0.0),
     workflows,

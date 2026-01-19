@@ -15,7 +15,7 @@ tl_plot_influence(
 )
 }
 \arguments{
-\item{model}{A tidysl model object}
+\item{model}{A tidylearn model object}
 
 \item{plot_type}{Type of influence plot: "cook", "leverage", "index"}
 

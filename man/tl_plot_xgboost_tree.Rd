@@ -7,7 +7,7 @@
 tl_plot_xgboost_tree(model, tree_index = 0, ...)
 }
 \arguments{
-\item{model}{A tidysl XGBoost model object}
+\item{model}{A tidylearn XGBoost model object}
 
 \item{tree_index}{Index of the tree to plot (default: 0, first tree)}
 

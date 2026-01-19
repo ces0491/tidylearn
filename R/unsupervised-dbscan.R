@@ -60,7 +60,7 @@ tidy_dbscan <- function(data, eps, minPts = 5, cols = NULL, distance = "euclidea
   }
 
   clusters_tbl <- tibble::tibble(
-    .id = obs_ids,
+    .obs_id = obs_ids,
     cluster = as.integer(db_model$cluster),
     is_noise = cluster == 0,
     is_core = seq_along(cluster) %in% attr(db_model, "core")
@@ -119,7 +119,7 @@ tidy_knn_dist <- function(data, k = 4, cols = NULL) {
 
   # Create tibble
   tibble::tibble(
-    .id = rownames(data) %||% paste0("obs_", seq_len(nrow(data))),
+    .obs_id = rownames(data) %||% paste0("obs_", seq_len(nrow(data))),
     knn_dist = as.numeric(knn_distances),
     rank = rank(knn_distances)
   )

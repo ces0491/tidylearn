@@ -1,5 +1,5 @@
-#' @title Regularization Functions for tidysl
-#' @name tidysl-regularization
+#' @title Regularization Functions for tidylearn
+#' @name tidylearn-regularization
 #' @description Ridge, Lasso, and Elastic Net regularization functionality
 #' @importFrom glmnet glmnet cv.glmnet predict.glmnet
 #' @importFrom stats model.matrix as.formula
@@ -157,7 +157,7 @@ tl_fit_regularized <- function(data, formula, is_classification = FALSE,
 
 #' Predict using a regularized regression model
 #'
-#' @param model A tidysl regularized model object
+#' @param model A tidylearn regularized model object
 #' @param new_data A data frame containing the new data
 #' @param type Type of prediction: "response" (default), "class" (for classification), "prob" (for classification)
 #' @param lambda Which lambda to use for prediction ("1se" or "min", default: "1se")
@@ -250,7 +250,7 @@ tl_predict_regularized <- function(model, new_data, type = "response",
 
 #' Predict using a Ridge regression model
 #'
-#' @param model A tidysl Ridge model object
+#' @param model A tidylearn Ridge model object
 #' @param new_data A data frame containing the new data
 #' @param type Type of prediction
 #' @param ... Additional arguments
@@ -262,7 +262,7 @@ tl_predict_ridge <- function(model, new_data, type = "response", ...) {
 
 #' Predict using a Lasso regression model
 #'
-#' @param model A tidysl Lasso model object
+#' @param model A tidylearn Lasso model object
 #' @param new_data A data frame containing the new data
 #' @param type Type of prediction
 #' @param ... Additional arguments
@@ -274,7 +274,7 @@ tl_predict_lasso <- function(model, new_data, type = "response", ...) {
 
 #' Predict using an Elastic Net regression model
 #'
-#' @param model A tidysl Elastic Net model object
+#' @param model A tidylearn Elastic Net model object
 #' @param new_data A data frame containing the new data
 #' @param type Type of prediction
 #' @param ... Additional arguments
@@ -286,7 +286,7 @@ tl_predict_elastic_net <- function(model, new_data, type = "response", ...) {
 
 #' Plot regularization path for a regularized regression model
 #'
-#' @param model A tidysl regularized model object
+#' @param model A tidylearn regularized model object
 #' @param label_n Number of top features to label (default: 5)
 #' @param ... Additional arguments
 #' @return A ggplot object
@@ -365,12 +365,15 @@ tl_plot_regularization_path <- function(model, label_n = 5, ...) {
 
 #' Plot cross-validation results for a regularized regression model
 #'
-#' @param model A tidysl regularized model object
-#' @param ... Additional arguments
-#' @return A ggplot object
+#' Shows the cross-validation error as a function of lambda for ridge, lasso,
+#' or elastic net models fitted with cv.glmnet.
+#'
+#' @param model A tidylearn regularized model object (ridge, lasso, or elastic_net)
+#' @param ... Additional arguments (currently unused)
+#' @return A ggplot object showing CV error vs lambda
 #' @importFrom ggplot2 ggplot aes geom_point geom_line geom_ribbon scale_x_log10 labs theme_minimal
 #' @export
-tl_plot_cv_results <- function(model, ...) {
+tl_plot_regularization_cv <- function(model, ...) {
   # Extract the glmnet model
   fit <- model$fit
 
@@ -425,7 +428,7 @@ tl_plot_cv_results <- function(model, ...) {
 
 #' Plot variable importance for a regularized regression model
 #'
-#' @param model A tidysl regularized model object
+#' @param model A tidylearn regularized model object
 #' @param lambda Which lambda to use ("1se" or "min", default: "1se")
 #' @param top_n Number of top features to display (default: 20)
 #' @param ... Additional arguments

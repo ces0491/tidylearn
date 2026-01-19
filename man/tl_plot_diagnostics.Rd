@@ -7,7 +7,7 @@
 tl_plot_diagnostics(model, which = 1:4, ...)
 }
 \arguments{
-\item{model}{A tidysl regression model object}
+\item{model}{A tidylearn regression model object}
 
 \item{which}{Which plots to create (1:4)}
 

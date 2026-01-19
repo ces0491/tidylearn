@@ -7,7 +7,7 @@
 tl_plot_svm_boundary(model, x_var = NULL, y_var = NULL, grid_size = 100, ...)
 }
 \arguments{
-\item{model}{A tidysl SVM model object}
+\item{model}{A tidylearn SVM model object}
 
 \item{x_var}{Name of the x-axis variable}
 

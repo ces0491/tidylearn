@@ -7,7 +7,7 @@
 tl_predict_xgboost(model, new_data, type = "response", ntreelimit = NULL, ...)
 }
 \arguments{
-\item{model}{A tidysl XGBoost model object}
+\item{model}{A tidylearn XGBoost model object}
 
 \item{new_data}{A data frame containing the new data}
 

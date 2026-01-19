@@ -24,7 +24,15 @@ library(ggplot2)
 
 ## Introduction
 
-Automated Machine Learning (AutoML) streamlines the model development process by automatically trying multiple approaches and selecting the best one. tidylearn's `tl_auto_ml()` function explores various modeling strategies including dimensionality reduction, clustering, and different supervised methods.
+Automated Machine Learning (AutoML) streamlines the model development process by
+automatically trying multiple approaches and selecting the best one. tidylearn's
+`tl_auto_ml()` function explores various modeling strategies including
+dimensionality reduction, clustering, and different supervised methods.
+
+**Note:** AutoML orchestrates the wrapped packages (glmnet, randomForest,
+xgboost, etc.) rather than implementing new algorithms. Each model in the
+leaderboard wraps an established package, and you can access the raw model
+objects via `model$fit`.
 
 ## Basic Usage
 

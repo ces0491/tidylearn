@@ -7,7 +7,7 @@
 tl_plot_actual_predicted(model, new_data = NULL, ...)
 }
 \arguments{
-\item{model}{A tidysl regression model object}
+\item{model}{A tidylearn regression model object}
 
 \item{new_data}{Optional data frame for evaluation (if NULL, uses training data)}
 

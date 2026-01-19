@@ -24,7 +24,13 @@ library(ggplot2)
 
 ## Introduction
 
-This vignette showcases tidylearn's unique capability to seamlessly integrate supervised and unsupervised learning. These integration functions demonstrate the power of a unified machine learning framework.
+This vignette showcases tidylearn's capability to seamlessly integrate
+supervised and unsupervised learning in multi-step workflows.
+
+**Important:** These integration functions orchestrate the wrapped packages
+(stats, glmnet, randomForest, cluster, etc.) rather than implementing new
+algorithms. tidylearn provides the workflow coordination, while the underlying
+packages do the computational work. Access raw model objects via `model$fit`.
 
 ## Dimensionality Reduction as Preprocessing
 
@@ -381,7 +387,8 @@ tidylearn's integration functions provide powerful ways to combine supervised an
 - **`tl_anomaly_aware()`**: Handle outliers intelligently
 - **`tl_stratified_models()`**: Create cluster-specific models
 
-These functions showcase the true power of tidylearn's unified framework, enabling workflows impossible with separate packages.
+These functions orchestrate the underlying packages (stats, cluster, glmnet,
+randomForest, etc.) to enable multi-step workflows with a consistent interface.
 
 ```{r}
 # Final integrated example

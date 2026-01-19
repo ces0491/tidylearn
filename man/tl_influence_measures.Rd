@@ -12,7 +12,7 @@ tl_influence_measures(
 )
 }
 \arguments{
-\item{model}{A tidysl model object}
+\item{model}{A tidylearn model object}
 
 \item{threshold_cook}{Cook's distance threshold (default: 4/n)}
 

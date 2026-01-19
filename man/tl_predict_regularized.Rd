@@ -7,7 +7,7 @@
 tl_predict_regularized(model, new_data, type = "response", lambda = "1se", ...)
 }
 \arguments{
-\item{model}{A tidysl regularized model object}
+\item{model}{A tidylearn regularized model object}
 
 \item{new_data}{A data frame containing the new data}
 

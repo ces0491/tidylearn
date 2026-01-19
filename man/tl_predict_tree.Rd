@@ -7,7 +7,7 @@
 tl_predict_tree(model, new_data, type = "response", ...)
 }
 \arguments{
-\item{model}{A tidysl tree model object}
+\item{model}{A tidylearn tree model object}
 
 \item{new_data}{A data frame containing the new data}
 

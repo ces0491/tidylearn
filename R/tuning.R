@@ -1,5 +1,5 @@
-#' @title Hyperparameter Tuning Functions for tidysl
-#' @name tidysl-tuning
+#' @title Hyperparameter Tuning Functions for tidylearn
+#' @name tidylearn-tuning
 #' @description Functions for automatic hyperparameter tuning and selection
 #' @importFrom stats model.matrix as.formula
 #' @importFrom dplyr %>% filter select mutate arrange
@@ -410,7 +410,7 @@ tl_tune_random <- function(data, formula, method, param_space, n_iter = 10, fold
 
 #' Plot hyperparameter tuning results
 #'
-#' @param model A tidysl model object with tuning results
+#' @param model A tidylearn model object with tuning results
 #' @param top_n Number of top parameter sets to highlight
 #' @param param1 First parameter to plot (for 2D grid or scatter plots)
 #' @param param2 Second parameter to plot (for 2D grid or scatter plots)

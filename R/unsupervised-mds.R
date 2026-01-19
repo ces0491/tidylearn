@@ -73,7 +73,7 @@ tidy_mds_classical <- function(dist_mat, ndim = 2, add_rownames = TRUE) {
 
   if (add_rownames && !is.null(attr(dist_mat, "Labels"))) {
     config_tbl <- tibble::as_tibble(config_matrix, .name_repair = "minimal") %>%
-      dplyr::mutate(.id = attr(dist_mat, "Labels"), .before = 1)
+      dplyr::mutate(.obs_id = attr(dist_mat, "Labels"), .before = 1)
   } else {
     config_tbl <- tibble::as_tibble(config_matrix)
   }
@@ -124,7 +124,7 @@ tidy_mds_smacof <- function(dist_mat, ndim = 2, type = "ratio", ...) {
 
   if (!is.null(attr(dist_mat, "Labels"))) {
     config_tbl <- tibble::as_tibble(config_matrix) %>%
-      dplyr::mutate(.id = attr(dist_mat, "Labels"), .before = 1)
+      dplyr::mutate(.obs_id = attr(dist_mat, "Labels"), .before = 1)
   } else {
     config_tbl <- tibble::as_tibble(config_matrix)
   }
@@ -168,7 +168,7 @@ tidy_mds_sammon <- function(dist_mat, ndim = 2, ...) {
 
   if (!is.null(attr(dist_mat, "Labels"))) {
     config_tbl <- tibble::as_tibble(config_matrix) %>%
-      dplyr::mutate(.id = attr(dist_mat, "Labels"), .before = 1)
+      dplyr::mutate(.obs_id = attr(dist_mat, "Labels"), .before = 1)
   } else {
     config_tbl <- tibble::as_tibble(config_matrix)
   }
@@ -210,7 +210,7 @@ tidy_mds_kruskal <- function(dist_mat, ndim = 2, ...) {
 
   if (!is.null(attr(dist_mat, "Labels"))) {
     config_tbl <- tibble::as_tibble(config_matrix) %>%
-      dplyr::mutate(.id = attr(dist_mat, "Labels"), .before = 1)
+      dplyr::mutate(.obs_id = attr(dist_mat, "Labels"), .before = 1)
   } else {
     config_tbl <- tibble::as_tibble(config_matrix)
   }
@@ -261,8 +261,8 @@ plot_mds <- function(mds_obj, color_by = NULL, label_points = TRUE,
   }
 
   # Add labels
-  if (label_points && ".id" %in% names(config)) {
-    p <- p + ggplot2::geom_text(ggplot2::aes(label = .id), vjust = -0.7, size = 3)
+  if (label_points && ".obs_id" %in% names(config)) {
+    p <- p + ggplot2::geom_text(ggplot2::aes(label = .obs_id), vjust = -0.7, size = 3)
   }
 
   # Add title with stress if available

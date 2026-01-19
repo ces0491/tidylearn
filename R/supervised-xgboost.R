@@ -1,5 +1,5 @@
-#' @title XGBoost Functions for tidysl
-#' @name tidysl-xgboost
+#' @title XGBoost Functions for tidylearn
+#' @name tidylearn-xgboost
 #' @description XGBoost-specific implementation for gradient boosting
 #' @importFrom stats model.matrix as.formula
 #' @importFrom dplyr %>% filter select mutate
@@ -121,7 +121,7 @@ tl_fit_xgboost <- function(data, formula, is_classification = FALSE,
 
 #' Predict using an XGBoost model
 #'
-#' @param model A tidysl XGBoost model object
+#' @param model A tidylearn XGBoost model object
 #' @param new_data A data frame containing the new data
 #' @param type Type of prediction: "response" (default), "prob" (for classification), "class" (for classification)
 #' @param ntreelimit Limit number of trees used for prediction (default: NULL, uses all trees)
@@ -211,7 +211,7 @@ tl_predict_xgboost <- function(model, new_data, type = "response", ntreelimit = 
 
 #' Plot feature importance for an XGBoost model
 #'
-#' @param model A tidysl XGBoost model object
+#' @param model A tidylearn XGBoost model object
 #' @param top_n Number of top features to display (default: 10)
 #' @param importance_type Type of importance: "gain", "cover", "frequency"
 #' @param ... Additional arguments
@@ -219,7 +219,7 @@ tl_predict_xgboost <- function(model, new_data, type = "response", ntreelimit = 
 #' @export
 tl_plot_xgboost_importance <- function(model, top_n = 10, importance_type = "gain", ...) {
   # Check if model is an XGBoost model
-  if (!inherits(model, "tidysl_model") || model$spec$method != "xgboost") {
+  if (!inherits(model, "tidylearn_model") || model$spec$method != "xgboost") {
     stop("This function requires an XGBoost model", call. = FALSE)
   }
 
@@ -246,14 +246,14 @@ tl_plot_xgboost_importance <- function(model, top_n = 10, importance_type = "gai
 
 #' Plot XGBoost tree visualization
 #'
-#' @param model A tidysl XGBoost model object
+#' @param model A tidylearn XGBoost model object
 #' @param tree_index Index of the tree to plot (default: 0, first tree)
 #' @param ... Additional arguments
 #' @return Tree visualization
 #' @export
 tl_plot_xgboost_tree <- function(model, tree_index = 0, ...) {
   # Check if model is an XGBoost model
-  if (!inherits(model, "tidysl_model") || model$spec$method != "xgboost") {
+  if (!inherits(model, "tidylearn_model") || model$spec$method != "xgboost") {
     stop("This function requires an XGBoost model", call. = FALSE)
   }
 
@@ -430,7 +430,7 @@ tl_tune_xgboost <- function(data, formula, is_classification = FALSE,
     attr(final_model, "response_levels") <- levels(y)
   }
 
-  # Create tidysl model wrapper
+  # Create tidylearn model wrapper
   model <- structure(
     list(
       spec = list(
@@ -442,7 +442,7 @@ tl_tune_xgboost <- function(data, formula, is_classification = FALSE,
       fit = final_model,
       data = data
     ),
-    class = c("tidysl_xgboost", "tidysl_model")
+    class = c("tidylearn_xgboost", "tidylearn_model")
   )
 
   # Add tuning results to model
@@ -460,7 +460,7 @@ tl_tune_xgboost <- function(data, formula, is_classification = FALSE,
 
 #' Generate SHAP values for XGBoost model interpretation
 #'
-#' @param model A tidysl XGBoost model object
+#' @param model A tidylearn XGBoost model object
 #' @param data Data for SHAP value calculation (default: NULL, uses training data)
 #' @param n_samples Number of samples to use (default: 100, NULL for all)
 #' @param trees_idx Trees to include (default: NULL, uses all trees)
@@ -468,7 +468,7 @@ tl_tune_xgboost <- function(data, formula, is_classification = FALSE,
 #' @export
 tl_xgboost_shap <- function(model, data = NULL, n_samples = 100, trees_idx = NULL) {
   # Check if model is an XGBoost model
-  if (!inherits(model, "tidysl_model") || model$spec$method != "xgboost") {
+  if (!inherits(model, "tidylearn_model") || model$spec$method != "xgboost") {
     stop("This function requires an XGBoost model", call. = FALSE)
   }
 
@@ -535,7 +535,7 @@ tl_xgboost_shap <- function(model, data = NULL, n_samples = 100, trees_idx = NUL
 
 #' Plot SHAP summary for XGBoost model
 #'
-#' @param model A tidysl XGBoost model object
+#' @param model A tidylearn XGBoost model object
 #' @param data Data for SHAP value calculation (default: NULL, uses training data)
 #' @param top_n Number of top features to display (default: 10)
 #' @param n_samples Number of samples to use (default: 100, NULL for all)
@@ -623,7 +623,7 @@ tl_plot_xgboost_shap_summary <- function(model, data = NULL, top_n = 10, n_sampl
 
 #' Plot SHAP dependence for a specific feature
 #'
-#' @param model A tidysl XGBoost model object
+#' @param model A tidylearn XGBoost model object
 #' @param feature Feature name to plot
 #' @param interaction_feature Feature to use for coloring (default: NULL)
 #' @param data Data for SHAP value calculation (default: NULL, uses training data)

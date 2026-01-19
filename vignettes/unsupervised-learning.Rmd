@@ -24,7 +24,19 @@ library(ggplot2)
 
 ## Introduction
 
-This vignette explores unsupervised learning in tidylearn, covering dimensionality reduction and clustering techniques.
+This vignette explores unsupervised learning in tidylearn. All methods wrap
+established R packages - the algorithms are unchanged, tidylearn simply provides
+a consistent interface and tidy output.
+
+**Wrapped packages include:**
+
+- stats (`prcomp()`, `kmeans()`, `hclust()`, `cmdscale()`)
+- cluster (`pam()`, `clara()`)
+- dbscan for density-based clustering
+- MASS (`isoMDS()`, `sammon()`)
+- smacof for MDS algorithms
+
+Access raw model objects via `model$fit` for package-specific functionality.
 
 ## Dimensionality Reduction
 

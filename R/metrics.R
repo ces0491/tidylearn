@@ -1,5 +1,5 @@
-#' @title Metrics Functionality for tidysl
-#' @name tidysl-metrics
+#' @title Metrics Functionality for tidylearn
+#' @name tidylearn-metrics
 #' @description Functions for calculating model evaluation metrics
 #' @importFrom yardstick accuracy precision recall f_meas rmse rsq mae mape roc_auc pr_auc
 #' @importFrom ROCR prediction performance
@@ -124,7 +124,7 @@ tl_calc_classification_metrics <- function(actuals, predicted, predicted_probs =
     }
   }
 
-  return(results)
+  results
 }
 
 #' Calculate the area under the precision-recall curve
@@ -149,10 +149,12 @@ tl_calculate_pr_auc <- function(perf) {
   # Calculate AUC using trapezoidal rule
   auc <- 0
   for (i in 2:length(recall)) {
-    auc <- auc + (recall[i] - recall[i-1]) * (precision[i] + precision[i-1]) / 2
+    width <- recall[i] - recall[i - 1]
+    height <- (precision[i] + precision[i - 1]) / 2
+    auc <- auc + width * height
   }
 
-  return(auc)
+  auc
 }
 
 #' Evaluate metrics at different thresholds
@@ -196,7 +198,7 @@ tl_evaluate_thresholds <- function(actuals, probs, thresholds, pos_class) {
     )
   })
 
-  return(threshold_results)
+  threshold_results
 }
 
 

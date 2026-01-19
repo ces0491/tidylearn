@@ -7,7 +7,7 @@
 tl_plot_partial_dependence(model, var, n.pts = 20, ...)
 }
 \arguments{
-\item{model}{A tidysl tree-based model object}
+\item{model}{A tidylearn tree-based model object}
 
 \item{var}{Variable name to plot}
 

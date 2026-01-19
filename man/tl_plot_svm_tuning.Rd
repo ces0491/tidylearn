@@ -7,7 +7,7 @@
 tl_plot_svm_tuning(model, ...)
 }
 \arguments{
-\item{model}{A tidysl SVM model object}
+\item{model}{A tidylearn SVM model object}
 
 \item{...}{Additional arguments}
 }

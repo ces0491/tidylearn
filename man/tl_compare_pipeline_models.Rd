@@ -7,7 +7,7 @@
 tl_compare_pipeline_models(pipeline, metrics = NULL)
 }
 \arguments{
-\item{pipeline}{A tidysl pipeline object with results}
+\item{pipeline}{A tidylearn pipeline object with results}
 
 \item{metrics}{Character vector of metrics to compare (if NULL, uses all available)}
 }

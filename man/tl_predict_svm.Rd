@@ -7,7 +7,7 @@
 tl_predict_svm(model, new_data, type = "response", ...)
 }
 \arguments{
-\item{model}{A tidysl SVM model object}
+\item{model}{A tidylearn SVM model object}
 
 \item{new_data}{A data frame containing the new data}
 

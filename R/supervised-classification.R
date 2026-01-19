@@ -1,5 +1,5 @@
-#' @title Classification Functions for tidysl
-#' @name tidysl-classification
+#' @title Classification Functions for tidylearn
+#' @name tidylearn-classification
 #' @description Logistic regression and classification metrics functionality
 #' @importFrom stats glm predict binomial
 #' @importFrom tibble tibble as_tibble
@@ -26,12 +26,12 @@ tl_fit_logistic <- function(data, formula, ...) {
   # Fit the logistic regression model
   glm_model <- stats::glm(formula, data = data, family = stats::binomial(), ...)
 
-  return(glm_model)
+  glm_model
 }
 
 #' Predict using a logistic regression model
 #'
-#' @param model A tidysl logistic model object
+#' @param model A tidylearn logistic model object
 #' @param new_data A data frame containing the new data
 #' @param type Type of prediction: "prob" (default), "class", "response"
 #' @param ... Additional arguments
@@ -52,7 +52,7 @@ tl_predict_logistic <- function(model, new_data, type = "prob", ...) {
   if (type == "response") {
     # Get the linear predictor
     preds <- stats::predict(model$fit, newdata = new_data, type = "response", ...)
-    return(preds)
+    preds
   } else if (type == "prob") {
     # Binary classification
     if (length(class_levels) == 2) {
@@ -66,7 +66,7 @@ tl_predict_logistic <- function(model, new_data, type = "prob", ...) {
         !!class_levels[2] := pos_probs
       )
 
-      return(prob_df)
+      prob_df
     } else {
       # Multiclass classification (requires multinomial logistic regression)
       stop("Multiclass logistic regression not currently implemented", call. = FALSE)
@@ -81,7 +81,7 @@ tl_predict_logistic <- function(model, new_data, type = "prob", ...) {
       pred_classes <- ifelse(pos_probs > 0.5, class_levels[2], class_levels[1])
       pred_classes <- factor(pred_classes, levels = class_levels)
 
-      return(pred_classes)
+      pred_classes
     } else {
       # Multiclass classification (requires multinomial logistic regression)
       stop("Multiclass logistic regression not currently implemented", call. = FALSE)
@@ -93,7 +93,7 @@ tl_predict_logistic <- function(model, new_data, type = "prob", ...) {
 
 #' Plot ROC curve for a classification model
 #'
-#' @param model A tidysl classification model object
+#' @param model A tidylearn classification model object
 #' @param new_data Optional data frame for evaluation (if NULL, uses training data)
 #' @param ... Additional arguments
 #' @return A ggplot object with ROC curve
@@ -148,7 +148,7 @@ tl_plot_roc <- function(model, new_data = NULL, ...) {
       ggplot2::coord_fixed() +
       ggplot2::theme_minimal()
 
-    return(p)
+    p
   } else {
     # Multiclass ROC (one-vs-rest)
     stop("Multiclass ROC curves not currently implemented", call. = FALSE)
@@ -157,7 +157,7 @@ tl_plot_roc <- function(model, new_data = NULL, ...) {
 
 #' Plot confusion matrix for a classification model
 #'
-#' @param model A tidysl classification model object
+#' @param model A tidylearn classification model object
 #' @param new_data Optional data frame for evaluation (if NULL, uses training data)
 #' @param ... Additional arguments
 #' @return A ggplot object with confusion matrix
@@ -202,12 +202,12 @@ tl_plot_confusion <- function(model, new_data = NULL, ...) {
     ggplot2::theme_minimal() +
     ggplot2::theme(panel.grid = ggplot2::element_blank())
 
-  return(p)
+  p
 }
 
 #' Plot precision-recall curve for a classification model
 #'
-#' @param model A tidysl classification model object
+#' @param model A tidylearn classification model object
 #' @param new_data Optional data frame for evaluation (if NULL, uses training data)
 #' @param ... Additional arguments
 #' @return A ggplot object with precision-recall curve
@@ -265,7 +265,7 @@ tl_plot_precision_recall <- function(model, new_data = NULL, ...) {
       ggplot2::xlim(0, 1) +
       ggplot2::theme_minimal()
 
-    return(p)
+    p
   } else {
     # Multiclass precision-recall curves (not implemented)
     stop("Multiclass precision-recall curves not currently implemented", call. = FALSE)
@@ -274,7 +274,7 @@ tl_plot_precision_recall <- function(model, new_data = NULL, ...) {
 
 #' Plot calibration curve for a classification model
 #'
-#' @param model A tidysl classification model object
+#' @param model A tidylearn classification model object
 #' @param new_data Optional data frame for evaluation (if NULL, uses training data)
 #' @param bins Number of bins for grouping predictions (default: 10)
 #' @param ... Additional arguments
@@ -339,7 +339,7 @@ tl_plot_calibration <- function(model, new_data = NULL, bins = 10, ...) {
       ggplot2::coord_fixed() +
       ggplot2::theme_minimal()
 
-    return(p)
+    p
   } else {
     # Multiclass calibration (not implemented)
     stop("Multiclass calibration curves not currently implemented", call. = FALSE)

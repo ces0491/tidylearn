@@ -1,6 +1,11 @@
-#' @title tidylearn: A Unified Tidy Approach to Machine Learning
+#' @title tidylearn: A Unified Tidy Interface to R's Machine Learning Ecosystem
 #' @name tidylearn-core
-#' @description Core functionality for the tidylearn package
+#' @description Core functionality for tidylearn. This package provides a unified
+#'   tidyverse-compatible interface to established R machine learning packages
+#'   including glmnet, randomForest, xgboost, e1071, rpart, gbm, nnet, cluster,
+#'   and dbscan. The underlying algorithms are unchanged - tidylearn wraps them
+#'   with consistent function signatures, tidy tibble output, and unified
+#'   ggplot2-based visualization. Access raw model objects via model$fit.
 #' @importFrom magrittr %>%
 #' @importFrom rlang .data .env
 #' @importFrom dplyr filter select mutate group_by summarize arrange
@@ -28,30 +33,43 @@ NULL
 
 #' Create a tidylearn model
 #'
-#' Unified interface for creating both supervised and unsupervised machine learning models.
-#' This function automatically detects the learning paradigm based on the method and formula.
+#' Unified interface for creating machine learning models by wrapping established R packages.
+#' This function dispatches to the appropriate underlying package based on the method specified.
+#'
+#' The wrapped packages include: stats (lm, glm, prcomp, kmeans, hclust), glmnet, randomForest,
+#' xgboost, gbm, e1071, nnet, rpart, cluster, and dbscan. The underlying algorithms are unchanged -
+#' this function provides a consistent interface and returns tidy output.
+#'
+#' Access the raw model object from the underlying package via \code{model$fit}.
 #'
 #' @param data A data frame containing the training data
 #' @param formula A formula specifying the model. For unsupervised methods, use \code{~ vars} or NULL.
-#' @param method The modeling method. Supervised: "linear", "logistic", "tree", "forest", "boost",
-#'   "ridge", "lasso", "elastic_net", "svm", "nn", "deep", "xgboost".
-#'   Unsupervised: "pca", "mds", "kmeans", "pam", "clara", "hclust", "dbscan".
-#' @param ... Additional arguments to pass to the underlying model function
-#' @return A tidylearn model object
+#' @param method The modeling method. Supervised: "linear" (stats::lm), "logistic" (stats::glm),
+#'   "tree" (rpart), "forest" (randomForest), "boost" (gbm), "ridge"/"lasso"/"elastic_net" (glmnet),
+#'   "svm" (e1071), "nn" (nnet), "deep" (keras), "xgboost" (xgboost).
+#'   Unsupervised: "pca" (stats::prcomp), "mds" (stats/MASS/smacof), "kmeans" (stats::kmeans),
+#'   "pam"/"clara" (cluster), "hclust" (stats::hclust), "dbscan" (dbscan).
+#' @param ... Additional arguments passed to the underlying model function
+#' @return A tidylearn model object containing the fitted model (\code{$fit}), specification,
+#'   and training data
 #' @export
 #' @examples
 #' \dontrun{
-#' # Supervised: Classification
+#' # Classification -> wraps randomForest::randomForest()
 #' model <- tl_model(iris, Species ~ ., method = "forest")
+#' model$fit  # Access the raw randomForest object
 #'
-#' # Supervised: Regression
+#' # Regression -> wraps stats::lm()
 #' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+#' model$fit  # Access the raw lm object
 #'
-#' # Unsupervised: PCA
+#' # PCA -> wraps stats::prcomp()
 #' model <- tl_model(iris, ~ ., method = "pca")
+#' model$fit  # Access the raw prcomp object
 #'
-#' # Unsupervised: Clustering
+#' # Clustering -> wraps stats::kmeans()
 #' model <- tl_model(iris, method = "kmeans", k = 3)
+#' model$fit  # Access the raw kmeans object
 #' }
 tl_model <- function(data, formula = NULL, method = "linear", ...) {
   # Validate inputs
@@ -142,7 +160,7 @@ tl_model_supervised <- function(data, formula, method, ...) {
     class = c(paste0("tidylearn_", method), "tidylearn_supervised", "tidylearn_model")
   )
 
-  return(model)
+  model
 }
 
 #' Create an unsupervised learning model
@@ -183,7 +201,7 @@ tl_model_unsupervised <- function(data, formula = NULL, method, ...) {
     class = c(paste0("tidylearn_", method), "tidylearn_unsupervised", "tidylearn_model")
   )
 
-  return(model)
+  model
 }
 
 #' Predict using a tidylearn model
@@ -226,17 +244,22 @@ predict_supervised <- function(object, new_data, type = "response", ...) {
     "logistic" = tl_predict_logistic(object, new_data, type, ...),
     "tree" = tl_predict_tree(object, new_data, type, ...),
     "forest" = tl_predict_forest(object, new_data, type, ...),
+    "boost" = tl_predict_boost(object, new_data, type, ...),
     "ridge" = tl_predict_glmnet(object, new_data, type, ...),
     "lasso" = tl_predict_glmnet(object, new_data, type, ...),
     "elastic_net" = tl_predict_glmnet(object, new_data, type, ...),
+    "svm" = tl_predict_svm(object, new_data, type, ...),
+    "nn" = tl_predict_nn(object, new_data, type, ...),
+    "deep" = tl_predict_deep(object, new_data, type, ...),
+    "xgboost" = tl_predict_xgboost(object, new_data, type, ...),
     stop("Unsupported supervised method for prediction: ", method, call. = FALSE)
   )
 
   # Ensure tibble output
   if (is.data.frame(preds) || inherits(preds, "tbl")) {
-    return(preds)
+    preds
   } else {
-    return(tibble::tibble(.pred = preds))
+    tibble::tibble(.pred = preds)
   }
 }
 
@@ -295,7 +318,7 @@ predict_unsupervised <- function(object, new_data, type = "response", ...) {
       warning("DBSCAN does not support standard out-of-sample prediction.")
       object$fit$clusters
     },
-    stop("Unsupervised unsupervised method for prediction: ", method, call. = FALSE)
+    stop("Unsupported unsupervised method for prediction: ", method, call. = FALSE)
   )
 
   result

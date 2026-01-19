@@ -7,7 +7,7 @@
 tl_plot_regularization_path(model, label_n = 5, ...)
 }
 \arguments{
-\item{model}{A tidysl regularized model object}
+\item{model}{A tidylearn regularized model object}
 
 \item{label_n}{Number of top features to label (default: 5)}
 

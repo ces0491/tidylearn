@@ -7,7 +7,7 @@
 tl_plot_importance_regularized(model, lambda = "1se", top_n = 20, ...)
 }
 \arguments{
-\item{model}{A tidysl regularized model object}
+\item{model}{A tidylearn regularized model object}
 
 \item{lambda}{Which lambda to use ("1se" or "min", default: "1se")}
 

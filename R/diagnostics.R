@@ -1,5 +1,5 @@
-#' @title Advanced Diagnostics Functions for tidysl
-#' @name tidysl-diagnostics
+#' @title Advanced Diagnostics Functions for tidylearn
+#' @name tidylearn-diagnostics
 #' @description Functions for advanced model diagnostics, assumption checking, and outlier detection
 #' @importFrom stats influence.measures cooks.distance hatvalues dffits dfbetas
 #' @importFrom stats lm.influence rstudent rstandard
@@ -10,7 +10,7 @@ NULL
 
 #' Calculate influence measures for a linear model
 #'
-#' @param model A tidysl model object
+#' @param model A tidylearn model object
 #' @param threshold_cook Cook's distance threshold (default: 4/n)
 #' @param threshold_leverage Leverage threshold (default: 2*(p+1)/n)
 #' @param threshold_dffits DFFITS threshold (default: 2*sqrt((p+1)/n))
@@ -20,9 +20,15 @@ tl_influence_measures <- function(model, threshold_cook = NULL,
                                   threshold_leverage = NULL,
                                   threshold_dffits = NULL) {
   # Check if model is supported
-  if (!inherits(model, "tidysl_model") ||
-      !model$spec$method %in% c("linear", "logistic", "polynomial", "ridge", "lasso", "elastic_net")) {
-    stop("Influence measures are only available for linear-based models", call. = FALSE)
+  supported_methods <- c(
+    "linear", "logistic", "polynomial", "ridge", "lasso", "elastic_net"
+  )
+  if (!inherits(model, "tidylearn_model") ||
+      !model$spec$method %in% supported_methods) {
+    stop(
+      "Influence measures are only available for linear-based models",
+      call. = FALSE
+    )
   }
 
   # Extract fitted model
@@ -81,12 +87,12 @@ tl_influence_measures <- function(model, threshold_cook = NULL,
   attr(influence_df, "threshold_leverage") <- threshold_leverage
   attr(influence_df, "threshold_dffits") <- threshold_dffits
 
-  return(influence_df)
+  influence_df
 }
 
 #' Plot influence diagnostics
 #'
-#' @param model A tidysl model object
+#' @param model A tidylearn model object
 #' @param plot_type Type of influence plot: "cook", "leverage", "index"
 #' @param threshold_cook Cook's distance threshold (default: 4/n)
 #' @param threshold_leverage Leverage threshold (default: 2*(p+1)/n)
@@ -115,18 +121,43 @@ tl_plot_influence <- function(model, plot_type = "cook", threshold_cook = NULL,
   if (plot_type == "cook") {
     # Cook's distance plot
     # Identify top points to label
-    top_idx <- order(influence_df$cooks_distance, decreasing = TRUE)[1:min(n_labels, nrow(influence_df))]
-    influence_df$label <- ifelse(influence_df$observation %in% influence_df$observation[top_idx],
-                                 as.character(influence_df$observation), "")
+    n_to_label <- min(n_labels, nrow(influence_df))
+    top_idx <- order(influence_df$cooks_distance, decreasing = TRUE)[1:n_to_label]
+    influence_df$label <- ifelse(
+      influence_df$observation %in% influence_df$observation[top_idx],
+      as.character(influence_df$observation),
+      ""
+    )
 
-    p <- ggplot2::ggplot(influence_df, ggplot2::aes(x = observation, y = cooks_distance)) +
-      ggplot2::geom_point(ggplot2::aes(color = is_cook_influential), size = 3, alpha = 0.7) +
-      ggplot2::geom_hline(yintercept = threshold_cook, linetype = "dashed", color = "red") +
-      ggplot2::geom_text(ggplot2::aes(label = label), hjust = -0.3, vjust = 0.5, size = label_size) +
+    subtitle_text <- paste(
+      "Threshold:",
+      round(threshold_cook, 4),
+      "- Points above are influential"
+    )
+    p <- ggplot2::ggplot(
+      influence_df,
+      ggplot2::aes(x = observation, y = cooks_distance)
+    ) +
+      ggplot2::geom_point(
+        ggplot2::aes(color = is_cook_influential),
+        size = 3,
+        alpha = 0.7
+      ) +
+      ggplot2::geom_hline(
+        yintercept = threshold_cook,
+        linetype = "dashed",
+        color = "red"
+      ) +
+      ggplot2::geom_text(
+        ggplot2::aes(label = label),
+        hjust = -0.3,
+        vjust = 0.5,
+        size = label_size
+      ) +
       ggplot2::scale_color_manual(values = c("blue", "red")) +
       ggplot2::labs(
         title = "Cook's Distance Plot",
-        subtitle = paste("Threshold:", round(threshold_cook, 4), "- Points above are influential"),
+        subtitle = subtitle_text,
         x = "Observation Index",
         y = "Cook's Distance",
         color = "Influential"
@@ -136,9 +167,13 @@ tl_plot_influence <- function(model, plot_type = "cook", threshold_cook = NULL,
   } else if (plot_type == "leverage") {
     # Leverage-Residual plot (Bubble plot with Cook's distance)
     # Identify top points to label
-    top_idx <- order(influence_df$cooks_distance, decreasing = TRUE)[1:min(n_labels, nrow(influence_df))]
-    influence_df$label <- ifelse(influence_df$observation %in% influence_df$observation[top_idx],
-                                 as.character(influence_df$observation), "")
+    n_to_label <- min(n_labels, nrow(influence_df))
+    top_idx <- order(influence_df$cooks_distance, decreasing = TRUE)[1:n_to_label]
+    influence_df$label <- ifelse(
+      influence_df$observation %in% influence_df$observation[top_idx],
+      as.character(influence_df$observation),
+      ""
+    )
 
     p <- ggplot2::ggplot(
       influence_df,
@@ -150,15 +185,28 @@ tl_plot_influence <- function(model, plot_type = "cook", threshold_cook = NULL,
       )
     ) +
       ggplot2::geom_point(alpha = 0.7) +
-      ggplot2::geom_hline(yintercept = c(-3, 0, 3), linetype = "dashed", color = c("red", "black", "red")) +
-      ggplot2::geom_vline(xintercept = threshold_leverage, linetype = "dashed", color = "red") +
-      ggplot2::geom_text(ggplot2::aes(label = label), hjust = -0.3, vjust = 0.5, size = label_size) +
+      ggplot2::geom_hline(
+        yintercept = c(-3, 0, 3),
+        linetype = "dashed",
+        color = c("red", "black", "red")
+      ) +
+      ggplot2::geom_vline(
+        xintercept = threshold_leverage,
+        linetype = "dashed",
+        color = "red"
+      ) +
+      ggplot2::geom_text(
+        ggplot2::aes(label = label),
+        hjust = -0.3,
+        vjust = 0.5,
+        size = label_size
+      ) +
       ggplot2::scale_color_manual(values = c("blue", "red")) +
       ggplot2::labs(
         title = "Leverage-Residual Plot",
         subtitle = paste(
           "Leverage threshold:", round(threshold_leverage, 4),
-          "- Residual threshold: ±3"
+          "- Residual threshold: +/-3"
         ),
         x = "Leverage (Hat Values)",
         y = "Standardized Residuals",
@@ -170,42 +218,74 @@ tl_plot_influence <- function(model, plot_type = "cook", threshold_cook = NULL,
   } else if (plot_type == "index") {
     # Index plot of residuals
     # Identify top points to label
-    top_idx <- order(abs(influence_df$std_residual), decreasing = TRUE)[1:min(n_labels, nrow(influence_df))]
-    influence_df$label <- ifelse(influence_df$observation %in% influence_df$observation[top_idx],
-                                 as.character(influence_df$observation), "")
+    n_to_label <- min(n_labels, nrow(influence_df))
+    top_idx <- order(
+      abs(influence_df$std_residual),
+      decreasing = TRUE
+    )[1:n_to_label]
+    influence_df$label <- ifelse(
+      influence_df$observation %in% influence_df$observation[top_idx],
+      as.character(influence_df$observation),
+      ""
+    )
 
-    p <- ggplot2::ggplot(influence_df, ggplot2::aes(x = observation, y = std_residual)) +
-      ggplot2::geom_point(ggplot2::aes(color = is_outlier), size = 3, alpha = 0.7) +
-      ggplot2::geom_hline(yintercept = c(-3, 0, 3), linetype = "dashed", color = c("red", "black", "red")) +
-      ggplot2::geom_text(ggplot2::aes(label = label), hjust = -0.3, vjust = 0.5, size = label_size) +
+    p <- ggplot2::ggplot(
+      influence_df,
+      ggplot2::aes(x = observation, y = std_residual)
+    ) +
+      ggplot2::geom_point(
+        ggplot2::aes(color = is_outlier),
+        size = 3,
+        alpha = 0.7
+      ) +
+      ggplot2::geom_hline(
+        yintercept = c(-3, 0, 3),
+        linetype = "dashed",
+        color = c("red", "black", "red")
+      ) +
+      ggplot2::geom_text(
+        ggplot2::aes(label = label),
+        hjust = -0.3,
+        vjust = 0.5,
+        size = label_size
+      ) +
       ggplot2::scale_color_manual(values = c("blue", "red")) +
       ggplot2::labs(
         title = "Index Plot of Standardized Residuals",
-        subtitle = "Points outside ±3 are considered outliers",
+        subtitle = "Points outside +/-3 are considered outliers",
         x = "Observation Index",
         y = "Standardized Residuals",
         color = "Outlier"
       ) +
       ggplot2::theme_minimal()
   } else {
-    stop("Invalid plot_type. Use 'cook', 'leverage', or 'index'.", call. = FALSE)
+    stop(
+      "Invalid plot_type. Use 'cook', 'leverage', or 'index'.",
+      call. = FALSE
+    )
   }
 
-  return(p)
+  p
 }
 
 #' Check model assumptions
 #'
-#' @param model A tidysl model object
+#' @param model A tidylearn model object
 #' @param test Logical; whether to perform statistical tests
 #' @param verbose Logical; whether to print test results and explanations
 #' @return A list with assumption check results
 #' @export
 tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
   # Check if model is supported
-  if (!inherits(model, "tidysl_model") ||
-      !model$spec$method %in% c("linear", "logistic", "polynomial", "ridge", "lasso", "elastic_net")) {
-    stop("Assumption checking is only available for linear-based models", call. = FALSE)
+  supported <- c(
+    "linear", "logistic", "polynomial", "ridge", "lasso", "elastic_net"
+  )
+  if (!inherits(model, "tidylearn_model") ||
+      !model$spec$method %in% supported) {
+    stop(
+      "Assumption checking is only available for linear-based models",
+      call. = FALSE
+    )
   }
 
   # Extract fitted model and data
@@ -223,10 +303,14 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
   # 1. Linearity
   # Check correlation between fitted values and residuals
   linearity_cor <- cor(fitted_values, residuals)
+  linearity_details <- paste(
+    "Correlation between fitted values and residuals:",
+    round(linearity_cor, 4)
+  )
   assumptions$linearity <- list(
     assumption = "Linearity",
     check = abs(linearity_cor) < 0.1,
-    details = paste("Correlation between fitted values and residuals:", round(linearity_cor, 4)),
+    details = linearity_details,
     recommendation = if (abs(linearity_cor) >= 0.1) {
       "Consider non-linear transformations or polynomial terms"
     } else {
@@ -239,22 +323,29 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
   if (test && requireNamespace("car", quietly = TRUE)) {
     dw_test <- car::durbinWatsonTest(fit)
     dw_statistic <- dw_test$dw
+    dw_recommendation <- if (dw_statistic < 1.5 || dw_statistic > 2.5) {
+      paste(
+        "Possible autocorrelation in residuals.",
+        "Check for time-series structure or clustering."
+      )
+    } else {
+      "Independence assumption appears satisfied"
+    }
     assumptions$independence <- list(
       assumption = "Independence",
       check = dw_statistic >= 1.5 && dw_statistic <= 2.5,
       details = paste("Durbin-Watson statistic:", round(dw_statistic, 4)),
-      recommendation = if (dw_statistic < 1.5 || dw_statistic > 2.5) {
-        "Possible autocorrelation in residuals. Check for time-series structure or clustering."
-      } else {
-        "Independence assumption appears satisfied"
-      }
+      recommendation = dw_recommendation
     )
   } else {
     assumptions$independence <- list(
       assumption = "Independence",
       check = NULL,
       details = "No statistical test performed",
-      recommendation = "Ensure observations are independent. Consider the data collection process."
+      recommendation = paste(
+        "Ensure observations are independent.",
+        "Consider the data collection process."
+      )
     )
   }
 
@@ -263,28 +354,40 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
   if (test && requireNamespace("lmtest", quietly = TRUE)) {
     bp_test <- lmtest::bptest(fit)
     bp_p_value <- bp_test$p.value
+    bp_recommendation <- if (bp_p_value < 0.05) {
+      paste(
+        "Heteroscedasticity detected.",
+        "Consider variance stabilizing transformations or robust SEs."
+      )
+    } else {
+      "Homoscedasticity assumption appears satisfied"
+    }
     assumptions$homoscedasticity <- list(
       assumption = "Homoscedasticity",
       check = bp_p_value >= 0.05,
       details = paste("Breusch-Pagan test p-value:", round(bp_p_value, 4)),
-      recommendation = if (bp_p_value < 0.05) {
-        "Heteroscedasticity detected. Consider variance stabilizing transformations or robust standard errors."
-      } else {
-        "Homoscedasticity assumption appears satisfied"
-      }
+      recommendation = bp_recommendation
     )
   } else {
     # Simpler check: correlation between abs(residuals) and fitted values
     het_cor <- cor(abs(residuals), fitted_values)
+    het_details <- paste(
+      "Correlation between |residuals| and fitted values:",
+      round(het_cor, 4)
+    )
+    het_recommendation <- if (abs(het_cor) >= 0.2) {
+      paste(
+        "Possible heteroscedasticity.",
+        "Consider variance stabilizing transformations or robust SEs."
+      )
+    } else {
+      "Homoscedasticity assumption appears satisfied"
+    }
     assumptions$homoscedasticity <- list(
       assumption = "Homoscedasticity",
       check = abs(het_cor) < 0.2,
-      details = paste("Correlation between |residuals| and fitted values:", round(het_cor, 4)),
-      recommendation = if (abs(het_cor) >= 0.2) {
-        "Possible heteroscedasticity. Consider variance stabilizing transformations or robust standard errors."
-      } else {
-        "Homoscedasticity assumption appears satisfied"
-      }
+      details = het_details,
+      recommendation = het_recommendation
     )
   }
 
@@ -293,15 +396,19 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
   if (test && length(residuals) <= 5000) {  # Shapiro-Wilk limited to 5000 observations
     sw_test <- shapiro.test(residuals)
     sw_p_value <- sw_test$p.value
+    norm_recommendation <- if (sw_p_value < 0.05) {
+      paste(
+        "Residuals may not be normally distributed.",
+        "Consider transformations or robust regression."
+      )
+    } else {
+      "Normality assumption appears satisfied"
+    }
     assumptions$normality <- list(
       assumption = "Normality of Residuals",
       check = sw_p_value >= 0.05,
       details = paste("Shapiro-Wilk test p-value:", round(sw_p_value, 4)),
-      recommendation = if (sw_p_value < 0.05) {
-        "Residuals may not be normally distributed. Consider transformations or robust regression."
-      } else {
-        "Normality assumption appears satisfied"
-      }
+      recommendation = norm_recommendation
     )
   } else {
     # Check skewness and kurtosis
@@ -309,29 +416,41 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
       skew <- moments::skewness(residuals)
       kurt <- moments::kurtosis(residuals)
       norm_check <- abs(skew) < 0.5 && abs(kurt - 3) < 1
+      norm_details <- paste(
+        "Skewness:", round(skew, 4),
+        "Kurtosis:", round(kurt, 4)
+      )
+      norm_recommendation <- if (!norm_check) {
+        paste(
+          "Residuals may not be normally distributed.",
+          "Consider transformations or robust regression."
+        )
+      } else {
+        "Normality assumption appears satisfied"
+      }
       assumptions$normality <- list(
         assumption = "Normality of Residuals",
         check = norm_check,
-        details = paste("Skewness:", round(skew, 4), "Kurtosis:", round(kurt, 4)),
-        recommendation = if (!norm_check) {
-          "Residuals may not be normally distributed. Consider transformations or robust regression."
-        } else {
-          "Normality assumption appears satisfied"
-        }
+        details = norm_details,
+        recommendation = norm_recommendation
       )
     } else {
       # Simplified check with quantiles
       q_norm <- qqnorm(residuals, plot = FALSE)
       cor_norm <- cor(q_norm$x, q_norm$y)
+      qq_recommendation <- if (cor_norm < 0.98) {
+        paste(
+          "Residuals may not be normally distributed.",
+          "Consider transformations or robust regression."
+        )
+      } else {
+        "Normality assumption appears satisfied"
+      }
       assumptions$normality <- list(
         assumption = "Normality of Residuals",
         check = cor_norm >= 0.98,
         details = paste("QQ-plot correlation:", round(cor_norm, 4)),
-        recommendation = if (cor_norm < 0.98) {
-          "Residuals may not be normally distributed. Consider transformations or robust regression."
-        } else {
-          "Normality assumption appears satisfied"
-        }
+        recommendation = qq_recommendation
       )
     }
   }
@@ -342,15 +461,19 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
     tryCatch({
       vif_values <- car::vif(fit)
       max_vif <- max(vif_values)
+      vif_recommendation <- if (max_vif >= 5) {
+        paste(
+          "Multicollinearity detected.",
+          "Consider removing or combining highly correlated predictors."
+        )
+      } else {
+        "No serious multicollinearity detected"
+      }
       assumptions$multicollinearity <- list(
         assumption = "No Multicollinearity",
         check = max_vif < 5,
         details = paste("Maximum VIF:", round(max_vif, 4)),
-        recommendation = if (max_vif >= 5) {
-          "Multicollinearity detected. Consider removing or combining highly correlated predictors."
-        } else {
-          "No serious multicollinearity detected"
-        }
+        recommendation = vif_recommendation
       )
     }, error = function(e) {
       # If VIF calculation fails, use correlation matrix
@@ -363,19 +486,27 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
       predictor_vars <- all.vars(formula)[-1]  # Remove response variable
 
       if (length(predictor_vars) > 1) {
-        pred_data <- stats::model.matrix(formula, data)[, -1]  # Remove intercept
+        pred_data <- stats::model.matrix(formula, data)[, -1]
         cor_matrix <- cor(pred_data)
         max_cor <- max(abs(cor_matrix[upper.tri(cor_matrix)]))
 
+        cor_details <- paste(
+          "Maximum correlation between predictors:",
+          round(max_cor, 4)
+        )
+        cor_recommendation <- if (max_cor >= 0.7) {
+          paste(
+            "Potential multicollinearity.",
+            "Consider removing or combining correlated predictors."
+          )
+        } else {
+          "No serious multicollinearity detected"
+        }
         assumptions$multicollinearity <- list(
           assumption = "No Multicollinearity",
           check = max_cor < 0.7,
-          details = paste("Maximum correlation between predictors:", round(max_cor, 4)),
-          recommendation = if (max_cor >= 0.7) {
-            "Potential multicollinearity. Consider removing or combining highly correlated predictors."
-          } else {
-            "No serious multicollinearity detected"
-          }
+          details = cor_details,
+          recommendation = cor_recommendation
         )
       } else {
         assumptions$multicollinearity <- list(
@@ -389,22 +520,30 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
   } else {
     # If car package not available, use correlation matrix
     formula <- model$spec$formula
-    predictor_vars <- all.vars(formula)[-1]  # Remove response variable
+    predictor_vars <- all.vars(formula)[-1]
 
     if (length(predictor_vars) > 1) {
-      pred_data <- stats::model.matrix(formula, data)[, -1]  # Remove intercept
+      pred_data <- stats::model.matrix(formula, data)[, -1]
       cor_matrix <- cor(pred_data)
       max_cor <- max(abs(cor_matrix[upper.tri(cor_matrix)]))
 
+      cor_details2 <- paste(
+        "Maximum correlation between predictors:",
+        round(max_cor, 4)
+      )
+      cor_recommendation2 <- if (max_cor >= 0.7) {
+        paste(
+          "Potential multicollinearity.",
+          "Consider removing or combining correlated predictors."
+        )
+      } else {
+        "No serious multicollinearity detected"
+      }
       assumptions$multicollinearity <- list(
         assumption = "No Multicollinearity",
         check = max_cor < 0.7,
-        details = paste("Maximum correlation between predictors:", round(max_cor, 4)),
-        recommendation = if (max_cor >= 0.7) {
-          "Potential multicollinearity. Consider removing or combining highly correlated predictors."
-        } else {
-          "No serious multicollinearity detected"
-        }
+        details = cor_details2,
+        recommendation = cor_recommendation2
       )
     } else {
       assumptions$multicollinearity <- list(
@@ -420,19 +559,22 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
   influence_df <- tl_influence_measures(model)
   n_influential <- sum(influence_df$is_influential)
 
+  outlier_recommendation <- if (n_influential > 0) {
+    influential_obs <- influence_df$observation[influence_df$is_influential]
+    obs_to_show <- influential_obs[1:min(5, n_influential)]
+    paste(
+      "Consider inspecting observations:",
+      paste(obs_to_show, collapse = ", "),
+      "... (and potentially others)"
+    )
+  } else {
+    "No influential outliers detected"
+  }
   assumptions$outliers <- list(
     assumption = "No Influential Outliers",
     check = n_influential == 0,
     details = paste(n_influential, "influential observations detected"),
-    recommendation = if (n_influential > 0) {
-      paste(
-        "Consider inspecting observations:",
-        paste(influence_df$observation[influence_df$is_influential][1:min(5, n_influential)], collapse = ", "),
-        "... (and potentially others)"
-      )
-    } else {
-      "No influential outliers detected"
-    }
+    recommendation = outlier_recommendation
   )
 
   # Print summary if verbose
@@ -466,7 +608,10 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
       "All checked assumptions appear to be satisfied."
     } else {
       n_violated <- sum(!checks)
-      paste(n_violated, "assumption(s) appear to be violated. See details for recommendations.")
+      paste(
+        n_violated,
+        "assumption(s) appear to be violated. See details."
+      )
     }
   } else {
     overall_status <- "Could not perform complete assumption checks."
@@ -479,12 +624,12 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
     n_satisfied = sum(checks)
   )
 
-  return(assumptions)
+  assumptions
 }
 
 #' Create a comprehensive diagnostic dashboard
 #'
-#' @param model A tidysl model object
+#' @param model A tidylearn model object
 #' @param include_influence Logical; whether to include influence diagnostics
 #' @param include_assumptions Logical; whether to include assumption checks
 #' @param include_performance Logical; whether to include performance metrics
@@ -498,7 +643,10 @@ tl_diagnostic_dashboard <- function(model, include_influence = TRUE,
 
   # Check package dependencies
   if (!requireNamespace("gridExtra", quietly = TRUE)) {
-    stop("Package 'gridExtra' is required for creating dashboards", call. = FALSE)
+    stop(
+      "Package 'gridExtra' is required for creating dashboards",
+      call. = FALSE
+    )
   }
 
   # Initialize plots list
@@ -507,11 +655,17 @@ tl_diagnostic_dashboard <- function(model, include_influence = TRUE,
   # Add basic diagnostic plots
   plots$residuals_vs_fitted <- tl_plot_residuals(model, type = "fitted")
   plots$residual_hist <- tl_plot_residuals(model, type = "histogram")
-  plots$qq_plot <- ggplot2::ggplot(data.frame(residuals = rstandard(model$fit)),
-                                   ggplot2::aes(sample = residuals)) +
+  plots$qq_plot <- ggplot2::ggplot(
+    data.frame(residuals = rstandard(model$fit)),
+    ggplot2::aes(sample = residuals)
+  ) +
     ggplot2::stat_qq() +
     ggplot2::stat_qq_line(color = "red") +
-    ggplot2::labs(title = "Normal Q-Q Plot", x = "Theoretical Quantiles", y = "Sample Quantiles") +
+    ggplot2::labs(
+      title = "Normal Q-Q Plot",
+      x = "Theoretical Quantiles",
+      y = "Sample Quantiles"
+    ) +
     ggplot2::theme_minimal()
 
   # Add scale-location plot
@@ -538,10 +692,22 @@ tl_diagnostic_dashboard <- function(model, include_influence = TRUE,
     )
 
     # Create a textual summary plot
-    plots$assumptions <- ggplot2::ggplot(assumption_results, ggplot2::aes(x = 1, y = Assumption, fill = Status)) +
+    status_colors <- c(
+      "Satisfied" = "green",
+      "Violated" = "red",
+      "Unknown" = "gray"
+    )
+    plots$assumptions <- ggplot2::ggplot(
+      assumption_results,
+      ggplot2::aes(x = 1, y = Assumption, fill = Status)
+    ) +
       ggplot2::geom_tile() +
-      ggplot2::geom_text(ggplot2::aes(label = Details), hjust = 0, x = 1.05) +
-      ggplot2::scale_fill_manual(values = c("Satisfied" = "green", "Violated" = "red", "Unknown" = "gray")) +
+      ggplot2::geom_text(
+        ggplot2::aes(label = Details),
+        hjust = 0,
+        x = 1.05
+      ) +
+      ggplot2::scale_fill_manual(values = status_colors) +
       ggplot2::labs(title = "Assumption Check Results") +
       ggplot2::theme_minimal() +
       ggplot2::theme(
@@ -559,9 +725,15 @@ tl_diagnostic_dashboard <- function(model, include_influence = TRUE,
     metrics <- tl_evaluate(model)
 
     # Create performance summary plot
-    plots$performance <- ggplot2::ggplot(metrics, ggplot2::aes(x = metric, y = value)) +
+    plots$performance <- ggplot2::ggplot(
+      metrics,
+      ggplot2::aes(x = metric, y = value)
+    ) +
       ggplot2::geom_col(fill = "steelblue") +
-      ggplot2::geom_text(ggplot2::aes(label = round(value, 3)), vjust = -0.5) +
+      ggplot2::geom_text(
+        ggplot2::aes(label = round(value, 3)),
+        vjust = -0.5
+      ) +
       ggplot2::labs(title = "Model Performance Metrics") +
       ggplot2::theme_minimal() +
       ggplot2::theme(
@@ -596,17 +768,21 @@ tl_diagnostic_dashboard <- function(model, include_influence = TRUE,
       nrow = length(plots)
     )
   } else {
-    stop("Invalid arrange_plots value. Use 'grid', 'row', or 'column'.", call. = FALSE)
+    stop(
+      "Invalid arrange_plots value. Use 'grid', 'row', or 'column'.",
+      call. = FALSE
+    )
   }
 
-  return(combined_plot)
+  combined_plot
 }
 
 #' Detect outliers in the data
 #'
 #' @param data A data frame containing the data
 #' @param variables Character vector of variables to check for outliers
-#' @param method Method for outlier detection: "boxplot", "z-score", "cook", "iqr", "mahalanobis"
+#' @param method Method for outlier detection: "boxplot", "z-score", "cook",
+#'   "iqr", "mahalanobis"
 #' @param threshold Threshold for outlier detection
 #' @param plot Logical; whether to create a plot of outliers
 #' @return A list with outlier detection results
@@ -640,9 +816,9 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
     threshold <- switch(method,
                         "boxplot" = 1.5,     # IQR multiplier
                         "z-score" = 3,       # Standard deviations
-                        "cook" = 4/nrow(data), # 4/n rule for Cook's distance
-                        "iqr" = 1.5,         # IQR multiplier
-                        "mahalanobis" = 0.975, # Quantile for chi-square distribution
+                        "cook" = 4 / nrow(data),
+                        "iqr" = 1.5,
+                        "mahalanobis" = 0.975,
                         2                    # Default multiplier
     )
   }
@@ -676,11 +852,16 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
     # Cook's distance method (requires fitting a model)
     # First need to create a model formula
     if (length(variables) < 2) {
-      stop("Cook's distance method requires at least 2 variables (response and predictor)", call. = FALSE)
+      stop(
+        "Cook's distance method requires at least 2 variables",
+        call. = FALSE
+      )
     }
 
     # Use first variable as response
-    formula <- stats::as.formula(paste(variables[1], "~", paste(variables[-1], collapse = " + ")))
+    formula <- stats::as.formula(
+      paste(variables[1], "~", paste(variables[-1], collapse = " + "))
+    )
 
     # Fit linear model
     model <- stats::lm(formula, data = data)
@@ -689,7 +870,11 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
     cooks_d <- stats::cooks.distance(model)
 
     # Create flags (only available for the whole observation, not by variable)
-    outlier_flags <- matrix(cooks_d > threshold, nrow = nrow(data), ncol = length(variables))
+    outlier_flags <- matrix(
+      cooks_d > threshold,
+      nrow = nrow(data),
+      ncol = length(variables)
+    )
     colnames(outlier_flags) <- variables
 
     method_name <- "Cook's Distance"
@@ -712,14 +897,24 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
     chi2_quantile <- stats::qchisq(threshold, df = length(variables))
 
     # Flag outliers (same for all variables)
-    outlier_flags <- matrix(mahal_dist > chi2_quantile, nrow = nrow(data), ncol = length(variables))
+    outlier_flags <- matrix(
+      mahal_dist > chi2_quantile,
+      nrow = nrow(data),
+      ncol = length(variables)
+    )
     colnames(outlier_flags) <- variables
 
     method_name <- "Mahalanobis Distance"
-    threshold_label <- paste0("Chi-square quantile (p = ", threshold, ", df = ", length(variables), "): ", round(chi2_quantile, 2))
+    threshold_label <- paste0(
+      "Chi-square quantile (p = ", threshold,
+      ", df = ", length(variables), "): ", round(chi2_quantile, 2)
+    )
 
   } else {
-    stop("Invalid method. Use 'boxplot', 'z-score', 'cook', 'iqr', or 'mahalanobis'.", call. = FALSE)
+    stop(
+      "Invalid method. Use 'boxplot', 'z-score', 'cook', 'iqr', or 'mahalanobis'.",
+      call. = FALSE
+    )
   }
 
   # Combine flags across variables
@@ -861,5 +1056,5 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
     plot = outlier_plot
   )
 
-  return(result)
+  result
 }

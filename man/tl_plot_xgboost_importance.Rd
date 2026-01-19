@@ -7,7 +7,7 @@
 tl_plot_xgboost_importance(model, top_n = 10, importance_type = "gain", ...)
 }
 \arguments{
-\item{model}{A tidysl XGBoost model object}
+\item{model}{A tidylearn XGBoost model object}
 
 \item{top_n}{Number of top features to display (default: 10)}
 

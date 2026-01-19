@@ -9,7 +9,7 @@ tl_compare_cv(data, models, folds = 5, metrics = NULL, ...)
 \arguments{
 \item{data}{A data frame containing the training data}
 
-\item{models}{A list of tidysl model objects}
+\item{models}{A list of tidylearn model objects}
 
 \item{folds}{Number of cross-validation folds}
 

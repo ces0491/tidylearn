@@ -27,7 +27,7 @@ plot_clusters(
 
 \item{title}{Plot title}
 
-\item{color_noise_black}{If TRUE, color noise points (cluster 0) as black (default: TRUE)}
+\item{color_noise_black}{If TRUE, color noise points (cluster 0) black}
 }
 \value{
 A ggplot object

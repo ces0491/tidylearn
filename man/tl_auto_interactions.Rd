@@ -27,7 +27,7 @@ tl_auto_interactions(
 \item{exclude_vars}{Character vector of variables to exclude from interaction testing}
 }
 \value{
-A tidysl model with important interactions
+A tidylearn model with important interactions
 }
 \description{
 Find important interactions automatically

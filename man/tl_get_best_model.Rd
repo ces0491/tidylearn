@@ -7,10 +7,10 @@
 tl_get_best_model(pipeline)
 }
 \arguments{
-\item{pipeline}{A tidysl pipeline object with results}
+\item{pipeline}{A tidylearn pipeline object with results}
 }
 \value{
-The best tidysl model
+The best tidylearn model
 }
 \description{
 Get the best model from a pipeline

@@ -21,7 +21,11 @@
 #' reduced <- tl_reduce_dimensions(iris, response = "Species", method = "pca", n_components = 3)
 #' model <- tl_model(reduced$data, Species ~ ., method = "logistic")
 #' }
-tl_reduce_dimensions <- function(data, response = NULL, method = "pca", n_components = NULL, ...) {
+tl_reduce_dimensions <- function(data,
+                                 response = NULL,
+                                 method = "pca",
+                                 n_components = NULL,
+                                 ...) {
   # Separate response if provided
   if (!is.null(response)) {
     if (!response %in% names(data)) {
@@ -58,7 +62,7 @@ tl_reduce_dimensions <- function(data, response = NULL, method = "pca", n_compon
     # Select dimensions
     if (!is.null(n_components)) {
       dim_cols <- paste0("Dim", seq_len(n_components))
-      transformed <- transformed %>% dplyr::select(.id, dplyr::all_of(dim_cols))
+      transformed <- transformed %>% dplyr::select(.obs_id, dplyr::all_of(dim_cols))
     }
 
     # Add response back
@@ -267,7 +271,8 @@ tl_anomaly_aware <- function(data, formula, response,
       formula_updated <- as.formula(paste(response_var, "~ . + is_anomaly"))
     } else {
       # Explicit predictors
-      formula_updated <- as.formula(paste(response_var, "~", paste(c(predictor_vars, "is_anomaly"), collapse = " + ")))
+      preds_str <- paste(c(predictor_vars, "is_anomaly"), collapse = " + ")
+      formula_updated <- as.formula(paste(response_var, "~", preds_str))
     }
     model <- tl_model(data_flagged, formula_updated, method = supervised_method)
   } else if (action == "downweight") {

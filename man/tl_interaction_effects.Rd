@@ -7,7 +7,7 @@
 tl_interaction_effects(model, var, by_var, at_values = NULL, intervals = TRUE)
 }
 \arguments{
-\item{model}{A tidysl model object}
+\item{model}{A tidylearn model object}
 
 \item{var}{Variable to calculate effects for}
 

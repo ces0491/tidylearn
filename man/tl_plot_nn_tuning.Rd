@@ -7,7 +7,7 @@
 tl_plot_nn_tuning(model, ...)
 }
 \arguments{
-\item{model}{A tidysl neural network model object}
+\item{model}{A tidylearn neural network model object}
 
 \item{...}{Additional arguments}
 }

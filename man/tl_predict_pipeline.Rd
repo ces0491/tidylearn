@@ -13,7 +13,7 @@ tl_predict_pipeline(
 )
 }
 \arguments{
-\item{pipeline}{A tidysl pipeline object with results}
+\item{pipeline}{A tidylearn pipeline object with results}
 
 \item{new_data}{A data frame containing the new data}
 

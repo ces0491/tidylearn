@@ -7,7 +7,7 @@
 tl_plot_importance_comparison(..., top_n = 10, names = NULL)
 }
 \arguments{
-\item{...}{tidysl model objects to compare}
+\item{...}{tidylearn model objects to compare}
 
 \item{top_n}{Number of top features to display (default: 10)}
 

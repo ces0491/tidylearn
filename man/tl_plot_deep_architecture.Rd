@@ -7,7 +7,7 @@
 tl_plot_deep_architecture(model, ...)
 }
 \arguments{
-\item{model}{A tidysl deep learning model object}
+\item{model}{A tidylearn deep learning model object}
 
 \item{...}{Additional arguments}
 }

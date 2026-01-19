@@ -7,7 +7,7 @@
 tl_plot_confusion(model, new_data = NULL, ...)
 }
 \arguments{
-\item{model}{A tidysl classification model object}
+\item{model}{A tidylearn classification model object}
 
 \item{new_data}{Optional data frame for evaluation (if NULL, uses training data)}
 
