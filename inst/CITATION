@@ -1,0 +1,14 @@
+citHeader("To cite tidylearn in publications use:")
+
+bibentry(
+  bibtype  = "Manual",
+  title    = "tidylearn: A Unified Tidy Interface to R's Machine Learning Ecosystem",
+  author   = person("Cesaire", "Tobias"),
+  year     = "2025",
+  url      = "https://github.com/ces0491/tidylearn",
+  textVersion = paste(
+    "Tobias, C. (2025).",
+    "tidylearn: A Unified Tidy Interface to R's Machine Learning Ecosystem.",
+    "https://github.com/ces0491/tidylearn"
+  )
+)

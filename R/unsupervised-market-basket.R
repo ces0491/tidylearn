@@ -31,6 +31,10 @@
 tidy_apriori <- function(transactions, support = 0.01, confidence = 0.5,
                          minlen = 2, maxlen = 10, target = "rules") {
 
+
+  # Check if arules is installed
+  tl_check_packages("arules")
+
   # Set up parameters
   params <- list(
     supp = support,
@@ -69,6 +73,9 @@ tidy_apriori <- function(transactions, support = 0.01, confidence = 0.5,
 #' @return A tibble with one row per rule
 #' @export
 tidy_rules <- function(rules) {
+
+  # Check if arules is installed
+  tl_check_packages("arules")
 
   if (length(rules) == 0) {
     return(tibble::tibble())
