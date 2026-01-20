@@ -44,11 +44,9 @@ use together.
 ## Installation
 
 ```r
-# Install from GitHub (when available)
+# Install from GitHub
 # devtools::install_github("ces0491/tidylearn")
 
-# For now, install from source
-devtools::install_local("path/to/tidylearn")
 ```
 
 ## Quick Start
