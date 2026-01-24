@@ -297,6 +297,7 @@ explore_dbscan_params <- function(data, eps_values, minPts_values) {
 #' @param x A tidy_dbscan object
 #' @param ... Additional arguments (ignored)
 #'
+#' @return Invisibly returns the input object x
 #' @export
 print.tidy_dbscan <- function(x, ...) {
   cat("Tidy DBSCAN Clustering\n")

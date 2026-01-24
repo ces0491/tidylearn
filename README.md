@@ -1,6 +1,6 @@
 # tidylearn <img src="man/figures/logo.png" align="right" height="139" alt="tidylearn logo" />
 
-A Unified Tidy Interface to Machine Learning in R
+Machine Learning for Tidynauts
 
 [![CRAN](https://img.shields.io/badge/CRAN-not_yet_published-orange)](https://cran.r-project.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
@@ -44,9 +44,11 @@ use together.
 ## Installation
 
 ```r
-# Install from GitHub
-# devtools::install_github("ces0491/tidylearn")
+# Install from CRAN
+install.packages("tidylearn")
 
+# Or install development version from GitHub
+# devtools::install_github("ces0491/tidylearn")
 ```
 
 ## Quick Start
@@ -114,7 +116,7 @@ tidylearn provides a unified interface to these established R packages:
 ### Supervised Learning
 
 | Method | Underlying Package | Function Called |
-|--------|-------------------|-----------------|
+| -------- | ------------------- | ----------------- |
 | `"linear"` | stats | `lm()` |
 | `"polynomial"` | stats | `lm()` with `poly()` |
 | `"logistic"` | stats | `glm(..., family = binomial)` |
@@ -185,12 +187,17 @@ result$leaderboard
 Consistent ggplot2-based plotting regardless of model type:
 
 ```r
-# All models support similar plotting interface
-tl_plot_importance(forest_model)
-tl_plot_diagnostics(linear_model)
-tl_plot_roc(classification_model)
-plot_clusters(clustering_result)
-plot_variance_explained(pca_result)
+# Generic plot method works for all model types
+plot(forest_model)       # Automatic visualization based on model type
+plot(linear_model)       # Diagnostic plots for regression
+plot(pca_result)         # Variance explained for PCA
+
+# Specialized plotting functions for unsupervised learning
+plot_clusters(clustering_result, cluster_col = "cluster")
+plot_variance_explained(pca_result$fit$variance_explained)
+
+# Interactive dashboard for detailed exploration
+tl_dashboard(model, test_data)
 ```
 
 ## Philosophy
@@ -227,7 +234,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-MIT License - see LICENSE file for details.
+MIT License - see [LICENSE.md](LICENSE.md) for details.
 
 ## Author
 

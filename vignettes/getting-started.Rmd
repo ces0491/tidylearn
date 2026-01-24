@@ -39,11 +39,11 @@ implementations with the convenience of a consistent, tidy API.
 ## Installation
 
 ```{r, eval = FALSE}
-# Install from GitHub
-# devtools::install_github("ces0491/tidylearn")
+# Install from CRAN
+install.packages("tidylearn")
 
-# Or install from source
-devtools::install_local("path/to/tidylearn")
+# Or install development version from GitHub
+# devtools::install_github("ces0491/tidylearn")
 ```
 
 ```{r setup}

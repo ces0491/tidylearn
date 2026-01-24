@@ -232,6 +232,7 @@ optimal_hclust_k <- function(hclust_obj, method = "silhouette", max_k = 10) {
 #' @param x A tidy_hclust object
 #' @param ... Additional arguments (ignored)
 #'
+#' @return Invisibly returns the input object x
 #' @export
 print.tidy_hclust <- function(x, ...) {
   cat("Tidy Hierarchical Clustering\n")

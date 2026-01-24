@@ -1,3 +1,15 @@
+# tidylearn CRAN Submission
+
+## Resubmission
+
+This is a resubmission. In this version I have:
+
+* Added method references with DOIs to the Description field in DESCRIPTION
+* Added \value tags to all exported print, summary, plot, and predict methods
+* Added \arguments tags for the pipe operator documentation
+* Replaced \dontrun{} with \donttest{} in all examples
+* Removed set.seed() with hardcoded value from tl_run_pipeline()
+
 ## R CMD check results
 
 0 errors | 0 warnings | 2 notes
@@ -33,6 +45,7 @@ interface layer.
 ## Test environments
 
 * Windows 11 x64, R 4.4.3
+* GitHub Actions: ubuntu-latest (R-devel, R-release), windows-latest (R-release), macos-latest (R-release)
 
 ## Downstream dependencies
 

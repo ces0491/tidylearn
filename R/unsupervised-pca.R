@@ -355,6 +355,7 @@ tidy_pca_biplot <- function(pca_obj, pc_x = 1, pc_y = 2, color_by = NULL,
 #' @param x A tidy_pca object
 #' @param ... Additional arguments (ignored)
 #'
+#' @return Invisibly returns the input object x
 #' @export
 print.tidy_pca <- function(x, ...) {
   cat("Tidy PCA Analysis\n")

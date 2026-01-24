@@ -190,7 +190,6 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
     }
 
     # Create a single train/test split
-    set.seed(123)  # For reproducibility
     train_idx <- sample(nrow(processed_data), round(train_prop * nrow(processed_data)))
     train_data <- processed_data[train_idx, ]
     test_data <- processed_data[-train_idx, ]

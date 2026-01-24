@@ -20,7 +20,7 @@
 #' @return Best model with performance comparison
 #' @export
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Automated modeling
 #' result <- tl_auto_ml(iris, Species ~ .)
 #' best_model <- result$best_model
@@ -228,6 +228,7 @@ create_leaderboard <- function(results, metric, task) {
 #' Print auto ML results
 #' @param x A tidylearn_automl object
 #' @param ... Additional arguments (ignored)
+#' @return Invisibly returns the input object x
 #' @export
 print.tidylearn_automl <- function(x, ...) {
   cat("tidylearn Auto ML Results\n")
@@ -258,7 +259,7 @@ print.tidylearn_automl <- function(x, ...) {
 #' @return An EDA object with multiple analyses
 #' @export
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' eda <- tl_explore(iris, response = "Species")
 #' plot(eda)
 #' }
@@ -319,6 +320,7 @@ tl_explore <- function(data, response = NULL, max_components = 5, k_range = 2:6)
 #' Print EDA results
 #' @param x A tidylearn_eda object
 #' @param ... Additional arguments (ignored)
+#' @return Invisibly returns the input object x
 #' @export
 print.tidylearn_eda <- function(x, ...) {
   cat("tidylearn Exploratory Data Analysis\n")
@@ -379,7 +381,7 @@ tl_optimal_clusters <- function(data, k_range = 2:6, method = "silhouette") {
 #' @return A transfer learning model
 #' @export
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' model <- tl_transfer_learning(iris, Species ~ ., pretrain_method = "pca")
 #' }
 tl_transfer_learning <- function(data, formula, pretrain_method = "pca",
@@ -414,6 +416,7 @@ tl_transfer_learning <- function(data, formula, pretrain_method = "pca",
 #' @param object A tidylearn_transfer model object
 #' @param new_data New data for predictions
 #' @param ... Additional arguments
+#' @return A tibble of predictions
 #' @export
 predict.tidylearn_transfer <- function(object, new_data, ...) {
   # Transform new data using pre-trained model

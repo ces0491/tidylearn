@@ -290,7 +290,7 @@ cat("AutoML:", round(automl_acc * 100, 1), "%\n")
 
 ```{r, eval=FALSE}
 # First pass: quick exploration
-quick_automl <- tl_auto_ml(split$train, Species ~ ~.,
+quick_automl <- tl_auto_ml(split$train, Species ~ .,
                           time_budget = 30,
                           use_reduction = TRUE,
                           use_clustering = FALSE)

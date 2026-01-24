@@ -17,7 +17,7 @@
 #' }
 #'
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' data("Groceries", package = "arules")
 #'
 #' # Basic apriori
@@ -358,6 +358,7 @@ recommend_products <- function(rules_obj, basket, top_n = 5, min_confidence = 0.
 #' @param x A tidy_apriori object
 #' @param ... Additional arguments (ignored)
 #'
+#' @return Invisibly returns the input object x
 #' @export
 print.tidy_apriori <- function(x, ...) {
   cat("Tidy Apriori Results\n")

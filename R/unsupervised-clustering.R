@@ -336,6 +336,7 @@ optimal_clusters <- function(data, max_k = 10, methods = c("silhouette", "gap", 
 #' @param x A tidy_kmeans object
 #' @param ... Additional arguments (ignored)
 #'
+#' @return Invisibly returns the input object x
 #' @export
 print.tidy_kmeans <- function(x, ...) {
   cat("Tidy K-Means Clustering\n")
@@ -359,6 +360,7 @@ print.tidy_kmeans <- function(x, ...) {
 #' @param x A tidy_pam object
 #' @param ... Additional arguments (ignored)
 #'
+#' @return Invisibly returns the input object x
 #' @export
 print.tidy_pam <- function(x, ...) {
   cat("Tidy PAM Clustering\n")

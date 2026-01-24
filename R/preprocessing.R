@@ -18,7 +18,7 @@
 #' @return A list containing processed data and preprocessing metadata
 #' @export
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' processed <- tl_prepare_data(iris, Species ~ ., scale_method = "standardize")
 #' model <- tl_model(processed$data, Species ~ ., method = "logistic")
 #' }
@@ -291,7 +291,7 @@ scale_features <- function(data, numeric_cols, method = "standardize") {
 #' @return A list with train and test data frames
 #' @export
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' split_data <- tl_split(iris, prop = 0.7, stratify = "Species")
 #' train <- split_data$train
 #' test <- split_data$test

@@ -353,6 +353,7 @@ compare_clusterings <- function(cluster_list, data, dist_mat = NULL) {
 #' @param x A tidy_silhouette object
 #' @param ... Additional arguments (ignored)
 #'
+#' @return Invisibly returns the input object x
 #' @export
 print.tidy_silhouette <- function(x, ...) {
   cat("Tidy Silhouette Analysis\n")
@@ -377,6 +378,7 @@ print.tidy_silhouette <- function(x, ...) {
 #' @param x A tidy_gap object
 #' @param ... Additional arguments (ignored)
 #'
+#' @return Invisibly returns the input object x
 #' @export
 print.tidy_gap <- function(x, ...) {
   cat("Tidy Gap Statistic\n")

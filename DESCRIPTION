@@ -10,6 +10,11 @@ Description: Provides a unified tidyverse-compatible interface to R's machine
     output, and unified 'ggplot2'-based visualization. The underlying algorithms
     are unchanged; 'tidylearn' simply makes them easier to use together. Access
     raw model objects via the $fit slot for package-specific functionality.
+    Methods include random forests Breiman (2001) <doi:10.1023/A:1010933404324>,
+    LASSO regression Tibshirani (1996) <doi:10.1111/j.2517-6161.1996.tb02080.x>,
+    elastic net Zou and Hastie (2005) <doi:10.1111/j.1467-9868.2005.00503.x>,
+    support vector machines Cortes and Vapnik (1995) <doi:10.1007/BF00994018>,
+    and gradient boosting Friedman (2001) <doi:10.1214/aos/1013203451>.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

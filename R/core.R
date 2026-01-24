@@ -19,6 +19,8 @@ NULL
 #'
 #' @name %>%
 #' @rdname pipe
+#' @param lhs A value or the magrittr placeholder.
+#' @param rhs A function call using the magrittr semantics.
 #' @keywords internal
 #' @export
 #' @importFrom magrittr %>%
@@ -54,7 +56,7 @@ NULL
 #'   and training data
 #' @export
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Classification -> wraps randomForest::randomForest()
 #' model <- tl_model(iris, Species ~ ., method = "forest")
 #' model$fit  # Access the raw randomForest object
@@ -328,6 +330,7 @@ predict_unsupervised <- function(object, new_data, type = "response", ...) {
 #' Print method for tidylearn models
 #' @param x A tidylearn model object
 #' @param ... Additional arguments (ignored)
+#' @return Invisibly returns the input object x
 #' @export
 print.tidylearn_model <- function(x, ...) {
   cat("tidylearn Model\n")
@@ -349,6 +352,7 @@ print.tidylearn_model <- function(x, ...) {
 #' Summary method for tidylearn models
 #' @param object A tidylearn model object
 #' @param ... Additional arguments (ignored)
+#' @return Invisibly returns the input object
 #' @export
 summary.tidylearn_model <- function(object, ...) {
   print(object)
@@ -372,6 +376,7 @@ summary.tidylearn_model <- function(object, ...) {
 #' @param x A tidylearn model object
 #' @param type Plot type (default: "auto")
 #' @param ... Additional arguments passed to plotting functions
+#' @return A ggplot2 object or NULL, called primarily for side effects
 #' @export
 plot.tidylearn_model <- function(x, type = "auto", ...) {
   if (inherits(x, "tidylearn_supervised")) {
@@ -381,7 +386,8 @@ plot.tidylearn_model <- function(x, type = "auto", ...) {
   }
 }
 
-#' Get model version information
+#' Get tidylearn version information
+#' @return A package_version object containing the version number
 #' @export
 tl_version <- function() {
   packageVersion("tidylearn")

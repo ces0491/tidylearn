@@ -291,6 +291,7 @@ plot_mds <- function(mds_obj, color_by = NULL, label_points = TRUE,
 #' @param x A tidy_mds object
 #' @param ... Additional arguments (ignored)
 #'
+#' @return Invisibly returns the input object x
 #' @export
 print.tidy_mds <- function(x, ...) {
   cat("Tidy MDS Analysis\n")

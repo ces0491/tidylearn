@@ -16,7 +16,7 @@
 #' @return A list containing the transformed data and the reduction model
 #' @export
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Reduce dimensions before classification
 #' reduced <- tl_reduce_dimensions(iris, response = "Species", method = "pca", n_components = 3)
 #' model <- tl_model(reduced$data, Species ~ ., method = "logistic")
@@ -91,7 +91,7 @@ tl_reduce_dimensions <- function(data,
 #' @return Original data with cluster assignment column(s) added
 #' @export
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Add cluster features before supervised learning
 #' data_with_clusters <- tl_add_cluster_features(iris, response = "Species",
 #'                                                 method = "kmeans", k = 3)
@@ -151,7 +151,7 @@ tl_add_cluster_features <- function(data, response = NULL, method = "kmeans", ..
 #' @return A tidylearn model trained on pseudo-labeled data
 #' @export
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Use only 10% of labels
 #' labeled_idx <- sample(nrow(iris), size = 15)
 #' model <- tl_semisupervised(iris, Species ~ ., labeled_indices = labeled_idx,
@@ -234,7 +234,7 @@ tl_semisupervised <- function(data, formula, labeled_indices,
 #' @return A tidylearn model or list with model and anomaly info
 #' @export
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' model <- tl_anomaly_aware(iris, Species ~ ., response = "Species",
 #'                            anomaly_method = "dbscan", action = "flag")
 #' }
@@ -306,7 +306,7 @@ tl_anomaly_aware <- function(data, formula, response,
 #' @return A list of models (one per cluster) plus cluster assignments
 #' @export
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' models <- tl_stratified_models(mtcars, mpg ~ ., cluster_method = "kmeans",
 #'                                 k = 3, supervised_method = "linear")
 #' }
@@ -349,6 +349,7 @@ tl_stratified_models <- function(data, formula, cluster_method = "kmeans",
 #' @param object A tidylearn_stratified model object
 #' @param new_data New data for predictions
 #' @param ... Additional arguments
+#' @return A tibble of predictions with cluster assignments
 #' @export
 predict.tidylearn_stratified <- function(object, new_data = NULL, ...) {
   if (is.null(new_data)) {
