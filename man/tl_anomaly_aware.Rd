@@ -37,7 +37,7 @@ Detect outliers using DBSCAN or other methods, then optionally
 remove them or down-weight them before supervised learning.
 }
 \examples{
-\dontrun{
+\donttest{
 model <- tl_anomaly_aware(iris, Species ~ ., response = "Species",
                            anomaly_method = "dbscan", action = "flag")
 }

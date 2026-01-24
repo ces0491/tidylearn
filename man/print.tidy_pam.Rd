@@ -11,6 +11,9 @@
 
 \item{...}{Additional arguments (ignored)}
 }
+\value{
+Invisibly returns the input object x
+}
 \description{
 Print Method for tidy_pam
 }

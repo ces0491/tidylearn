@@ -34,7 +34,7 @@ Train a supervised model with limited labels by first clustering the data
 and propagating labels within clusters.
 }
 \examples{
-\dontrun{
+\donttest{
 # Use only 10\% of labels
 labeled_idx <- sample(nrow(iris), size = 15)
 model <- tl_semisupervised(iris, Species ~ ., labeled_indices = labeled_idx,

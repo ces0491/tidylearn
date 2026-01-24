@@ -30,7 +30,7 @@ A transfer learning model
 Use unsupervised pre-training (e.g., autoencoder features) before supervised learning
 }
 \examples{
-\dontrun{
+\donttest{
 model <- tl_transfer_learning(iris, Species ~ ., pretrain_method = "pca")
 }
 }

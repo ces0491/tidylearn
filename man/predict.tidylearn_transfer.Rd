@@ -13,6 +13,9 @@
 
 \item{...}{Additional arguments}
 }
+\value{
+A tibble of predictions
+}
 \description{
 Predict with transfer learning model
 }

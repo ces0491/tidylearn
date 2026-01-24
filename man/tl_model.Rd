@@ -35,7 +35,7 @@ this function provides a consistent interface and returns tidy output.
 Access the raw model object from the underlying package via \code{model$fit}.
 }
 \examples{
-\dontrun{
+\donttest{
 # Classification -> wraps randomForest::randomForest()
 model <- tl_model(iris, Species ~ ., method = "forest")
 model$fit  # Access the raw randomForest object

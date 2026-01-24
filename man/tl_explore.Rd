@@ -23,7 +23,7 @@ Comprehensive EDA combining unsupervised learning techniques
 to understand data structure before modeling
 }
 \examples{
-\dontrun{
+\donttest{
 eda <- tl_explore(iris, response = "Species")
 plot(eda)
 }

@@ -13,6 +13,9 @@
 
 \item{...}{Additional arguments}
 }
+\value{
+A tibble of predictions with cluster assignments
+}
 \description{
 Predict from stratified models
 }

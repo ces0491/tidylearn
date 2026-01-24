@@ -12,24 +12,13 @@ This is a resubmission. In this version I have:
 
 ## R CMD check results
 
-0 errors | 0 warnings | 2 notes
+0 errors | 0 warnings | 0 note
 
-### NOTEs
+### NOTE
 
 1. **New submission**
 
    This is the first submission of tidylearn to CRAN.
-
-2. **Suggested packages not available**
-
-   ```
-   Packages suggested but not available for checking:
-     'arules', 'arulesViz', 'mclust'
-   ```
-
-   These packages are optional dependencies used only for specific features
-   (market basket analysis and model-based clustering). The package functions
-   correctly without them.
 
 ## Package Description
 

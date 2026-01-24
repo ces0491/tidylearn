@@ -38,7 +38,7 @@ A list of class "tidy_rules" containing:
 Mine association rules using the Apriori algorithm with tidy output
 }
 \examples{
-\dontrun{
+\donttest{
 data("Groceries", package = "arules")
 
 # Basic apriori

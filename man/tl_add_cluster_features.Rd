@@ -23,7 +23,7 @@ Add cluster assignments as features for supervised learning.
 This semi-supervised approach can capture non-linear patterns.
 }
 \examples{
-\dontrun{
+\donttest{
 # Add cluster features before supervised learning
 data_with_clusters <- tl_add_cluster_features(iris, response = "Species",
                                                 method = "kmeans", k = 3)

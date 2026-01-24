@@ -44,7 +44,7 @@ Comprehensive preprocessing pipeline including imputation, scaling,
 encoding, and feature engineering
 }
 \examples{
-\dontrun{
+\donttest{
 processed <- tl_prepare_data(iris, Species ~ ., scale_method = "standardize")
 model <- tl_model(processed$data, Species ~ ., method = "logistic")
 }

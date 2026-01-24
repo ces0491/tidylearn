@@ -33,7 +33,7 @@ A list of models (one per cluster) plus cluster assignments
 Create cluster-specific supervised models for heterogeneous data
 }
 \examples{
-\dontrun{
+\donttest{
 models <- tl_stratified_models(mtcars, mpg ~ ., cluster_method = "kmeans",
                                 k = 3, supervised_method = "linear")
 }

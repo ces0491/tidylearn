@@ -338,6 +338,47 @@ print.tidylearn_eda <- function(x, ...) {
   invisible(x)
 }
 
+#' Plot EDA results
+#' @param x A tidylearn_eda object
+#' @param ... Additional arguments (ignored)
+#' @return Invisibly returns the input object x, called for side effects (plotting)
+#' @export
+plot.tidylearn_eda <- function(x, ...) {
+  # Get PCA scores for visualization
+  pca_scores <- x$pca$fit$scores
+  clusters <- x$kmeans$fit$clusters$cluster
+
+  # Create plot data
+  plot_data <- data.frame(
+    PC1 = pca_scores$PC1,
+    PC2 = pca_scores$PC2,
+    Cluster = as.factor(clusters)
+  )
+
+  # Add response if available
+  if (!is.null(x$response) && x$response %in% names(x$data)) {
+    plot_data$Response <- x$data[[x$response]]
+  }
+
+  # Create the plot (use .data$ to avoid R CMD check NOTEs)
+  p <- ggplot2::ggplot(plot_data, ggplot2::aes(
+    x = .data[["PC1"]],
+    y = .data[["PC2"]],
+    color = .data[["Cluster"]]
+  )) +
+    ggplot2::geom_point(size = 2, alpha = 0.7) +
+    ggplot2::labs(
+      title = "EDA: PCA with K-means Clusters",
+      subtitle = paste("k =", x$summary$best_k, "clusters"),
+      x = "Principal Component 1",
+      y = "Principal Component 2"
+    ) +
+    ggplot2::theme_minimal()
+
+  print(p)
+  invisible(x)
+}
+
 #' Find optimal number of clusters
 #' @keywords internal
 #' @noRd

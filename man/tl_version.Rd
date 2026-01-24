@@ -2,10 +2,13 @@
 % Please edit documentation in R/core.R
 \name{tl_version}
 \alias{tl_version}
-\title{Get model version information}
+\title{Get tidylearn version information}
 \usage{
 tl_version()
 }
+\value{
+A package_version object containing the version number
+}
 \description{
-Get model version information
+Get tidylearn version information
 }

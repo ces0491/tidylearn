@@ -13,6 +13,9 @@
 
 \item{...}{Additional arguments passed to plotting functions}
 }
+\value{
+A ggplot2 object or NULL, called primarily for side effects
+}
 \description{
 Plot method for tidylearn models
 }

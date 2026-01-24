@@ -22,7 +22,7 @@ A list with train and test data frames
 Split data into train and test sets
 }
 \examples{
-\dontrun{
+\donttest{
 split_data <- tl_split(iris, prop = 0.7, stratify = "Species")
 train <- split_data$train
 test <- split_data$test
