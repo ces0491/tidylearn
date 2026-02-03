@@ -60,7 +60,6 @@ Suggests:
     NeuralNetTools,
     onnx,
     parsnip,
-    pmml,
     recipes,
     reticulate,
     rmarkdown,

@@ -366,6 +366,7 @@ result_reg <- tl_auto_ml(mtcars, mpg ~ .,
 ## When to Use AutoML
 
 **Good use cases:**
+
 - Quick prototyping and baseline establishment
 - When you're unsure which algorithm to use
 - Feature engineering exploration
@@ -373,6 +374,7 @@ result_reg <- tl_auto_ml(mtcars, mpg ~ .,
 - Limited ML expertise
 
 **Consider manual selection when:**
+
 - You have domain knowledge about the best approach
 - Interpretability is critical
 - You need fine-grained control over hyperparameters

@@ -234,7 +234,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-MIT License - see [LICENSE.md](LICENSE.md) for details.
+MIT License - see [LICENSE](https://github.com/ces0491/tidylearn/blob/main/LICENSE) for details.
 
 ## Author
 

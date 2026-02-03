@@ -9,6 +9,10 @@ This is a resubmission. In this version I have:
 * Added \arguments tags for the pipe operator documentation
 * Replaced \dontrun{} with \donttest{} in all examples
 * Removed set.seed() with hardcoded value from tl_run_pipeline()
+* Removed 'pmml' from Suggests (not in mainstream repositories)
+* Fixed invalid file URI in README.md (LICENSE.md link now points to GitHub)
+* Fixed vignette column name references to match actual function output
+* Fixed markdown formatting issues in NEWS.md and vignettes
 
 ## R CMD check results
 

@@ -7,14 +7,14 @@
 
 ### Features
 
-**Unified Interface**
+#### Unified Interface
 
 * `tl_model()` - Single function to fit 20+ machine learning models
 * Consistent function signatures across all methods
 * Tidy tibble output for all results
 * Access raw model objects via `$fit` for package-specific functionality
 
-**Supervised Learning Methods**
+#### Supervised Learning Methods
 
 * Linear regression (stats::lm)
 * Polynomial regression (stats::lm with poly)
@@ -28,7 +28,7 @@
 * Neural networks (nnet)
 * Deep learning (keras, optional)
 
-**Unsupervised Learning Methods**
+#### Unsupervised Learning Methods
 
 * Principal Component Analysis (stats::prcomp)
 * Multidimensional Scaling (stats, MASS, smacof)
@@ -38,7 +38,7 @@
 * Hierarchical clustering (stats::hclust)
 * DBSCAN (dbscan)
 
-**Additional Features**
+#### Additional Features
 
 * `tl_split()` - Train/test splitting with stratification support
 * `tl_prepare_data()` - Data preprocessing (scaling, imputation, encoding)

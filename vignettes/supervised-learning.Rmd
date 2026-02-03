@@ -22,6 +22,7 @@ library(dplyr)
 ```
 
 ## Introduction
+
 This vignette demonstrates supervised learning capabilities in tidylearn. All
 methods shown here wrap established R packages - the algorithms are unchanged,
 tidylearn simply provides a consistent interface and tidy output.

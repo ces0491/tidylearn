@@ -103,7 +103,7 @@ cat("Feature reduction:", round((1 - 3/4) * 100, 1), "%\n")
 
 Add cluster assignments as features to boost supervised learning performance.
 
-### Basic Usage
+### Adding Cluster Features
 
 ```{r}
 # Add cluster features

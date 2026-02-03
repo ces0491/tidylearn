@@ -58,7 +58,7 @@ print(variance_explained)
 
 ```{r}
 # Cumulative variance explained
-cumsum(variance_explained$proportion)
+cumsum(variance_explained$prop_variance)
 ```
 
 ```{r}
@@ -76,8 +76,8 @@ ggplot(pca_plot_data, aes(x = PC1, y = PC2, color = Species)) +
   geom_point(size = 3, alpha = 0.7) +
   labs(
     title = "PCA of Iris Dataset",
-    x = paste0("PC1 (", round(variance_explained$proportion[1] * 100, 1), "%)"),
-    y = paste0("PC2 (", round(variance_explained$proportion[2] * 100, 1), "%)")
+    x = paste0("PC1 (", round(variance_explained$prop_variance[1] * 100, 1), "%)"),
+    y = paste0("PC2 (", round(variance_explained$prop_variance[2] * 100, 1), "%)")
   ) +
   theme_minimal()
 ```
@@ -359,7 +359,7 @@ pca_features <- tl_model(mtcars, method = "pca")
 
 # Keep components explaining 90% of variance
 var_exp <- pca_features$fit$variance_explained
-cumulative_var <- cumsum(var_exp$proportion)
+cumulative_var <- cumsum(var_exp$prop_variance)
 n_components <- which(cumulative_var >= 0.90)[1]
 
 cat("Components needed for 90% variance:", n_components, "\n")
