@@ -18,6 +18,7 @@
 #'
 #' @examples
 #' \donttest{
+#' if (requireNamespace("arules", quietly = TRUE)) {
 #' data("Groceries", package = "arules")
 #'
 #' # Basic apriori
@@ -25,6 +26,7 @@
 #'
 #' # Access rules
 #' rules$rules_tbl
+#' }
 #' }
 #'
 #' @export

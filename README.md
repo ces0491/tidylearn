@@ -2,7 +2,7 @@
 
 Machine Learning for Tidynauts
 
-[![CRAN](https://img.shields.io/badge/CRAN-not_yet_published-orange)](https://cran.r-project.org/)
+[![CRAN status](https://www.r-pkg.org/badges/version/tidylearn)](https://cran.r-project.org/package=tidylearn)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 ## Overview
