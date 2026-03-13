@@ -519,7 +519,7 @@ tl_dashboard <- function(model, new_data = NULL, ...) {
 
       if (model$spec$is_classification) {
         # Classification
-        pred_class <- predict(model, new_data, type = "class")
+        pred_class <- predict(model, new_data, type = "class")$.pred
         pred_prob <- predict(model, new_data, type = "prob")
 
         # Combine into a data frame
@@ -529,7 +529,7 @@ tl_dashboard <- function(model, new_data = NULL, ...) {
         )
       } else {
         # Regression
-        predictions <- predict(model, new_data)$prediction
+        predictions <- predict(model, new_data)$.pred
 
         # Combine into a data frame
         results <- data.frame(

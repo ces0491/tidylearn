@@ -1,39 +1,19 @@
 # tidylearn CRAN Submission
 
-## Resubmission
+## Patch release (0.1.1)
 
-This is a resubmission. In this version I have:
+This is a patch release fixing a bug reported in
+[#1](https://github.com/ces0491/tidylearn/issues/1). Changes:
 
-* Added method references with DOIs to the Description field in DESCRIPTION
-* Added \value tags to all exported print, summary, plot, and predict methods
-* Added \arguments tags for the pipe operator documentation
-* Replaced \dontrun{} with \donttest{} in all examples
-* Removed set.seed() with hardcoded value from tl_run_pipeline()
-* Removed 'pmml' from Suggests (not in mainstream repositories)
-* Fixed invalid file URI in README.md (LICENSE.md link now points to GitHub)
-* Fixed vignette column name references to match actual function output
-* Fixed markdown formatting issues in NEWS.md and vignettes
+* Added missing `tl_plot_model()` and `tl_plot_unsupervised()` internal
+  dispatcher functions so that `plot()` works on tidylearn model objects
+* Fixed column name mismatch (`$prediction` -> `$.pred`) in
+  `tl_plot_actual_predicted()`, `tl_plot_residuals()`,
+  `tl_plot_confusion()`, and `tl_dashboard()`
 
 ## R CMD check results
 
-0 errors | 0 warnings | 0 note
-
-### NOTE
-
-1. **New submission**
-
-   This is the first submission of tidylearn to CRAN.
-
-## Package Description
-
-tidylearn provides a unified tidyverse-compatible interface to R's machine
-learning ecosystem. It wraps established packages like glmnet, randomForest,
-xgboost, e1071, cluster, and dbscan - providing consistent function signatures,
-tidy tibble output, and unified visualization.
-
-**Important**: tidylearn does NOT reimplement any algorithms. All computations
-are performed by the underlying packages. tidylearn provides a consistent
-interface layer.
+0 errors | 0 warnings | 0 notes
 
 ## Test environments
 
@@ -42,4 +22,4 @@ interface layer.
 
 ## Downstream dependencies
 
-This is a new package with no reverse dependencies.
+No reverse dependencies.
