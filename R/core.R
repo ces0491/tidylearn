@@ -372,6 +372,85 @@ summary.tidylearn_model <- function(object, ...) {
   invisible(object)
 }
 
+#' Plot a supervised tidylearn model
+#'
+#' Dispatches to the appropriate plotting function based on model type and
+#' requested plot type.
+#'
+#' @param model A tidylearn supervised model object
+#' @param type Plot type. For regression: "auto", "actual_predicted",
+#'   "residuals", "diagnostics". For classification: "auto", "confusion",
+#'   "roc", "precision_recall", "calibration", "lift", "gain".
+#'   "importance" is available for tree-based and regularized models.
+#' @param ... Additional arguments passed to the underlying plot function
+#' @return A ggplot2 object (invisibly for base-graphics plots)
+#' @keywords internal
+tl_plot_model <- function(model, type = "auto", ...) {
+  is_class <- model$spec$is_classification
+
+  if (type == "auto") {
+    type <- if (is_class) "confusion" else "actual_predicted"
+  }
+
+  switch(
+    type,
+    # Regression plots
+    "actual_predicted" = tl_plot_actual_predicted(model, ...),
+    "residuals"        = tl_plot_residuals(model, ...),
+    "diagnostics"      = tl_plot_diagnostics(model, ...),
+    # Classification plots
+    "confusion"        = tl_plot_confusion(model, ...),
+    "roc"              = tl_plot_roc(model, ...),
+    "precision_recall" = tl_plot_precision_recall(model, ...),
+    "calibration"      = tl_plot_calibration(model, ...),
+    "lift"             = tl_plot_lift(model, ...),
+    "gain"             = tl_plot_gain(model, ...),
+    # Shared
+    "importance"       = tl_plot_importance(model, ...),
+    stop(
+      "Unknown plot type '", type, "'. ",
+      if (is_class) {
+        "Use: 'confusion', 'roc', 'precision_recall', 'calibration', 'lift', 'gain', or 'importance'."
+      } else {
+        "Use: 'actual_predicted', 'residuals', 'diagnostics', or 'importance'."
+      },
+      call. = FALSE
+    )
+  )
+}
+
+#' Plot an unsupervised tidylearn model
+#'
+#' Dispatches to the appropriate plotting function based on the unsupervised
+#' model method.
+#'
+#' @param model A tidylearn unsupervised model object
+#' @param type Plot type (default: "auto"). Currently unused; reserved for
+#'   future sub-type selection.
+#' @param ... Additional arguments passed to the underlying plot function
+#' @return A ggplot2 object or invisible result
+#' @keywords internal
+tl_plot_unsupervised <- function(model, type = "auto", ...) {
+  method <- model$spec$method
+
+  switch(
+    method,
+    "pca"    = plot_variance_explained(get_pca_variance(model$fit), ...),
+    "kmeans" = ,
+    "pam"    = ,
+    "clara"  = ,
+    "dbscan" = plot_clusters(
+      cbind(model$data, cluster = model$fit$cluster), ...
+    ),
+    "hclust" = plot_dendrogram(model$fit, ...),
+    "mds"    = plot_mds(model$fit, ...),
+    stop(
+      "Plotting not implemented for unsupervised method: ", method,
+      call. = FALSE
+    )
+  )
+}
+
 #' Plot method for tidylearn models
 #' @param x A tidylearn model object
 #' @param type Plot type (default: "auto")

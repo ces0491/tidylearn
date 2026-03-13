@@ -176,7 +176,7 @@ tl_plot_confusion <- function(model, new_data = NULL, ...) {
   }
 
   # Get predicted classes
-  predicted <- predict(model, new_data, type = "class")$prediction
+  predicted <- predict(model, new_data, type = "class")$.pred
 
   # Create confusion matrix
   cm <- table(Actual = actuals, Predicted = predicted)

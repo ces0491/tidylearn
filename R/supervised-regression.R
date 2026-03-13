@@ -227,7 +227,7 @@ tl_plot_actual_predicted <- function(model, new_data = NULL, ...) {
 
   # Get actual and predicted values
   actuals <- new_data[[model$spec$response_var]]
-  predictions <- predict(model, new_data)$prediction
+  predictions <- predict(model, new_data)$.pred
 
   # Create data frame for plotting
   plot_data <- tibble::tibble(
@@ -295,7 +295,7 @@ tl_plot_residuals <- function(model, type = "fitted", ...) {
       ggplot2::theme_minimal()
   } else if (type == "predicted") {
     # Get predictions
-    predictions <- predict(model, model$data)$prediction
+    predictions <- predict(model, model$data)$.pred
 
     # Add to plot data
     plot_data$predicted <- predictions

@@ -39,6 +39,7 @@ Mine association rules using the Apriori algorithm with tidy output
 }
 \examples{
 \donttest{
+if (requireNamespace("arules", quietly = TRUE)) {
 data("Groceries", package = "arules")
 
 # Basic apriori
@@ -46,6 +47,7 @@ rules <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
 
 # Access rules
 rules$rules_tbl
+}
 }
 
 }

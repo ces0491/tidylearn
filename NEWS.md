@@ -1,3 +1,17 @@
+# tidylearn 0.1.1
+
+## Bug Fixes
+
+* Fixed `plot()` failing on supervised models with
+  "could not find function 'tl_plot_model'" by implementing the missing
+  `tl_plot_model()` and `tl_plot_unsupervised()` internal dispatchers
+  ([#1](https://github.com/ces0491/tidylearn/issues/1))
+* Fixed `tl_plot_actual_predicted()`, `tl_plot_residuals()`, and
+  `tl_plot_confusion()` failing due to accessing a non-existent `$prediction`
+  column on predict output (correct column is `$.pred`)
+* Fixed the same `$prediction` column mismatch in the `tl_dashboard()`
+  predictions table
+
 # tidylearn 0.1.0
 
 ## Initial CRAN Release
