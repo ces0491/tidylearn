@@ -1,15 +1,17 @@
 # tidylearn CRAN Submission
 
-## Patch release (0.1.1)
+## Minor release (0.2.0)
 
-This is a patch release fixing a bug reported in
-[#1](https://github.com/ces0491/tidylearn/issues/1). Changes:
+This release adds a new family of `tl_table_*()` functions for producing
+formatted `gt` tables from tidylearn models — mirroring the existing
+`plot()` interface but for report-ready tables. Changes:
 
-* Added missing `tl_plot_model()` and `tl_plot_unsupervised()` internal
-  dispatcher functions so that `plot()` works on tidylearn model objects
-* Fixed column name mismatch (`$prediction` -> `$.pred`) in
-  `tl_plot_actual_predicted()`, `tl_plot_residuals()`,
-  `tl_plot_confusion()`, and `tl_dashboard()`
+* Added `tl_table()` dispatcher and 8 exported table functions:
+  `tl_table_metrics()`, `tl_table_coefficients()`, `tl_table_confusion()`,
+  `tl_table_importance()`, `tl_table_variance()`, `tl_table_loadings()`,
+  `tl_table_clusters()`, `tl_table_comparison()`
+* `gt` added as a suggested dependency (not required for core functionality)
+* New "Reporting with tidylearn" vignette
 
 ## R CMD check results
 
@@ -17,8 +19,7 @@ This is a patch release fixing a bug reported in
 
 ## Test environments
 
-* Windows 11 x64, R 4.4.3
-* GitHub Actions: ubuntu-latest (R-devel, R-release), windows-latest (R-release), macos-latest (R-release)
+* Windows 11 x64, R 4.5.2
 
 ## Downstream dependencies
 

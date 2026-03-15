@@ -342,7 +342,7 @@ tl_fit_dbscan <- function(data, formula = NULL, eps = 0.5, minPts = 5, ...) {
   # Return in expected format
   list(
     clusters = db_result$clusters,
-    core_points = db_result$core_points,
+    summary = db_result$summary,
     n_clusters = db_result$n_clusters,
     n_noise = db_result$n_noise,
     model = db_result$model
