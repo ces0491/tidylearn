@@ -1,3 +1,37 @@
+# tidylearn 0.2.0
+
+## New Features
+
+### Formatted gt Tables
+
+* New `tl_table()` dispatcher function — mirrors `plot()` but produces
+  formatted `gt` tables instead of ggplot2 visualisations
+* `tl_table_metrics()` — styled evaluation metrics table from `tl_evaluate()`
+* `tl_table_coefficients()` — model coefficients with p-values (lm/glm) or
+  sorted by magnitude (glmnet), with conditional highlighting
+* `tl_table_confusion()` — confusion matrix with correct predictions
+  highlighted on the diagonal
+* `tl_table_importance()` — ranked feature importance with colour gradient
+* `tl_table_variance()` — PCA variance explained with cumulative % coloured
+* `tl_table_loadings()` — PCA loadings with diverging red–blue colour scale
+* `tl_table_clusters()` — cluster sizes and mean feature values for kmeans,
+  pam, clara, dbscan, and hclust models
+* `tl_table_comparison()` — side-by-side multi-model comparison table
+* All table functions share a consistent `gt` theme via internal
+  `tl_gt_theme()` helper
+* `gt` is a suggested dependency — functions error with an install message if
+  `gt` is not available
+
+### New Vignette
+
+* Added "Reporting with tidylearn" vignette covering all plot and table
+  functions
+
+## Bug Fixes
+
+* Fixed `tl_fit_dbscan()` returning a non-existent `core_points` field
+  instead of `summary` from the underlying `tidy_dbscan()` result
+
 # tidylearn 0.1.1
 
 ## Bug Fixes

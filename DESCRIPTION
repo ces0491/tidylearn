@@ -1,13 +1,14 @@
 Package: tidylearn
 Title: A Unified Tidy Interface to R's Machine Learning Ecosystem
-Version: 0.1.1
+Version: 0.2.0
 Authors@R:
     person("Cesaire", "Tobias", email = "cesaire@sheetsolved.com", role = c("aut", "cre"))
 Description: Provides a unified tidyverse-compatible interface to R's machine
     learning packages. Wraps established implementations from 'glmnet',
     'randomForest', 'xgboost', 'e1071', 'rpart', 'gbm', 'nnet', 'cluster',
     'dbscan', and others - providing consistent function signatures, tidy tibble
-    output, and unified 'ggplot2'-based visualization. The underlying algorithms
+    output, unified 'ggplot2'-based visualization, and optional formatted 'gt'
+    tables via the tl_table() family of functions. The underlying algorithms
     are unchanged; 'tidylearn' simply makes them easier to use together. Access
     raw model objects via the $fit slot for package-specific functionality.
     Methods include random forests Breiman (2001) <doi:10.1023/A:1010933404324>,
@@ -52,6 +53,7 @@ Suggests:
     GGally,
     ggforce,
     gridExtra,
+    gt,
     keras,
     knitr,
     lmtest,
@@ -103,4 +105,5 @@ Collate:
     'diagnostics.R'
     'metrics.R'
     'visualization.R'
+    'tables.R'
     'workflows.R'

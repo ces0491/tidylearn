@@ -19,7 +19,8 @@ utils::globalVariables(c(
   "residuals", "rhs", "score", "shap_value", "sil_width", "size",
   "sqrt_abs_residuals", "std_residual", "support", "tl_plot_model",
   "tl_plot_unsupervised", "tl_prediction_intervals", "tot_withinss", "tpr",
-  "value", "var_value", "variable", "variance", "where", "x", "x_end", "y", "y_end"
+  "value", "var_value", "variable", "variance", "where", "x", "x_end", "y", "y_end",
+  "abs_estimate", "estimate", "p_value", "significant", "std_error", "term"
 ))
 
 
