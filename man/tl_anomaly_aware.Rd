@@ -21,7 +21,8 @@ tl_anomaly_aware(
 
 \item{response}{Response variable name}
 
-\item{anomaly_method}{Method for anomaly detection: "dbscan", "isolation_forest"}
+\item{anomaly_method}{Method for anomaly detection:
+"dbscan", "isolation_forest"}
 
 \item{action}{Action to take: "remove", "flag", "downweight"}
 

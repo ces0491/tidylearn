@@ -35,7 +35,11 @@ tl_auto_ml <- function(data, formula, task = "auto",
   if (task == "auto") {
     response_var <- all.vars(formula)[1]
     y <- data[[response_var]]
-    task <- if (is.factor(y) || is.character(y)) "classification" else "regression"
+    task <- if (is.factor(y) || is.character(y)) {
+      "classification"
+    } else {
+      "regression"
+    }
   }
 
   # Set default metric
@@ -83,15 +87,24 @@ tl_auto_ml <- function(data, formula, task = "auto",
       n_predictors <- ncol(data) - 1
       n_components <- min(5, ceiling(n_predictors / 2))
 
-      reduced <- tl_reduce_dimensions(data, response = response_var,
-                                     method = "pca", n_components = n_components)
+      reduced <- tl_reduce_dimensions(
+        data, response = response_var,
+        method = "pca",
+        n_components = n_components
+      )
 
       # Update formula for reduced data
-      pred_vars <- names(reduced$data)[!names(reduced$data) %in% c(".obs_id", response_var)]
-      formula_reduced <- as.formula(paste(response_var, "~", paste(pred_vars, collapse = " + ")))
+      pred_vars <- names(reduced$data)[
+        !names(reduced$data) %in% c(".obs_id", response_var)
+      ]
+      formula_reduced <- as.formula(paste(
+        response_var, "~",
+        paste(pred_vars, collapse = " + ")
+      ))
 
       for (method in baseline_methods) {
-        if (difftime(Sys.time(), start_time, units = "secs") > time_budget) break
+        if (difftime(Sys.time(), start_time,
+                     units = "secs") > time_budget) break
 
         model_name <- paste0("pca_", method)
         message("  Training: ", model_name)
@@ -122,13 +135,20 @@ tl_auto_ml <- function(data, formula, task = "auto",
 
     tryCatch({
       response_var <- all.vars(formula)[1]
-      k <- if (task == "classification") length(unique(data[[response_var]])) else 3
+      k <- if (task == "classification") {
+        length(unique(data[[response_var]]))
+      } else {
+        3
+      }
 
-      data_clustered <- tl_add_cluster_features(data, response = response_var,
-                                               method = "kmeans", k = k)
+      data_clustered <- tl_add_cluster_features(
+        data, response = response_var,
+        method = "kmeans", k = k
+      )
 
       for (method in baseline_methods) {
-        if (difftime(Sys.time(), start_time, units = "secs") > time_budget) break
+        if (difftime(Sys.time(), start_time,
+                     units = "secs") > time_budget) break
 
         model_name <- paste0("clustered_", method)
         message("  Training: ", model_name)
@@ -150,7 +170,11 @@ tl_auto_ml <- function(data, formula, task = "auto",
   # 4. Advanced models if time allows
   message("\n[4/4] Training advanced models...")
   if (difftime(Sys.time(), start_time, units = "secs") < time_budget * 0.7) {
-    advanced_methods <- if (task == "classification") c("svm", "xgboost") else c("ridge", "lasso")
+    advanced_methods <- if (task == "classification") {
+      c("svm", "xgboost")
+    } else {
+      c("ridge", "lasso")
+    }
 
     for (method in advanced_methods) {
       if (difftime(Sys.time(), start_time, units = "secs") > time_budget) break
@@ -263,7 +287,9 @@ print.tidylearn_automl <- function(x, ...) {
 #' eda <- tl_explore(iris, response = "Species")
 #' plot(eda)
 #' }
-tl_explore <- function(data, response = NULL, max_components = 5, k_range = 2:6) {
+tl_explore <- function(data, response = NULL,
+                       max_components = 5,
+                       k_range = 2:6) {
   message("Running Exploratory Data Analysis...")
 
   # 1. Dimensionality Reduction
@@ -288,13 +314,6 @@ tl_explore <- function(data, response = NULL, max_components = 5, k_range = 2:6)
 
   # 4. Distance analysis
   message("[4/4] Distance analysis...")
-  # Compute pairwise distances (sample if large dataset)
-  if (nrow(data) > 1000) {
-    sample_idx <- sample(nrow(data), 1000)
-    distance_data <- predictor_data[sample_idx, ]
-  } else {
-    distance_data <- predictor_data
-  }
 
   message("EDA complete!")
 
@@ -341,7 +360,8 @@ print.tidylearn_eda <- function(x, ...) {
 #' Plot EDA results
 #' @param x A tidylearn_eda object
 #' @param ... Additional arguments (ignored)
-#' @return Invisibly returns the input object x, called for side effects (plotting)
+#' @return Invisibly returns the input object x,
+#'   called for side effects (plotting)
 #' @export
 plot.tidylearn_eda <- function(x, ...) {
   # Get PCA scores for visualization
@@ -391,8 +411,12 @@ tl_optimal_clusters <- function(data, k_range = 2:6, method = "silhouette") {
 
     # Compute silhouette score
     if (requireNamespace("cluster", quietly = TRUE)) {
-      sil <- cluster::silhouette(km$fit$clusters$cluster,
-                                 stats::dist(dplyr::select(data, where(is.numeric))))
+      dist_mat <- stats::dist(
+        dplyr::select(data, where(is.numeric))
+      )
+      sil <- cluster::silhouette(
+        km$fit$clusters$cluster, dist_mat
+      )
       scores[i] <- mean(sil[, 3])
     } else {
       # Fallback to within-cluster sum of squares
@@ -412,7 +436,8 @@ tl_optimal_clusters <- function(data, k_range = 2:6, method = "silhouette") {
 
 #' Transfer Learning Workflow
 #'
-#' Use unsupervised pre-training (e.g., autoencoder features) before supervised learning
+#' Use unsupervised pre-training (e.g., autoencoder
+#' features) before supervised learning
 #'
 #' @param data Training data
 #' @param formula Model formula
@@ -434,12 +459,17 @@ tl_transfer_learning <- function(data, formula, pretrain_method = "pca",
 
   # Phase 1: Unsupervised pre-training
   message("[Phase 1] Unsupervised pre-training with ", pretrain_method, "...")
-  pretrain_model <- tl_reduce_dimensions(data, response = response_var,
-                                        method = pretrain_method, ...)
+  pretrain_model <- tl_reduce_dimensions(
+    data, response = response_var,
+    method = pretrain_method, ...
+  )
 
   # Phase 2: Supervised learning on transformed features
   message("[Phase 2] Supervised learning with ", supervised_method, "...")
-  supervised_model <- tl_model(pretrain_model$data, formula, method = supervised_method)
+  supervised_model <- tl_model(
+    pretrain_model$data, formula,
+    method = supervised_method
+  )
 
   # Combine models
   structure(

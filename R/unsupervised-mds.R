@@ -3,9 +3,11 @@
 #' Unified interface for MDS methods with tidy output
 #'
 #' @param data A data frame, tibble, or distance matrix
-#' @param method Character; "classical" (default), "metric", "nonmetric", "sammon", or "kruskal"
+#' @param method Character; "classical" (default),
+#'   "metric", "nonmetric", "sammon", or "kruskal"
 #' @param ndim Number of dimensions for output (default: 2)
-#' @param distance Character; distance metric if data is not already a dist object (default: "euclidean")
+#' @param distance Character; distance metric if data is
+#'   not already a dist object (default: "euclidean")
 #' @param ... Additional arguments passed to specific MDS functions
 #'
 #' @return A list of class "tidy_mds" containing:
@@ -22,7 +24,9 @@
 #' print(mds_result)
 #'
 #' @export
-tidy_mds <- function(data, method = "classical", ndim = 2, distance = "euclidean", ...) {
+tidy_mds <- function(data, method = "classical",
+                     ndim = 2, distance = "euclidean",
+                     ...) {
 
   # Convert to distance matrix if needed
   if (inherits(data, "dist")) {
@@ -104,7 +108,8 @@ tidy_mds_classical <- function(dist_mat, ndim = 2, add_rownames = TRUE) {
 #'
 #' @param dist_mat A distance matrix (dist object)
 #' @param ndim Number of dimensions (default: 2)
-#' @param type Character; "ratio" for metric, "ordinal" for non-metric (default: "ratio")
+#' @param type Character; "ratio" for metric, "ordinal"
+#'   for non-metric (default: "ratio")
 #' @param ... Additional arguments passed to smacof::mds()
 #'
 #' @return A tidy_mds object
@@ -251,18 +256,27 @@ plot_mds <- function(mds_obj, color_by = NULL, label_points = TRUE,
   dim_y_name <- paste0("Dim", dim_y)
 
   # Base plot
-  p <- ggplot2::ggplot(config, ggplot2::aes(x = .data[[dim_x_name]], y = .data[[dim_y_name]]))
+  p <- ggplot2::ggplot(
+    config,
+    ggplot2::aes(x = .data[[dim_x_name]], y = .data[[dim_y_name]])
+  )
 
   # Add points
   if (!is.null(color_by)) {
-    p <- p + ggplot2::geom_point(ggplot2::aes(color = .data[[color_by]]), size = 3, alpha = 0.7)
+    p <- p + ggplot2::geom_point(
+      ggplot2::aes(color = .data[[color_by]]),
+      size = 3, alpha = 0.7
+    )
   } else {
     p <- p + ggplot2::geom_point(size = 3, alpha = 0.7, color = "steelblue")
   }
 
   # Add labels
   if (label_points && ".obs_id" %in% names(config)) {
-    p <- p + ggplot2::geom_text(ggplot2::aes(label = .obs_id), vjust = -0.7, size = 3)
+    p <- p + ggplot2::geom_text(
+      ggplot2::aes(label = .obs_id),
+      vjust = -0.7, size = 3
+    )
   }
 
   # Add title with stress if available

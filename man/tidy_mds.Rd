@@ -9,11 +9,13 @@ tidy_mds(data, method = "classical", ndim = 2, distance = "euclidean", ...)
 \arguments{
 \item{data}{A data frame, tibble, or distance matrix}
 
-\item{method}{Character; "classical" (default), "metric", "nonmetric", "sammon", or "kruskal"}
+\item{method}{Character; "classical" (default),
+"metric", "nonmetric", "sammon", or "kruskal"}
 
 \item{ndim}{Number of dimensions for output (default: 2)}
 
-\item{distance}{Character; distance metric if data is not already a dist object (default: "euclidean")}
+\item{distance}{Character; distance metric if data is
+not already a dist object (default: "euclidean")}
 
 \item{...}{Additional arguments passed to specific MDS functions}
 }

@@ -11,7 +11,8 @@ tl_predict_polynomial(model, new_data, type = "response", level = 0.95, ...)
 
 \item{new_data}{A data frame containing the new data}
 
-\item{type}{Type of prediction: "response" (default), "confidence", "prediction"}
+\item{type}{Type of prediction: "response" (default),
+"confidence", "prediction"}
 
 \item{level}{Confidence level for intervals (default: 0.95)}
 

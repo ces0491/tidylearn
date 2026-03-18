@@ -9,11 +9,13 @@ tl_plot_xgboost_shap_summary(model, data = NULL, top_n = 10, n_samples = 100)
 \arguments{
 \item{model}{A tidylearn XGBoost model object}
 
-\item{data}{Data for SHAP value calculation (default: NULL, uses training data)}
+\item{data}{Data for SHAP value calculation
+(default: NULL, uses training data)}
 
 \item{top_n}{Number of top features to display (default: 10)}
 
-\item{n_samples}{Number of samples to use (default: 100, NULL for all)}
+\item{n_samples}{Number of samples to use
+(default: 100, NULL for all)}
 }
 \value{
 A ggplot object with SHAP summary

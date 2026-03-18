@@ -20,7 +20,8 @@ tl_tune_xgboost(
 
 \item{formula}{A formula specifying the model}
 
-\item{is_classification}{Logical indicating if this is a classification problem}
+\item{is_classification}{Logical indicating if this is a
+classification problem}
 
 \item{param_grid}{Named list of parameter values to try}
 

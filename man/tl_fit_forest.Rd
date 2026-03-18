@@ -19,7 +19,8 @@ tl_fit_forest(
 
 \item{formula}{A formula specifying the model}
 
-\item{is_classification}{Logical indicating if this is a classification problem}
+\item{is_classification}{Logical indicating if this is a
+classification problem}
 
 \item{ntree}{Number of trees to grow (default: 500)}
 

@@ -9,7 +9,8 @@ tl_plot_intervals(model, new_data = NULL, level = 0.95, ...)
 \arguments{
 \item{model}{A tidylearn regression model object}
 
-\item{new_data}{Optional data frame for prediction (if NULL, uses training data)}
+\item{new_data}{Optional data frame for prediction
+(if NULL, uses training data)}
 
 \item{level}{Confidence level (default: 0.95)}
 

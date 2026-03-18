@@ -4,10 +4,12 @@
 \alias{tidylearn-core}
 \title{tidylearn: A Unified Tidy Interface to R's Machine Learning Ecosystem}
 \description{
-Core functionality for tidylearn. This package provides a unified
-tidyverse-compatible interface to established R machine learning packages
-including glmnet, randomForest, xgboost, e1071, rpart, gbm, nnet, cluster,
-and dbscan. The underlying algorithms are unchanged - tidylearn wraps them
-with consistent function signatures, tidy tibble output, and unified
-ggplot2-based visualization. Access raw model objects via model$fit.
+Core functionality for tidylearn. This package
+provides a unified tidyverse-compatible interface to
+established R machine learning packages including glmnet,
+randomForest, xgboost, e1071, rpart, gbm, nnet, cluster,
+and dbscan. The underlying algorithms are unchanged -
+tidylearn wraps them with consistent function signatures,
+tidy tibble output, and unified ggplot2-based
+visualization. Access raw model objects via model$fit.
 }

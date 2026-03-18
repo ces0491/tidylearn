@@ -143,6 +143,7 @@ test_that("supervised models work with formula variations", {
   expect_s3_class(model2, "tidylearn_logistic")
 
   # Formula with subset of variables
-  model3 <- tl_model(iris, Species ~ Sepal.Length + Petal.Length, method = "logistic")
+  model3 <- tl_model(iris, Species ~ Sepal.Length + Petal.Length,
+                     method = "logistic")
   expect_s3_class(model3, "tidylearn_logistic")
 })

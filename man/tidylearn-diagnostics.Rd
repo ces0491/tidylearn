@@ -4,5 +4,6 @@
 \alias{tidylearn-diagnostics}
 \title{Advanced Diagnostics Functions for tidylearn}
 \description{
-Functions for advanced model diagnostics, assumption checking, and outlier detection
+Functions for advanced model diagnostics,
+assumption checking, and outlier detection
 }

@@ -7,7 +7,8 @@
 plot_silhouette(sil_obj)
 }
 \arguments{
-\item{sil_obj}{A tidy_silhouette object or tibble from tidy_silhouette_analysis}
+\item{sil_obj}{A tidy_silhouette object or tibble
+from tidy_silhouette_analysis}
 }
 \value{
 A ggplot object

@@ -33,12 +33,16 @@ Feature Engineering via Dimensionality Reduction
 }
 \details{
 Use PCA, MDS, or other dimensionality reduction as a preprocessing step
-for supervised learning. This can improve model performance and interpretability.
+for supervised learning. This can improve model performance
+and interpretability.
 }
 \examples{
 \donttest{
 # Reduce dimensions before classification
-reduced <- tl_reduce_dimensions(iris, response = "Species", method = "pca", n_components = 3)
+reduced <- tl_reduce_dimensions(
+  iris, response = "Species",
+  method = "pca", n_components = 3
+)
 model <- tl_model(reduced$data, Species ~ ., method = "logistic")
 }
 }

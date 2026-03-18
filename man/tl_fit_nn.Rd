@@ -20,7 +20,8 @@ tl_fit_nn(
 
 \item{formula}{A formula specifying the model}
 
-\item{is_classification}{Logical indicating if this is a classification problem}
+\item{is_classification}{Logical indicating if this is a
+classification problem}
 
 \item{size}{Number of units in the hidden layer (default: 5)}
 

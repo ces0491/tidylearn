@@ -9,10 +9,13 @@
 \arguments{
 \item{object}{A tidylearn model object}
 
-\item{new_data}{A data frame containing the new data. If NULL, uses training data.}
+\item{new_data}{A data frame containing the new data.
+If NULL, uses training data.}
 
-\item{type}{Type of prediction. For supervised: "response" (default), "prob", "class".
-For unsupervised: "scores", "clusters", "transform" depending on method.}
+\item{type}{Type of prediction. For supervised:
+"response" (default), "prob", "class". For
+unsupervised: "scores", "clusters", "transform"
+depending on method.}
 
 \item{...}{Additional arguments}
 }

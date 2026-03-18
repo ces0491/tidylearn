@@ -38,6 +38,8 @@ and propagating labels within clusters.
 # Use only 10\% of labels
 labeled_idx <- sample(nrow(iris), size = 15)
 model <- tl_semisupervised(iris, Species ~ ., labeled_indices = labeled_idx,
-                           cluster_method = "kmeans", supervised_method = "logistic")
+  cluster_method = "kmeans",
+  supervised_method = "logistic"
+)
 }
 }

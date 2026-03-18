@@ -14,9 +14,11 @@ implementations with the convenience of a consistent, tidy API.
 
 **What tidylearn does:**
 
+- Reads data from diverse sources (`tl_read()`) — CSV, Excel, Parquet,
+  JSON, databases, S3, Kaggle, and more
 - Provides one consistent interface (`tl_model()`) to 20+ ML algorithms
 - Returns tidy tibbles instead of varied output formats
-- Offers unified ggplot2-based visualization across all methods
+- Offers unified ggplot2-based visualization and formatted `gt` tables
 - Enables pipe-friendly workflows with `%>%`
 - Orchestrates complex workflows combining multiple techniques
 
@@ -52,6 +54,33 @@ install.packages("tidylearn")
 ```
 
 ## Quick Start
+
+### Data Ingestion
+
+`tl_read()` auto-detects the format and returns a tidy `tidylearn_data` object:
+
+```r
+library(tidylearn)
+
+# Single files — format auto-detected from extension
+data <- tl_read("sales.csv")
+data <- tl_read("results.xlsx", sheet = "Q1")
+data <- tl_read("experiment.parquet")
+
+# Databases
+data <- tl_read_sqlite("warehouse.sqlite", "SELECT * FROM sales")
+data <- tl_read_postgres("localhost", query = "SELECT * FROM customers",
+                         dbname = "analytics", user = "me")
+
+# Cloud and API sources
+data <- tl_read_s3("s3://my-bucket/data.csv")
+data <- tl_read_kaggle("zillow/zecon", file = "Zip_time_series.csv")
+
+# Multi-file reading
+data <- tl_read(c("jan.csv", "feb.csv", "mar.csv"))
+data <- tl_read_dir("data/monthly/", format = "csv")
+data <- tl_read_zip("download.zip")
+```
 
 ### Unified Interface
 
@@ -200,6 +229,26 @@ plot_variance_explained(pca_result$fit$variance_explained)
 tl_dashboard(model, test_data)
 ```
 
+## Formatted Tables
+
+The `tl_table()` family produces polished `gt` tables for reporting:
+
+```r
+# Auto-selects the best table type
+tl_table(model)
+
+# Specific table types
+tl_table_metrics(model, new_data = test_data)
+tl_table_coefficients(model)
+tl_table_confusion(model, new_data = test_data)
+tl_table_importance(model)
+
+# Compare models side-by-side
+tl_table_comparison(model1, model2, model3,
+                    new_data = test_data,
+                    names = c("Linear", "Forest", "XGBoost"))
+```
+
 ## Philosophy
 
 tidylearn is built on these principles:
@@ -223,10 +272,22 @@ tidylearn is built on these principles:
 ?tidylearn
 
 # Explore main functions
+?tl_read
 ?tl_model
 ?tl_evaluate
+?tl_table
 ?tl_auto_ml
 ```
+
+### Vignettes
+
+- **Getting Started** — Overview of the tidylearn workflow
+- **Data Ingestion** — Reading from files, databases, and cloud sources
+- **Supervised Learning** — Classification and regression
+- **Unsupervised Learning** — PCA, clustering, and MDS
+- **Reporting** — Plots and formatted tables
+- **Integration Workflows** — Combining multiple techniques
+- **AutoML** — Automated machine learning
 
 ## Contributing
 

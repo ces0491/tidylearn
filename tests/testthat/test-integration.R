@@ -1,5 +1,6 @@
 test_that("tl_reduce_dimensions works with PCA", {
-  result <- tl_reduce_dimensions(iris, response = "Species", method = "pca", n_components = 3)
+  result <- tl_reduce_dimensions(iris, response = "Species",
+                                 method = "pca", n_components = 3)
 
   expect_type(result, "list")
   expect_true("data" %in% names(result))
@@ -52,7 +53,7 @@ test_that("tl_add_cluster_features works with different clustering methods", {
   # PAM
   skip_if_not_installed("cluster")
   data_pam <- tl_add_cluster_features(iris, response = "Species",
-                                     method = "pam", k = 3)
+                                      method = "pam", k = 3)
   expect_true("cluster_pam" %in% names(data_pam))
 })
 
@@ -62,9 +63,9 @@ test_that("tl_semisupervised performs label propagation", {
   labeled_idx <- sample(nrow(iris), size = 15)
 
   model <- tl_semisupervised(iris, Species ~ .,
-                            labeled_indices = labeled_idx,
-                            cluster_method = "kmeans",
-                            supervised_method = "logistic")
+                             labeled_indices = labeled_idx,
+                             cluster_method = "kmeans",
+                             supervised_method = "logistic")
 
   expect_s3_class(model, "tidylearn_semisupervised")
   expect_s3_class(model, "tidylearn_supervised")
@@ -83,10 +84,10 @@ test_that("tl_anomaly_aware detects and handles outliers", {
 
   # Flag anomalies
   model_flag <- tl_anomaly_aware(iris, Species ~ .,
-                                response = "Species",
-                                anomaly_method = "dbscan",
-                                action = "flag",
-                                supervised_method = "logistic")
+                                 response = "Species",
+                                 anomaly_method = "dbscan",
+                                 action = "flag",
+                                 supervised_method = "logistic")
 
   expect_s3_class(model_flag, "tidylearn_anomaly_aware")
   expect_true("anomaly_info" %in% names(model_flag))
@@ -94,10 +95,10 @@ test_that("tl_anomaly_aware detects and handles outliers", {
 
   # Remove anomalies
   model_remove <- tl_anomaly_aware(iris, Species ~ .,
-                                  response = "Species",
-                                  anomaly_method = "dbscan",
-                                  action = "remove",
-                                  supervised_method = "logistic")
+                                   response = "Species",
+                                   anomaly_method = "dbscan",
+                                   action = "remove",
+                                   supervised_method = "logistic")
 
   expect_s3_class(model_remove, "tidylearn_anomaly_aware")
   expect_true("anomalies_removed" %in% names(model_remove))
@@ -105,9 +106,9 @@ test_that("tl_anomaly_aware detects and handles outliers", {
 
 test_that("tl_stratified_models creates cluster-specific models", {
   models <- tl_stratified_models(mtcars, mpg ~ .,
-                                cluster_method = "kmeans",
-                                k = 3,
-                                supervised_method = "linear")
+                                 cluster_method = "kmeans",
+                                 k = 3,
+                                 supervised_method = "linear")
 
   expect_s3_class(models, "tidylearn_stratified")
   expect_true("cluster_model" %in% names(models))
@@ -120,9 +121,9 @@ test_that("tl_stratified_models creates cluster-specific models", {
 
 test_that("predict.tidylearn_stratified assigns to clusters and predicts", {
   models <- tl_stratified_models(mtcars, mpg ~ .,
-                                cluster_method = "kmeans",
-                                k = 2,
-                                supervised_method = "linear")
+                                 cluster_method = "kmeans",
+                                 k = 2,
+                                 supervised_method = "linear")
 
   # Predict on training data
   preds <- predict(models)
@@ -143,7 +144,8 @@ test_that("integration functions validate inputs", {
   )
 
   expect_error(
-    tl_add_cluster_features(iris, response = "InvalidColumn", method = "kmeans", k = 3),
+    tl_add_cluster_features(iris, response = "InvalidColumn",
+                            method = "kmeans", k = 3),
     "Response variable.*not found"
   )
 })
@@ -151,7 +153,7 @@ test_that("integration functions validate inputs", {
 test_that("reduced data can be used for supervised learning", {
   # Reduce dimensions
   reduced <- tl_reduce_dimensions(iris, response = "Species",
-                                 method = "pca", n_components = 3)
+                                  method = "pca", n_components = 3)
 
   # Train model on reduced data
   model <- tl_model(reduced$data, Species ~ ., method = "logistic")
@@ -165,8 +167,9 @@ test_that("reduced data can be used for supervised learning", {
 
 test_that("cluster features improve model", {
   # This is more of an integration test to ensure the workflow works
-  data_clustered <- tl_add_cluster_features(iris, response = "Species",
-                                           method = "kmeans", k = 3)
+  data_clustered <- tl_add_cluster_features(iris,
+                                            response = "Species",
+                                            method = "kmeans", k = 3)
 
   # Train model with cluster features
   model <- tl_model(data_clustered, Species ~ ., method = "logistic")

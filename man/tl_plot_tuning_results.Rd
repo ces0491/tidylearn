@@ -13,15 +13,20 @@ tl_plot_tuning_results(
 )
 }
 \arguments{
-\item{model}{A tidylearn model object with tuning results}
+\item{model}{A tidylearn model object with tuning
+results}
 
-\item{top_n}{Number of top parameter sets to highlight}
+\item{top_n}{Number of top parameter sets to
+highlight}
 
-\item{param1}{First parameter to plot (for 2D grid or scatter plots)}
+\item{param1}{First parameter to plot (for 2D grid
+or scatter plots)}
 
-\item{param2}{Second parameter to plot (for 2D grid or scatter plots)}
+\item{param2}{Second parameter to plot (for 2D grid
+or scatter plots)}
 
-\item{plot_type}{Type of plot: "scatter", "grid", "parallel", "importance"}
+\item{plot_type}{Type of plot: "scatter", "grid",
+"parallel", "importance"}
 }
 \value{
 A ggplot object

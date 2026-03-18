@@ -1,85 +1,123 @@
 #' @title Regularization Functions for tidylearn
 #' @name tidylearn-regularization
-#' @description Ridge, Lasso, and Elastic Net regularization functionality
+#' @description Ridge, Lasso, and Elastic Net regularization
+#'   functionality
 #' @importFrom glmnet glmnet cv.glmnet predict.glmnet
 #' @importFrom stats model.matrix as.formula
 #' @importFrom tibble tibble
-#' @importFrom dplyr %>%
 NULL
 
 #' Fit a Ridge regression model
 #'
 #' @param data A data frame containing the training data
 #' @param formula A formula specifying the model
-#' @param is_classification Logical indicating if this is a classification problem
-#' @param alpha Mixing parameter (0 for Ridge, 1 for Lasso, between 0-1 for Elastic Net)
-#' @param lambda Regularization parameter (if NULL, uses cross-validation to select)
-#' @param cv_folds Number of folds for cross-validation (default: 5)
+#' @param is_classification Logical indicating if this is a
+#'   classification problem
+#' @param alpha Mixing parameter (0 for Ridge, 1 for Lasso,
+#'   between 0-1 for Elastic Net)
+#' @param lambda Regularization parameter (if NULL, uses
+#'   cross-validation to select)
+#' @param cv_folds Number of folds for cross-validation
+#'   (default: 5)
 #' @param ... Additional arguments to pass to glmnet()
 #' @return A fitted Ridge regression model
 #' @keywords internal
-tl_fit_ridge <- function(data, formula, is_classification = FALSE,
-                         alpha = 0, lambda = NULL, cv_folds = 5, ...) {
-  return(tl_fit_regularized(data, formula, is_classification, alpha, lambda, cv_folds, ...))
+tl_fit_ridge <- function(data, formula,
+                         is_classification = FALSE,
+                         alpha = 0, lambda = NULL,
+                         cv_folds = 5, ...) {
+  tl_fit_regularized(
+    data, formula, is_classification,
+    alpha, lambda, cv_folds, ...
+  )
 }
 
 #' Fit a Lasso regression model
 #'
 #' @param data A data frame containing the training data
 #' @param formula A formula specifying the model
-#' @param is_classification Logical indicating if this is a classification problem
-#' @param alpha Mixing parameter (0 for Ridge, 1 for Lasso, between 0-1 for Elastic Net)
-#' @param lambda Regularization parameter (if NULL, uses cross-validation to select)
-#' @param cv_folds Number of folds for cross-validation (default: 5)
+#' @param is_classification Logical indicating if this is a
+#'   classification problem
+#' @param alpha Mixing parameter (0 for Ridge, 1 for Lasso,
+#'   between 0-1 for Elastic Net)
+#' @param lambda Regularization parameter (if NULL, uses
+#'   cross-validation to select)
+#' @param cv_folds Number of folds for cross-validation
+#'   (default: 5)
 #' @param ... Additional arguments to pass to glmnet()
 #' @return A fitted Lasso regression model
 #' @keywords internal
-tl_fit_lasso <- function(data, formula, is_classification = FALSE,
-                         alpha = 1, lambda = NULL, cv_folds = 5, ...) {
-  return(tl_fit_regularized(data, formula, is_classification, alpha, lambda, cv_folds, ...))
+tl_fit_lasso <- function(data, formula,
+                         is_classification = FALSE,
+                         alpha = 1, lambda = NULL,
+                         cv_folds = 5, ...) {
+  tl_fit_regularized(
+    data, formula, is_classification,
+    alpha, lambda, cv_folds, ...
+  )
 }
 
 #' Fit an Elastic Net regression model
 #'
 #' @param data A data frame containing the training data
 #' @param formula A formula specifying the model
-#' @param is_classification Logical indicating if this is a classification problem
-#' @param alpha Mixing parameter (default: 0.5 for Elastic Net)
-#' @param lambda Regularization parameter (if NULL, uses cross-validation to select)
-#' @param cv_folds Number of folds for cross-validation (default: 5)
+#' @param is_classification Logical indicating if this is a
+#'   classification problem
+#' @param alpha Mixing parameter (default: 0.5 for
+#'   Elastic Net)
+#' @param lambda Regularization parameter (if NULL, uses
+#'   cross-validation to select)
+#' @param cv_folds Number of folds for cross-validation
+#'   (default: 5)
 #' @param ... Additional arguments to pass to glmnet()
 #' @return A fitted Elastic Net regression model
 #' @keywords internal
-tl_fit_elastic_net <- function(data, formula, is_classification = FALSE,
-                               alpha = 0.5, lambda = NULL, cv_folds = 5, ...) {
-  return(tl_fit_regularized(data, formula, is_classification, alpha, lambda, cv_folds, ...))
+tl_fit_elastic_net <- function(data, formula,
+                               is_classification = FALSE,
+                               alpha = 0.5,
+                               lambda = NULL,
+                               cv_folds = 5, ...) {
+  tl_fit_regularized(
+    data, formula, is_classification,
+    alpha, lambda, cv_folds, ...
+  )
 }
 
-#' Fit a regularized regression model (Ridge, Lasso, or Elastic Net)
+#' Fit a regularized regression model
+#'
+#' Fits Ridge, Lasso, or Elastic Net regularization.
 #'
 #' @param data A data frame containing the training data
 #' @param formula A formula specifying the model
-#' @param is_classification Logical indicating if this is a classification problem
-#' @param alpha Mixing parameter (0 for Ridge, 1 for Lasso, between 0-1 for Elastic Net)
-#' @param lambda Regularization parameter (if NULL, uses cross-validation to select)
-#' @param cv_folds Number of folds for cross-validation (default: 5)
+#' @param is_classification Logical indicating if this is a
+#'   classification problem
+#' @param alpha Mixing parameter (0 for Ridge, 1 for Lasso,
+#'   between 0-1 for Elastic Net)
+#' @param lambda Regularization parameter (if NULL, uses
+#'   cross-validation to select)
+#' @param cv_folds Number of folds for cross-validation
+#'   (default: 5)
 #' @param ... Additional arguments to pass to glmnet()
 #' @return A fitted regularized regression model
 #' @keywords internal
-tl_fit_regularized <- function(data, formula, is_classification = FALSE,
-                               alpha = 0, lambda = NULL, cv_folds = 5, ...) {
+tl_fit_regularized <- function(data, formula,
+                               is_classification = FALSE,
+                               alpha = 0, lambda = NULL,
+                               cv_folds = 5, ...) {
   # Check if glmnet is installed
   tl_check_packages("glmnet")
 
   # Parse the formula
   response_var <- all.vars(formula)[1]
 
-  # Extract response (y) and predictors (X) matrices
+  # Extract response (y) and predictors matrices
   y <- data[[response_var]]
 
-  # Create model matrix for predictors (X)
+  # Create model matrix for predictors
   # Remove intercept as glmnet adds it by default
-  X <- stats::model.matrix(formula, data = data)[, -1, drop = FALSE]
+  x_mat <- stats::model.matrix(
+    formula, data = data
+  )[, -1, drop = FALSE]
 
   # Determine the appropriate family based on problem type
   if (is_classification) {
@@ -103,7 +141,7 @@ tl_fit_regularized <- function(data, formula, is_classification = FALSE,
   if (is.null(lambda)) {
     # Use cross-validation to select optimal lambda
     cv_model <- glmnet::cv.glmnet(
-      x = X,
+      x = x_mat,
       y = y,
       alpha = alpha,
       family = family,
@@ -116,13 +154,13 @@ tl_fit_regularized <- function(data, formula, is_classification = FALSE,
     lambda_1se <- cv_model$lambda.1se
 
     # Fit final model with optimal lambda
-    # By default, use lambda.1se for better generalization
+    # Use lambda.1se for better generalization
     model <- glmnet::glmnet(
-      x = X,
+      x = x_mat,
       y = y,
       alpha = alpha,
       family = family,
-      lambda = cv_model$lambda,  # Keep all lambda values for plots
+      lambda = cv_model$lambda,
       ...
     )
 
@@ -133,7 +171,7 @@ tl_fit_regularized <- function(data, formula, is_classification = FALSE,
   } else {
     # Fit model with user-specified lambda
     model <- glmnet::glmnet(
-      x = X,
+      x = x_mat,
       y = y,
       alpha = alpha,
       family = family,
@@ -146,26 +184,30 @@ tl_fit_regularized <- function(data, formula, is_classification = FALSE,
     attr(model, "lambda_1se") <- lambda
   }
 
-  # Store formula, variables, and alpha for future reference
+  # Store formula, variables, and alpha
   attr(model, "formula") <- formula
   attr(model, "response_var") <- response_var
   attr(model, "alpha") <- alpha
   attr(model, "is_classification") <- is_classification
 
-  return(model)
+  model
 }
 
 #' Predict using a regularized regression model
 #'
 #' @param model A tidylearn regularized model object
 #' @param new_data A data frame containing the new data
-#' @param type Type of prediction: "response" (default), "class" (for classification), "prob" (for classification)
-#' @param lambda Which lambda to use for prediction ("1se" or "min", default: "1se")
+#' @param type Type of prediction: "response" (default),
+#'   "class" or "prob" (for classification)
+#' @param lambda Which lambda to use for prediction
+#'   ("1se" or "min", default: "1se")
 #' @param ... Additional arguments
 #' @return Predictions
 #' @keywords internal
-tl_predict_regularized <- function(model, new_data, type = "response",
-                                   lambda = "1se", ...) {
+tl_predict_regularized <- function(model, new_data,
+                                   type = "response",
+                                   lambda = "1se",
+                                   ...) {
   fit <- model$fit
   is_classification <- model$spec$is_classification
   formula <- model$spec$formula
@@ -179,72 +221,134 @@ tl_predict_regularized <- function(model, new_data, type = "response",
   } else if (is.numeric(lambda)) {
     lambda_val <- lambda
   } else {
-    stop("Invalid lambda specification. Use '1se', 'min', or a numeric value.", call. = FALSE)
+    stop(
+      "Invalid lambda specification. ",
+      "Use '1se', 'min', or a numeric value.",
+      call. = FALSE
+    )
   }
 
   # Create model matrix for new data (excluding intercept)
-  X_new <- stats::model.matrix(formula, data = new_data)[, -1, drop = FALSE]
+  x_new <- stats::model.matrix(
+    formula, data = new_data
+  )[, -1, drop = FALSE]
 
   # Make predictions
   if (is_classification) {
     # Classification predictions
     if (type == "response" || type == "link") {
       # Linear predictor
-      preds <- glmnet::predict.glmnet(fit, newx = X_new, s = lambda_val, type = "link", ...)
-      return(as.vector(preds))
+      preds <- glmnet::predict.glmnet(
+        fit,
+        newx = x_new,
+        s = lambda_val,
+        type = "link",
+        ...
+      )
+      as.vector(preds)
     } else if (type == "class") {
       # Predicted classes
-      if ("family" %in% names(fit) && fit$family == "binomial") {
+      if ("family" %in% names(fit) &&
+            fit$family == "binomial") {
         # Binary classification
-        probs <- glmnet::predict.glmnet(fit, newx = X_new, s = lambda_val, type = "response", ...)
+        probs <- glmnet::predict.glmnet(
+          fit,
+          newx = x_new,
+          s = lambda_val,
+          type = "response",
+          ...
+        )
 
         # Get class levels from training data
-        class_levels <- levels(factor(model$data[[response_var]]))
+        class_levels <- levels(
+          factor(model$data[[response_var]])
+        )
 
         # Classify based on probability > 0.5
-        pred_classes <- ifelse(as.vector(probs) > 0.5, class_levels[2], class_levels[1])
-        pred_classes <- factor(pred_classes, levels = class_levels)
+        pred_classes <- ifelse(
+          as.vector(probs) > 0.5,
+          class_levels[2],
+          class_levels[1]
+        )
+        pred_classes <- factor(
+          pred_classes, levels = class_levels
+        )
 
-        return(pred_classes)
+        pred_classes
       } else {
         # Multiclass classification
-        preds <- glmnet::predict.glmnet(fit, newx = X_new, s = lambda_val, type = "class", ...)
-        return(as.vector(preds))
+        preds <- glmnet::predict.glmnet(
+          fit,
+          newx = x_new,
+          s = lambda_val,
+          type = "class",
+          ...
+        )
+        as.vector(preds)
       }
     } else if (type == "prob") {
       # Predicted probabilities
-      if ("family" %in% names(fit) && fit$family == "binomial") {
+      if ("family" %in% names(fit) &&
+            fit$family == "binomial") {
         # Binary classification
-        pos_probs <- as.vector(glmnet::predict.glmnet(fit, newx = X_new, s = lambda_val, type = "response", ...))
+        pos_probs <- as.vector(
+          glmnet::predict.glmnet(
+            fit,
+            newx = x_new,
+            s = lambda_val,
+            type = "response",
+            ...
+          )
+        )
         neg_probs <- 1 - pos_probs
 
         # Get class levels from training data
-        class_levels <- levels(factor(model$data[[response_var]]))
+        class_levels <- levels(
+          factor(model$data[[response_var]])
+        )
 
-        # Create a data frame with probabilities for each class
+        # Create a data frame with probs for each class
         prob_df <- tibble::tibble(
           !!class_levels[1] := neg_probs,
           !!class_levels[2] := pos_probs
         )
 
-        return(prob_df)
+        prob_df
       } else {
         # Multiclass classification
-        probs <- glmnet::predict.glmnet(fit, newx = X_new, s = lambda_val, type = "response", ...)
+        probs <- glmnet::predict.glmnet(
+          fit,
+          newx = x_new,
+          s = lambda_val,
+          type = "response",
+          ...
+        )
 
         # Reshape to data frame
         prob_df <- as.data.frame(probs)
-        names(prob_df) <- levels(factor(model$data[[response_var]]))
+        names(prob_df) <- levels(
+          factor(model$data[[response_var]])
+        )
 
-        return(tibble::as_tibble(prob_df))
+        tibble::as_tibble(prob_df)
       }
     } else {
-      stop("Invalid prediction type for classification. Use 'response', 'class', or 'prob'.", call. = FALSE)
+      stop(
+        "Invalid prediction type for classification. ",
+        "Use 'response', 'class', or 'prob'.",
+        call. = FALSE
+      )
     }
   } else {
     # Regression predictions
-    preds <- glmnet::predict.glmnet(fit, newx = X_new, s = lambda_val, type = "response", ...)
-    return(as.vector(preds))
+    preds <- glmnet::predict.glmnet(
+      fit,
+      newx = x_new,
+      s = lambda_val,
+      type = "response",
+      ...
+    )
+    as.vector(preds)
   }
 }
 
@@ -256,8 +360,10 @@ tl_predict_regularized <- function(model, new_data, type = "response",
 #' @param ... Additional arguments
 #' @return Predictions
 #' @keywords internal
-tl_predict_ridge <- function(model, new_data, type = "response", ...) {
-  return(tl_predict_regularized(model, new_data, type, ...))
+tl_predict_ridge <- function(model, new_data,
+                             type = "response",
+                             ...) {
+  tl_predict_regularized(model, new_data, type, ...)
 }
 
 #' Predict using a Lasso regression model
@@ -268,8 +374,10 @@ tl_predict_ridge <- function(model, new_data, type = "response", ...) {
 #' @param ... Additional arguments
 #' @return Predictions
 #' @keywords internal
-tl_predict_lasso <- function(model, new_data, type = "response", ...) {
-  return(tl_predict_regularized(model, new_data, type, ...))
+tl_predict_lasso <- function(model, new_data,
+                             type = "response",
+                             ...) {
+  tl_predict_regularized(model, new_data, type, ...)
 }
 
 #' Predict using an Elastic Net regression model
@@ -280,19 +388,25 @@ tl_predict_lasso <- function(model, new_data, type = "response", ...) {
 #' @param ... Additional arguments
 #' @return Predictions
 #' @keywords internal
-tl_predict_elastic_net <- function(model, new_data, type = "response", ...) {
-  return(tl_predict_regularized(model, new_data, type, ...))
+tl_predict_elastic_net <- function(model, new_data,
+                                   type = "response",
+                                   ...) {
+  tl_predict_regularized(model, new_data, type, ...)
 }
 
-#' Plot regularization path for a regularized regression model
+#' Plot regularization path for a regularized model
 #'
 #' @param model A tidylearn regularized model object
-#' @param label_n Number of top features to label (default: 5)
+#' @param label_n Number of top features to label
+#'   (default: 5)
 #' @param ... Additional arguments
 #' @return A ggplot object
-#' @importFrom ggplot2 ggplot aes geom_line scale_x_log10 labs theme_minimal
+#' @importFrom ggplot2 ggplot aes geom_line
+#'   scale_x_log10 labs theme_minimal
 #' @export
-tl_plot_regularization_path <- function(model, label_n = 5, ...) {
+tl_plot_regularization_path <- function(model,
+                                        label_n = 5,
+                                        ...) {
   # Extract the glmnet model
   fit <- model$fit
 
@@ -304,39 +418,75 @@ tl_plot_regularization_path <- function(model, label_n = 5, ...) {
 
   # Create a data frame for plotting
   coef_df <- tibble::tibble(
-    lambda = rep(fit$lambda, each = nrow(coef_matrix)),
-    feature = rep(rownames(coef_matrix), times = length(fit$lambda)),
+    lambda = rep(
+      fit$lambda, each = nrow(coef_matrix)
+    ),
+    feature = rep(
+      rownames(coef_matrix),
+      times = length(fit$lambda)
+    ),
     coefficient = as.vector(coef_matrix)
   )
 
-  # Identify the top features (by maximum absolute coefficient)
+  # Identify the top features (by max absolute coef)
   top_features <- coef_df %>%
     dplyr::group_by(.data$feature) %>%
-    dplyr::summarize(max_abs_coef = max(abs(.data$coefficient)), .groups = "drop") %>%
+    dplyr::summarize(
+      max_abs_coef = max(abs(.data$coefficient)),
+      .groups = "drop"
+    ) %>%
     dplyr::arrange(dplyr::desc(.data$max_abs_coef)) %>%
     dplyr::slice_head(n = label_n) %>%
     dplyr::pull(.data$feature)
 
   # Mark top features for labeling
   coef_df <- coef_df %>%
-    dplyr::mutate(is_top = .data$feature %in% top_features)
+    dplyr::mutate(
+      is_top = .data$feature %in% top_features
+    )
 
   # Get optimal lambda values
   lambda_min <- attr(fit, "lambda_min")
   lambda_1se <- attr(fit, "lambda_1se")
 
   # Create the plot
-  p <- ggplot2::ggplot(coef_df, ggplot2::aes(x = lambda, y = coefficient, group = feature, color = is_top)) +
-    ggplot2::geom_line(ggplot2::aes(alpha = is_top, size = is_top)) +
-    ggplot2::geom_vline(xintercept = lambda_min, linetype = "dashed", color = "blue") +
-    ggplot2::geom_vline(xintercept = lambda_1se, linetype = "dashed", color = "red") +
+  p <- ggplot2::ggplot(
+    coef_df,
+    ggplot2::aes(
+      x = lambda,
+      y = coefficient,
+      group = feature,
+      color = is_top
+    )
+  ) +
+    ggplot2::geom_line(
+      ggplot2::aes(alpha = is_top, size = is_top)
+    ) +
+    ggplot2::geom_vline(
+      xintercept = lambda_min,
+      linetype = "dashed",
+      color = "blue"
+    ) +
+    ggplot2::geom_vline(
+      xintercept = lambda_1se,
+      linetype = "dashed",
+      color = "red"
+    ) +
     ggplot2::scale_x_log10() +
-    ggplot2::scale_alpha_manual(values = c(0.3, 1)) +
-    ggplot2::scale_size_manual(values = c(0.5, 1.2)) +
-    ggplot2::scale_color_manual(values = c("gray", "steelblue")) +
+    ggplot2::scale_alpha_manual(
+      values = c(0.3, 1)
+    ) +
+    ggplot2::scale_size_manual(
+      values = c(0.5, 1.2)
+    ) +
+    ggplot2::scale_color_manual(
+      values = c("gray", "steelblue")
+    ) +
     ggplot2::labs(
       title = "Regularization Path",
-      subtitle = paste0("Blue: lambda.min, Red: lambda.1se"),
+      subtitle = paste0(
+        "Blue: lambda.min, Red: lambda.1se"
+      ),
       x = "Lambda (log scale)",
       y = "Coefficients"
     ) +
@@ -348,30 +498,40 @@ tl_plot_regularization_path <- function(model, label_n = 5, ...) {
     # Get the rightmost lambda value
     rightmost_lambda <- min(fit$lambda)
 
-    # Get coefficients at the rightmost lambda for top features
+    # Get coefficients at rightmost lambda for top feats
     label_data <- coef_df %>%
-      dplyr::filter(.data$is_top, .data$lambda == rightmost_lambda)
+      dplyr::filter(
+        .data$is_top,
+        .data$lambda == rightmost_lambda
+      )
 
     # Add labels
     p <- p + ggplot2::geom_text(
       data = label_data,
-      ggplot2::aes(label = feature, x = lambda * 1.1, y = coefficient),
+      ggplot2::aes(
+        label = feature,
+        x = lambda * 1.1,
+        y = coefficient
+      ),
       hjust = 0, vjust = 0.5, size = 3
     )
   }
 
-  return(p)
+  p
 }
 
-#' Plot cross-validation results for a regularized regression model
+#' Plot cross-validation results for a regularized model
 #'
-#' Shows the cross-validation error as a function of lambda for ridge, lasso,
-#' or elastic net models fitted with cv.glmnet.
+#' Shows the cross-validation error as a function of
+#' lambda for ridge, lasso, or elastic net models fitted
+#' with cv.glmnet.
 #'
-#' @param model A tidylearn regularized model object (ridge, lasso, or elastic_net)
+#' @param model A tidylearn regularized model object
+#'   (ridge, lasso, or elastic_net)
 #' @param ... Additional arguments (currently unused)
 #' @return A ggplot object showing CV error vs lambda
-#' @importFrom ggplot2 ggplot aes geom_point geom_line geom_ribbon scale_x_log10 labs theme_minimal
+#' @importFrom ggplot2 ggplot aes geom_point geom_line
+#'   geom_ribbon scale_x_log10 labs theme_minimal
 #' @export
 tl_plot_regularization_cv <- function(model, ...) {
   # Extract the glmnet model
@@ -380,13 +540,17 @@ tl_plot_regularization_cv <- function(model, ...) {
   # Check if cross-validation results are available
   cv_results <- attr(fit, "cv_results")
   if (is.null(cv_results)) {
-    stop("Cross-validation results not available. Model must be fitted with lambda = NULL.", call. = FALSE)
+    stop(
+      "Cross-validation results not available. ",
+      "Model must be fitted with lambda = NULL.",
+      call. = FALSE
+    )
   }
 
   # Get lambda values and mean cross-validated error
   lambda <- cv_results$lambda
-  cvm <- cv_results$cvm  # Mean cross-validated error
-  cvsd <- cv_results$cvsd  # Standard error of cross-validated error
+  cvm <- cv_results$cvm
+  cvsd <- cv_results$cvsd
 
   # Create a data frame for plotting
   cv_df <- tibble::tibble(
@@ -408,34 +572,59 @@ tl_plot_regularization_cv <- function(model, ...) {
   }
 
   # Create the plot
-  p <- ggplot2::ggplot(cv_df, ggplot2::aes(x = lambda, y = error)) +
-    ggplot2::geom_ribbon(ggplot2::aes(ymin = error_lower, ymax = error_upper), alpha = 0.2) +
+  p <- ggplot2::ggplot(
+    cv_df,
+    ggplot2::aes(x = lambda, y = error)
+  ) +
+    ggplot2::geom_ribbon(
+      ggplot2::aes(
+        ymin = error_lower,
+        ymax = error_upper
+      ),
+      alpha = 0.2
+    ) +
     ggplot2::geom_point() +
     ggplot2::geom_line() +
-    ggplot2::geom_vline(xintercept = lambda_min, linetype = "dashed", color = "blue") +
-    ggplot2::geom_vline(xintercept = lambda_1se, linetype = "dashed", color = "red") +
+    ggplot2::geom_vline(
+      xintercept = lambda_min,
+      linetype = "dashed",
+      color = "blue"
+    ) +
+    ggplot2::geom_vline(
+      xintercept = lambda_1se,
+      linetype = "dashed",
+      color = "red"
+    ) +
     ggplot2::scale_x_log10() +
     ggplot2::labs(
       title = "Cross-Validation Results",
-      subtitle = paste0("Blue: lambda.min, Red: lambda.1se"),
+      subtitle = paste0(
+        "Blue: lambda.min, Red: lambda.1se"
+      ),
       x = "Lambda (log scale)",
       y = y_label
     ) +
     ggplot2::theme_minimal()
 
-  return(p)
+  p
 }
 
-#' Plot variable importance for a regularized regression model
+#' Plot variable importance for a regularized model
 #'
 #' @param model A tidylearn regularized model object
-#' @param lambda Which lambda to use ("1se" or "min", default: "1se")
-#' @param top_n Number of top features to display (default: 20)
+#' @param lambda Which lambda to use
+#'   ("1se" or "min", default: "1se")
+#' @param top_n Number of top features to display
+#'   (default: 20)
 #' @param ... Additional arguments
 #' @return A ggplot object
-#' @importFrom ggplot2 ggplot aes geom_col coord_flip labs theme_minimal
+#' @importFrom ggplot2 ggplot aes geom_col coord_flip
+#'   labs theme_minimal
 #' @export
-tl_plot_importance_regularized <- function(model, lambda = "1se", top_n = 20, ...) {
+tl_plot_importance_regularized <- function(model,
+                                           lambda = "1se",
+                                           top_n = 20,
+                                           ...) {
   # Extract the glmnet model
   fit <- model$fit
 
@@ -447,11 +636,14 @@ tl_plot_importance_regularized <- function(model, lambda = "1se", top_n = 20, ..
   } else if (is.numeric(lambda)) {
     lambda_val <- lambda
   } else {
-    stop("Invalid lambda specification. Use '1se', 'min', or a numeric value.", call. = FALSE)
+    stop(
+      "Invalid lambda specification. ",
+      "Use '1se', 'min', or a numeric value.",
+      call. = FALSE
+    )
   }
 
   # Get coefficients at selected lambda
-  lambda_index <- which.min(abs(fit$lambda - lambda_val))
   coefs <- as.matrix(coef(fit, s = lambda_val))
 
   # Exclude intercept
@@ -467,25 +659,36 @@ tl_plot_importance_regularized <- function(model, lambda = "1se", top_n = 20, ..
     dplyr::slice_head(n = top_n)
 
   # Create the plot
-  p <- ggplot2::ggplot(importance_df, ggplot2::aes(x = stats::reorder(feature, importance), y = importance)) +
+  p <- ggplot2::ggplot(
+    importance_df,
+    ggplot2::aes(
+      x = stats::reorder(feature, importance),
+      y = importance
+    )
+  ) +
     ggplot2::geom_col(fill = "steelblue") +
     ggplot2::coord_flip() +
     ggplot2::labs(
       title = "Feature Importance",
-      subtitle = paste0("Based on coefficient magnitudes at lambda = ", round(lambda_val, 5)),
+      subtitle = paste0(
+        "Based on coefficient magnitudes at ",
+        "lambda = ", round(lambda_val, 5)
+      ),
       x = NULL,
       y = "Absolute Coefficient Value"
     ) +
     ggplot2::theme_minimal()
 
-  return(p)
+  p
 }
 
 
 #' Predict using a glmnet model
 #' @keywords internal
 #' @noRd
-tl_predict_glmnet <- function(model, new_data, type = "response", ...) {
+tl_predict_glmnet <- function(model, new_data,
+                              type = "response",
+                              ...) {
   fit <- model$fit
   is_classification <- model$spec$is_classification
 
@@ -498,16 +701,30 @@ tl_predict_glmnet <- function(model, new_data, type = "response", ...) {
   predictor_vars <- all_vars[-1]  # Remove response
 
   # Create formula manually without using update()
-  if (length(predictor_vars) == 0 || (length(predictor_vars) == 1 && predictor_vars[1] == ".")) {
+  if (length(predictor_vars) == 0 ||
+        (length(predictor_vars) == 1 &&
+           predictor_vars[1] == ".")) {
     # Use all predictors except response
-    predictor_names <- setdiff(names(new_data), response_var)
-    predictor_formula <- as.formula(paste("~", paste(predictor_names, collapse = " + "), "- 1"))
+    predictor_names <- setdiff(
+      names(new_data), response_var
+    )
+    predictor_formula <- as.formula(paste(
+      "~",
+      paste(predictor_names, collapse = " + "),
+      "- 1"
+    ))
   } else {
-    predictor_formula <- as.formula(paste("~", paste(predictor_vars, collapse = " + "), "- 1"))
+    predictor_formula <- as.formula(paste(
+      "~",
+      paste(predictor_vars, collapse = " + "),
+      "- 1"
+    ))
   }
 
   # Create model matrix
-  X_new <- stats::model.matrix(predictor_formula, data = new_data)
+  x_new <- stats::model.matrix(
+    predictor_formula, data = new_data
+  )
 
   # Get optimal lambda value from model
   lambda_val <- attr(fit, "lambda_min")
@@ -518,10 +735,20 @@ tl_predict_glmnet <- function(model, new_data, type = "response", ...) {
 
   # Make predictions
   if (is_classification) {
-    preds <- predict(fit, newx = X_new, type = "class", s = lambda_val)
-    return(as.vector(preds))
+    preds <- predict(
+      fit,
+      newx = x_new,
+      type = "class",
+      s = lambda_val
+    )
+    as.vector(preds)
   } else {
-    preds <- predict(fit, newx = X_new, type = "response", s = lambda_val)
-    return(as.vector(preds))
+    preds <- predict(
+      fit,
+      newx = x_new,
+      type = "response",
+      s = lambda_val
+    )
+    as.vector(preds)
   }
 }

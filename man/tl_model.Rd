@@ -9,28 +9,36 @@ tl_model(data, formula = NULL, method = "linear", ...)
 \arguments{
 \item{data}{A data frame containing the training data}
 
-\item{formula}{A formula specifying the model. For unsupervised methods, use \code{~ vars} or NULL.}
+\item{formula}{A formula specifying the model. For
+unsupervised methods, use \code{~ vars} or NULL.}
 
-\item{method}{The modeling method. Supervised: "linear" (stats::lm), "logistic" (stats::glm),
-"tree" (rpart), "forest" (randomForest), "boost" (gbm), "ridge"/"lasso"/"elastic_net" (glmnet),
-"svm" (e1071), "nn" (nnet), "deep" (keras), "xgboost" (xgboost).
-Unsupervised: "pca" (stats::prcomp), "mds" (stats/MASS/smacof), "kmeans" (stats::kmeans),
-"pam"/"clara" (cluster), "hclust" (stats::hclust), "dbscan" (dbscan).}
+\item{method}{The modeling method. Supervised: "linear"
+(stats::lm), "logistic" (stats::glm), "tree" (rpart),
+"forest" (randomForest), "boost" (gbm),
+"ridge"/"lasso"/"elastic_net" (glmnet), "svm" (e1071),
+"nn" (nnet), "deep" (keras), "xgboost" (xgboost).
+Unsupervised: "pca" (stats::prcomp),
+"mds" (stats/MASS/smacof), "kmeans" (stats::kmeans),
+"pam"/"clara" (cluster), "hclust" (stats::hclust),
+"dbscan" (dbscan).}
 
 \item{...}{Additional arguments passed to the underlying model function}
 }
 \value{
-A tidylearn model object containing the fitted model (\code{$fit}), specification,
-and training data
+A tidylearn model object containing the fitted
+model (\code{$fit}), specification, and training data
 }
 \description{
-Unified interface for creating machine learning models by wrapping established R packages.
-This function dispatches to the appropriate underlying package based on the method specified.
+Unified interface for creating machine learning models
+by wrapping established R packages. This function dispatches
+to the appropriate underlying package based on the method.
 }
 \details{
-The wrapped packages include: stats (lm, glm, prcomp, kmeans, hclust), glmnet, randomForest,
-xgboost, gbm, e1071, nnet, rpart, cluster, and dbscan. The underlying algorithms are unchanged -
-this function provides a consistent interface and returns tidy output.
+The wrapped packages include: stats (lm, glm, prcomp,
+kmeans, hclust), glmnet, randomForest, xgboost, gbm,
+e1071, nnet, rpart, cluster, and dbscan. The underlying
+algorithms are unchanged - this function provides a
+consistent interface and returns tidy output.
 
 Access the raw model object from the underlying package via \code{model$fit}.
 }

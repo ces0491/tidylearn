@@ -19,9 +19,11 @@ tl_plot_xgboost_shap_dependence(
 
 \item{interaction_feature}{Feature to use for coloring (default: NULL)}
 
-\item{data}{Data for SHAP value calculation (default: NULL, uses training data)}
+\item{data}{Data for SHAP value calculation
+(default: NULL, uses training data)}
 
-\item{n_samples}{Number of samples to use (default: 100, NULL for all)}
+\item{n_samples}{Number of samples to use
+(default: 100, NULL for all)}
 }
 \value{
 A ggplot object with SHAP dependence plot

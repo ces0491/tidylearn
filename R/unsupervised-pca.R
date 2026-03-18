@@ -4,8 +4,10 @@
 #' containing scores, loadings, variance explained, and the original model.
 #'
 #' @param data A data frame or tibble
-#' @param cols Columns to include in PCA (tidy select syntax). If NULL, uses all numeric columns.
-#' @param scale Logical; should variables be scaled to unit variance? Default TRUE.
+#' @param cols Columns to include in PCA (tidy select
+#'   syntax). If NULL, uses all numeric columns.
+#' @param scale Logical; should variables be scaled to
+#'   unit variance? Default TRUE.
 #' @param center Logical; should variables be centered? Default TRUE.
 #' @param method Character; "prcomp" (default, recommended) or "princomp"
 #'
@@ -29,7 +31,8 @@
 #' pca_result$variance
 #'
 #' @export
-tidy_pca <- function(data, cols = NULL, scale = TRUE, center = TRUE, method = "prcomp") {
+tidy_pca <- function(data, cols = NULL, scale = TRUE,
+                     center = TRUE, method = "prcomp") {
 
   # Convert to data frame if needed
   data <- as.data.frame(data)
@@ -70,7 +73,6 @@ tidy_pca <- function(data, cols = NULL, scale = TRUE, center = TRUE, method = "p
     dplyr::mutate(.obs_id = obs_id, .before = 1)
 
   # Create tidy loadings tibble (long format)
-  n_pcs <- ncol(loadings_matrix)
   loadings_tbl <- tibble::as_tibble(loadings_matrix, rownames = "variable") %>%
     tidyr::pivot_longer(
       cols = -variable,
@@ -179,7 +181,8 @@ augment_pca <- function(pca_obj, data, n_components = NULL) {
 #'
 #' @param pca_obj A tidy_pca object
 #' @param type Character; "variance" or "proportion" (default)
-#' @param add_line Logical; add horizontal line at eigenvalue = 1? (for Kaiser criterion)
+#' @param add_line Logical; add horizontal line at
+#'   eigenvalue = 1? (for Kaiser criterion)
 #'
 #' @return A ggplot object
 #' @export
@@ -242,8 +245,11 @@ tidy_pca_screeplot <- function(pca_obj, type = "proportion", add_line = TRUE) {
 #'
 #' @return A ggplot object
 #' @export
-tidy_pca_biplot <- function(pca_obj, pc_x = 1, pc_y = 2, color_by = NULL,
-                             arrow_scale = 1, label_obs = FALSE, label_vars = TRUE) {
+tidy_pca_biplot <- function(pca_obj, pc_x = 1, pc_y = 2,
+                            color_by = NULL,
+                            arrow_scale = 1,
+                            label_obs = FALSE,
+                            label_vars = TRUE) {
   if (!inherits(pca_obj, "tidy_pca")) {
     stop("pca_obj must be a tidy_pca object")
   }

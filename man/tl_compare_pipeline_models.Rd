@@ -9,7 +9,8 @@ tl_compare_pipeline_models(pipeline, metrics = NULL)
 \arguments{
 \item{pipeline}{A tidylearn pipeline object with results}
 
-\item{metrics}{Character vector of metrics to compare (if NULL, uses all available)}
+\item{metrics}{Character vector of metrics to compare
+(if NULL, uses all available)}
 }
 \value{
 A comparison plot of model performance

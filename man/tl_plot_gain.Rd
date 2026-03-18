@@ -9,9 +9,11 @@ tl_plot_gain(model, new_data = NULL, bins = 10, ...)
 \arguments{
 \item{model}{A tidylearn classification model object}
 
-\item{new_data}{Optional data frame for evaluation (if NULL, uses training data)}
+\item{new_data}{Optional data frame for evaluation
+(if NULL, uses training data)}
 
-\item{bins}{Number of bins for grouping predictions (default: 10)}
+\item{bins}{Number of bins for grouping predictions
+(default: 10)}
 
 \item{...}{Additional arguments}
 }

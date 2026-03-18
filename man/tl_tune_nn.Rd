@@ -19,7 +19,8 @@ tl_tune_nn(
 
 \item{formula}{A formula specifying the model}
 
-\item{is_classification}{Logical indicating if this is a classification problem}
+\item{is_classification}{Logical indicating if this is a
+classification problem}
 
 \item{sizes}{Vector of hidden layer sizes to try}
 

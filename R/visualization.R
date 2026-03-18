@@ -2,10 +2,11 @@
 #' @name tidylearn-visualization
 #' @description General visualization functions for tidylearn models
 #' @importFrom ggplot2 ggplot aes geom_line geom_point geom_bar geom_boxplot
-#' @importFrom ggplot2 geom_histogram geom_density geom_jitter scale_color_gradient
+#' @importFrom ggplot2 geom_histogram geom_density
+#' @importFrom ggplot2 geom_jitter scale_color_gradient
 #' @importFrom ggplot2 labs theme_minimal
 #' @importFrom tibble tibble as_tibble
-#' @importFrom dplyr %>% mutate filter group_by summarize arrange
+#' @importFrom dplyr mutate filter group_by summarize arrange
 NULL
 
 #' Plot feature importance across multiple models
@@ -39,7 +40,7 @@ tl_plot_importance_comparison <- function(..., top_n = 10, names = NULL) {
       imp_data
     } else if (model$spec$method %in% c("ridge", "lasso", "elastic_net")) {
       # Regularized regression
-      imp_data <- tl_extract_importance_regularized(model)
+      imp_data <- tl_extract_importance_reg(model)
 
       # Add model name
       imp_data$model <- name
@@ -64,7 +65,10 @@ tl_plot_importance_comparison <- function(..., top_n = 10, names = NULL) {
   # Find top features across all models
   top_features <- all_importance %>%
     dplyr::group_by(.data[["feature"]]) %>%
-    dplyr::summarize(avg_importance = mean(.data[["importance"]]), .groups = "drop") %>%
+    dplyr::summarize(
+      avg_importance = mean(.data[["importance"]]),
+      .groups = "drop"
+    ) %>%
     dplyr::arrange(dplyr::desc(.data[["avg_importance"]])) %>%
     dplyr::slice_head(n = top_n) %>%
     dplyr::pull(.data[["feature"]])
@@ -146,10 +150,10 @@ tl_extract_importance <- function(model) {
     )
   } else {
     stop(
-    "Variable importance extraction not implemented for method: ",
-    method,
-    call. = FALSE
-  )
+      "Variable importance extraction not implemented for method: ",
+      method,
+      call. = FALSE
+    )
   }
 
   # Normalize importance to 0-100 scale
@@ -167,7 +171,7 @@ tl_extract_importance <- function(model) {
 #' @param lambda Which lambda to use ("1se" or "min", default: "1se")
 #' @return A data frame with feature importance values
 #' @keywords internal
-tl_extract_importance_regularized <- function(model, lambda = "1se") {
+tl_extract_importance_reg <- function(model, lambda = "1se") {
   # Extract the glmnet model
   fit <- model$fit
 
@@ -186,7 +190,6 @@ tl_extract_importance_regularized <- function(model, lambda = "1se") {
   }
 
   # Get coefficients at selected lambda
-  lambda_index <- which.min(abs(fit$lambda - lambda_val))
   coefs <- as.matrix(coef(fit, s = lambda_val))
 
   # Exclude intercept
@@ -211,12 +214,17 @@ tl_extract_importance_regularized <- function(model, lambda = "1se") {
 #' Plot model comparison
 #'
 #' @param ... tidylearn model objects to compare
-#' @param new_data Optional data frame for evaluation (if NULL, uses training data)
+#' @param new_data Optional data frame for evaluation
+#'   (if NULL, uses training data)
 #' @param metrics Character vector of metrics to compute
 #' @param names Optional character vector of model names
 #' @return A ggplot object with model comparison
 #' @export
-tl_plot_model_comparison <- function(..., new_data = NULL, metrics = NULL, names = NULL) {
+tl_plot_model_comparison <- function(
+    ...,
+    new_data = NULL,
+    metrics = NULL,
+    names = NULL) {
   # Get models
   models <- list(...)
 
@@ -301,7 +309,8 @@ tl_plot_model_comparison <- function(..., new_data = NULL, metrics = NULL, names
 #' Plot cross-validation results
 #'
 #' @param cv_results Cross-validation results from tl_cv function
-#' @param metrics Character vector of metrics to plot (if NULL, plots all metrics)
+#' @param metrics Character vector of metrics to plot
+#'   (if NULL, plots all metrics)
 #' @return A ggplot object with cross-validation results
 #' @export
 tl_plot_cv_results <- function(cv_results, metrics = NULL) {
@@ -347,7 +356,8 @@ tl_plot_cv_results <- function(cv_results, metrics = NULL) {
 #' Create interactive visualization dashboard for a model
 #'
 #' @param model A tidylearn model object
-#' @param new_data Optional data frame for evaluation (if NULL, uses training data)
+#' @param new_data Optional data frame for evaluation
+#'   (if NULL, uses training data)
 #' @param ... Additional arguments
 #' @return A Shiny app object
 #' @export
@@ -365,10 +375,22 @@ tl_dashboard <- function(model, new_data = NULL, ...) {
 
     shinydashboard::dashboardSidebar(
       shinydashboard::sidebarMenu(
-        shinydashboard::menuItem("Overview", tabName = "overview", icon = shiny::icon("dashboard")),
-        shinydashboard::menuItem("Performance", tabName = "performance", icon = shiny::icon("chart-line")),
-        shinydashboard::menuItem("Predictions", tabName = "predictions", icon = shiny::icon("table")),
-        shinydashboard::menuItem("Diagnostics", tabName = "diagnostics", icon = shiny::icon("chart-area"))
+        shinydashboard::menuItem(
+          "Overview", tabName = "overview",
+          icon = shiny::icon("dashboard")
+        ),
+        shinydashboard::menuItem(
+          "Performance", tabName = "performance",
+          icon = shiny::icon("chart-line")
+        ),
+        shinydashboard::menuItem(
+          "Predictions", tabName = "predictions",
+          icon = shiny::icon("table")
+        ),
+        shinydashboard::menuItem(
+          "Diagnostics", tabName = "diagnostics",
+          icon = shiny::icon("chart-area")
+        )
       )
     ),
 
@@ -503,11 +525,18 @@ tl_dashboard <- function(model, new_data = NULL, ...) {
 
     # Feature importance
     output$importance_plot <- shiny::renderPlot({
-      if (model$spec$method %in% c("tree", "forest", "boost", "ridge", "lasso", "elastic_net")) {
+      tree_or_reg <- c(
+        "tree", "forest", "boost",
+        "ridge", "lasso", "elastic_net"
+      )
+      if (model$spec$method %in% tree_or_reg) {
         tl_plot_importance(model)
       } else {
         shiny::validate(
-          shiny::need(FALSE, "Feature importance not available for this model type")
+          shiny::need(
+            FALSE,
+            "Feature importance not available for this model type"
+          )
         )
       }
     })
@@ -601,15 +630,21 @@ tl_dashboard <- function(model, new_data = NULL, ...) {
 #' Plot lift chart for a classification model
 #'
 #' @param model A tidylearn classification model object
-#' @param new_data Optional data frame for evaluation (if NULL, uses training data)
-#' @param bins Number of bins for grouping predictions (default: 10)
+#' @param new_data Optional data frame for evaluation
+#'   (if NULL, uses training data)
+#' @param bins Number of bins for grouping predictions
+#'   (default: 10)
 #' @param ... Additional arguments
 #' @return A ggplot object with lift chart
-#' @importFrom ggplot2 ggplot aes geom_line geom_point geom_hline labs theme_minimal
+#' @importFrom ggplot2 ggplot aes geom_line geom_point
+#' @importFrom ggplot2 geom_hline labs theme_minimal
 #' @export
 tl_plot_lift <- function(model, new_data = NULL, bins = 10, ...) {
   if (!model$spec$is_classification) {
-    stop("Lift chart is only available for classification models", call. = FALSE)
+    stop(
+      "Lift chart is only available for classification models",
+      call. = FALSE
+    )
   }
 
   if (is.null(new_data)) {
@@ -711,15 +746,21 @@ tl_plot_lift <- function(model, new_data = NULL, bins = 10, ...) {
 #' Plot gain chart for a classification model
 #'
 #' @param model A tidylearn classification model object
-#' @param new_data Optional data frame for evaluation (if NULL, uses training data)
-#' @param bins Number of bins for grouping predictions (default: 10)
+#' @param new_data Optional data frame for evaluation
+#'   (if NULL, uses training data)
+#' @param bins Number of bins for grouping predictions
+#'   (default: 10)
 #' @param ... Additional arguments
 #' @return A ggplot object with gain chart
-#' @importFrom ggplot2 ggplot aes geom_line geom_point geom_abline labs theme_minimal
+#' @importFrom ggplot2 ggplot aes geom_line geom_point
+#' @importFrom ggplot2 geom_abline labs theme_minimal
 #' @export
 tl_plot_gain <- function(model, new_data = NULL, bins = 10, ...) {
   if (!model$spec$is_classification) {
-    stop("Gain chart is only available for classification models", call. = FALSE)
+    stop(
+      "Gain chart is only available for classification models",
+      call. = FALSE
+    )
   }
 
   if (is.null(new_data)) {
@@ -774,7 +815,8 @@ tl_plot_gain <- function(model, new_data = NULL, bins = 10, ...) {
 
       # Calculate metrics
       cumulative_pct_population <- end_idx / nrow(ordered_data) * 100
-      cumulative_pct_responders <- cumulative_responders / total_responders * 100
+      cumulative_pct_responders <-
+        cumulative_responders / total_responders * 100
 
       # Add to results
       gain_data <- gain_data %>%
@@ -832,7 +874,8 @@ tl_plot_gain <- function(model, new_data = NULL, bins = 10, ...) {
 }
 #' Plot Clusters in 2D Space
 #'
-#' Visualize clustering results using first two dimensions or specified dimensions
+#' Visualize clustering results using first two dimensions
+#' or specified dimensions
 #'
 #' @param data A data frame with cluster assignments
 #' @param cluster_col Name of cluster column (default: "cluster")
@@ -872,9 +915,14 @@ plot_clusters <- function(data,
     dplyr::mutate(!!cluster_col := as.factor(!!rlang::sym(cluster_col)))
 
   # Create base plot
-  p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = !!rlang::sym(x_col),
-                                                y = !!rlang::sym(y_col),
-                                                color = !!rlang::sym(cluster_col))) +
+  p <- ggplot2::ggplot(
+    plot_data,
+    ggplot2::aes(
+      x = !!rlang::sym(x_col),
+      y = !!rlang::sym(y_col),
+      color = !!rlang::sym(cluster_col)
+    )
+  ) +
     ggplot2::geom_point(size = 2.5, alpha = 0.7) +
     ggplot2::labs(
       title = title,
@@ -992,7 +1040,10 @@ plot_cluster_sizes <- function(clusters, title = "Cluster Size Distribution") {
   cluster_counts <- tibble::tibble(cluster = as.factor(clusters)) %>%
     dplyr::count(cluster)
 
-  ggplot2::ggplot(cluster_counts, ggplot2::aes(x = cluster, y = n, fill = cluster)) +
+  ggplot2::ggplot(
+    cluster_counts,
+    ggplot2::aes(x = cluster, y = n, fill = cluster)
+  ) +
     ggplot2::geom_col() +
     ggplot2::geom_text(ggplot2::aes(label = n), vjust = -0.5) +
     ggplot2::labs(
@@ -1010,7 +1061,8 @@ plot_cluster_sizes <- function(clusters, title = "Cluster Size Distribution") {
 #' Create combined scree plot showing individual and cumulative variance
 #'
 #' @param variance_tbl Variance tibble from tidy_pca
-#' @param threshold Horizontal line for variance threshold (default: 0.8 for 80%)
+#' @param threshold Horizontal line for variance threshold
+#'   (default: 0.8 for 80%)
 #'
 #' @return A ggplot object
 #' @export
@@ -1110,8 +1162,11 @@ create_cluster_dashboard <- function(data,
   # 1. Cluster scatter plot (first two numeric columns)
   numeric_cols <- names(data)[sapply(data, is.numeric)]
   if (length(numeric_cols) >= 2) {
-    plots[[1]] <- plot_clusters(data, cluster_col = cluster_col,
-                                x_col = numeric_cols[1], y_col = numeric_cols[2])
+    plots[[1]] <- plot_clusters(
+      data, cluster_col = cluster_col,
+      x_col = numeric_cols[1],
+      y_col = numeric_cols[2]
+    )
   }
 
   # 2. Cluster sizes
@@ -1120,8 +1175,14 @@ create_cluster_dashboard <- function(data,
   # 3. If validation metrics provided, create metrics plot
   if (!is.null(validation_metrics)) {
     # Create a text plot with metrics
+    fmt <- paste0(
+      "Validation Metrics\n\n",
+      "Number of Clusters: %d\n",
+      "Avg Silhouette: %.3f\n",
+      "Min Size: %d\nMax Size: %d"
+    )
     metrics_text <- sprintf(
-      "Validation Metrics\n\nNumber of Clusters: %d\nAvg Silhouette: %.3f\nMin Size: %d\nMax Size: %d",
+      fmt,
       validation_metrics$k,
       validation_metrics$avg_silhouette %||% NA,
       validation_metrics$min_size,
@@ -1129,7 +1190,10 @@ create_cluster_dashboard <- function(data,
     )
 
     plots[[3]] <- ggplot2::ggplot() +
-      ggplot2::annotate("text", x = 0.5, y = 0.5, label = metrics_text, size = 5) +
+      ggplot2::annotate(
+        "text", x = 0.5, y = 0.5,
+        label = metrics_text, size = 5
+      ) +
       ggplot2::theme_void()
   }
 

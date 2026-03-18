@@ -1,11 +1,13 @@
 #' @title tidylearn: A Unified Tidy Interface to R's Machine Learning Ecosystem
 #' @name tidylearn-core
-#' @description Core functionality for tidylearn. This package provides a unified
-#'   tidyverse-compatible interface to established R machine learning packages
-#'   including glmnet, randomForest, xgboost, e1071, rpart, gbm, nnet, cluster,
-#'   and dbscan. The underlying algorithms are unchanged - tidylearn wraps them
-#'   with consistent function signatures, tidy tibble output, and unified
-#'   ggplot2-based visualization. Access raw model objects via model$fit.
+#' @description Core functionality for tidylearn. This package
+#'   provides a unified tidyverse-compatible interface to
+#'   established R machine learning packages including glmnet,
+#'   randomForest, xgboost, e1071, rpart, gbm, nnet, cluster,
+#'   and dbscan. The underlying algorithms are unchanged -
+#'   tidylearn wraps them with consistent function signatures,
+#'   tidy tibble output, and unified ggplot2-based
+#'   visualization. Access raw model objects via model$fit.
 #' @importFrom magrittr %>%
 #' @importFrom rlang .data .env
 #' @importFrom dplyr filter select mutate group_by summarize arrange
@@ -35,25 +37,33 @@ NULL
 
 #' Create a tidylearn model
 #'
-#' Unified interface for creating machine learning models by wrapping established R packages.
-#' This function dispatches to the appropriate underlying package based on the method specified.
+#' Unified interface for creating machine learning models
+#' by wrapping established R packages. This function dispatches
+#' to the appropriate underlying package based on the method.
 #'
-#' The wrapped packages include: stats (lm, glm, prcomp, kmeans, hclust), glmnet, randomForest,
-#' xgboost, gbm, e1071, nnet, rpart, cluster, and dbscan. The underlying algorithms are unchanged -
-#' this function provides a consistent interface and returns tidy output.
+#' The wrapped packages include: stats (lm, glm, prcomp,
+#' kmeans, hclust), glmnet, randomForest, xgboost, gbm,
+#' e1071, nnet, rpart, cluster, and dbscan. The underlying
+#' algorithms are unchanged - this function provides a
+#' consistent interface and returns tidy output.
 #'
 #' Access the raw model object from the underlying package via \code{model$fit}.
 #'
 #' @param data A data frame containing the training data
-#' @param formula A formula specifying the model. For unsupervised methods, use \code{~ vars} or NULL.
-#' @param method The modeling method. Supervised: "linear" (stats::lm), "logistic" (stats::glm),
-#'   "tree" (rpart), "forest" (randomForest), "boost" (gbm), "ridge"/"lasso"/"elastic_net" (glmnet),
-#'   "svm" (e1071), "nn" (nnet), "deep" (keras), "xgboost" (xgboost).
-#'   Unsupervised: "pca" (stats::prcomp), "mds" (stats/MASS/smacof), "kmeans" (stats::kmeans),
-#'   "pam"/"clara" (cluster), "hclust" (stats::hclust), "dbscan" (dbscan).
+#' @param formula A formula specifying the model. For
+#'   unsupervised methods, use \code{~ vars} or NULL.
+#' @param method The modeling method. Supervised: "linear"
+#'   (stats::lm), "logistic" (stats::glm), "tree" (rpart),
+#'   "forest" (randomForest), "boost" (gbm),
+#'   "ridge"/"lasso"/"elastic_net" (glmnet), "svm" (e1071),
+#'   "nn" (nnet), "deep" (keras), "xgboost" (xgboost).
+#'   Unsupervised: "pca" (stats::prcomp),
+#'   "mds" (stats/MASS/smacof), "kmeans" (stats::kmeans),
+#'   "pam"/"clara" (cluster), "hclust" (stats::hclust),
+#'   "dbscan" (dbscan).
 #' @param ... Additional arguments passed to the underlying model function
-#' @return A tidylearn model object containing the fitted model (\code{$fit}), specification,
-#'   and training data
+#' @return A tidylearn model object containing the fitted
+#'   model (\code{$fit}), specification, and training data
 #' @export
 #' @examples
 #' \donttest{
@@ -80,19 +90,29 @@ tl_model <- function(data, formula = NULL, method = "linear", ...) {
   }
 
   # Define supervised and unsupervised methods
-  supervised_methods <- c("linear", "polynomial", "logistic", "tree", "forest", "boost",
-                         "ridge", "lasso", "elastic_net", "svm", "nn", "deep", "xgboost")
-  unsupervised_methods <- c("pca", "mds", "kmeans", "pam", "clara", "hclust", "dbscan")
+  supervised_methods <- c(
+    "linear", "polynomial", "logistic", "tree",
+    "forest", "boost", "ridge", "lasso",
+    "elastic_net", "svm", "nn", "deep", "xgboost"
+  )
+  unsupervised_methods <- c(
+    "pca", "mds", "kmeans", "pam",
+    "clara", "hclust", "dbscan"
+  )
 
   # Determine paradigm
   is_supervised <- method %in% supervised_methods
   is_unsupervised <- method %in% unsupervised_methods
 
   if (!is_supervised && !is_unsupervised) {
-    stop("Unknown method: ", method,
-         "\nSupervised methods: ", paste(supervised_methods, collapse = ", "),
-         "\nUnsupervised methods: ", paste(unsupervised_methods, collapse = ", "),
-         call. = FALSE)
+    stop(
+      "Unknown method: ", method,
+      "\nSupervised methods: ",
+      paste(supervised_methods, collapse = ", "),
+      "\nUnsupervised methods: ",
+      paste(unsupervised_methods, collapse = ", "),
+      call. = FALSE
+    )
   }
 
   # Route to appropriate function
@@ -118,10 +138,15 @@ tl_model_supervised <- function(data, formula, method, ...) {
 
   # Determine if classification or regression
   y <- data[[response_var]]
-  is_classification <- is.factor(y) || is.character(y) || (is.numeric(y) && length(unique(y)) <= 10)
+  is_classification <- is.factor(y) ||
+    is.character(y) ||
+    (is.numeric(y) && length(unique(y)) <= 10)
 
   if (is_classification && is.numeric(y)) {
-    warning("Response appears to be categorical but is stored as numeric. Consider converting to factor.")
+    warning(
+      "Response appears to be categorical but is ",
+      "stored as numeric. Consider converting to factor."
+    )
   }
 
   # Create model specification
@@ -159,7 +184,10 @@ tl_model_supervised <- function(data, formula, method, ...) {
       fit = fitted_model,
       data = data
     ),
-    class = c(paste0("tidylearn_", method), "tidylearn_supervised", "tidylearn_model")
+    class = c(
+      paste0("tidylearn_", method),
+      "tidylearn_supervised", "tidylearn_model"
+    )
   )
 
   model
@@ -200,7 +228,10 @@ tl_model_unsupervised <- function(data, formula = NULL, method, ...) {
       fit = fitted_model,
       data = data
     ),
-    class = c(paste0("tidylearn_", method), "tidylearn_unsupervised", "tidylearn_model")
+    class = c(
+      paste0("tidylearn_", method),
+      "tidylearn_unsupervised", "tidylearn_model"
+    )
   )
 
   model
@@ -211,13 +242,19 @@ tl_model_unsupervised <- function(data, formula = NULL, method, ...) {
 #' Unified prediction interface for both supervised and unsupervised models
 #'
 #' @param object A tidylearn model object
-#' @param new_data A data frame containing the new data. If NULL, uses training data.
-#' @param type Type of prediction. For supervised: "response" (default), "prob", "class".
-#'   For unsupervised: "scores", "clusters", "transform" depending on method.
+#' @param new_data A data frame containing the new data.
+#'   If NULL, uses training data.
+#' @param type Type of prediction. For supervised:
+#'   "response" (default), "prob", "class". For
+#'   unsupervised: "scores", "clusters", "transform"
+#'   depending on method.
 #' @param ... Additional arguments
 #' @return Predictions as a tibble
 #' @export
-predict.tidylearn_model <- function(object, new_data = NULL, type = "response", ...) {
+predict.tidylearn_model <- function(object,
+                                    new_data = NULL,
+                                    type = "response",
+                                    ...) {
   if (is.null(new_data)) {
     new_data <- object$data
   }
@@ -254,7 +291,10 @@ predict_supervised <- function(object, new_data, type = "response", ...) {
     "nn" = tl_predict_nn(object, new_data, type, ...),
     "deep" = tl_predict_deep(object, new_data, type, ...),
     "xgboost" = tl_predict_xgboost(object, new_data, type, ...),
-    stop("Unsupported supervised method for prediction: ", method, call. = FALSE)
+    stop(
+      "Unsupported supervised method for prediction: ",
+      method, call. = FALSE
+    )
   )
 
   # Ensure tibble output
@@ -279,17 +319,32 @@ predict_unsupervised <- function(object, new_data, type = "response", ...) {
         object$fit$scores
       } else {
         # Transform new data using the PCA rotation
-        X <- as.matrix(new_data %>% dplyr::select(where(is.numeric)))
+        x_mat <- new_data %>%
+          dplyr::select(where(is.numeric)) %>%
+          as.matrix()
         if (object$fit$settings$center) {
-          X <- scale(X, center = object$fit$model$center, scale = FALSE)
+          x_mat <- scale(
+            x_mat,
+            center = object$fit$model$center,
+            scale = FALSE
+          )
         }
         if (object$fit$settings$scale) {
-          X <- scale(X, center = FALSE, scale = object$fit$model$scale)
+          x_mat <- scale(
+            x_mat,
+            center = FALSE,
+            scale = object$fit$model$scale
+          )
         }
-        scores <- X %*% object$fit$model$rotation
-        colnames(scores) <- paste0("PC", 1:ncol(scores))
+        scores <- x_mat %*% object$fit$model$rotation
+        colnames(scores) <- paste0(
+          "PC", seq_len(ncol(scores))
+        )
         tibble::as_tibble(scores) %>%
-          dplyr::mutate(.obs_id = as.character(seq_len(nrow(.))), .before = 1)
+          dplyr::mutate(
+            .obs_id = as.character(seq_len(nrow(scores))),
+            .before = 1
+          )
       }
     },
     "kmeans" = {
@@ -297,9 +352,11 @@ predict_unsupervised <- function(object, new_data, type = "response", ...) {
         object$fit$clusters
       } else {
         # Assign to nearest center
-        X <- as.matrix(new_data %>% dplyr::select(where(is.numeric)))
+        x_mat <- new_data %>%
+          dplyr::select(where(is.numeric)) %>%
+          as.matrix()
         centers <- object$fit$model$centers
-        dists <- apply(X, 1, function(x) {
+        dists <- apply(x_mat, 1, function(x) {
           apply(centers, 1, function(c) sum((x - c)^2))
         })
         clusters <- apply(dists, 2, which.min)
@@ -312,7 +369,10 @@ predict_unsupervised <- function(object, new_data, type = "response", ...) {
     },
     "hclust" = {
       # Hierarchical clustering doesn't support standard prediction
-      warning("Hierarchical clustering does not support standard out-of-sample prediction.")
+      warning(
+        "Hierarchical clustering does not support ",
+        "standard out-of-sample prediction."
+      )
       object$fit$clusters
     },
     "dbscan" = {
@@ -320,7 +380,10 @@ predict_unsupervised <- function(object, new_data, type = "response", ...) {
       warning("DBSCAN does not support standard out-of-sample prediction.")
       object$fit$clusters
     },
-    stop("Unsupported unsupervised method for prediction: ", method, call. = FALSE)
+    stop(
+      "Unsupported unsupervised method for prediction: ",
+      method, call. = FALSE
+    )
   )
 
   result
@@ -339,7 +402,13 @@ print.tidylearn_model <- function(x, ...) {
   cat("Method:", x$spec$method, "\n")
 
   if (x$spec$paradigm == "supervised") {
-    cat("Task:", ifelse(x$spec$is_classification, "Classification", "Regression"), "\n")
+    cat(
+      "Task:",
+      ifelse(
+        x$spec$is_classification,
+        "Classification", "Regression"
+      ), "\n"
+    )
     cat("Formula:", deparse(x$spec$formula), "\n")
   } else {
     cat("Technique:", x$spec$method, "\n")
@@ -410,9 +479,17 @@ tl_plot_model <- function(model, type = "auto", ...) {
     stop(
       "Unknown plot type '", type, "'. ",
       if (is_class) {
-        "Use: 'confusion', 'roc', 'precision_recall', 'calibration', 'lift', 'gain', or 'importance'."
+        paste0(
+          "Use: 'confusion', 'roc', ",
+          "'precision_recall', 'calibration', ",
+          "'lift', 'gain', or 'importance'."
+        )
       } else {
-        "Use: 'actual_predicted', 'residuals', 'diagnostics', or 'importance'."
+        paste0(
+          "Use: 'actual_predicted', ",
+          "'residuals', 'diagnostics', ",
+          "or 'importance'."
+        )
       },
       call. = FALSE
     )

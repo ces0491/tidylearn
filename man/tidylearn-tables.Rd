@@ -4,8 +4,9 @@
 \alias{tidylearn-tables}
 \title{Table Functions for tidylearn}
 \description{
-Functions for producing formatted gt tables from tidylearn models.
-Provides a parallel interface to the plot functions: \code{tl_table(model, type)}
+Functions for producing formatted gt tables
+from tidylearn models. Provides a parallel interface to
+the plot functions: \code{tl_table(model, type)}
 dispatches to the appropriate table formatter based on model type.
 Requires the gt package (suggested dependency).
 }

@@ -4,5 +4,6 @@
 \alias{tidylearn-svm}
 \title{Support Vector Machines for tidylearn}
 \description{
-SVM functionality for classification and regression
+SVM functionality for classification and
+regression
 }

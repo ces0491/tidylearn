@@ -4,9 +4,9 @@ test_that("tl_auto_ml runs with basic settings", {
 
   # Run with short time budget for testing
   result <- tl_auto_ml(iris, Species ~ .,
-                      use_reduction = TRUE,
-                      use_clustering = TRUE,
-                      time_budget = 10)
+                       use_reduction = TRUE,
+                       use_clustering = TRUE,
+                       time_budget = 10)
 
   expect_type(result, "list")
   expect_true("models" %in% names(result))
@@ -22,15 +22,15 @@ test_that("tl_auto_ml detects task type automatically", {
 
   # Classification task
   result_class <- tl_auto_ml(iris, Species ~ .,
-                            task = "auto",
-                            time_budget = 5)
+                             task = "auto",
+                             time_budget = 5)
 
   expect_type(result_class, "list")
 
   # Regression task
   result_reg <- tl_auto_ml(mtcars, mpg ~ wt + hp,
-                          task = "auto",
-                          time_budget = 5)
+                           task = "auto",
+                           time_budget = 5)
 
   expect_type(result_reg, "list")
 })
@@ -41,9 +41,9 @@ test_that("tl_auto_ml respects time budget", {
   # Very short time budget
   start_time <- Sys.time()
   result <- tl_auto_ml(iris, Species ~ .,
-                      time_budget = 5,
-                      use_reduction = FALSE,
-                      use_clustering = FALSE)
+                       time_budget = 5,
+                       use_reduction = FALSE,
+                       use_clustering = FALSE)
   end_time <- Sys.time()
 
   # Should complete within reasonable time (with some buffer)
@@ -55,9 +55,9 @@ test_that("tl_auto_ml can disable reduction and clustering", {
   skip_on_cran()
 
   result <- tl_auto_ml(iris, Species ~ .,
-                      use_reduction = FALSE,
-                      use_clustering = FALSE,
-                      time_budget = 10)
+                       use_reduction = FALSE,
+                       use_clustering = FALSE,
+                       time_budget = 10)
 
   expect_type(result, "list")
 
@@ -77,8 +77,8 @@ test_that("tl_auto_ml handles small datasets", {
   small_data <- iris[1:30, ]
 
   result <- tl_auto_ml(small_data, Species ~ .,
-                      time_budget = 5,
-                      cv_folds = 3)
+                       time_budget = 5,
+                       cv_folds = 3)
 
   expect_type(result, "list")
   expect_gte(length(result$models), 1)
@@ -88,7 +88,7 @@ test_that("tl_auto_ml returns best model", {
   skip_on_cran()
 
   result <- tl_auto_ml(iris, Species ~ .,
-                      time_budget = 10)
+                       time_budget = 10)
 
   expect_true("best_model" %in% names(result))
   expect_s3_class(result$best_model, "tidylearn_model")
@@ -101,8 +101,8 @@ test_that("tl_auto_ml works with regression tasks", {
   skip_on_cran()
 
   result <- tl_auto_ml(mtcars, mpg ~ .,
-                      task = "regression",
-                      time_budget = 10)
+                       task = "regression",
+                       time_budget = 10)
 
   expect_type(result, "list")
   expect_gte(length(result$models), 1)
@@ -113,7 +113,7 @@ test_that("tl_auto_ml handles errors gracefully", {
 
   # Should not crash even if some models fail
   result <- tl_auto_ml(iris, Species ~ .,
-                      time_budget = 5)
+                       time_budget = 5)
 
   expect_type(result, "list")
   # Should have trained at least one successful model

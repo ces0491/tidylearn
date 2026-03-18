@@ -20,11 +20,14 @@ tl_prepare_data(
 
 \item{formula}{Optional formula (for supervised learning)}
 
-\item{impute_method}{Method for missing value imputation: "mean", "median", "mode", "knn"}
+\item{impute_method}{Method for missing value imputation:
+"mean", "median", "mode", "knn"}
 
-\item{scale_method}{Scaling method: "standardize", "normalize", "robust", "none"}
+\item{scale_method}{Scaling method: "standardize",
+"normalize", "robust", "none"}
 
-\item{encode_categorical}{Whether to encode categorical variables (default: TRUE)}
+\item{encode_categorical}{Whether to encode categorical
+variables (default: TRUE)}
 
 \item{remove_zero_variance}{Remove zero-variance features (default: TRUE)}
 
@@ -36,7 +39,8 @@ tl_prepare_data(
 A list containing processed data and preprocessing metadata
 }
 \description{
-Unified preprocessing functions that work with both supervised and unsupervised workflows
+Unified preprocessing functions that work with both
+supervised and unsupervised workflows
 Prepare Data for Machine Learning
 }
 \details{

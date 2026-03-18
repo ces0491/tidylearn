@@ -2,8 +2,9 @@
 #' @name tidylearn-interactions
 #' @description Functions for testing, visualizing, and analyzing interactions
 #' @importFrom stats lm anova
-#' @importFrom dplyr %>% filter select mutate
-#' @importFrom ggplot2 ggplot aes geom_line geom_point facet_wrap labs theme_minimal
+#' @importFrom dplyr filter select mutate
+#' @importFrom ggplot2 ggplot aes geom_line geom_point
+#'   facet_wrap labs theme_minimal
 NULL
 
 #' Test for significant interactions between variables
@@ -11,7 +12,8 @@ NULL
 #' @param data A data frame containing the data
 #' @param formula A formula specifying the base model without interactions
 #' @param var1 First variable to test for interactions
-#' @param var2 Second variable to test for interactions (if NULL, tests var1 with all others)
+#' @param var2 Second variable to test for interactions
+#'   (if NULL, tests var1 with all others)
 #' @param all_pairs Logical; whether to test all variable pairs
 #' @param categorical_only Logical; whether to only test categorical variables
 #' @param numeric_only Logical; whether to only test numeric variables
@@ -23,20 +25,17 @@ tl_test_interactions <- function(data, formula, var1 = NULL, var2 = NULL,
                                  all_pairs = FALSE, categorical_only = FALSE,
                                  numeric_only = FALSE, mixed_only = FALSE,
                                  alpha = 0.05) {
-  # Extract response variable
-  response_var <- all.vars(formula)[1]
-
   # Extract predictor variables
   predictors <- all.vars(formula)[-1]
 
   # Categorize variables
   var_types <- sapply(data[predictors], function(x) {
     if (is.factor(x) || is.character(x)) {
-      return("categorical")
+      "categorical"
     } else if (is.numeric(x)) {
-      return("numeric")
+      "numeric"
     } else {
-      return("other")
+      "other"
     }
   })
 
@@ -56,7 +55,9 @@ tl_test_interactions <- function(data, formula, var1 = NULL, var2 = NULL,
 
   # Filter pairs based on variable types
   if (categorical_only) {
-    pairs <- pairs[sapply(pairs, function(p) all(var_types[p] == "categorical"))]
+    pairs <- pairs[sapply(
+      pairs, function(p) all(var_types[p] == "categorical")
+    )]
   } else if (numeric_only) {
     pairs <- pairs[sapply(pairs, function(p) all(var_types[p] == "numeric"))]
   } else if (mixed_only) {
@@ -87,14 +88,14 @@ tl_test_interactions <- function(data, formula, var1 = NULL, var2 = NULL,
     delta_r2 <- r2_int - r2_base
 
     # Create result row
-    return(data.frame(
+    data.frame(
       var1 = pair[1],
       var2 = pair[2],
       p_value = p_value,
       significant = p_value < alpha,
       delta_r2 = delta_r2,
       f_statistic = models_comparison$F[2]
-    ))
+    )
   })
 
   # Combine results
@@ -103,7 +104,7 @@ tl_test_interactions <- function(data, formula, var1 = NULL, var2 = NULL,
   # Sort by significance
   all_results <- all_results[order(all_results$p_value), ]
 
-  return(all_results)
+  all_results
 }
 
 #' Plot interaction effects
@@ -117,8 +118,11 @@ tl_test_interactions <- function(data, formula, var1 = NULL, var2 = NULL,
 #' @param ... Additional arguments to pass to predict()
 #' @return A ggplot object
 #' @export
-tl_plot_interaction <- function(model, var1, var2, n_points = 100, fixed_values = NULL,
-                                confidence = TRUE, ...) {
+tl_plot_interaction <- function(model, var1, var2,
+                                n_points = 100,
+                                fixed_values = NULL,
+                                confidence = TRUE,
+                                ...) {
   # Extract data
   data <- model$data
 
@@ -130,8 +134,12 @@ tl_plot_interaction <- function(model, var1, var2, n_points = 100, fixed_values 
   }
 
   # Determine variable types
-  var1_type <- if (is.factor(data[[var1]]) || is.character(data[[var1]])) "categorical" else "numeric"
-  var2_type <- if (is.factor(data[[var2]]) || is.character(data[[var2]])) "categorical" else "numeric"
+  var1_type <- if (
+    is.factor(data[[var1]]) || is.character(data[[var1]])
+  ) "categorical" else "numeric"
+  var2_type <- if (
+    is.factor(data[[var2]]) || is.character(data[[var2]])
+  ) "categorical" else "numeric"
 
   # Create grid of values
   if (var1_type == "categorical") {
@@ -213,7 +221,10 @@ tl_plot_interaction <- function(model, var1, var2, n_points = 100, fixed_values 
   # Create plot
   if (var1_type == "numeric" && var2_type == "categorical") {
     # Line plot with x = var1, color = var2
-    p <- ggplot2::ggplot(grid, ggplot2::aes(x = .data[[var1]], y = .data[[y_col]], color = .data[[var2]])) +
+    p <- ggplot2::ggplot(grid, ggplot2::aes(
+      x = .data[[var1]], y = .data[[y_col]],
+      color = .data[[var2]]
+    )) +
       ggplot2::geom_line() +
       ggplot2::labs(
         title = paste("Interaction between", var1, "and", var2),
@@ -225,14 +236,21 @@ tl_plot_interaction <- function(model, var1, var2, n_points = 100, fixed_values 
     # Add confidence intervals if available
     if (confidence && !is.null(lower_col) && !is.null(upper_col)) {
       p <- p + ggplot2::geom_ribbon(
-        ggplot2::aes(ymin = .data[[lower_col]], ymax = .data[[upper_col]], fill = .data[[var2]]),
+        ggplot2::aes(
+          ymin = .data[[lower_col]],
+          ymax = .data[[upper_col]],
+          fill = .data[[var2]]
+        ),
         alpha = 0.2,
         linetype = 0
       )
     }
   } else if (var1_type == "categorical" && var2_type == "numeric") {
     # Line plot with x = var2, color = var1
-    p <- ggplot2::ggplot(grid, ggplot2::aes(x = .data[[var2]], y = .data[[y_col]], color = .data[[var1]])) +
+    p <- ggplot2::ggplot(grid, ggplot2::aes(
+      x = .data[[var2]], y = .data[[y_col]],
+      color = .data[[var1]]
+    )) +
       ggplot2::geom_line() +
       ggplot2::labs(
         title = paste("Interaction between", var1, "and", var2),
@@ -244,14 +262,21 @@ tl_plot_interaction <- function(model, var1, var2, n_points = 100, fixed_values 
     # Add confidence intervals if available
     if (confidence && !is.null(lower_col) && !is.null(upper_col)) {
       p <- p + ggplot2::geom_ribbon(
-        ggplot2::aes(ymin = .data[[lower_col]], ymax = .data[[upper_col]], fill = .data[[var1]]),
+        ggplot2::aes(
+          ymin = .data[[lower_col]],
+          ymax = .data[[upper_col]],
+          fill = .data[[var1]]
+        ),
         alpha = 0.2,
         linetype = 0
       )
     }
   } else if (var1_type == "numeric" && var2_type == "numeric") {
     # Contour plot or heat map
-    p <- ggplot2::ggplot(grid, ggplot2::aes(x = .data[[var1]], y = .data[[var2]], z = .data[[y_col]])) +
+    p <- ggplot2::ggplot(grid, ggplot2::aes(
+      x = .data[[var1]], y = .data[[var2]],
+      z = .data[[y_col]]
+    )) +
       ggplot2::geom_contour_filled() +
       ggplot2::labs(
         title = paste("Interaction between", var1, "and", var2),
@@ -261,7 +286,10 @@ tl_plot_interaction <- function(model, var1, var2, n_points = 100, fixed_values 
       )
   } else {
     # Categorical x Categorical: Faceted bar plot
-    p <- ggplot2::ggplot(grid, ggplot2::aes(x = .data[[var1]], y = .data[[y_col]], fill = .data[[var2]])) +
+    p <- ggplot2::ggplot(grid, ggplot2::aes(
+      x = .data[[var1]], y = .data[[y_col]],
+      fill = .data[[var2]]
+    )) +
       ggplot2::geom_col(position = "dodge") +
       ggplot2::labs(
         title = paste("Interaction between", var1, "and", var2),
@@ -274,7 +302,7 @@ tl_plot_interaction <- function(model, var1, var2, n_points = 100, fixed_values 
   # Apply minimal theme
   p <- p + ggplot2::theme_minimal()
 
-  return(p)
+  p
 }
 
 #' Find important interactions automatically
@@ -284,7 +312,8 @@ tl_plot_interaction <- function(model, var1, var2, n_points = 100, fixed_values 
 #' @param top_n Number of top interactions to return
 #' @param min_r2_change Minimum change in R-squared to consider
 #' @param max_p_value Maximum p-value for significance
-#' @param exclude_vars Character vector of variables to exclude from interaction testing
+#' @param exclude_vars Character vector of variables to exclude
+#'   from interaction testing
 #' @return A tidylearn model with important interactions
 #' @export
 tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
@@ -297,11 +326,11 @@ tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
     predictors <- setdiff(predictors, exclude_vars)
   }
 
-  # Generate all possible pairs
-  pairs <- combn(predictors, 2, simplify = FALSE)
-
   # Test all interactions
-  test_results <- tl_test_interactions(data, formula, all_pairs = TRUE, alpha = max_p_value)
+  test_results <- tl_test_interactions(
+    data, formula, all_pairs = TRUE,
+    alpha = max_p_value
+  )
 
   # Filter significant interactions
   significant <- test_results %>%
@@ -325,7 +354,10 @@ tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
     paste0(row["var1"], ":", row["var2"])
   })
 
-  new_formula <- update(formula, paste0(". ~ . +", paste(interaction_terms, collapse = " + ")))
+  int_str <- paste(interaction_terms, collapse = " + ")
+  new_formula <- update(
+    formula, paste0(". ~ . +", int_str)
+  )
 
   # Fit model with interactions
   interaction_model <- tl_model(data, new_formula, method = "linear")
@@ -334,7 +366,7 @@ tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
   attr(interaction_model, "interaction_tests") <- test_results
   attr(interaction_model, "selected_interactions") <- top_interactions
 
-  return(interaction_model)
+  interaction_model
 }
 
 #' Calculate partial effects based on a model with interactions
@@ -346,7 +378,9 @@ tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
 #' @param intervals Logical; whether to include confidence intervals
 #' @return A data frame with marginal effects
 #' @export
-tl_interaction_effects <- function(model, var, by_var, at_values = NULL, intervals = TRUE) {
+tl_interaction_effects <- function(model, var, by_var,
+                                   at_values = NULL,
+                                   intervals = TRUE) {
   # Extract data
   data <- model$data
   formula <- model$spec$formula
@@ -378,7 +412,10 @@ tl_interaction_effects <- function(model, var, by_var, at_values = NULL, interva
     }
   } else {
     # For continuous by_var, use quantiles
-    by_values <- stats::quantile(data[[by_var]], probs = seq(0, 1, 0.25), na.rm = TRUE)
+    by_values <- stats::quantile(
+      data[[by_var]], probs = seq(0, 1, 0.25),
+      na.rm = TRUE
+    )
     names(by_values) <- paste0("Q", seq(0, 100, 25))
   }
 
@@ -457,36 +494,44 @@ tl_interaction_effects <- function(model, var, by_var, at_values = NULL, interva
 
       # If only one value, can't compute slope
       if (nrow(sub_grid) <= 1) {
-        return(data.frame(
+        data.frame(
           by_value = bv,
-          by_label = if (is.null(names(by_values))) as.character(bv) else names(by_values)[match(bv, by_values)],
+          by_label = if (is.null(names(by_values))) {
+            as.character(bv)
+          } else {
+            names(by_values)[match(bv, by_values)]
+          },
           slope = NA,
           slope_se = NA
-        ))
+        )
       }
 
       # Fit linear model to get slope
       slope_model <- lm(fit ~ .data[[var]], data = sub_grid)
       slope_coef <- coef(summary(slope_model))
 
-      return(data.frame(
+      data.frame(
         by_value = bv,
-        by_label = if (is.null(names(by_values))) as.character(bv) else names(by_values)[match(bv, by_values)],
+        by_label = if (is.null(names(by_values))) {
+          as.character(bv)
+        } else {
+          names(by_values)[match(bv, by_values)]
+        },
         slope = slope_coef[2, 1],
         slope_se = slope_coef[2, 2]
-      ))
+      )
     })
 
     # Combine all slopes
     final_slopes <- do.call(rbind, slopes)
 
     # Return both grid and slopes
-    return(list(
+    list(
       effects = final_grid,
       slopes = final_slopes
-    ))
+    )
   } else {
     # For categorical variables, just return the effects
-    return(final_grid)
+    final_grid
   }
 }

@@ -22,7 +22,8 @@ tl_calc_classification_metrics(
 
 \item{metrics}{Character vector of metrics to compute}
 
-\item{thresholds}{Optional vector of thresholds to evaluate for threshold-dependent metrics}
+\item{thresholds}{Optional vector of thresholds to evaluate
+for threshold-dependent metrics}
 
 \item{...}{Additional arguments}
 }

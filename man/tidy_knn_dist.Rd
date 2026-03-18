@@ -11,7 +11,8 @@ tidy_knn_dist(data, k = 4, cols = NULL)
 
 \item{k}{Number of nearest neighbors (default: 4)}
 
-\item{cols}{Columns to include (tidy select). If NULL, uses all numeric columns.}
+\item{cols}{Columns to include (tidy select).
+If NULL, uses all numeric columns.}
 }
 \value{
 A tibble with observation IDs and k-NN distances

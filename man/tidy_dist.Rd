@@ -9,9 +9,12 @@ tidy_dist(data, method = "euclidean", cols = NULL, ...)
 \arguments{
 \item{data}{A data frame or tibble}
 
-\item{method}{Character; distance method (default: "euclidean"). Options: "euclidean", "manhattan", "maximum", "gower"}
+\item{method}{Character; distance method
+(default: "euclidean"). Options: "euclidean",
+"manhattan", "maximum", "gower"}
 
-\item{cols}{Columns to include (tidy select). If NULL, uses all numeric columns.}
+\item{cols}{Columns to include (tidy select).
+If NULL, uses all numeric columns.}
 
 \item{...}{Additional arguments passed to distance functions}
 }

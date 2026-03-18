@@ -4,10 +4,12 @@
 #'
 #' @param data A data frame or tibble
 #' @param k Number of clusters
-#' @param cols Columns to include (tidy select). If NULL, uses all numeric columns.
+#' @param cols Columns to include (tidy select).
+#'   If NULL, uses all numeric columns.
 #' @param nstart Number of random starts (default: 25)
-#' @param iter_max Maximum number of iterations (default: 100)
-#' @param algorithm K-means algorithm: "Hartigan-Wong" (default), "Lloyd", "Forgy", "MacQueen"
+#' @param iter_max Maximum iterations (default: 100)
+#' @param algorithm K-means algorithm: "Hartigan-Wong"
+#'   (default), "Lloyd", "Forgy", "MacQueen"
 #'
 #' @return A list of class "tidy_kmeans" containing:
 #' \itemize{
@@ -97,7 +99,8 @@ augment_kmeans <- function(kmeans_obj, data) {
 #'
 #' @param data A data frame, tibble, or dist object
 #' @param k Number of clusters
-#' @param metric Distance metric (default: "euclidean"). Use "gower" for mixed data types.
+#' @param metric Distance metric (default: "euclidean").
+#'   Use "gower" for mixed data types.
 #' @param cols Columns to include (tidy select). If NULL, uses all columns.
 #'
 #' @return A list of class "tidy_pam" containing:
@@ -146,13 +149,15 @@ tidy_pam <- function(data, k, metric = "euclidean", cols = NULL) {
 
   # Create clusters tibble
   clusters_tbl <- tibble::tibble(
-    .obs_id = names(pam_model$clustering) %||% as.character(seq_along(pam_model$clustering)),
+    .obs_id = names(pam_model$clustering) %||%
+      as.character(seq_along(pam_model$clustering)),
     cluster = as.integer(pam_model$clustering)
   )
 
   # Create medoids tibble
   if (!is.null(data_orig)) {
-    medoids_tbl <- tibble::as_tibble(data_orig[pam_model$medoids, , drop = FALSE]) %>%
+    medoid_data <- data_orig[pam_model$medoids, , drop = FALSE]
+    medoids_tbl <- tibble::as_tibble(medoid_data) %>%
       dplyr::mutate(
         cluster = seq_len(k),
         medoid_index = pam_model$medoids,
@@ -220,7 +225,8 @@ augment_pam <- function(pam_obj, data) {
 #' }
 #'
 #' @export
-tidy_clara <- function(data, k, metric = "euclidean", samples = 50, sampsize = NULL) {
+tidy_clara <- function(data, k, metric = "euclidean",
+                       samples = 50, sampsize = NULL) {
 
   # Select numeric columns if data frame
   if (!inherits(data, "dist")) {
@@ -246,7 +252,8 @@ tidy_clara <- function(data, k, metric = "euclidean", samples = 50, sampsize = N
 
   # Create clusters tibble
   clusters_tbl <- tibble::tibble(
-    .obs_id = names(clara_model$clustering) %||% as.character(seq_along(clara_model$clustering)),
+    .obs_id = names(clara_model$clustering) %||%
+      as.character(seq_along(clara_model$clustering)),
     cluster = as.integer(clara_model$clustering)
   )
 
@@ -308,7 +315,9 @@ calc_wss <- function(data, max_k = 10, nstart = 25) {
 #'
 #' @return A list with results from each method
 #' @export
-optimal_clusters <- function(data, max_k = 10, methods = c("silhouette", "gap", "wss")) {
+optimal_clusters <- function(
+    data, max_k = 10,
+    methods = c("silhouette", "gap", "wss")) {
 
   results <- list()
 

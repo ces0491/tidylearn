@@ -9,7 +9,8 @@ plot_gap_stat(gap_obj, show_methods = FALSE)
 \arguments{
 \item{gap_obj}{A tidy_gap object}
 
-\item{show_methods}{Logical; show all three k selection methods? (default: FALSE)}
+\item{show_methods}{Logical; show all three k
+selection methods? (default: FALSE)}
 }
 \value{
 A ggplot object

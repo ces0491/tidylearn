@@ -11,7 +11,8 @@ tl_predict_deep(model, new_data, type = "response", ...)
 
 \item{new_data}{A data frame containing the new data}
 
-\item{type}{Type of prediction: "response" (default), "prob" (for classification), "class" (for classification)}
+\item{type}{Type of prediction: "response" (default),
+"prob" (for classification), "class" (for classification)}
 
 \item{...}{Additional arguments}
 }

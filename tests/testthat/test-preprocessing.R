@@ -6,9 +6,9 @@ test_that("tl_prepare_data handles missing values", {
 
   # Prepare data with imputation
   result <- tl_prepare_data(data_missing, Species ~ .,
-                           impute_method = "mean",
-                           scale_method = "none",
-                           encode_categorical = FALSE)
+                            impute_method = "mean",
+                            scale_method = "none",
+                            encode_categorical = FALSE)
 
   # Check that NAs are imputed
   expect_false(any(is.na(result$data)))
@@ -18,9 +18,9 @@ test_that("tl_prepare_data handles missing values", {
 test_that("tl_prepare_data scales features correctly", {
   # Standardization
   result_std <- tl_prepare_data(iris, Species ~ .,
-                               impute_method = "mean",
-                               scale_method = "standardize",
-                               encode_categorical = FALSE)
+                                impute_method = "mean",
+                                scale_method = "standardize",
+                                encode_categorical = FALSE)
 
   numeric_cols <- sapply(result_std$data, is.numeric)
   numeric_data <- result_std$data[, numeric_cols]
@@ -31,13 +31,15 @@ test_that("tl_prepare_data scales features correctly", {
 
   # Normalization
   result_norm <- tl_prepare_data(iris, Species ~ .,
-                                impute_method = "mean",
-                                scale_method = "normalize",
-                                encode_categorical = FALSE)
+                                 impute_method = "mean",
+                                 scale_method = "normalize",
+                                 encode_categorical = FALSE)
 
   numeric_data_norm <- result_norm$data[, numeric_cols]
   # Check values are in [0, 1]
-  expect_true(all(numeric_data_norm >= 0 & numeric_data_norm <= 1, na.rm = TRUE))
+  expect_true(
+    all(numeric_data_norm >= 0 & numeric_data_norm <= 1, na.rm = TRUE)
+  )
 })
 
 test_that("tl_prepare_data encodes categorical variables", {
@@ -50,8 +52,8 @@ test_that("tl_prepare_data encodes categorical variables", {
   )
 
   result <- tl_prepare_data(test_data, y ~ .,
-                           encode_categorical = TRUE,
-                           scale_method = "none")
+                            encode_categorical = TRUE,
+                            scale_method = "none")
 
   # Original categorical variable should be replaced with dummies
   expect_false("cat_var" %in% names(result$data))
@@ -64,9 +66,9 @@ test_that("tl_prepare_data removes zero variance features", {
   test_data$zero_var <- 1
 
   result <- tl_prepare_data(test_data, Species ~ .,
-                           remove_zero_variance = TRUE,
-                           scale_method = "none",
-                           encode_categorical = FALSE)
+                            remove_zero_variance = TRUE,
+                            scale_method = "none",
+                            encode_categorical = FALSE)
 
   # Zero variance column should be removed
   expect_false("zero_var" %in% names(result$data))
@@ -76,13 +78,14 @@ test_that("tl_prepare_data removes zero variance features", {
 test_that("tl_prepare_data removes highly correlated features", {
   # Create data with highly correlated columns
   test_data <- iris
-  test_data$Sepal.Length.Copy <- test_data$Sepal.Length + rnorm(nrow(iris), 0, 0.01)
+  test_data$Sepal.Length.Copy <-
+    test_data$Sepal.Length + rnorm(nrow(iris), 0, 0.01)
 
   result <- tl_prepare_data(test_data, Species ~ .,
-                           remove_correlated = TRUE,
-                           correlation_cutoff = 0.95,
-                           scale_method = "none",
-                           encode_categorical = FALSE)
+                            remove_correlated = TRUE,
+                            correlation_cutoff = 0.95,
+                            scale_method = "none",
+                            encode_categorical = FALSE)
 
   # One of the correlated columns should be removed
   has_original <- "Sepal.Length" %in% names(result$data)
@@ -130,8 +133,8 @@ test_that("tl_split validates inputs", {
 
 test_that("tl_prepare_data preserves response variable", {
   result <- tl_prepare_data(iris, Species ~ .,
-                           scale_method = "standardize",
-                           encode_categorical = FALSE)
+                            scale_method = "standardize",
+                            encode_categorical = FALSE)
 
   # Response should be present and unchanged
   expect_true("Species" %in% names(result$data))

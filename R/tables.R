@@ -1,7 +1,8 @@
 #' @title Table Functions for tidylearn
 #' @name tidylearn-tables
-#' @description Functions for producing formatted gt tables from tidylearn models.
-#'   Provides a parallel interface to the plot functions: \code{tl_table(model, type)}
+#' @description Functions for producing formatted gt tables
+#'   from tidylearn models. Provides a parallel interface to
+#'   the plot functions: \code{tl_table(model, type)}
 #'   dispatches to the appropriate table formatter based on model type.
 #'   Requires the gt package (suggested dependency).
 NULL
@@ -16,7 +17,9 @@ NULL
 #' @return A styled gt object
 #' @keywords internal
 #' @noRd
-tl_gt_theme <- function(gt_tbl, title = NULL, subtitle = NULL, source_note = NULL) {
+tl_gt_theme <- function(gt_tbl, title = NULL,
+                        subtitle = NULL,
+                        source_note = NULL) {
   gt_tbl <- gt_tbl %>%
     gt::tab_options(
       heading.background.color = "#2c3e50",
@@ -149,8 +152,11 @@ tl_table_unsupervised <- function(model, type = "auto", ...) {
     "variance" = tl_table_variance(model, ...),
     "loadings" = tl_table_loadings(model, ...),
     "clusters" = tl_table_clusters(model, ...),
-    stop("Unknown table type '", type, "'. Use: 'variance', 'loadings', or 'clusters'.",
-         call. = FALSE)
+    stop(
+      "Unknown table type '", type,
+      "'. Use: 'variance', 'loadings', or 'clusters'.",
+      call. = FALSE
+    )
   )
 }
 
@@ -280,7 +286,10 @@ tl_table_coefficients <- function(model, lambda = "1se", digits = 4, ...) {
       ) %>%
       tl_gt_theme(
         title = paste0(tools::toTitleCase(method), " Coefficients"),
-        subtitle = paste0("lambda = ", signif(lambda_val, 4), " (", lambda, ")"),
+        subtitle = paste0(
+          "lambda = ", signif(lambda_val, 4),
+          " (", lambda, ")"
+        ),
         source_note = tl_model_info(model)
       )
 
@@ -377,7 +386,7 @@ tl_table_importance <- function(model, top_n = 20, digits = 2, ...) {
   if (method %in% c("tree", "forest", "boost")) {
     imp_df <- tl_extract_importance(model)
   } else if (method %in% c("ridge", "lasso", "elastic_net")) {
-    imp_df <- tl_extract_importance_regularized(model)
+    imp_df <- tl_extract_importance_reg(model)
   } else {
     stop("Importance table not available for method '", method, "'.",
          call. = FALSE)
@@ -439,7 +448,10 @@ tl_table_variance <- function(model, n_components = NULL, digits = 4, ...) {
       prop_variance = "Proportion", cum_variance = "Cumulative"
     ) %>%
     gt::fmt_number(columns = c("sdev", "variance"), decimals = digits) %>%
-    gt::fmt_percent(columns = c("prop_variance", "cum_variance"), decimals = 1) %>%
+    gt::fmt_percent(
+      columns = c("prop_variance", "cum_variance"),
+      decimals = 1
+    ) %>%
     gt::data_color(
       columns = "cum_variance",
       palette = c("#ffffff", "#27ae60")
@@ -525,8 +537,6 @@ tl_table_clusters <- function(model, k = 3, digits = 2, ...) {
       dplyr::mutate(size = sizes, .after = "cluster")
   } else if (method %in% c("pam", "clara")) {
     centers <- model$fit$medoids
-    cluster_col <- if ("cluster" %in% names(centers)) "cluster" else names(centers)[1]
-    cluster_ids <- centers[[cluster_col]]
     cluster_counts <- model$fit$clusters %>%
       dplyr::count(.data$cluster, name = "size")
     summary_tbl <- centers %>%
@@ -556,10 +566,13 @@ tl_table_clusters <- function(model, k = 3, digits = 2, ...) {
         .groups = "drop"
       )
   } else {
-    stop("Cluster table not available for method '", method, "'.", call. = FALSE)
+    stop("Cluster table not available for method '",
+         method, "'.", call. = FALSE)
   }
 
-  numeric_cols <- names(summary_tbl)[vapply(summary_tbl, is.numeric, logical(1))]
+  numeric_cols <- names(summary_tbl)[
+    vapply(summary_tbl, is.numeric, logical(1))
+  ]
   numeric_cols <- setdiff(numeric_cols, c("cluster", "size", "medoid_index"))
 
   summary_tbl %>%
@@ -597,7 +610,9 @@ tl_table_clusters <- function(model, k = 3, digits = 2, ...) {
 #' m2 <- tl_model(mtcars, mpg ~ ., method = "lasso")
 #' tl_table_comparison(m1, m2, names = c("Linear", "Lasso"))
 #' }
-tl_table_comparison <- function(..., new_data = NULL, names = NULL, digits = 4) {
+tl_table_comparison <- function(..., new_data = NULL,
+                                names = NULL,
+                                digits = 4) {
   tl_check_packages("gt")
 
   models <- list(...)

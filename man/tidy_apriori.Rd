@@ -24,7 +24,9 @@ tidy_apriori(
 
 \item{maxlen}{Maximum rule length (default: 10)}
 
-\item{target}{Type of association mined: "rules" (default), "frequent itemsets", "maximally frequent itemsets"}
+\item{target}{Type of association mined: "rules"
+(default), "frequent itemsets",
+"maximally frequent itemsets"}
 }
 \value{
 A list of class "tidy_rules" containing:

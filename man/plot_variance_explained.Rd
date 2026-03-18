@@ -9,7 +9,8 @@ plot_variance_explained(variance_tbl, threshold = 0.8)
 \arguments{
 \item{variance_tbl}{Variance tibble from tidy_pca}
 
-\item{threshold}{Horizontal line for variance threshold (default: 0.8 for 80\%)}
+\item{threshold}{Horizontal line for variance threshold
+(default: 0.8 for 80\%)}
 }
 \value{
 A ggplot object

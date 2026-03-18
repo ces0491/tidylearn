@@ -9,7 +9,8 @@ tl_plot_cv_comparison(cv_results, metrics = NULL)
 \arguments{
 \item{cv_results}{Results from tl_compare_cv function}
 
-\item{metrics}{Character vector of metrics to plot (if NULL, plots all metrics)}
+\item{metrics}{Character vector of metrics to plot
+(if NULL, plots all metrics)}
 }
 \value{
 A ggplot object

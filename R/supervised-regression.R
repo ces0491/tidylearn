@@ -3,7 +3,7 @@
 #' @description Linear and polynomial regression functionality
 #' @importFrom stats lm predict poly model.matrix
 #' @importFrom tibble tibble
-#' @importFrom dplyr %>% bind_cols
+#' @importFrom dplyr bind_cols
 NULL
 
 #' Fit a linear regression model
@@ -22,23 +22,38 @@ tl_fit_linear <- function(data, formula, ...) {
 #'
 #' @param model A tidylearn linear model object
 #' @param new_data A data frame containing the new data
-#' @param type Type of prediction: "response" (default), "confidence", "prediction"
+#' @param type Type of prediction: "response" (default),
+#'   "confidence", "prediction"
 #' @param level Confidence level for intervals (default: 0.95)
 #' @param ... Additional arguments
 #' @return Predictions
 #' @keywords internal
-tl_predict_linear <- function(model, new_data, type = "response", level = 0.95, ...) {
+tl_predict_linear <- function(model, new_data,
+                              type = "response",
+                              level = 0.95, ...) {
   if (type == "response") {
-    preds <- stats::predict(model$fit, newdata = new_data, ...)
+    preds <- stats::predict(
+      model$fit, newdata = new_data, ...
+    )
     preds
   } else if (type == "confidence") {
-    pred_obj <- stats::predict(model$fit, newdata = new_data, interval = "confidence", level = level, ...)
+    pred_obj <- stats::predict(
+      model$fit, newdata = new_data,
+      interval = "confidence", level = level, ...
+    )
     as.data.frame(pred_obj)
   } else if (type == "prediction") {
-    pred_obj <- stats::predict(model$fit, newdata = new_data, interval = "prediction", level = level, ...)
+    pred_obj <- stats::predict(
+      model$fit, newdata = new_data,
+      interval = "prediction", level = level, ...
+    )
     as.data.frame(pred_obj)
   } else {
-    stop("Invalid prediction type. Use 'response', 'confidence', or 'prediction'.", call. = FALSE)
+    stop(
+      "Invalid prediction type. ",
+      "Use 'response', 'confidence', or 'prediction'.",
+      call. = FALSE
+    )
   }
 }
 
@@ -64,17 +79,28 @@ tl_fit_polynomial <- function(data, formula, degree = 2, ...) {
     # Check if this is an interaction term or has special characters
     if (grepl(":", var) || grepl("\\*", var) || grepl("^I\\(", var)) {
       # Keep interaction terms as they are
-      poly_formula <- paste(poly_formula, var,
-                            ifelse(i < length(predictor_vars), "+", ""))
+      poly_formula <- paste(
+        poly_formula, var,
+        ifelse(i < length(predictor_vars), "+", "")
+      )
     } else {
       # Create polynomial term
-      poly_formula <- paste(poly_formula, paste0("poly(", var, ", degree = ", degree, ", raw = TRUE)"),
-                            ifelse(i < length(predictor_vars), "+", ""))
+      poly_term <- paste0(
+        "poly(", var,
+        ", degree = ", degree,
+        ", raw = TRUE)"
+      )
+      poly_formula <- paste(
+        poly_formula, poly_term,
+        ifelse(i < length(predictor_vars), "+", "")
+      )
     }
   }
 
   # Fit the polynomial model
-  poly_model <- stats::lm(as.formula(poly_formula), data = data, ...)
+  poly_model <- stats::lm(
+    as.formula(poly_formula), data = data, ...
+  )
 
   # Store original formula and degree for future reference
   attr(poly_model, "original_formula") <- formula
@@ -87,28 +113,43 @@ tl_fit_polynomial <- function(data, formula, degree = 2, ...) {
 #'
 #' @param model A tidylearn polynomial model object
 #' @param new_data A data frame containing the new data
-#' @param type Type of prediction: "response" (default), "confidence", "prediction"
+#' @param type Type of prediction: "response" (default),
+#'   "confidence", "prediction"
 #' @param level Confidence level for intervals (default: 0.95)
 #' @param ... Additional arguments
 #' @return Predictions
 #' @keywords internal
-tl_predict_polynomial <- function(model, new_data, type = "response", level = 0.95, ...) {
+tl_predict_polynomial <- function(model, new_data,
+                                  type = "response",
+                                  level = 0.95, ...) {
   # Extract polynomial degree
   degree <- attr(model$fit, "poly_degree")
   if (is.null(degree)) degree <- 2  # Default if not stored
 
   # Call the underlying prediction function
   if (type == "response") {
-    preds <- stats::predict(model$fit, newdata = new_data, ...)
+    preds <- stats::predict(
+      model$fit, newdata = new_data, ...
+    )
     preds
   } else if (type == "confidence") {
-    pred_obj <- stats::predict(model$fit, newdata = new_data, interval = "confidence", level = level, ...)
+    pred_obj <- stats::predict(
+      model$fit, newdata = new_data,
+      interval = "confidence", level = level, ...
+    )
     as.data.frame(pred_obj)
   } else if (type == "prediction") {
-    pred_obj <- stats::predict(model$fit, newdata = new_data, interval = "prediction", level = level, ...)
+    pred_obj <- stats::predict(
+      model$fit, newdata = new_data,
+      interval = "prediction", level = level, ...
+    )
     as.data.frame(pred_obj)
   } else {
-    stop("Invalid prediction type. Use 'response', 'confidence', or 'prediction'.", call. = FALSE)
+    stop(
+      "Invalid prediction type. ",
+      "Use 'response', 'confidence', or 'prediction'.",
+      call. = FALSE
+    )
   }
 }
 
@@ -118,8 +159,10 @@ tl_predict_polynomial <- function(model, new_data, type = "response", level = 0.
 #' @param which Which plots to create (1:4)
 #' @param ... Additional arguments
 #' @return A ggplot object (or list of ggplot objects)
-#' @importFrom ggplot2 ggplot aes geom_point geom_smooth geom_hline geom_text
-#' @importFrom ggplot2 labs theme_minimal scale_color_gradient stat_qq stat_qq_line
+#' @importFrom ggplot2 ggplot aes geom_point geom_smooth
+#'   geom_hline geom_text
+#' @importFrom ggplot2 labs theme_minimal scale_color_gradient
+#'   stat_qq stat_qq_line
 #' @keywords internal
 tl_plot_diagnostics <- function(model, which = 1:4, ...) {
   # Get residuals and fitted values
@@ -142,10 +185,18 @@ tl_plot_diagnostics <- function(model, which = 1:4, ...) {
 
   # Plot 1: Residuals vs Fitted
   if (1 %in% which) {
-    p1 <- ggplot2::ggplot(plot_data, ggplot2::aes(x = fitted, y = residuals)) +
+    p1 <- ggplot2::ggplot(
+      plot_data,
+      ggplot2::aes(x = fitted, y = residuals)
+    ) +
       ggplot2::geom_point(alpha = 0.6) +
-      ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
-      ggplot2::geom_smooth(se = FALSE, color = "blue", method = "loess") +
+      ggplot2::geom_hline(
+        yintercept = 0, linetype = "dashed",
+        color = "red"
+      ) +
+      ggplot2::geom_smooth(
+        se = FALSE, color = "blue", method = "loess"
+      ) +
       ggplot2::labs(
         title = "Residuals vs Fitted",
         x = "Fitted values",
@@ -158,7 +209,10 @@ tl_plot_diagnostics <- function(model, which = 1:4, ...) {
 
   # Plot 2: Normal Q-Q
   if (2 %in% which) {
-    p2 <- ggplot2::ggplot(plot_data, ggplot2::aes(sample = std_residuals)) +
+    p2 <- ggplot2::ggplot(
+      plot_data,
+      ggplot2::aes(sample = std_residuals)
+    ) +
       ggplot2::stat_qq() +
       ggplot2::stat_qq_line(color = "red") +
       ggplot2::labs(
@@ -173,9 +227,14 @@ tl_plot_diagnostics <- function(model, which = 1:4, ...) {
 
   # Plot 3: Scale-Location
   if (3 %in% which) {
-    p3 <- ggplot2::ggplot(plot_data, ggplot2::aes(x = fitted, y = sqrt_abs_residuals)) +
+    p3 <- ggplot2::ggplot(
+      plot_data,
+      ggplot2::aes(x = fitted, y = sqrt_abs_residuals)
+    ) +
       ggplot2::geom_point(alpha = 0.6) +
-      ggplot2::geom_smooth(se = FALSE, color = "blue", method = "loess") +
+      ggplot2::geom_smooth(
+        se = FALSE, color = "blue", method = "loess"
+      ) +
       ggplot2::labs(
         title = "Scale-Location",
         x = "Fitted values",
@@ -188,10 +247,24 @@ tl_plot_diagnostics <- function(model, which = 1:4, ...) {
 
   # Plot 4: Cook's distance / Leverage
   if (4 %in% which) {
-    p4 <- ggplot2::ggplot(plot_data, ggplot2::aes(x = leverage, y = std_residuals)) +
-      ggplot2::geom_point(ggplot2::aes(size = cooks_distance, color = cooks_distance), alpha = 0.6) +
-      ggplot2::geom_hline(yintercept = c(-2, 0, 2), linetype = "dashed", color = "red") +
-      ggplot2::scale_color_gradient(low = "blue", high = "red") +
+    p4 <- ggplot2::ggplot(
+      plot_data,
+      ggplot2::aes(x = leverage, y = std_residuals)
+    ) +
+      ggplot2::geom_point(
+        ggplot2::aes(
+          size = cooks_distance,
+          color = cooks_distance
+        ),
+        alpha = 0.6
+      ) +
+      ggplot2::geom_hline(
+        yintercept = c(-2, 0, 2),
+        linetype = "dashed", color = "red"
+      ) +
+      ggplot2::scale_color_gradient(
+        low = "blue", high = "red"
+      ) +
       ggplot2::labs(
         title = "Residuals vs Leverage",
         x = "Leverage",
@@ -215,12 +288,16 @@ tl_plot_diagnostics <- function(model, which = 1:4, ...) {
 #' Plot actual vs predicted values for a regression model
 #'
 #' @param model A tidylearn regression model object
-#' @param new_data Optional data frame for evaluation (if NULL, uses training data)
+#' @param new_data Optional data frame for evaluation
+#'   (if NULL, uses training data)
 #' @param ... Additional arguments
 #' @return A ggplot object
-#' @importFrom ggplot2 ggplot aes geom_point geom_abline labs theme_minimal
+#' @importFrom ggplot2 ggplot aes geom_point geom_abline
+#'   labs theme_minimal
 #' @keywords internal
-tl_plot_actual_predicted <- function(model, new_data = NULL, ...) {
+tl_plot_actual_predicted <- function(model,
+                                     new_data = NULL,
+                                     ...) {
   if (is.null(new_data)) {
     new_data <- model$data
   }
@@ -240,12 +317,21 @@ tl_plot_actual_predicted <- function(model, new_data = NULL, ...) {
   r_squared <- round(cor(actuals, predictions)^2, 3)
 
   # Create the plot
-  p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = actual, y = predicted)) +
+  p <- ggplot2::ggplot(
+    plot_data,
+    ggplot2::aes(x = actual, y = predicted)
+  ) +
     ggplot2::geom_point(alpha = 0.6) +
-    ggplot2::geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+    ggplot2::geom_abline(
+      intercept = 0, slope = 1,
+      color = "red", linetype = "dashed"
+    ) +
     ggplot2::labs(
       title = "Actual vs Predicted Values",
-      subtitle = paste0("Correlation: ", corr, ", R-squared: ", r_squared),
+      subtitle = paste0(
+        "Correlation: ", corr,
+        ", R-squared: ", r_squared
+      ),
       x = "Actual values",
       y = "Predicted values"
     ) +
@@ -257,10 +343,12 @@ tl_plot_actual_predicted <- function(model, new_data = NULL, ...) {
 #' Plot residuals for a regression model
 #'
 #' @param model A tidylearn regression model object
-#' @param type Type of residual plot: "fitted" (default), "histogram", "predicted"
+#' @param type Type of residual plot: "fitted" (default),
+#'   "histogram", "predicted"
 #' @param ... Additional arguments
 #' @return A ggplot object
-#' @importFrom ggplot2 ggplot aes geom_point geom_hline geom_histogram labs theme_minimal
+#' @importFrom ggplot2 ggplot aes geom_point geom_hline
+#'   geom_histogram labs theme_minimal
 #' @keywords internal
 tl_plot_residuals <- function(model, type = "fitted", ...) {
   # Get residuals and fitted values
@@ -275,9 +363,15 @@ tl_plot_residuals <- function(model, type = "fitted", ...) {
 
   # Create the plot based on type
   if (type == "fitted") {
-    p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = fitted, y = residuals)) +
+    p <- ggplot2::ggplot(
+      plot_data,
+      ggplot2::aes(x = fitted, y = residuals)
+    ) +
       ggplot2::geom_point(alpha = 0.6) +
-      ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+      ggplot2::geom_hline(
+        yintercept = 0, linetype = "dashed",
+        color = "red"
+      ) +
       ggplot2::labs(
         title = "Residuals vs Fitted Values",
         x = "Fitted values",
@@ -285,8 +379,14 @@ tl_plot_residuals <- function(model, type = "fitted", ...) {
       ) +
       ggplot2::theme_minimal()
   } else if (type == "histogram") {
-    p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = residuals)) +
-      ggplot2::geom_histogram(bins = 30, fill = "steelblue", color = "white", alpha = 0.7) +
+    p <- ggplot2::ggplot(
+      plot_data,
+      ggplot2::aes(x = residuals)
+    ) +
+      ggplot2::geom_histogram(
+        bins = 30, fill = "steelblue",
+        color = "white", alpha = 0.7
+      ) +
       ggplot2::labs(
         title = "Histogram of Residuals",
         x = "Residuals",
@@ -300,9 +400,15 @@ tl_plot_residuals <- function(model, type = "fitted", ...) {
     # Add to plot data
     plot_data$predicted <- predictions
 
-    p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = predicted, y = residuals)) +
+    p <- ggplot2::ggplot(
+      plot_data,
+      ggplot2::aes(x = predicted, y = residuals)
+    ) +
       ggplot2::geom_point(alpha = 0.6) +
-      ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+      ggplot2::geom_hline(
+        yintercept = 0, linetype = "dashed",
+        color = "red"
+      ) +
       ggplot2::labs(
         title = "Residuals vs Predicted Values",
         x = "Predicted values",
@@ -310,7 +416,11 @@ tl_plot_residuals <- function(model, type = "fitted", ...) {
       ) +
       ggplot2::theme_minimal()
   } else {
-    stop("Invalid plot type. Use 'fitted', 'histogram', or 'predicted'.", call. = FALSE)
+    stop(
+      "Invalid plot type. ",
+      "Use 'fitted', 'histogram', or 'predicted'.",
+      call. = FALSE
+    )
   }
 
   p
@@ -319,30 +429,40 @@ tl_plot_residuals <- function(model, type = "fitted", ...) {
 #' Create confidence and prediction interval plots
 #'
 #' @param model A tidylearn regression model object
-#' @param new_data Optional data frame for prediction (if NULL, uses training data)
+#' @param new_data Optional data frame for prediction
+#'   (if NULL, uses training data)
 #' @param level Confidence level (default: 0.95)
 #' @param ... Additional arguments
 #' @return A ggplot object
-#' @importFrom ggplot2 ggplot aes geom_point geom_ribbon labs theme_minimal
+#' @importFrom ggplot2 ggplot aes geom_point geom_ribbon
+#'   labs theme_minimal
 #' @export
-tl_plot_intervals <- function(model, new_data = NULL, level = 0.95, ...) {
+tl_plot_intervals <- function(model,
+                              new_data = NULL,
+                              level = 0.95, ...) {
   if (is.null(new_data)) {
     new_data <- model$data
   }
 
   if (model$spec$is_classification) {
-    stop("Interval plots are only available for regression models", call. = FALSE)
+    stop(
+      "Interval plots are only available ",
+      "for regression models",
+      call. = FALSE
+    )
   }
 
   # Get actual values
-  x_var <- all.vars(model$spec$formula)[-1][1]  # First predictor variable
+  x_var <- all.vars(model$spec$formula)[-1][1]
   y_var <- model$spec$response_var
 
   # Sort data by x variable for smooth curves
   sorted_data <- new_data[order(new_data[[x_var]]), ]
 
   # Calculate intervals
-  intervals <- tl_prediction_intervals(model, sorted_data, level = level)
+  intervals <- tl_prediction_intervals(
+    model, sorted_data, level = level
+  )
 
   # Create plot data
   plot_data <- tibble::tibble(
@@ -356,20 +476,41 @@ tl_plot_intervals <- function(model, new_data = NULL, level = 0.95, ...) {
   )
 
   # Create the plot
-  p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = x)) +
+  p <- ggplot2::ggplot(
+    plot_data, ggplot2::aes(x = x)
+  ) +
     # Prediction intervals (wider)
-    ggplot2::geom_ribbon(ggplot2::aes(ymin = pred_lower, ymax = pred_upper),
-                         fill = "lightblue", alpha = 0.3) +
+    ggplot2::geom_ribbon(
+      ggplot2::aes(
+        ymin = pred_lower, ymax = pred_upper
+      ),
+      fill = "lightblue", alpha = 0.3
+    ) +
     # Confidence intervals (narrower)
-    ggplot2::geom_ribbon(ggplot2::aes(ymin = conf_lower, ymax = conf_upper),
-                         fill = "steelblue", alpha = 0.5) +
+    ggplot2::geom_ribbon(
+      ggplot2::aes(
+        ymin = conf_lower, ymax = conf_upper
+      ),
+      fill = "steelblue", alpha = 0.5
+    ) +
     # Fitted line
-    ggplot2::geom_line(ggplot2::aes(y = pred), color = "blue", size = 1) +
+    ggplot2::geom_line(
+      ggplot2::aes(y = pred),
+      color = "blue", size = 1
+    ) +
     # Actual points
-    ggplot2::geom_point(ggplot2::aes(y = y), alpha = 0.6) +
+    ggplot2::geom_point(
+      ggplot2::aes(y = y), alpha = 0.6
+    ) +
     ggplot2::labs(
-      title = paste0("Regression with ", level * 100, "% Confidence & Prediction Intervals"),
-      subtitle = "Dark band: Confidence interval, Light band: Prediction interval",
+      title = paste0(
+        "Regression with ", level * 100,
+        "% Confidence & Prediction Intervals"
+      ),
+      subtitle = paste0(
+        "Dark band: Confidence interval, ",
+        "Light band: Prediction interval"
+      ),
       x = x_var,
       y = y_var
     ) +

@@ -4,5 +4,6 @@
 \alias{tidylearn-model-selection}
 \title{Model Selection Functions for tidylearn}
 \description{
-Functions for stepwise model selection, cross-validation, and hyperparameter tuning
+Functions for stepwise model selection,
+cross-validation, and hyperparameter tuning
 }

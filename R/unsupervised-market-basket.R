@@ -7,7 +7,9 @@
 #' @param confidence Minimum confidence (default: 0.5)
 #' @param minlen Minimum rule length (default: 2)
 #' @param maxlen Maximum rule length (default: 10)
-#' @param target Type of association mined: "rules" (default), "frequent itemsets", "maximally frequent itemsets"
+#' @param target Type of association mined: "rules"
+#'   (default), "frequent itemsets",
+#'   "maximally frequent itemsets"
 #'
 #' @return A list of class "tidy_rules" containing:
 #' \itemize{
@@ -130,7 +132,7 @@ inspect_rules <- function(rules_obj, by = "lift", n = 10, decreasing = TRUE) {
   if (by %in% names(rules_tbl)) {
     rules_tbl <- rules_tbl %>%
       dplyr::arrange(dplyr::desc(!!rlang::sym(by))) %>%
-      dplyr::slice(1:min(n, nrow(rules_tbl)))
+      dplyr::slice(seq_len(min(n, nrow(rules_tbl))))
 
     if (!decreasing) {
       rules_tbl <- rules_tbl %>%
@@ -138,7 +140,8 @@ inspect_rules <- function(rules_obj, by = "lift", n = 10, decreasing = TRUE) {
     }
   } else {
     warning("Sorting column not found, returning first n rules")
-    rules_tbl <- rules_tbl %>% dplyr::slice(1:min(n, nrow(rules_tbl)))
+    rules_tbl <- rules_tbl %>%
+      dplyr::slice(seq_len(min(n, nrow(rules_tbl))))
   }
 
   rules_tbl
@@ -173,7 +176,10 @@ filter_rules_by_item <- function(rules_obj, item, where = "both") {
       dplyr::filter(grepl(item, rhs, fixed = TRUE))
   } else {
     filtered <- rules_tbl %>%
-      dplyr::filter(grepl(item, lhs, fixed = TRUE) | grepl(item, rhs, fixed = TRUE))
+      dplyr::filter(
+        grepl(item, lhs, fixed = TRUE) |
+          grepl(item, rhs, fixed = TRUE)
+      )
   }
 
   filtered
@@ -202,10 +208,13 @@ find_related_items <- function(rules_obj, item, min_lift = 1.5, top_n = 10) {
 
   # Filter rules containing the item
   related <- rules_tbl %>%
-    dplyr::filter(grepl(item, lhs, fixed = TRUE) | grepl(item, rhs, fixed = TRUE)) %>%
+    dplyr::filter(
+      grepl(item, lhs, fixed = TRUE) |
+        grepl(item, rhs, fixed = TRUE)
+    ) %>%
     dplyr::filter(lift >= min_lift) %>%
     dplyr::arrange(dplyr::desc(lift)) %>%
-    dplyr::slice(1:min(top_n, dplyr::n()))
+    dplyr::slice(seq_len(min(top_n, dplyr::n())))
 
   related
 }
@@ -265,7 +274,8 @@ summarize_rules <- function(rules_obj) {
 #' Create visualizations of association rules
 #'
 #' @param rules_obj A tidy_apriori object, rules object, or rules tibble
-#' @param method Visualization method: "scatter" (default), "graph", "grouped", "paracoord"
+#' @param method Visualization method: "scatter"
+#'   (default), "graph", "grouped", "paracoord"
 #' @param top_n Number of top rules to visualize (default: 50)
 #' @param ... Additional arguments passed to plot() for rules visualization
 #'
@@ -279,7 +289,10 @@ visualize_rules <- function(rules_obj, method = "scatter", top_n = 50, ...) {
   } else if (inherits(rules_obj, "rules")) {
     rules <- rules_obj
   } else if (is.data.frame(rules_obj)) {
-    stop("Cannot visualize tibble directly; provide tidy_apriori or rules object")
+    stop(
+      "Cannot visualize tibble directly; ",
+      "provide tidy_apriori or rules object"
+    )
   } else {
     stop("rules_obj must be a tidy_apriori or rules object")
   }
@@ -294,7 +307,13 @@ visualize_rules <- function(rules_obj, method = "scatter", top_n = 50, ...) {
     # Scatter plot with ggplot2
     rules_tbl <- tidy_rules(rules)
 
-    p <- ggplot2::ggplot(rules_tbl, ggplot2::aes(x = support, y = confidence, color = lift, size = lift)) +
+    p <- ggplot2::ggplot(
+      rules_tbl,
+      ggplot2::aes(
+        x = support, y = confidence,
+        color = lift, size = lift
+      )
+    ) +
       ggplot2::geom_point(alpha = 0.6) +
       ggplot2::scale_color_gradient(low = "lightblue", high = "red") +
       ggplot2::labs(
@@ -305,13 +324,17 @@ visualize_rules <- function(rules_obj, method = "scatter", top_n = 50, ...) {
       ) +
       ggplot2::theme_minimal()
 
-    return(p)
+    p
 
   } else {
     # Use arulesViz for other methods
     # Check if arulesViz is available
     if (!requireNamespace("arulesViz", quietly = TRUE)) {
-      stop("Package 'arulesViz' is required for this visualization method.", call. = FALSE)
+      stop(
+        "Package 'arulesViz' is required for ",
+        "this visualization method.",
+        call. = FALSE
+      )
     }
     plot(rules, method = method, ...)
   }
@@ -329,7 +352,9 @@ visualize_rules <- function(rules_obj, method = "scatter", top_n = 50, ...) {
 #'
 #' @return A tibble with recommended items and metrics
 #' @export
-recommend_products <- function(rules_obj, basket, top_n = 5, min_confidence = 0.5) {
+recommend_products <- function(rules_obj, basket,
+                               top_n = 5,
+                               min_confidence = 0.5) {
 
   # Get rules tibble
   if (inherits(rules_obj, "tidy_apriori")) {
@@ -349,7 +374,7 @@ recommend_products <- function(rules_obj, basket, top_n = 5, min_confidence = 0.
     })) %>%
     dplyr::arrange(dplyr::desc(lift)) %>%
     dplyr::select(rhs, confidence, lift, support) %>%
-    dplyr::slice(1:min(top_n, dplyr::n()))
+    dplyr::slice(seq_len(min(top_n, dplyr::n())))
 
   recommendations
 }
@@ -368,7 +393,9 @@ print.tidy_apriori <- function(x, ...) {
   cat("Parameters:\n")
   cat("  Minimum support:   ", x$parameters$supp, "\n")
   cat("  Minimum confidence:", x$parameters$conf, "\n")
-  cat("  Rule length:       ", x$parameters$minlen, "-", x$parameters$maxlen, "\n\n")
+  cat("  Rule length:       ",
+      x$parameters$minlen, "-",
+      x$parameters$maxlen, "\n\n")
 
   cat("Results:\n")
   cat("  Number of rules:", x$n_rules, "\n\n")
@@ -377,12 +404,21 @@ print.tidy_apriori <- function(x, ...) {
     summary <- summarize_rules(x)
 
     cat("Quality Measure Summary:\n")
-    cat("  Support:    ", sprintf("%.4f - %.4f (mean: %.4f)",
-                                  summary$support$min, summary$support$max, summary$support$mean), "\n")
-    cat("  Confidence: ", sprintf("%.4f - %.4f (mean: %.4f)",
-                                  summary$confidence$min, summary$confidence$max, summary$confidence$mean), "\n")
-    cat("  Lift:       ", sprintf("%.2f - %.2f (mean: %.2f)",
-                                  summary$lift$min, summary$lift$max, summary$lift$mean), "\n\n")
+    cat("  Support:    ",
+        sprintf("%.4f - %.4f (mean: %.4f)",
+                summary$support$min,
+                summary$support$max,
+                summary$support$mean), "\n")
+    cat("  Confidence: ",
+        sprintf("%.4f - %.4f (mean: %.4f)",
+                summary$confidence$min,
+                summary$confidence$max,
+                summary$confidence$mean), "\n")
+    cat("  Lift:       ",
+        sprintf("%.2f - %.2f (mean: %.2f)",
+                summary$lift$min,
+                summary$lift$max,
+                summary$lift$mean), "\n\n")
 
     cat("Top 5 rules by lift:\n")
     print(inspect_rules(x, by = "lift", n = 5))
