@@ -143,18 +143,28 @@ tl_read_postgres <- function(dsn, query, dbname = NULL, user = NULL,
   tl_check_packages("DBI", "RPostgres")
 
   if (missing(query) || !is.character(query) || !nzchar(query)) {
-    stop("'query' is required. Provide a SQL string.", call. = FALSE)
+    stop("'query' is required. Provide a SQL string.",
+         call. = FALSE)
   }
+
+  conn <- NULL
+  on.exit({
+    if (!is.null(conn)) DBI::dbDisconnect(conn)
+  }, add = TRUE)
 
   # Parse connection string if provided
   if (grepl("^postgres(ql)?://", dsn)) {
     conn <- tryCatch(
-      DBI::dbConnect(RPostgres::Postgres(), dsn = dsn, ...),
+      DBI::dbConnect(
+        RPostgres::Postgres(), dsn = dsn, ...
+      ),
       error = function(e) {
-        stop("Failed to connect to PostgreSQL: ", e$message,
-             "\nCheck your connection string and ensure the database ",
-             "is accessible.",
-             call. = FALSE)
+        stop(
+          "Failed to connect to PostgreSQL: ",
+          e$message,
+          "\nCheck your connection string.",
+          call. = FALSE
+        )
       }
     )
   } else {
@@ -169,14 +179,15 @@ tl_read_postgres <- function(dsn, query, dbname = NULL, user = NULL,
         ...
       ),
       error = function(e) {
-        stop("Failed to connect to PostgreSQL: ", e$message,
-             "\nCheck your connection parameters and ensure the database ",
-             "is accessible.",
-             call. = FALSE)
+        stop(
+          "Failed to connect to PostgreSQL: ",
+          e$message,
+          "\nCheck your connection parameters.",
+          call. = FALSE
+        )
       }
     )
   }
-  on.exit(DBI::dbDisconnect(conn), add = TRUE)
 
   data <- DBI::dbGetQuery(conn, query)
 
@@ -228,8 +239,14 @@ tl_read_mysql <- function(dsn, query, dbname = NULL, user = NULL,
   tl_check_packages("DBI", "RMariaDB")
 
   if (missing(query) || !is.character(query) || !nzchar(query)) {
-    stop("'query' is required. Provide a SQL string.", call. = FALSE)
+    stop("'query' is required. Provide a SQL string.",
+         call. = FALSE)
   }
+
+  conn <- NULL
+  on.exit({
+    if (!is.null(conn)) DBI::dbDisconnect(conn)
+  }, add = TRUE)
 
   # Parse connection string or use named params
   if (grepl("^mysql://", dsn)) {
@@ -245,10 +262,12 @@ tl_read_mysql <- function(dsn, query, dbname = NULL, user = NULL,
         ...
       ),
       error = function(e) {
-        stop("Failed to connect to MySQL: ", e$message,
-             "\nCheck your connection string and ensure the database ",
-             "is accessible.",
-             call. = FALSE)
+        stop(
+          "Failed to connect to MySQL: ",
+          e$message,
+          "\nCheck your connection string.",
+          call. = FALSE
+        )
       }
     )
   } else {
@@ -263,14 +282,15 @@ tl_read_mysql <- function(dsn, query, dbname = NULL, user = NULL,
         ...
       ),
       error = function(e) {
-        stop("Failed to connect to MySQL: ", e$message,
-             "\nCheck your connection parameters and ensure the database ",
-             "is accessible.",
-             call. = FALSE)
+        stop(
+          "Failed to connect to MySQL: ",
+          e$message,
+          "\nCheck your connection parameters.",
+          call. = FALSE
+        )
       }
     )
   }
-  on.exit(DBI::dbDisconnect(conn), add = TRUE)
 
   data <- DBI::dbGetQuery(conn, query)
 

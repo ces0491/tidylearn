@@ -4,7 +4,7 @@
 \alias{tl_predict_boost}
 \title{Predict using a gradient boosting model}
 \usage{
-tl_predict_boost(model, new_data, type = "response", n_trees = NULL, ...)
+tl_predict_boost(model, new_data, type = "response", n.trees = NULL, ...)
 }
 \arguments{
 \item{model}{A tidylearn boost model object}
@@ -14,7 +14,7 @@ tl_predict_boost(model, new_data, type = "response", n_trees = NULL, ...)
 \item{type}{Type of prediction: "response"
 (default), "prob" (for classification)}
 
-\item{n_trees}{Number of trees to use for prediction
+\item{n.trees}{Number of trees to use for prediction
 (if NULL, uses optimal number)}
 
 \item{...}{Additional arguments}

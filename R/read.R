@@ -118,7 +118,9 @@ tl_detect_format <- function(source) {
   if (grepl("^postgres(ql)?://", source)) return("postgres")
   if (grepl("^mysql://", source)) return("mysql")
 
+
   # Fall back to file extension matching
+  # Note: .txt defaults to CSV; use format = "tsv" to override
   ext <- tolower(tools::file_ext(source))
 
   ext_map <- c(
@@ -162,7 +164,9 @@ tl_detect_format <- function(source) {
 #'   \code{"rds"}, \code{"rdata"},
 #'   \code{"sqlite"}, \code{"postgres"}, \code{"mysql"}, \code{"bigquery"},
 #'   \code{"s3"}, \code{"github"}, \code{"kaggle"}. When \code{NULL} (default),
-#'   the format is auto-detected from the file extension or source pattern.
+#'   the format is auto-detected from the file extension
+#'   or source pattern. Note: \code{.txt} files default
+#'   to CSV; use \code{format = "tsv"} to override.
 #' @param .quiet Logical. If \code{TRUE}, suppresses
 #'   informational messages. Default is \code{FALSE}.
 #'
@@ -274,11 +278,20 @@ tl_read_multi <- function(paths, ..., format = NULL, .quiet = FALSE) {
 
   results <- lapply(paths, function(p) {
     df <- tl_read(p, ..., format = format, .quiet = TRUE)
-    df$source_file <- basename(p)
+    col <- "source_file"
+    if (col %in% names(df)) {
+      col <- "tl_source_file"
+      warning(
+        "Column 'source_file' already exists in data. ",
+        "Using 'tl_source_file' instead.",
+        call. = FALSE
+      )
+    }
+    df[[col]] <- basename(p)
     df
   })
 
-  combined <- do.call(rbind, results)
+  combined <- dplyr::bind_rows(results)
 
   if (!.quiet) {
     message("Combined: ", nrow(combined), " rows x ", ncol(combined),

@@ -74,7 +74,7 @@ test_that("Hierarchical clustering works", {
 test_that("DBSCAN clustering works", {
   skip_if_not_installed("dbscan")
 
-  model <- tl_model(iris[, 1:4], method = "dbscan", eps = 0.5, min_pts = 5)
+  model <- tl_model(iris[, 1:4], method = "dbscan", eps = 0.5, minPts = 5)
 
   expect_s3_class(model, "tidylearn_dbscan")
 

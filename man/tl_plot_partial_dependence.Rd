@@ -4,14 +4,14 @@
 \alias{tl_plot_partial_dependence}
 \title{Plot partial dependence for tree-based models}
 \usage{
-tl_plot_partial_dependence(model, var, n_pts = 20, ...)
+tl_plot_partial_dependence(model, var, n.pts = 20, ...)
 }
 \arguments{
 \item{model}{A tidylearn tree-based model object}
 
 \item{var}{Variable name to plot}
 
-\item{n_pts}{Number of points for continuous
+\item{n.pts}{Number of points for continuous
 variables (default: 20)}
 
 \item{...}{Additional arguments}

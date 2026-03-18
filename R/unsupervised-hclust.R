@@ -219,7 +219,7 @@ optimal_hclust_k <- function(hclust_obj, method = "silhouette", max_k = 10) {
     # Use gap statistic
     gap_result <- tidy_gap_stat(
       hclust_obj$data,
-      fun_cluster = function(data, k) {
+      FUN_cluster = function(data, k) {
         hc_temp <- stats::hclust(stats::dist(data), method = hclust_obj$method)
         stats::cutree(hc_temp, k = k)
       },

@@ -4,18 +4,18 @@
 \alias{explore_dbscan_params}
 \title{Explore DBSCAN Parameters}
 \usage{
-explore_dbscan_params(data, eps_values, min_pts_values)
+explore_dbscan_params(data, eps_values, minPts_values)
 }
 \arguments{
 \item{data}{A data frame or matrix}
 
 \item{eps_values}{Vector of eps values to test}
 
-\item{min_pts_values}{Vector of min_pts values to test}
+\item{minPts_values}{Vector of minPts values to test}
 }
 \value{
 A tibble with parameter combinations and resulting cluster counts
 }
 \description{
-Test multiple eps and min_pts combinations
+Test multiple eps and minPts combinations
 }

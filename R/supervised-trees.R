@@ -182,13 +182,13 @@ tl_predict_forest <- function(model, new_data, type = "response", ...) {
 #' @param formula A formula specifying the model
 #' @param is_classification Logical indicating if this is a
 #'   classification problem
-#' @param n_trees Number of trees (default: 100)
-#' @param interaction_depth Depth of interactions
+#' @param n.trees Number of trees (default: 100)
+#' @param interaction.depth Depth of interactions
 #'   (default: 3)
 #' @param shrinkage Learning rate (default: 0.1)
-#' @param n_minobsinnode Minimum number of observations
+#' @param n.minobsinnode Minimum number of observations
 #'   in terminal nodes (default: 10)
-#' @param cv_folds Number of cross-validation folds
+#' @param cv.folds Number of cross-validation folds
 #'   (default: 0, no CV)
 #' @param ... Additional arguments to pass to gbm()
 #' @return A fitted gradient boosting model
@@ -196,11 +196,11 @@ tl_predict_forest <- function(model, new_data, type = "response", ...) {
 tl_fit_boost <- function(
     data, formula,
     is_classification = FALSE,
-    n_trees = 100,
-    interaction_depth = 3,
+    n.trees = 100,
+    interaction.depth = 3,
     shrinkage = 0.1,
-    n_minobsinnode = 10,
-    cv_folds = 0, ...) {
+    n.minobsinnode = 10,
+    cv.folds = 0, ...) {
   # Check if gbm is installed
   tl_check_packages("gbm")
 
@@ -228,11 +228,11 @@ tl_fit_boost <- function(
     formula = formula,
     data = data,
     distribution = distribution,
-    n.trees = n_trees,
-    interaction.depth = interaction_depth,
+    n.trees = n.trees,
+    interaction.depth = interaction.depth,
     shrinkage = shrinkage,
-    n.minobsinnode = n_minobsinnode,
-    cv.folds = cv_folds,
+    n.minobsinnode = n.minobsinnode,
+    cv.folds = cv.folds,
     verbose = FALSE,
     ...
   )
@@ -246,7 +246,7 @@ tl_fit_boost <- function(
 #' @param new_data A data frame containing the new data
 #' @param type Type of prediction: "response"
 #'   (default), "prob" (for classification)
-#' @param n_trees Number of trees to use for prediction
+#' @param n.trees Number of trees to use for prediction
 #'   (if NULL, uses optimal number)
 #' @param ... Additional arguments
 #' @return Predictions
@@ -254,21 +254,21 @@ tl_fit_boost <- function(
 tl_predict_boost <- function(
     model, new_data,
     type = "response",
-    n_trees = NULL, ...) {
+    n.trees = NULL, ...) {
   # Get the boosting model
   fit <- model$fit
   is_classification <- model$spec$is_classification
 
   # Determine the number of trees to use
-  if (is.null(n_trees)) {
+  if (is.null(n.trees)) {
     if (fit$cv.folds > 0) {
       # Use the optimal number of trees from CV
-      n_trees <- gbm::gbm.perf(
+      n.trees <- gbm::gbm.perf(
         fit, method = "cv", plot.it = FALSE
       )
     } else {
       # Use all trees
-      n_trees <- fit$n.trees
+      n.trees <- fit$n.trees
     }
   }
 
@@ -280,7 +280,7 @@ tl_predict_boost <- function(
         # Get probabilities on the scale of the response
         probs <- gbm::predict.gbm(
           fit, newdata = new_data,
-          n.trees = n_trees,
+          n.trees = n.trees,
           type = "response", ...
         )
 
@@ -301,7 +301,7 @@ tl_predict_boost <- function(
         # Get probabilities
         probs <- gbm::predict.gbm(
           fit, newdata = new_data,
-          n.trees = n_trees,
+          n.trees = n.trees,
           type = "response", ...
         )
 
@@ -335,7 +335,7 @@ tl_predict_boost <- function(
         # Get class probabilities
         probs <- gbm::predict.gbm(
           fit, newdata = new_data,
-          n.trees = n_trees,
+          n.trees = n.trees,
           type = "response", ...
         )
 
@@ -364,7 +364,7 @@ tl_predict_boost <- function(
         # Get class probabilities
         probs <- gbm::predict.gbm(
           fit, newdata = new_data,
-          n.trees = n_trees,
+          n.trees = n.trees,
           type = "response", ...
         )
 
@@ -405,7 +405,7 @@ tl_predict_boost <- function(
     # Regression predictions
     preds <- gbm::predict.gbm(
       fit, newdata = new_data,
-      n.trees = n_trees,
+      n.trees = n.trees,
       type = "response", ...
     )
     preds
@@ -519,14 +519,14 @@ tl_plot_tree <- function(model, ...) {
 #'
 #' @param model A tidylearn tree-based model object
 #' @param var Variable name to plot
-#' @param n_pts Number of points for continuous
+#' @param n.pts Number of points for continuous
 #'   variables (default: 20)
 #' @param ... Additional arguments
 #' @return A ggplot object
 #' @importFrom ggplot2 ggplot aes geom_line geom_point
 #' @importFrom ggplot2 labs theme_minimal
 #' @export
-tl_plot_partial_dependence <- function(model, var, n_pts = 20, ...) {
+tl_plot_partial_dependence <- function(model, var, n.pts = 20, ...) {
   if (!model$spec$method %in% c("tree", "forest", "boost")) {
     stop(
       "Partial dependence plots are currently ",
@@ -559,7 +559,7 @@ tl_plot_partial_dependence <- function(model, var, n_pts = 20, ...) {
     grid_values <- seq(
       min(var_values, na.rm = TRUE),
       max(var_values, na.rm = TRUE),
-      length.out = n_pts
+      length.out = n.pts
     )
   }
 

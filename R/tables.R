@@ -386,7 +386,7 @@ tl_table_importance <- function(model, top_n = 20, digits = 2, ...) {
   if (method %in% c("tree", "forest", "boost")) {
     imp_df <- tl_extract_importance(model)
   } else if (method %in% c("ridge", "lasso", "elastic_net")) {
-    imp_df <- tl_extract_importance_reg(model)
+    imp_df <- tl_extract_importance_regularized(model)
   } else {
     stop("Importance table not available for method '", method, "'.",
          call. = FALSE)

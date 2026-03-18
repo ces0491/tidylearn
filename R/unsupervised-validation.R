@@ -174,34 +174,34 @@ plot_silhouette <- function(sil_obj) {
 #' Compute gap statistic for determining optimal number of clusters
 #'
 #' @param data A data frame or tibble
-#' @param fun_cluster Clustering function (default: uses kmeans internally)
+#' @param FUN_cluster Clustering function (default: uses kmeans internally)
 #' @param max_k Maximum number of clusters (default: 10)
-#' @param n_boot Number of bootstrap samples (default: 50)
+#' @param B Number of bootstrap samples (default: 50)
 #' @param nstart If using kmeans, number of random starts (default: 25)
 #'
 #' @return A list of class "tidy_gap" containing gap statistics
 #' @export
-tidy_gap_stat <- function(data, fun_cluster = NULL,
-                          max_k = 10, n_boot = 50,
+tidy_gap_stat <- function(data, FUN_cluster = NULL,
+                          max_k = 10, B = 50,
                           nstart = 25) {
 
   data_numeric <- data %>% dplyr::select(where(is.numeric))
 
   # Use cluster::clusGap
-  if (is.null(fun_cluster)) {
+  if (is.null(FUN_cluster)) {
     gap_result <- cluster::clusGap(
       data_numeric,
       FUN = stats::kmeans,
       nstart = nstart,
       K.max = max_k,
-      B = n_boot
+      B = B
     )
   } else {
     gap_result <- cluster::clusGap(
       data_numeric,
-      FUN = fun_cluster,
+      FUN = FUN_cluster,
       K.max = max_k,
-      B = n_boot
+      B = B
     )
   }
 
@@ -210,22 +210,22 @@ tidy_gap_stat <- function(data, fun_cluster = NULL,
     dplyr::mutate(k = 1:max_k, .before = 1)
 
   # Determine optimal k using different methods
-  k_first_se_max <- cluster::maxSE(gap_result$Tab[, "gap"],
-                                   gap_result$Tab[, "SE.sim"],
-                                   method = "firstSEmax")
-
-  k_global_max <- cluster::maxSE(gap_result$Tab[, "gap"],
+  k_firstSEmax <- cluster::maxSE(gap_result$Tab[, "gap"],
                                  gap_result$Tab[, "SE.sim"],
-                                 method = "globalmax")
+                                 method = "firstSEmax")
+
+  k_globalmax <- cluster::maxSE(gap_result$Tab[, "gap"],
+                                gap_result$Tab[, "SE.sim"],
+                                method = "globalmax")
 
   k_firstmax <- which.max(gap_result$Tab[, "gap"])
 
   result <- list(
     gap_data = gap_tbl,
-    k_first_se_max = k_first_se_max,
-    k_global_max = k_global_max,
+    k_firstSEmax = k_firstSEmax,
+    k_globalmax = k_globalmax,
     k_firstmax = k_firstmax,
-    recommended_k = k_first_se_max,  # Most conservative
+    recommended_k = k_firstSEmax,  # Most conservative
     model = gap_result
   )
 
@@ -273,11 +273,11 @@ plot_gap_stat <- function(gap_obj, show_methods = FALSE) {
   if (show_methods) {
     p <- p +
       ggplot2::geom_vline(
-        xintercept = gap_obj$k_first_se_max,
+        xintercept = gap_obj$k_firstSEmax,
         color = "red", linetype = "dashed"
       ) +
       ggplot2::geom_vline(
-        xintercept = gap_obj$k_global_max,
+        xintercept = gap_obj$k_globalmax,
         color = "purple", linetype = "dashed"
       ) +
       ggplot2::geom_vline(
@@ -286,13 +286,13 @@ plot_gap_stat <- function(gap_obj, show_methods = FALSE) {
       ) +
       ggplot2::annotate(
         "text",
-        x = gap_obj$k_first_se_max, y = gap_y,
+        x = gap_obj$k_firstSEmax, y = gap_y,
         label = "firstSEmax", color = "red",
         angle = 90, vjust = -0.5, size = 3
       ) +
       ggplot2::annotate(
         "text",
-        x = gap_obj$k_global_max, y = gap_y,
+        x = gap_obj$k_globalmax, y = gap_y,
         label = "globalmax", color = "purple",
         angle = 90, vjust = -0.5, size = 3
       ) +
@@ -430,8 +430,8 @@ print.tidy_gap <- function(x, ...) {
   cat("Recommended k:", x$recommended_k, "(firstSEmax method)\n\n")
 
   cat("Alternative methods:\n")
-  cat("  firstSEmax: k =", x$k_first_se_max, "(most conservative)\n")
-  cat("  globalmax:  k =", x$k_global_max, "(middle ground)\n")
+  cat("  firstSEmax: k =", x$k_firstSEmax, "(most conservative)\n")
+  cat("  globalmax:  k =", x$k_globalmax, "(middle ground)\n")
   cat("  firstmax:   k =", x$k_firstmax, "(most liberal)\n\n")
 
   cat("Gap Statistics (first 10):\n")

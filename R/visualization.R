@@ -40,7 +40,7 @@ tl_plot_importance_comparison <- function(..., top_n = 10, names = NULL) {
       imp_data
     } else if (model$spec$method %in% c("ridge", "lasso", "elastic_net")) {
       # Regularized regression
-      imp_data <- tl_extract_importance_reg(model)
+      imp_data <- tl_extract_importance_regularized(model)
 
       # Add model name
       imp_data$model <- name
@@ -171,7 +171,7 @@ tl_extract_importance <- function(model) {
 #' @param lambda Which lambda to use ("1se" or "min", default: "1se")
 #' @return A data frame with feature importance values
 #' @keywords internal
-tl_extract_importance_reg <- function(model, lambda = "1se") {
+tl_extract_importance_regularized <- function(model, lambda = "1se") {
   # Extract the glmnet model
   fit <- model$fit
 

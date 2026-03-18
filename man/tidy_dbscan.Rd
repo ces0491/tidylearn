@@ -4,14 +4,14 @@
 \alias{tidy_dbscan}
 \title{Tidy DBSCAN Clustering}
 \usage{
-tidy_dbscan(data, eps, min_pts = 5, cols = NULL, distance = "euclidean")
+tidy_dbscan(data, eps, minPts = 5, cols = NULL, distance = "euclidean")
 }
 \arguments{
 \item{data}{A data frame, tibble, or distance matrix}
 
 \item{eps}{Neighborhood radius (epsilon)}
 
-\item{min_pts}{Minimum number of points to form a dense region (default: 5)}
+\item{minPts}{Minimum number of points to form a dense region (default: 5)}
 
 \item{cols}{Columns to include (tidy select).
 If NULL, uses all numeric columns.}
@@ -35,10 +35,10 @@ Performs density-based clustering with tidy output
 }
 \examples{
 # Basic DBSCAN
-db_result <- tidy_dbscan(iris, eps = 0.5, min_pts = 5)
+db_result <- tidy_dbscan(iris, eps = 0.5, minPts = 5)
 
 # With suggested eps from k-NN distance plot
-eps_suggestion <- suggest_eps(iris, min_pts = 5)
-db_result <- tidy_dbscan(iris, eps = eps_suggestion$eps, min_pts = 5)
+eps_suggestion <- suggest_eps(iris, minPts = 5)
+db_result <- tidy_dbscan(iris, eps = eps_suggestion$eps, minPts = 5)
 
 }

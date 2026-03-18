@@ -18,7 +18,9 @@ One of \code{"csv"}, \code{"tsv"},
 \code{"rds"}, \code{"rdata"},
 \code{"sqlite"}, \code{"postgres"}, \code{"mysql"}, \code{"bigquery"},
 \code{"s3"}, \code{"github"}, \code{"kaggle"}. When \code{NULL} (default),
-the format is auto-detected from the file extension or source pattern.}
+the format is auto-detected from the file extension
+or source pattern. Note: \code{.txt} files default
+to CSV; use \code{format = "tsv"} to override.}
 
 \item{.quiet}{Logical. If \code{TRUE}, suppresses
 informational messages. Default is \code{FALSE}.}

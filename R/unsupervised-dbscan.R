@@ -4,7 +4,7 @@
 #'
 #' @param data A data frame, tibble, or distance matrix
 #' @param eps Neighborhood radius (epsilon)
-#' @param min_pts Minimum number of points to form a dense region (default: 5)
+#' @param minPts Minimum number of points to form a dense region (default: 5)
 #' @param cols Columns to include (tidy select).
 #'   If NULL, uses all numeric columns.
 #' @param distance Distance metric if data is not a
@@ -22,14 +22,14 @@
 #'
 #' @examples
 #' # Basic DBSCAN
-#' db_result <- tidy_dbscan(iris, eps = 0.5, min_pts = 5)
+#' db_result <- tidy_dbscan(iris, eps = 0.5, minPts = 5)
 #'
 #' # With suggested eps from k-NN distance plot
-#' eps_suggestion <- suggest_eps(iris, min_pts = 5)
-#' db_result <- tidy_dbscan(iris, eps = eps_suggestion$eps, min_pts = 5)
+#' eps_suggestion <- suggest_eps(iris, minPts = 5)
+#' db_result <- tidy_dbscan(iris, eps = eps_suggestion$eps, minPts = 5)
 #'
 #' @export
-tidy_dbscan <- function(data, eps, min_pts = 5,
+tidy_dbscan <- function(data, eps, minPts = 5,
                         cols = NULL,
                         distance = "euclidean") {
 
@@ -49,7 +49,7 @@ tidy_dbscan <- function(data, eps, min_pts = 5,
   }
 
   # Perform DBSCAN
-  db_model <- dbscan::dbscan(data_matrix, eps = eps, minPts = min_pts)
+  db_model <- dbscan::dbscan(data_matrix, eps = eps, minPts = minPts)
 
   # Count clusters and noise
   n_clusters <- max(db_model$cluster)
@@ -86,7 +86,7 @@ tidy_dbscan <- function(data, eps, min_pts = 5,
     n_clusters = n_clusters,
     n_noise = n_noise,
     eps = eps,
-    min_pts = min_pts,
+    minPts = minPts,
     model = db_model
   )
 
@@ -135,7 +135,7 @@ tidy_knn_dist <- function(data, k = 4, cols = NULL) {
 #' Use k-NN distance plot to suggest eps value
 #'
 #' @param data A data frame or matrix
-#' @param min_pts Minimum points parameter (used as k for k-NN)
+#' @param minPts Minimum points parameter (used as k for k-NN)
 #' @param method Method to suggest eps: "knee" (default), "percentile"
 #' @param percentile If method="percentile", which
 #'   percentile to use (default: 0.95)
@@ -148,16 +148,16 @@ tidy_knn_dist <- function(data, k = 4, cols = NULL) {
 #' }
 #'
 #' @examples
-#' eps_info <- suggest_eps(iris, min_pts = 5)
+#' eps_info <- suggest_eps(iris, minPts = 5)
 #' eps_info$eps
 #'
 #' @export
-suggest_eps <- function(data, min_pts = 5,
+suggest_eps <- function(data, minPts = 5,
                         method = "percentile",
                         percentile = 0.95) {
 
   # Compute k-NN distances
-  knn_data <- tidy_knn_dist(data, k = min_pts)
+  knn_data <- tidy_knn_dist(data, k = minPts)
 
   # Suggest eps based on method
   if (method == "percentile") {
@@ -275,36 +275,36 @@ augment_dbscan <- function(dbscan_obj, data) {
 
 #' Explore DBSCAN Parameters
 #'
-#' Test multiple eps and min_pts combinations
+#' Test multiple eps and minPts combinations
 #'
 #' @param data A data frame or matrix
 #' @param eps_values Vector of eps values to test
-#' @param min_pts_values Vector of min_pts values to test
+#' @param minPts_values Vector of minPts values to test
 #'
 #' @return A tibble with parameter combinations and resulting cluster counts
 #' @export
-explore_dbscan_params <- function(data, eps_values, min_pts_values) {
+explore_dbscan_params <- function(data, eps_values, minPts_values) {
 
   data_numeric <- data %>% dplyr::select(where(is.numeric))
 
   # Create parameter grid
   param_grid <- expand.grid(
     eps = eps_values,
-    min_pts = min_pts_values,
+    minPts = minPts_values,
     stringsAsFactors = FALSE
   )
 
   # Test each combination
   results <- purrr::map2_dfr(
     param_grid$eps,
-    param_grid$min_pts,
+    param_grid$minPts,
     function(e, m) {
       db <- tidy_dbscan(
-        data_numeric, eps = e, min_pts = m
+        data_numeric, eps = e, minPts = m
       )
       tibble::tibble(
         eps = e,
-        min_pts = m,
+        minPts = m,
         n_clusters = db$n_clusters,
         n_noise = db$n_noise,
         prop_noise = db$n_noise / nrow(data_numeric)
@@ -328,7 +328,7 @@ print.tidy_dbscan <- function(x, ...) {
   cat("======================\n\n")
   cat("Parameters:\n")
   cat("  eps (neighborhood radius):", x$eps, "\n")
-  cat("  min_pts (minimum points): ", x$min_pts, "\n\n")
+  cat("  minPts (minimum points): ", x$minPts, "\n\n")
 
   cat("Results:\n")
   cat("  Number of clusters:", x$n_clusters, "\n")
@@ -351,7 +351,7 @@ print.tidy_dbscan <- function(x, ...) {
 #' Fit DBSCAN for tidylearn models
 #' @keywords internal
 #' @noRd
-tl_fit_dbscan <- function(data, formula = NULL, eps = 0.5, min_pts = 5, ...) {
+tl_fit_dbscan <- function(data, formula = NULL, eps = 0.5, minPts = 5, ...) {
   tl_check_packages("dbscan")
 
   # Extract variables to use
@@ -363,7 +363,7 @@ tl_fit_dbscan <- function(data, formula = NULL, eps = 0.5, min_pts = 5, ...) {
   }
 
   # Fit DBSCAN using tidy_dbscan
-  db_result <- tidy_dbscan(data_for_db, eps = eps, min_pts = min_pts, ...)
+  db_result <- tidy_dbscan(data_for_db, eps = eps, minPts = minPts, ...)
 
   # Return in expected format
   list(
