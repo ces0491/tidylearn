@@ -76,8 +76,12 @@ ggplot(pca_plot_data, aes(x = PC1, y = PC2, color = Species)) +
   geom_point(size = 3, alpha = 0.7) +
   labs(
     title = "PCA of Iris Dataset",
-    x = paste0("PC1 (", round(variance_explained$prop_variance[1] * 100, 1), "%)"),
-    y = paste0("PC2 (", round(variance_explained$prop_variance[2] * 100, 1), "%)")
+    x = paste0(
+      "PC1 (", round(variance_explained$prop_variance[1] * 100, 1), "%)"
+    ),
+    y = paste0(
+      "PC2 (", round(variance_explained$prop_variance[2] * 100, 1), "%)"
+    )
   ) +
   theme_minimal()
 ```
@@ -180,7 +184,9 @@ print(model_hclust)
 
 ```{r}
 # Plot dendrogram
-plot(model_hclust$fit$model, labels = FALSE, main = "Hierarchical Clustering of Iris")
+plot(model_hclust$fit$model,
+     labels = FALSE,
+     main = "Hierarchical Clustering of Iris")
 ```
 
 ```{r}
@@ -227,7 +233,7 @@ CLARA is efficient for large datasets:
 
 ```{r, eval=FALSE}
 # Create larger dataset
-large_data <- iris[rep(1:nrow(iris), 10), 1:4]
+large_data <- iris[rep(seq_len(nrow(iris)), 10), 1:4]
 
 # Perform CLARA
 model_clara <- tl_model(large_data, method = "clara", k = 3, samples = 5)
@@ -342,7 +348,9 @@ customer_segments <- tl_model(customers_scaled, method = "kmeans", k = 4)
 customers$segment <- customer_segments$fit$clusters$cluster
 
 # Visualize segments
-ggplot(customers, aes(x = income, y = spending_score, color = as.factor(segment))) +
+ggplot(customers,
+       aes(x = income, y = spending_score,
+           color = as.factor(segment))) +
   geom_point(size = 3, alpha = 0.7) +
   labs(
     title = "Customer Segmentation",
@@ -364,7 +372,10 @@ n_components <- which(cumulative_var >= 0.90)[1]
 
 cat("Components needed for 90% variance:", n_components, "\n")
 cat("Original features:", ncol(mtcars), "\n")
-cat("Dimension reduction:", round((1 - n_components/ncol(mtcars)) * 100, 1), "%\n")
+dim_reduction <- round(
+  (1 - n_components / ncol(mtcars)) * 100, 1
+)
+cat("Dimension reduction:", dim_reduction, "%\n")
 ```
 
 ## Best Practices

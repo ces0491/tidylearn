@@ -4,16 +4,17 @@
 \alias{suggest_eps}
 \title{Suggest eps Parameter for DBSCAN}
 \usage{
-suggest_eps(data, minPts = 5, method = "percentile", percentile = 0.95)
+suggest_eps(data, min_pts = 5, method = "percentile", percentile = 0.95)
 }
 \arguments{
 \item{data}{A data frame or matrix}
 
-\item{minPts}{Minimum points parameter (used as k for k-NN)}
+\item{min_pts}{Minimum points parameter (used as k for k-NN)}
 
 \item{method}{Method to suggest eps: "knee" (default), "percentile"}
 
-\item{percentile}{If method="percentile", which percentile to use (default: 0.95)}
+\item{percentile}{If method="percentile", which
+percentile to use (default: 0.95)}
 }
 \value{
 A list containing:
@@ -27,7 +28,7 @@ A list containing:
 Use k-NN distance plot to suggest eps value
 }
 \examples{
-eps_info <- suggest_eps(iris, minPts = 5)
+eps_info <- suggest_eps(iris, min_pts = 5)
 eps_info$eps
 
 }

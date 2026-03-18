@@ -9,7 +9,8 @@ tl_plot_deep_history(model, metrics = c("loss", "val_loss"), ...)
 \arguments{
 \item{model}{A tidylearn deep learning model object}
 
-\item{metrics}{Which metrics to plot (default: c("loss", "val_loss"))}
+\item{metrics}{Which metrics to plot
+(default: c("loss", "val_loss"))}
 
 \item{...}{Additional arguments}
 }

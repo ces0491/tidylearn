@@ -24,7 +24,8 @@ tl_auto_interactions(
 
 \item{max_p_value}{Maximum p-value for significance}
 
-\item{exclude_vars}{Character vector of variables to exclude from interaction testing}
+\item{exclude_vars}{Character vector of variables to exclude
+from interaction testing}
 }
 \value{
 A tidylearn model with important interactions

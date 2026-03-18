@@ -6,7 +6,8 @@
 #' Feature Engineering via Dimensionality Reduction
 #'
 #' Use PCA, MDS, or other dimensionality reduction as a preprocessing step
-#' for supervised learning. This can improve model performance and interpretability.
+#' for supervised learning. This can improve model performance
+#' and interpretability.
 #'
 #' @param data A data frame
 #' @param response Response variable name (will be preserved)
@@ -18,7 +19,10 @@
 #' @examples
 #' \donttest{
 #' # Reduce dimensions before classification
-#' reduced <- tl_reduce_dimensions(iris, response = "Species", method = "pca", n_components = 3)
+#' reduced <- tl_reduce_dimensions(
+#'   iris, response = "Species",
+#'   method = "pca", n_components = 3
+#' )
 #' model <- tl_model(reduced$data, Species ~ ., method = "logistic")
 #' }
 tl_reduce_dimensions <- function(data,
@@ -29,7 +33,10 @@ tl_reduce_dimensions <- function(data,
   # Separate response if provided
   if (!is.null(response)) {
     if (!response %in% names(data)) {
-      stop("Response variable '", response, "' not found in data", call. = FALSE)
+      stop(
+        "Response variable '", response,
+        "' not found in data", call. = FALSE
+      )
     }
     response_data <- data[[response]]
     predictor_data <- data %>% dplyr::select(-dplyr::all_of(response))
@@ -48,7 +55,8 @@ tl_reduce_dimensions <- function(data,
     # Select components
     if (!is.null(n_components)) {
       pc_cols <- paste0("PC", seq_len(n_components))
-      transformed <- transformed %>% dplyr::select(.obs_id, dplyr::all_of(pc_cols))
+      transformed <- transformed %>%
+        dplyr::select(.obs_id, dplyr::all_of(pc_cols))
     }
 
     # Add response back
@@ -62,7 +70,8 @@ tl_reduce_dimensions <- function(data,
     # Select dimensions
     if (!is.null(n_components)) {
       dim_cols <- paste0("Dim", seq_len(n_components))
-      transformed <- transformed %>% dplyr::select(.obs_id, dplyr::all_of(dim_cols))
+      transformed <- transformed %>%
+        dplyr::select(.obs_id, dplyr::all_of(dim_cols))
     }
 
     # Add response back
@@ -97,11 +106,17 @@ tl_reduce_dimensions <- function(data,
 #'                                                 method = "kmeans", k = 3)
 #' model <- tl_model(data_with_clusters, Species ~ ., method = "forest")
 #' }
-tl_add_cluster_features <- function(data, response = NULL, method = "kmeans", ...) {
+tl_add_cluster_features <- function(data,
+                                    response = NULL,
+                                    method = "kmeans",
+                                    ...) {
   # Separate response if provided
   if (!is.null(response)) {
     if (!response %in% names(data)) {
-      stop("Response variable '", response, "' not found in data", call. = FALSE)
+      stop(
+        "Response variable '", response,
+        "' not found in data", call. = FALSE
+      )
     }
     predictor_data <- data %>% dplyr::select(-dplyr::all_of(response))
   } else {
@@ -155,7 +170,9 @@ tl_add_cluster_features <- function(data, response = NULL, method = "kmeans", ..
 #' # Use only 10% of labels
 #' labeled_idx <- sample(nrow(iris), size = 15)
 #' model <- tl_semisupervised(iris, Species ~ ., labeled_indices = labeled_idx,
-#'                            cluster_method = "kmeans", supervised_method = "logistic")
+#'   cluster_method = "kmeans",
+#'   supervised_method = "logistic"
+#' )
 #' }
 tl_semisupervised <- function(data, formula, labeled_indices,
                               cluster_method = "kmeans",
@@ -165,7 +182,6 @@ tl_semisupervised <- function(data, formula, labeled_indices,
 
   # Create training data with only labeled observations
   labeled_data <- data[labeled_indices, ]
-  unlabeled_data <- data[-labeled_indices, ]
 
   # Cluster the full dataset (excluding response)
   predictor_data <- data %>% dplyr::select(-dplyr::all_of(response_var))
@@ -198,7 +214,10 @@ tl_semisupervised <- function(data, formula, labeled_indices,
   pseudo_labeled <- cluster_labels %>%
     dplyr::left_join(label_mapping, by = "cluster") %>%
     dplyr::mutate(
-      final_label = dplyr::if_else(obs_id %in% labeled_indices, as.character(label), cluster_label)
+      final_label = dplyr::if_else(
+        obs_id %in% labeled_indices,
+        as.character(label), cluster_label
+      )
     )
 
   # Create pseudo-labeled dataset
@@ -227,7 +246,8 @@ tl_semisupervised <- function(data, formula, labeled_indices,
 #' @param data A data frame
 #' @param formula Model formula
 #' @param response Response variable name
-#' @param anomaly_method Method for anomaly detection: "dbscan", "isolation_forest"
+#' @param anomaly_method Method for anomaly detection:
+#'   "dbscan", "isolation_forest"
 #' @param action Action to take: "remove", "flag", "downweight"
 #' @param supervised_method Supervised learning method
 #' @param ... Additional arguments
@@ -239,9 +259,10 @@ tl_semisupervised <- function(data, formula, labeled_indices,
 #'                            anomaly_method = "dbscan", action = "flag")
 #' }
 tl_anomaly_aware <- function(data, formula, response,
-                              anomaly_method = "dbscan",
-                              action = "flag",
-                              supervised_method = "logistic", ...) {
+                             anomaly_method = "dbscan",
+                             action = "flag",
+                             supervised_method = "logistic",
+                             ...) {
   # Separate predictors for anomaly detection
   predictor_data <- data %>% dplyr::select(-dplyr::all_of(response))
 
@@ -278,7 +299,10 @@ tl_anomaly_aware <- function(data, formula, response,
   } else if (action == "downweight") {
     # Create weights (anomalies get lower weight)
     weights <- ifelse(is_anomaly, 0.1, 1.0)
-    model <- tl_model(data, formula, method = supervised_method, weights = weights)
+    model <- tl_model(
+      data, formula,
+      method = supervised_method, weights = weights
+    )
   }
 
   # Add anomaly detection info
@@ -370,8 +394,10 @@ predict.tidylearn_stratified <- function(object, new_data = NULL, ...) {
     model_name <- paste0("cluster_", cluster_id)
 
     if (model_name %in% names(object$supervised_models)) {
-      pred <- predict(object$supervised_models[[model_name]],
-                     new_data = new_data[i, , drop = FALSE], ...)
+      pred <- predict(
+        object$supervised_models[[model_name]],
+        new_data = new_data[i, , drop = FALSE], ...
+      )
       predictions[[i]] <- pred$.pred[1]
     } else {
       predictions[[i]] <- NA

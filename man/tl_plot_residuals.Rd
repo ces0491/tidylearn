@@ -9,7 +9,8 @@ tl_plot_residuals(model, type = "fitted", ...)
 \arguments{
 \item{model}{A tidylearn regression model object}
 
-\item{type}{Type of residual plot: "fitted" (default), "histogram", "predicted"}
+\item{type}{Type of residual plot: "fitted" (default),
+"histogram", "predicted"}
 
 \item{...}{Additional arguments}
 }

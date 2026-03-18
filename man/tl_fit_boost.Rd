@@ -8,11 +8,11 @@ tl_fit_boost(
   data,
   formula,
   is_classification = FALSE,
-  n.trees = 100,
-  interaction.depth = 3,
+  n_trees = 100,
+  interaction_depth = 3,
   shrinkage = 0.1,
-  n.minobsinnode = 10,
-  cv.folds = 0,
+  n_minobsinnode = 10,
+  cv_folds = 0,
   ...
 )
 }
@@ -21,17 +21,21 @@ tl_fit_boost(
 
 \item{formula}{A formula specifying the model}
 
-\item{is_classification}{Logical indicating if this is a classification problem}
+\item{is_classification}{Logical indicating if this is a
+classification problem}
 
-\item{n.trees}{Number of trees (default: 100)}
+\item{n_trees}{Number of trees (default: 100)}
 
-\item{interaction.depth}{Depth of interactions (default: 3)}
+\item{interaction_depth}{Depth of interactions
+(default: 3)}
 
 \item{shrinkage}{Learning rate (default: 0.1)}
 
-\item{n.minobsinnode}{Minimum number of observations in terminal nodes (default: 10)}
+\item{n_minobsinnode}{Minimum number of observations
+in terminal nodes (default: 10)}
 
-\item{cv.folds}{Number of cross-validation folds (default: 0, no CV)}
+\item{cv_folds}{Number of cross-validation folds
+(default: 0, no CV)}
 
 \item{...}{Additional arguments to pass to gbm()}
 }

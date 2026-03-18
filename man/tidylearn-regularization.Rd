@@ -4,5 +4,6 @@
 \alias{tidylearn-regularization}
 \title{Regularization Functions for tidylearn}
 \description{
-Ridge, Lasso, and Elastic Net regularization functionality
+Ridge, Lasso, and Elastic Net regularization
+functionality
 }

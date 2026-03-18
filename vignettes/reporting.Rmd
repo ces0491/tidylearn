@@ -1,0 +1,213 @@
+---
+title: "Reporting with tidylearn"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Reporting with tidylearn}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+## Overview
+
+tidylearn is designed so that analysis results flow directly into reports.
+Every model produces tidy tibbles, ggplot2 visualisations, and — with the
+`tl_table_*()` functions — polished `gt` tables, all with a consistent
+interface. This vignette walks through the reporting tools available.
+
+```{r setup}
+library(tidylearn)
+library(dplyr)
+library(ggplot2)
+library(gt)
+```
+
+---
+
+## Plots
+
+tidylearn's `plot()` method dispatches to the right visualisation for each
+model type. All plots are ggplot2 objects — themeable, composable, and
+convertible to plotly.
+
+### Regression
+
+```{r plot-regression}
+model_reg <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+
+# Actual vs predicted — one call
+plot(model_reg, type = "actual_predicted")
+```
+
+### Classification
+
+```{r plot-classification}
+split <- tl_split(iris, prop = 0.7, stratify = "Species", seed = 42)
+model_clf <- tl_model(split$train, Species ~ ., method = "forest")
+
+plot(model_clf, type = "confusion")
+```
+
+### PCA
+
+```{r plot-pca}
+pca <- tidy_pca(USArrests, scale = TRUE)
+
+tidy_pca_screeplot(pca)
+tidy_pca_biplot(pca, label_obs = TRUE)
+```
+
+### Regularisation
+
+```{r plot-lasso}
+model_lasso <- tl_model(mtcars, mpg ~ ., method = "lasso")
+
+tl_plot_regularization_path(model_lasso)
+tl_plot_regularization_cv(model_lasso)
+```
+
+---
+
+## Tables
+
+The `tl_table()` family mirrors the plot interface but produces formatted
+`gt` tables instead. Like `plot()`, `tl_table()` dispatches based on model
+type and a `type` parameter:
+
+```{r table-auto, eval = FALSE}
+tl_table(model)                       # auto-selects the best table type
+tl_table(model, type = "coefficients") # specific type
+```
+
+### Evaluation Metrics
+
+```{r table-metrics}
+tl_table_metrics(model_reg)
+```
+
+### Coefficients
+
+For linear and logistic models, the table includes standard errors, test
+statistics, and p-values, with significant terms highlighted:
+
+```{r table-coef}
+tl_table_coefficients(model_reg)
+```
+
+For regularised models, coefficients are sorted by magnitude and zero
+coefficients are greyed out:
+
+```{r table-coef-lasso}
+tl_table_coefficients(model_lasso)
+```
+
+### Confusion Matrix
+
+A formatted confusion matrix with correct predictions highlighted on the
+diagonal:
+
+```{r table-confusion}
+tl_table_confusion(model_clf, new_data = split$test)
+```
+
+### Feature Importance
+
+A ranked importance table with a colour gradient:
+
+```{r table-importance}
+tl_table_importance(model_clf)
+```
+
+### PCA Variance Explained
+
+Cumulative variance is coloured green to highlight how many components are
+needed:
+
+```{r table-variance}
+pca_model <- tl_model(USArrests, method = "pca")
+tl_table_variance(pca_model)
+```
+
+### PCA Loadings
+
+A diverging red–blue colour scale highlights strong positive and negative
+loadings:
+
+```{r table-loadings}
+tl_table_loadings(pca_model)
+```
+
+### Cluster Summary
+
+Cluster sizes and mean feature values:
+
+```{r table-clusters}
+km <- tl_model(iris[, 1:4], method = "kmeans", k = 3)
+tl_table_clusters(km)
+```
+
+### Model Comparison
+
+Compare multiple models side-by-side:
+
+```{r table-comparison}
+m1 <- tl_model(split$train, Species ~ ., method = "logistic")
+m2 <- tl_model(split$train, Species ~ ., method = "forest")
+m3 <- tl_model(split$train, Species ~ ., method = "tree")
+
+tl_table_comparison(
+  m1, m2, m3,
+  new_data = split$test,
+  names = c("Logistic", "Random Forest", "Decision Tree")
+)
+```
+
+---
+
+## Interactive Reporting with plotly
+
+Because all plot functions return ggplot2 objects, converting to interactive
+plotly charts is a one-liner:
+
+```{r plotly, eval = FALSE}
+library(plotly)
+
+ggplotly(plot(model_reg, type = "actual_predicted"))
+ggplotly(tidy_pca_biplot(pca, label_obs = TRUE))
+ggplotly(tl_plot_regularization_path(model_lasso))
+```
+
+---
+
+## Putting It Together
+
+A typical reporting workflow combines plots and tables for the same model.
+Because the interface is consistent, the same pattern works regardless of
+the algorithm:
+
+```{r workflow}
+# Fit
+model <- tl_model(split$train, Species ~ ., method = "forest")
+
+# Evaluate
+tl_table_metrics(model, new_data = split$test)
+
+# Visualise
+plot(model, type = "confusion")
+
+# Drill into feature importance
+tl_table_importance(model, top_n = 4)
+```
+
+Swap `method = "forest"` for `method = "tree"` or `method = "svm"` and the
+reporting code above works without modification.

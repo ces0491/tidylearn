@@ -27,7 +27,8 @@ tl_transfer_learning(
 A transfer learning model
 }
 \description{
-Use unsupervised pre-training (e.g., autoencoder features) before supervised learning
+Use unsupervised pre-training (e.g., autoencoder
+features) before supervised learning
 }
 \examples{
 \donttest{

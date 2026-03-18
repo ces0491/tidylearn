@@ -9,7 +9,8 @@ tl_evaluate(object, new_data = NULL, ...)
 \arguments{
 \item{object}{A tidylearn model object}
 
-\item{new_data}{Optional new data for evaluation (if NULL, uses training data)}
+\item{new_data}{Optional new data for evaluation
+(if NULL, uses training data)}
 
 \item{...}{Additional arguments}
 }

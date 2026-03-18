@@ -1,25 +1,43 @@
 #' Utility functions for tidylearn
 #' @keywords internal
-#' @importFrom stats aov coef cor fitted median qqnorm reorder residuals runif sd setNames terms update var
+#' @importFrom stats aov coef cor fitted median qqnorm
+#'   reorder residuals runif sd setNames terms update var
 #' @importFrom utils combn getFromNamespace head packageVersion
 #' @noRd
 
 # Suppress R CMD check notes about global variables from tidyverse NSE
 utils::globalVariables(c(
-  ".", ".id", ".obs_id", ".row_id", ":=", "Actual", "Assumption", "Details", "Freq", "Predicted",
-  "SE.sim", "Status", "abs_shap_value", "actual", "all_of", "avg_sil_width", "cluster",
-  "cluster_label", "coefficient", "component", "conf_lower", "conf_upper",
-  "confidence", "cooks_distance", "cost", "cum_variance", "decay", "decile", "distance",
-  "epoch", "error", "error_lower", "error_upper", "feature", "feature_value", "fold", "fpr", "frac_pos", "gap",
-  "id1", "id2", "interaction_value", "is_best", "is_cook_influential", "is_core",
-  "is_influential", "is_noise", "is_outlier", "is_top", "k", "knn_dist", "label", "lambda",
-  "leverage", "lhs", "lift", "loading", "mean_pred_prob", "mean_value", "metric",
-  "model", "n", "neighbor", "obs_id", "observation", "pc_num", "percentage",
-  "pred", "pred_lower", "pred_upper", "predicted", "prop_variance",
-  "residuals", "rhs", "score", "shap_value", "sil_width", "size",
-  "sqrt_abs_residuals", "std_residual", "support", "tl_plot_model",
-  "tl_plot_unsupervised", "tl_prediction_intervals", "tot_withinss", "tpr",
-  "value", "var_value", "variable", "variance", "where", "x", "x_end", "y", "y_end"
+  ".", ".id", ".obs_id", ".row_id", ":=",
+  "Actual", "Assumption", "Details", "Freq",
+  "Predicted", "SE.sim", "Status",
+  "abs_shap_value", "actual", "all_of",
+  "avg_sil_width", "cluster", "cluster_label",
+  "coefficient", "component",
+  "conf_lower", "conf_upper", "confidence",
+  "cooks_distance", "cost", "cum_variance",
+  "decay", "decile", "distance",
+  "epoch", "error", "error_lower", "error_upper",
+  "feature", "feature_value", "fold",
+  "fpr", "frac_pos", "gap",
+  "id1", "id2", "interaction_value", "is_best",
+  "is_cook_influential", "is_core",
+  "is_influential", "is_noise", "is_outlier",
+  "is_top", "k", "knn_dist", "label", "lambda",
+  "leverage", "lhs", "lift", "loading",
+  "mean_pred_prob", "mean_value", "metric",
+  "model", "n", "neighbor", "obs_id",
+  "observation", "pc_num", "percentage",
+  "pred", "pred_lower", "pred_upper",
+  "predicted", "prop_variance",
+  "residuals", "rhs", "score", "shap_value",
+  "sil_width", "size", "sqrt_abs_residuals",
+  "std_residual", "support", "tl_plot_model",
+  "tl_plot_unsupervised",
+  "tl_prediction_intervals", "tot_withinss",
+  "tpr", "value", "var_value", "variable",
+  "variance", "where", "x", "x_end",
+  "y", "y_end", "abs_estimate", "estimate",
+  "p_value", "significant", "std_error", "term"
 ))
 
 
@@ -57,14 +75,18 @@ extract_response <- function(formula, data) {
   if (response_var %in% names(data)) {
     return(data[[response_var]])
   }
-  return(NULL)
+  NULL
 }
 
 #' Create observation IDs
 #' @keywords internal
 #' @noRd
 create_obs_ids <- function(data) {
-  if (!is.null(rownames(data)) && !all(rownames(data) == as.character(seq_len(nrow(data))))) {
+  has_names <- !is.null(rownames(data)) &&
+    !all(rownames(data) == as.character(
+      seq_len(nrow(data))
+    ))
+  if (has_names) {
     return(rownames(data))
   }
   paste0("obs_", seq_len(nrow(data)))
@@ -75,7 +97,8 @@ create_obs_ids <- function(data) {
 #' @noRd
 validate_data <- function(data, allow_missing = FALSE) {
   if (!is.data.frame(data)) {
-    stop("data must be a data frame or tibble", call. = FALSE)
+    stop("data must be a data frame or tibble",
+         call. = FALSE)
   }
 
   if (nrow(data) == 0) {
@@ -83,7 +106,10 @@ validate_data <- function(data, allow_missing = FALSE) {
   }
 
   if (!allow_missing && any(is.na(data))) {
-    warning("Missing values detected in data. Consider imputation or removing missing values.")
+    warning(
+      "Missing values detected in data. ",
+      "Consider imputation or removing missing values."
+    )
   }
 
   invisible(TRUE)
@@ -102,15 +128,30 @@ get_formula_vars <- function(formula, data) {
     # One-sided: ~ vars
     rhs <- formula[[2]]
     if (rhs == ".") {
-      return(names(data)[sapply(data, is.numeric)])
+      names(data)[sapply(data, is.numeric)]
     } else {
-      return(all.vars(formula))
+      all.vars(formula)
     }
   } else {
     # Two-sided: response ~ predictors
     vars <- all.vars(formula)
-    return(vars[-1])  # Exclude response
+    vars[-1]  # Exclude response
   }
+}
+
+#' Validate that a file path exists
+#' @keywords internal
+#' @noRd
+tl_validate_file_path <- function(path) {
+  if (!is.character(path) || length(path) != 1) {
+    stop("'path' must be a single character string",
+         call. = FALSE)
+  }
+  if (!file.exists(path)) {
+    stop("File not found: '", path, "'",
+         call. = FALSE)
+  }
+  invisible(TRUE)
 }
 
 #' Check if required packages are installed
@@ -121,8 +162,10 @@ tl_check_packages <- function(...) {
 
   for (pkg in packages) {
     if (!requireNamespace(pkg, quietly = TRUE)) {
-      stop("Package '", pkg, "' is required but not installed. ",
-           "Please install it with: install.packages('", pkg, "')",
+      stop("Package '", pkg, "' is required but ",
+           "not installed. ",
+           "Please install it with: install.packages('",
+           pkg, "')",
            call. = FALSE)
     }
   }

@@ -18,13 +18,15 @@ tidy_kmeans(
 
 \item{k}{Number of clusters}
 
-\item{cols}{Columns to include (tidy select). If NULL, uses all numeric columns.}
+\item{cols}{Columns to include (tidy select).
+If NULL, uses all numeric columns.}
 
 \item{nstart}{Number of random starts (default: 25)}
 
-\item{iter_max}{Maximum number of iterations (default: 100)}
+\item{iter_max}{Maximum iterations (default: 100)}
 
-\item{algorithm}{K-means algorithm: "Hartigan-Wong" (default), "Lloyd", "Forgy", "MacQueen"}
+\item{algorithm}{K-means algorithm: "Hartigan-Wong"
+(default), "Lloyd", "Forgy", "MacQueen"}
 }
 \value{
 A list of class "tidy_kmeans" containing:

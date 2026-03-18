@@ -7,11 +7,13 @@
 tl_default_param_grid(method, size = "medium", is_classification = TRUE)
 }
 \arguments{
-\item{method}{Model method ("tree", "forest", "boost", "svm", etc.)}
+\item{method}{Model method ("tree", "forest",
+"boost", "svm", etc.)}
 
 \item{size}{Grid size: "small", "medium", "large"}
 
-\item{is_classification}{Whether the task is classification or regression}
+\item{is_classification}{Whether the task is
+classification or regression}
 }
 \value{
 A named list of parameter values to tune

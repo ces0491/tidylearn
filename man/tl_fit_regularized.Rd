@@ -2,7 +2,7 @@
 % Please edit documentation in R/supervised-regularization.R
 \name{tl_fit_regularized}
 \alias{tl_fit_regularized}
-\title{Fit a regularized regression model (Ridge, Lasso, or Elastic Net)}
+\title{Fit a regularized regression model}
 \usage{
 tl_fit_regularized(
   data,
@@ -19,13 +19,17 @@ tl_fit_regularized(
 
 \item{formula}{A formula specifying the model}
 
-\item{is_classification}{Logical indicating if this is a classification problem}
+\item{is_classification}{Logical indicating if this is a
+classification problem}
 
-\item{alpha}{Mixing parameter (0 for Ridge, 1 for Lasso, between 0-1 for Elastic Net)}
+\item{alpha}{Mixing parameter (0 for Ridge, 1 for Lasso,
+between 0-1 for Elastic Net)}
 
-\item{lambda}{Regularization parameter (if NULL, uses cross-validation to select)}
+\item{lambda}{Regularization parameter (if NULL, uses
+cross-validation to select)}
 
-\item{cv_folds}{Number of folds for cross-validation (default: 5)}
+\item{cv_folds}{Number of folds for cross-validation
+(default: 5)}
 
 \item{...}{Additional arguments to pass to glmnet()}
 }
@@ -33,6 +37,6 @@ tl_fit_regularized(
 A fitted regularized regression model
 }
 \description{
-Fit a regularized regression model (Ridge, Lasso, or Elastic Net)
+Fits Ridge, Lasso, or Elastic Net regularization.
 }
 \keyword{internal}

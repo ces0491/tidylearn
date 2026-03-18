@@ -23,7 +23,8 @@ tl_test_interactions(
 
 \item{var1}{First variable to test for interactions}
 
-\item{var2}{Second variable to test for interactions (if NULL, tests var1 with all others)}
+\item{var2}{Second variable to test for interactions
+(if NULL, tests var1 with all others)}
 
 \item{all_pairs}{Logical; whether to test all variable pairs}
 

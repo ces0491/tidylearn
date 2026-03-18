@@ -23,11 +23,14 @@ tl_fit_deep(
 
 \item{formula}{A formula specifying the model}
 
-\item{is_classification}{Logical indicating if this is a classification problem}
+\item{is_classification}{Logical indicating if this is a
+classification problem}
 
-\item{hidden_layers}{Vector of units in each hidden layer (default: c(32, 16))}
+\item{hidden_layers}{Vector of units in each hidden layer
+(default: c(32, 16))}
 
-\item{activation}{Activation function for hidden layers (default: "relu")}
+\item{activation}{Activation function for hidden layers
+(default: "relu")}
 
 \item{dropout}{Dropout rate for regularization (default: 0.2)}
 
@@ -35,9 +38,11 @@ tl_fit_deep(
 
 \item{batch_size}{Batch size for training (default: 32)}
 
-\item{validation_split}{Proportion of data for validation (default: 0.2)}
+\item{validation_split}{Proportion of data for validation
+(default: 0.2)}
 
-\item{verbose}{Verbosity mode (0 = silent, 1 = progress bar, 2 = one line per epoch) (default: 0)}
+\item{verbose}{Verbosity mode (0 = silent, 1 = progress bar,
+2 = one line per epoch) (default: 0)}
 
 \item{...}{Additional arguments}
 }

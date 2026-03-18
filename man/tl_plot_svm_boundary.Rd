@@ -13,7 +13,8 @@ tl_plot_svm_boundary(model, x_var = NULL, y_var = NULL, grid_size = 100, ...)
 
 \item{y_var}{Name of the y-axis variable}
 
-\item{grid_size}{Number of points in each dimension for the grid (default: 100)}
+\item{grid_size}{Number of points in each dimension
+for the grid (default: 100)}
 
 \item{...}{Additional arguments}
 }

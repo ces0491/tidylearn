@@ -5,14 +5,15 @@
 #' @importFrom stats predict
 #' @importFrom stats model.matrix as.formula
 #' @importFrom tibble tibble as_tibble
-#' @importFrom dplyr %>% mutate
+#' @importFrom dplyr mutate
 NULL
 
 #' Fit a neural network model
 #'
 #' @param data A data frame containing the training data
 #' @param formula A formula specifying the model
-#' @param is_classification Logical indicating if this is a classification problem
+#' @param is_classification Logical indicating if this is a
+#'   classification problem
 #' @param size Number of units in the hidden layer (default: 5)
 #' @param decay Weight decay parameter (default: 0)
 #' @param maxit Maximum number of iterations (default: 100)
@@ -60,14 +61,15 @@ tl_fit_nn <- function(data, formula, is_classification = FALSE,
     )
   }
 
-  return(nn_model)
+  nn_model
 }
 
 #' Predict using a neural network model
 #'
 #' @param model A tidylearn neural network model object
 #' @param new_data A data frame containing the new data
-#' @param type Type of prediction: "response" (default), "prob" (for classification), "class" (for classification)
+#' @param type Type of prediction: "response" (default),
+#'   "prob" (for classification), "class" (for classification)
 #' @param ... Additional arguments
 #' @return Predictions
 #' @keywords internal
@@ -83,7 +85,9 @@ tl_predict_nn <- function(model, new_data, type = "response", ...) {
 
     if (type == "prob") {
       # Get class probabilities
-      probs <- as.data.frame(predict(fit, newdata = new_data, type = "raw", ...))
+      probs <- as.data.frame(
+        predict(fit, newdata = new_data, type = "raw", ...)
+      )
 
       # For binary classification
       if (length(levels) == 2) {
@@ -105,10 +109,12 @@ tl_predict_nn <- function(model, new_data, type = "response", ...) {
         prob_df <- tibble::as_tibble(probs)
       }
 
-      return(prob_df)
+      prob_df
     } else if (type == "class") {
       # Get probabilities first
-      probs <- as.data.frame(predict(fit, newdata = new_data, type = "raw", ...))
+      probs <- as.data.frame(
+        predict(fit, newdata = new_data, type = "raw", ...)
+      )
 
       # For binary classification
       if (length(levels) == 2) {
@@ -127,17 +133,21 @@ tl_predict_nn <- function(model, new_data, type = "response", ...) {
       # Convert to factor with original levels
       pred_classes <- factor(pred_classes, levels = levels)
 
-      return(pred_classes)
+      pred_classes
     } else if (type == "response") {
       # Same as "class" for classification
-      return(tl_predict_nn(model, new_data, type = "class", ...))
+      tl_predict_nn(model, new_data, type = "class", ...)
     } else {
-      stop("Invalid prediction type for neural networks. Use 'prob', 'class', or 'response'.", call. = FALSE)
+      stop(
+        "Invalid prediction type for neural networks. ",
+        "Use 'prob', 'class', or 'response'.",
+        call. = FALSE
+      )
     }
   } else {
     # Regression predictions
     preds <- as.vector(predict(fit, newdata = new_data, type = "raw", ...))
-    return(preds)
+    preds
   }
 }
 
@@ -150,12 +160,19 @@ tl_predict_nn <- function(model, new_data, type = "response", ...) {
 #' @export
 tl_plot_nn_architecture <- function(model, ...) {
   if (model$spec$method != "nn") {
-    stop("Neural network architecture plot is only available for neural network models", call. = FALSE)
+    stop(
+      "Neural network architecture plot is only ",
+      "available for neural network models",
+      call. = FALSE
+    )
   }
 
   # Check if NeuralNetTools is installed
   if (!requireNamespace("NeuralNetTools", quietly = TRUE)) {
-    message("Package 'NeuralNetTools' is required for neural network visualization. Please install it.")
+    message(
+      "Package 'NeuralNetTools' is required for ",
+      "neural network visualization. Please install it."
+    )
     return(NULL)
   }
 
@@ -167,7 +184,8 @@ tl_plot_nn_architecture <- function(model, ...) {
 #'
 #' @param data A data frame containing the training data
 #' @param formula A formula specifying the model
-#' @param is_classification Logical indicating if this is a classification problem
+#' @param is_classification Logical indicating if this is a
+#'   classification problem
 #' @param sizes Vector of hidden layer sizes to try
 #' @param decays Vector of weight decay parameters to try
 #' @param folds Number of cross-validation folds (default: 5)
@@ -194,7 +212,7 @@ tl_tune_nn <- function(data, formula, is_classification = FALSE,
   response_var <- all.vars(formula)[1]
 
   # Loop through parameter combinations
-  for (i in 1:nrow(tune_results)) {
+  for (i in seq_len(nrow(tune_results))) {
     size <- tune_results$size[i]
     decay <- tune_results$decay[i]
 
@@ -278,12 +296,12 @@ tl_tune_nn <- function(data, formula, is_classification = FALSE,
   )
 
   # Return results
-  return(list(
+  list(
     model = best_model,
     best_size = best_size,
     best_decay = best_decay,
     tuning_results = tune_results
-  ))
+  )
 }
 
 #' Plot neural network training history
@@ -306,18 +324,24 @@ tl_plot_nn_tuning <- function(model, ...) {
     dplyr::mutate(size = factor(.data$size), decay = factor(.data$decay))
 
   # Create heatmap
-  p <- ggplot2::ggplot(heatmap_data, ggplot2::aes(x = decay, y = size, fill = error)) +
+  p <- ggplot2::ggplot(
+    heatmap_data,
+    ggplot2::aes(x = decay, y = size, fill = error)
+  ) +
     ggplot2::geom_tile() +
     ggplot2::geom_text(ggplot2::aes(label = round(error, 4)), color = "white") +
     ggplot2::scale_fill_gradient(low = "blue", high = "red") +
     ggplot2::labs(
       title = "Neural Network Parameter Tuning",
-      subtitle = paste0("Best parameters: size = ", model$best_size, ", decay = ", model$best_decay),
+      subtitle = paste0(
+        "Best parameters: size = ", model$best_size,
+        ", decay = ", model$best_decay
+      ),
       x = "Weight Decay",
       y = "Hidden Layer Size",
       fill = "Error"
     ) +
     ggplot2::theme_minimal()
 
-  return(p)
+  p
 }

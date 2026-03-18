@@ -11,7 +11,8 @@ tidy_pam(data, k, metric = "euclidean", cols = NULL)
 
 \item{k}{Number of clusters}
 
-\item{metric}{Distance metric (default: "euclidean"). Use "gower" for mixed data types.}
+\item{metric}{Distance metric (default: "euclidean").
+Use "gower" for mixed data types.}
 
 \item{cols}{Columns to include (tidy select). If NULL, uses all columns.}
 }

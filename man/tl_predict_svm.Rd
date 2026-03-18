@@ -11,7 +11,8 @@ tl_predict_svm(model, new_data, type = "response", ...)
 
 \item{new_data}{A data frame containing the new data}
 
-\item{type}{Type of prediction: "response" (default), "prob" (for classification)}
+\item{type}{Type of prediction: "response" (default),
+"prob" (for classification)}
 
 \item{...}{Additional arguments}
 }

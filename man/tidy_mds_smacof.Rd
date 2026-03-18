@@ -11,7 +11,8 @@ tidy_mds_smacof(dist_mat, ndim = 2, type = "ratio", ...)
 
 \item{ndim}{Number of dimensions (default: 2)}
 
-\item{type}{Character; "ratio" for metric, "ordinal" for non-metric (default: "ratio")}
+\item{type}{Character; "ratio" for metric, "ordinal"
+for non-metric (default: "ratio")}
 
 \item{...}{Additional arguments passed to smacof::mds()}
 }

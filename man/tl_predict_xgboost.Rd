@@ -11,9 +11,11 @@ tl_predict_xgboost(model, new_data, type = "response", ntreelimit = NULL, ...)
 
 \item{new_data}{A data frame containing the new data}
 
-\item{type}{Type of prediction: "response" (default), "prob" (for classification), "class" (for classification)}
+\item{type}{Type of prediction: "response" (default),
+"prob" (for classification), "class" (for classification)}
 
-\item{ntreelimit}{Limit number of trees used for prediction (default: NULL, uses all trees)}
+\item{ntreelimit}{Limit number of trees used for prediction
+(default: NULL, uses all trees)}
 
 \item{...}{Additional arguments}
 }

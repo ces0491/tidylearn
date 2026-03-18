@@ -3,7 +3,7 @@
 #' @description Logistic regression and classification metrics functionality
 #' @importFrom stats glm predict binomial
 #' @importFrom tibble tibble as_tibble
-#' @importFrom dplyr %>% mutate
+#' @importFrom dplyr mutate
 #' @importFrom ROCR prediction performance
 #' @importFrom ggplot2 ggplot aes geom_line geom_abline labs theme_minimal
 NULL
@@ -19,7 +19,11 @@ tl_fit_logistic <- function(data, formula, ...) {
   # Ensure response variable is a factor
   response_var <- all.vars(formula)[1]
   if (!is.factor(data[[response_var]])) {
-    warning("Converting response variable to factor for logistic regression", call. = FALSE)
+    warning(
+      "Converting response variable to factor ",
+      "for logistic regression",
+      call. = FALSE
+    )
     data[[response_var]] <- factor(data[[response_var]])
   }
 
@@ -51,13 +55,18 @@ tl_predict_logistic <- function(model, new_data, type = "prob", ...) {
   # Make predictions based on the type
   if (type == "response") {
     # Get the linear predictor
-    preds <- stats::predict(model$fit, newdata = new_data, type = "response", ...)
+    preds <- stats::predict(
+      model$fit, newdata = new_data, type = "response", ...
+    )
     preds
   } else if (type == "prob") {
     # Binary classification
     if (length(class_levels) == 2) {
       # Get probabilities for the positive class
-      pos_probs <- stats::predict(model$fit, newdata = new_data, type = "response", ...)
+      pos_probs <- stats::predict(
+        model$fit, newdata = new_data,
+        type = "response", ...
+      )
       neg_probs <- 1 - pos_probs
 
       # Create a data frame with probabilities for each class
@@ -69,13 +78,20 @@ tl_predict_logistic <- function(model, new_data, type = "prob", ...) {
       prob_df
     } else {
       # Multiclass classification (requires multinomial logistic regression)
-      stop("Multiclass logistic regression not currently implemented", call. = FALSE)
+      stop(
+        "Multiclass logistic regression not ",
+        "currently implemented",
+        call. = FALSE
+      )
     }
   } else if (type == "class") {
     # Binary classification
     if (length(class_levels) == 2) {
       # Get probabilities for the positive class
-      pos_probs <- stats::predict(model$fit, newdata = new_data, type = "response", ...)
+      pos_probs <- stats::predict(
+        model$fit, newdata = new_data,
+        type = "response", ...
+      )
 
       # Classify based on probability > 0.5
       pred_classes <- ifelse(pos_probs > 0.5, class_levels[2], class_levels[1])
@@ -84,17 +100,26 @@ tl_predict_logistic <- function(model, new_data, type = "prob", ...) {
       pred_classes
     } else {
       # Multiclass classification (requires multinomial logistic regression)
-      stop("Multiclass logistic regression not currently implemented", call. = FALSE)
+      stop(
+        "Multiclass logistic regression not ",
+        "currently implemented",
+        call. = FALSE
+      )
     }
   } else {
-    stop("Invalid prediction type. Use 'prob', 'class', or 'response'.", call. = FALSE)
+    stop(
+      "Invalid prediction type. ",
+      "Use 'prob', 'class', or 'response'.",
+      call. = FALSE
+    )
   }
 }
 
 #' Plot ROC curve for a classification model
 #'
 #' @param model A tidylearn classification model object
-#' @param new_data Optional data frame for evaluation (if NULL, uses training data)
+#' @param new_data Optional data frame for evaluation
+#'   (if NULL, uses training data)
 #' @param ... Additional arguments
 #' @return A ggplot object with ROC curve
 #' @importFrom ROCR prediction performance
@@ -138,7 +163,10 @@ tl_plot_roc <- function(model, new_data = NULL, ...) {
     # Create the plot
     p <- ggplot2::ggplot(roc_data, ggplot2::aes(x = fpr, y = tpr)) +
       ggplot2::geom_line(color = "blue", size = 1) +
-      ggplot2::geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray") +
+      ggplot2::geom_abline(
+        intercept = 0, slope = 1,
+        linetype = "dashed", color = "gray"
+      ) +
       ggplot2::labs(
         title = "ROC Curve",
         subtitle = paste0("AUC = ", round(auc, 3)),
@@ -158,7 +186,8 @@ tl_plot_roc <- function(model, new_data = NULL, ...) {
 #' Plot confusion matrix for a classification model
 #'
 #' @param model A tidylearn classification model object
-#' @param new_data Optional data frame for evaluation (if NULL, uses training data)
+#' @param new_data Optional data frame for evaluation
+#'   (if NULL, uses training data)
 #' @param ... Additional arguments
 #' @return A ggplot object with confusion matrix
 #' @importFrom ggplot2 ggplot aes geom_tile geom_text scale_fill_gradient
@@ -190,8 +219,14 @@ tl_plot_confusion <- function(model, new_data = NULL, ...) {
   # Create the plot
   p <- ggplot2::ggplot(cm_df, ggplot2::aes(x = Predicted, y = Actual)) +
     ggplot2::geom_tile(ggplot2::aes(fill = Freq), color = "white") +
-    ggplot2::geom_text(ggplot2::aes(label = paste0(Freq, "\n(", round(percentage, 1), "%)")),
-                       color = "black", size = 4) +
+    ggplot2::geom_text(
+      ggplot2::aes(
+        label = paste0(
+          Freq, "\n(", round(percentage, 1), "%)"
+        )
+      ),
+      color = "black", size = 4
+    ) +
     ggplot2::scale_fill_gradient(low = "white", high = "steelblue") +
     ggplot2::labs(
       title = "Confusion Matrix",
@@ -208,7 +243,8 @@ tl_plot_confusion <- function(model, new_data = NULL, ...) {
 #' Plot precision-recall curve for a classification model
 #'
 #' @param model A tidylearn classification model object
-#' @param new_data Optional data frame for evaluation (if NULL, uses training data)
+#' @param new_data Optional data frame for evaluation
+#'   (if NULL, uses training data)
 #' @param ... Additional arguments
 #' @return A ggplot object with precision-recall curve
 #' @importFrom ROCR prediction performance
@@ -268,18 +304,24 @@ tl_plot_precision_recall <- function(model, new_data = NULL, ...) {
     p
   } else {
     # Multiclass precision-recall curves (not implemented)
-    stop("Multiclass precision-recall curves not currently implemented", call. = FALSE)
+    stop(
+      "Multiclass precision-recall curves not ",
+      "currently implemented",
+      call. = FALSE
+    )
   }
 }
 
 #' Plot calibration curve for a classification model
 #'
 #' @param model A tidylearn classification model object
-#' @param new_data Optional data frame for evaluation (if NULL, uses training data)
+#' @param new_data Optional data frame for evaluation
+#'   (if NULL, uses training data)
 #' @param bins Number of bins for grouping predictions (default: 10)
 #' @param ... Additional arguments
 #' @return A ggplot object with calibration curve
-#' @importFrom ggplot2 ggplot aes geom_point geom_line geom_abline labs theme_minimal
+#' @importFrom ggplot2 ggplot aes geom_point geom_line
+#'   geom_abline labs theme_minimal
 #' @keywords internal
 tl_plot_calibration <- function(model, new_data = NULL, bins = 10, ...) {
   if (is.null(new_data)) {
@@ -305,12 +347,15 @@ tl_plot_calibration <- function(model, new_data = NULL, bins = 10, ...) {
 
     # Create bins of predictions
     bin_breaks <- seq(0, 1, length.out = bins + 1)
-    bin_mids <- (bin_breaks[-1] + bin_breaks[-(bins + 1)]) / 2
 
     # Assign each prediction to a bin
-    bins_idx <- cut(pos_probs, breaks = bin_breaks, labels = FALSE, include.lowest = TRUE)
+    bins_idx <- cut(
+      pos_probs, breaks = bin_breaks,
+      labels = FALSE, include.lowest = TRUE
+    )
 
-    # Calculate mean predicted probability and fraction of positives for each bin
+    # Calculate mean predicted probability and fraction of
+    # positives for each bin
     calibration_data <- tibble::tibble(
       bin = bins_idx,
       prob = pos_probs,
@@ -325,13 +370,22 @@ tl_plot_calibration <- function(model, new_data = NULL, bins = 10, ...) {
       )
 
     # Create the plot
-    p <- ggplot2::ggplot(calibration_data, ggplot2::aes(x = mean_pred_prob, y = frac_pos)) +
+    p <- ggplot2::ggplot(
+      calibration_data,
+      ggplot2::aes(x = mean_pred_prob, y = frac_pos)
+    ) +
       ggplot2::geom_point(ggplot2::aes(size = n), alpha = 0.7) +
       ggplot2::geom_line(color = "blue") +
-      ggplot2::geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray") +
+      ggplot2::geom_abline(
+        intercept = 0, slope = 1,
+        linetype = "dashed", color = "gray"
+      ) +
       ggplot2::labs(
         title = "Calibration Curve",
-        subtitle = "Perfectly calibrated predictions should lie on the diagonal",
+        subtitle = paste0(
+          "Perfectly calibrated predictions ",
+          "should lie on the diagonal"
+        ),
         x = "Mean Predicted Probability",
         y = "Fraction of Positives",
         size = "Count"
@@ -342,6 +396,10 @@ tl_plot_calibration <- function(model, new_data = NULL, bins = 10, ...) {
     p
   } else {
     # Multiclass calibration (not implemented)
-    stop("Multiclass calibration curves not currently implemented", call. = FALSE)
+    stop(
+      "Multiclass calibration curves not ",
+      "currently implemented",
+      call. = FALSE
+    )
   }
 }

@@ -22,19 +22,24 @@ tl_fit_svm(
 
 \item{formula}{A formula specifying the model}
 
-\item{is_classification}{Logical indicating if this is a classification problem}
+\item{is_classification}{Logical indicating if this is a
+classification problem}
 
-\item{kernel}{Kernel function ("linear", "polynomial", "radial", "sigmoid")}
+\item{kernel}{Kernel function
+("linear", "polynomial", "radial", "sigmoid")}
 
 \item{cost}{Cost parameter (default: 1)}
 
-\item{gamma}{Gamma parameter for kernels (default: 1/ncol(data))}
+\item{gamma}{Gamma parameter for kernels
+(default: 1/ncol(data))}
 
 \item{degree}{Degree for polynomial kernel (default: 3)}
 
-\item{tune}{Logical indicating whether to tune hyperparameters (default: FALSE)}
+\item{tune}{Logical indicating whether to tune
+hyperparameters (default: FALSE)}
 
-\item{tune_folds}{Number of folds for cross-validation during tuning (default: 5)}
+\item{tune_folds}{Number of folds for cross-validation
+during tuning (default: 5)}
 
 \item{...}{Additional arguments to pass to svm()}
 }

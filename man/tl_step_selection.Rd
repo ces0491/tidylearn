@@ -19,7 +19,8 @@ tl_step_selection(
 
 \item{formula}{A formula specifying the initial model}
 
-\item{direction}{Direction of stepwise selection: "forward", "backward", or "both"}
+\item{direction}{Direction of stepwise selection:
+"forward", "backward", or "both"}
 
 \item{criterion}{Criterion for selection: "AIC" or "BIC"}
 

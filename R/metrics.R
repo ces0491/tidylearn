@@ -1,9 +1,10 @@
 #' @title Metrics Functionality for tidylearn
 #' @name tidylearn-metrics
 #' @description Functions for calculating model evaluation metrics
-#' @importFrom yardstick accuracy precision recall f_meas rmse rsq mae mape roc_auc pr_auc
+#' @importFrom yardstick accuracy precision recall f_meas
+#'   rmse rsq mae mape roc_auc pr_auc
 #' @importFrom ROCR prediction performance
-#' @importFrom dplyr tibble %>% mutate
+#' @importFrom dplyr tibble mutate
 NULL
 
 #' Calculate classification metrics
@@ -12,13 +13,17 @@ NULL
 #' @param predicted Predicted class values
 #' @param predicted_probs Predicted probabilities (for metrics like AUC)
 #' @param metrics Character vector of metrics to compute
-#' @param thresholds Optional vector of thresholds to evaluate for threshold-dependent metrics
+#' @param thresholds Optional vector of thresholds to evaluate
+#'   for threshold-dependent metrics
 #' @param ... Additional arguments
 #' @return A tibble of evaluation metrics
 #' @export
-tl_calc_classification_metrics <- function(actuals, predicted, predicted_probs = NULL,
-                                           metrics = c("accuracy", "precision", "recall", "f1", "auc"),
-                                           thresholds = NULL, ...) {
+tl_calc_classification_metrics <- function(
+    actuals, predicted,
+    predicted_probs = NULL,
+    metrics = c("accuracy", "precision",
+                "recall", "f1", "auc"),
+    thresholds = NULL, ...) {
   # Ensure actuals is a factor
   if (!is.factor(actuals)) {
     actuals <- as.factor(actuals)
@@ -62,10 +67,10 @@ tl_calc_classification_metrics <- function(actuals, predicted, predicted_probs =
   }
 
   # Calculate threshold-dependent metrics if probabilities are provided
-  if (!is.null(predicted_probs) && (
-    "auc" %in% metrics ||
-    "pr_auc" %in% metrics ||
-    !is.null(thresholds))) {
+  has_threshold_metrics <- !is.null(predicted_probs) &&
+    ("auc" %in% metrics || "pr_auc" %in% metrics ||
+       !is.null(thresholds))
+  if (has_threshold_metrics) {
 
     # For binary classification
     if (ncol(predicted_probs) == 2) {
@@ -104,11 +109,21 @@ tl_calc_classification_metrics <- function(actuals, predicted, predicted_probs =
       # Multiclass AUC (one-vs-rest)
       if ("auc" %in% metrics) {
         # Calculate one-vs-rest AUC for each class
-        class_aucs <- purrr::map_dbl(names(predicted_probs), function(class_name) {
-          binary_actuals <- as.integer(actuals == class_name)
-          pred_obj <- ROCR::prediction(predicted_probs[[class_name]], binary_actuals)
-          unlist(ROCR::performance(pred_obj, "auc")@y.values)
-        })
+        class_aucs <- purrr::map_dbl(
+          names(predicted_probs),
+          function(class_name) {
+            binary_actuals <- as.integer(
+              actuals == class_name
+            )
+            pred_obj <- ROCR::prediction(
+              predicted_probs[[class_name]],
+              binary_actuals
+            )
+            unlist(
+              ROCR::performance(pred_obj, "auc")@y.values
+            )
+          }
+        )
 
         # Average AUC across classes
         macro_auc <- mean(class_aucs)
@@ -118,7 +133,10 @@ tl_calc_classification_metrics <- function(actuals, predicted, predicted_probs =
         for (i in seq_along(names(predicted_probs))) {
           class_name <- names(predicted_probs)[i]
           results <- results %>%
-            dplyr::add_row(metric = paste0("auc_", class_name), value = class_aucs[i])
+            dplyr::add_row(
+              metric = paste0("auc_", class_name),
+              value = class_aucs[i]
+            )
         }
       }
     }
@@ -166,12 +184,18 @@ tl_calculate_pr_auc <- function(perf) {
 #' @return A tibble of metrics at different thresholds
 #' @keywords internal
 tl_evaluate_thresholds <- function(actuals, probs, thresholds, pos_class) {
-  # No need to convert actuals to binary here, we need the factor for the metrics
+  # No need to convert actuals to binary here,
+  # we need the factor for the metrics
 
   threshold_results <- purrr::map_dfr(thresholds, function(threshold) {
     # Make predictions at this threshold
-    pred_class <- factor(ifelse(probs >= threshold, pos_class, levels(actuals)[1]),
-                         levels = levels(actuals))
+    pred_vals <- ifelse(
+      probs >= threshold, pos_class,
+      levels(actuals)[1]
+    )
+    pred_class <- factor(
+      pred_vals, levels = levels(actuals)
+    )
 
     # Calculate metrics
     acc <- yardstick::accuracy_vec(actuals, pred_class)
@@ -181,7 +205,7 @@ tl_evaluate_thresholds <- function(actuals, probs, thresholds, pos_class) {
 
     # Calculate F2 and F0.5 scores
     f2 <- yardstick::f_meas_vec(actuals, pred_class, beta = 2)
-    f0.5 <- yardstick::f_meas_vec(actuals, pred_class, beta = 0.5)
+    f0_5 <- yardstick::f_meas_vec(actuals, pred_class, beta = 0.5)
 
     # Return results for this threshold
     tibble::tibble(
@@ -194,7 +218,7 @@ tl_evaluate_thresholds <- function(actuals, probs, thresholds, pos_class) {
         paste0("f2_t", threshold),
         paste0("f0.5_t", threshold)
       ),
-      value = c(acc, prec, rec, f1, f2, f0.5)
+      value = c(acc, prec, rec, f1, f2, f0_5)
     )
   })
 
@@ -204,7 +228,8 @@ tl_evaluate_thresholds <- function(actuals, probs, thresholds, pos_class) {
 
 #' Evaluate a tidylearn model
 #' @param object A tidylearn model object
-#' @param new_data Optional new data for evaluation (if NULL, uses training data)
+#' @param new_data Optional new data for evaluation
+#'   (if NULL, uses training data)
 #' @param ... Additional arguments
 #' @return A tibble of evaluation metrics
 #' @export
@@ -269,7 +294,9 @@ tl_cv <- function(data, formula, method, folds = 5, ...) {
 
   for (i in 1:folds) {
     # Create fold indices
-    test_indices <- indices[((i-1)*fold_size + 1):min(i*fold_size, n)]
+    test_indices <- indices[
+      ((i - 1) * fold_size + 1):min(i * fold_size, n)
+    ]
     train_indices <- setdiff(1:n, test_indices)
 
     # Split data

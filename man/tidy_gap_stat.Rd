@@ -4,16 +4,16 @@
 \alias{tidy_gap_stat}
 \title{Tidy Gap Statistic}
 \usage{
-tidy_gap_stat(data, FUN_cluster = NULL, max_k = 10, B = 50, nstart = 25)
+tidy_gap_stat(data, fun_cluster = NULL, max_k = 10, n_boot = 50, nstart = 25)
 }
 \arguments{
 \item{data}{A data frame or tibble}
 
-\item{FUN_cluster}{Clustering function (default: uses kmeans internally)}
+\item{fun_cluster}{Clustering function (default: uses kmeans internally)}
 
 \item{max_k}{Maximum number of clusters (default: 10)}
 
-\item{B}{Number of bootstrap samples (default: 50)}
+\item{n_boot}{Number of bootstrap samples (default: 50)}
 
 \item{nstart}{If using kmeans, number of random starts (default: 25)}
 }

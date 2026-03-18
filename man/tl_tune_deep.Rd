@@ -21,17 +21,22 @@ tl_tune_deep(
 
 \item{formula}{A formula specifying the model}
 
-\item{is_classification}{Logical indicating if this is a classification problem}
+\item{is_classification}{Logical indicating if this is a
+classification problem}
 
-\item{hidden_layers_options}{List of vectors defining hidden layer configurations to try}
+\item{hidden_layers_options}{List of vectors defining hidden
+layer configurations to try}
 
-\item{learning_rates}{Learning rates to try (default: c(0.01, 0.001, 0.0001))}
+\item{learning_rates}{Learning rates to try
+(default: c(0.01, 0.001, 0.0001))}
 
-\item{batch_sizes}{Batch sizes to try (default: c(16, 32, 64))}
+\item{batch_sizes}{Batch sizes to try
+(default: c(16, 32, 64))}
 
 \item{epochs}{Number of training epochs (default: 30)}
 
-\item{validation_split}{Proportion of data for validation (default: 0.2)}
+\item{validation_split}{Proportion of data for validation
+(default: 0.2)}
 
 \item{...}{Additional arguments}
 }

@@ -33,5 +33,6 @@ plot_clusters(
 A ggplot object
 }
 \description{
-Visualize clustering results using first two dimensions or specified dimensions
+Visualize clustering results using first two dimensions
+or specified dimensions
 }

@@ -105,7 +105,8 @@ tidy_silhouette_analysis <- function(data, max_k = 10, method = "kmeans",
 
 #' Plot Silhouette Analysis
 #'
-#' @param sil_obj A tidy_silhouette object or tibble from tidy_silhouette_analysis
+#' @param sil_obj A tidy_silhouette object or tibble
+#'   from tidy_silhouette_analysis
 #'
 #' @return A ggplot object
 #' @export
@@ -115,9 +116,18 @@ plot_silhouette <- function(sil_obj) {
     # Individual silhouette plot
     sil_data <- sil_obj$silhouette_data
 
-    p <- ggplot2::ggplot(sil_data, ggplot2::aes(x = .id, y = sil_width, fill = as.factor(cluster))) +
+    p <- ggplot2::ggplot(
+      sil_data,
+      ggplot2::aes(
+        x = .id, y = sil_width,
+        fill = as.factor(cluster)
+      )
+    ) +
       ggplot2::geom_col() +
-      ggplot2::geom_hline(yintercept = sil_obj$avg_width, linetype = "dashed", color = "red") +
+      ggplot2::geom_hline(
+        yintercept = sil_obj$avg_width,
+        linetype = "dashed", color = "red"
+      ) +
       ggplot2::facet_wrap(~cluster, scales = "free_x") +
       ggplot2::labs(
         title = "Silhouette Plot",
@@ -149,7 +159,10 @@ plot_silhouette <- function(sil_obj) {
       ggplot2::theme_minimal()
 
   } else {
-    stop("sil_obj must be a tidy_silhouette object or silhouette analysis tibble")
+    stop(
+      "sil_obj must be a tidy_silhouette object ",
+      "or silhouette analysis tibble"
+    )
   }
 
   p
@@ -161,32 +174,34 @@ plot_silhouette <- function(sil_obj) {
 #' Compute gap statistic for determining optimal number of clusters
 #'
 #' @param data A data frame or tibble
-#' @param FUN_cluster Clustering function (default: uses kmeans internally)
+#' @param fun_cluster Clustering function (default: uses kmeans internally)
 #' @param max_k Maximum number of clusters (default: 10)
-#' @param B Number of bootstrap samples (default: 50)
+#' @param n_boot Number of bootstrap samples (default: 50)
 #' @param nstart If using kmeans, number of random starts (default: 25)
 #'
 #' @return A list of class "tidy_gap" containing gap statistics
 #' @export
-tidy_gap_stat <- function(data, FUN_cluster = NULL, max_k = 10, B = 50, nstart = 25) {
+tidy_gap_stat <- function(data, fun_cluster = NULL,
+                          max_k = 10, n_boot = 50,
+                          nstart = 25) {
 
   data_numeric <- data %>% dplyr::select(where(is.numeric))
 
   # Use cluster::clusGap
-  if (is.null(FUN_cluster)) {
+  if (is.null(fun_cluster)) {
     gap_result <- cluster::clusGap(
       data_numeric,
       FUN = stats::kmeans,
       nstart = nstart,
       K.max = max_k,
-      B = B
+      B = n_boot
     )
   } else {
     gap_result <- cluster::clusGap(
       data_numeric,
-      FUN = FUN_cluster,
+      FUN = fun_cluster,
       K.max = max_k,
-      B = B
+      B = n_boot
     )
   }
 
@@ -195,22 +210,22 @@ tidy_gap_stat <- function(data, FUN_cluster = NULL, max_k = 10, B = 50, nstart =
     dplyr::mutate(k = 1:max_k, .before = 1)
 
   # Determine optimal k using different methods
-  k_firstSEmax <- cluster::maxSE(gap_result$Tab[, "gap"],
-                                 gap_result$Tab[, "SE.sim"],
-                                 method = "firstSEmax")
+  k_first_se_max <- cluster::maxSE(gap_result$Tab[, "gap"],
+                                   gap_result$Tab[, "SE.sim"],
+                                   method = "firstSEmax")
 
-  k_globalmax <- cluster::maxSE(gap_result$Tab[, "gap"],
-                                gap_result$Tab[, "SE.sim"],
-                                method = "globalmax")
+  k_global_max <- cluster::maxSE(gap_result$Tab[, "gap"],
+                                 gap_result$Tab[, "SE.sim"],
+                                 method = "globalmax")
 
   k_firstmax <- which.max(gap_result$Tab[, "gap"])
 
   result <- list(
     gap_data = gap_tbl,
-    k_firstSEmax = k_firstSEmax,
-    k_globalmax = k_globalmax,
+    k_first_se_max = k_first_se_max,
+    k_global_max = k_global_max,
     k_firstmax = k_firstmax,
-    recommended_k = k_firstSEmax,  # Most conservative
+    recommended_k = k_first_se_max,  # Most conservative
     model = gap_result
   )
 
@@ -222,7 +237,8 @@ tidy_gap_stat <- function(data, FUN_cluster = NULL, max_k = 10, B = 50, nstart =
 #' Plot Gap Statistic
 #'
 #' @param gap_obj A tidy_gap object
-#' @param show_methods Logical; show all three k selection methods? (default: FALSE)
+#' @param show_methods Logical; show all three k
+#'   selection methods? (default: FALSE)
 #'
 #' @return A ggplot object
 #' @export
@@ -243,27 +259,55 @@ plot_gap_stat <- function(gap_obj, show_methods = FALSE) {
     ) +
     ggplot2::labs(
       title = "Gap Statistic",
-      subtitle = sprintf("Recommended k = %d (firstSEmax method)", gap_obj$recommended_k),
+      subtitle = sprintf(
+        "Recommended k = %d (firstSEmax method)",
+        gap_obj$recommended_k
+      ),
       x = "Number of Clusters (k)",
       y = "Gap Statistic"
     ) +
     ggplot2::theme_minimal()
 
   # Add vertical lines for different methods
+  gap_y <- max(gap_data$gap) * 0.95
   if (show_methods) {
     p <- p +
-      ggplot2::geom_vline(xintercept = gap_obj$k_firstSEmax, color = "red", linetype = "dashed") +
-      ggplot2::geom_vline(xintercept = gap_obj$k_globalmax, color = "purple", linetype = "dashed") +
-      ggplot2::geom_vline(xintercept = gap_obj$k_firstmax, color = "green", linetype = "dashed") +
-      ggplot2::annotate("text", x = gap_obj$k_firstSEmax, y = max(gap_data$gap) * 0.95,
-                       label = "firstSEmax", color = "red", angle = 90, vjust = -0.5, size = 3) +
-      ggplot2::annotate("text", x = gap_obj$k_globalmax, y = max(gap_data$gap) * 0.95,
-                       label = "globalmax", color = "purple", angle = 90, vjust = -0.5, size = 3) +
-      ggplot2::annotate("text", x = gap_obj$k_firstmax, y = max(gap_data$gap) * 0.95,
-                       label = "firstmax", color = "green", angle = 90, vjust = -0.5, size = 3)
+      ggplot2::geom_vline(
+        xintercept = gap_obj$k_first_se_max,
+        color = "red", linetype = "dashed"
+      ) +
+      ggplot2::geom_vline(
+        xintercept = gap_obj$k_global_max,
+        color = "purple", linetype = "dashed"
+      ) +
+      ggplot2::geom_vline(
+        xintercept = gap_obj$k_firstmax,
+        color = "green", linetype = "dashed"
+      ) +
+      ggplot2::annotate(
+        "text",
+        x = gap_obj$k_first_se_max, y = gap_y,
+        label = "firstSEmax", color = "red",
+        angle = 90, vjust = -0.5, size = 3
+      ) +
+      ggplot2::annotate(
+        "text",
+        x = gap_obj$k_global_max, y = gap_y,
+        label = "globalmax", color = "purple",
+        angle = 90, vjust = -0.5, size = 3
+      ) +
+      ggplot2::annotate(
+        "text",
+        x = gap_obj$k_firstmax, y = gap_y,
+        label = "firstmax", color = "green",
+        angle = 90, vjust = -0.5, size = 3
+      )
   } else {
     p <- p +
-      ggplot2::geom_vline(xintercept = gap_obj$recommended_k, color = "red", linetype = "dashed")
+      ggplot2::geom_vline(
+        xintercept = gap_obj$recommended_k,
+        color = "red", linetype = "dashed"
+      )
   }
 
   p
@@ -386,8 +430,8 @@ print.tidy_gap <- function(x, ...) {
   cat("Recommended k:", x$recommended_k, "(firstSEmax method)\n\n")
 
   cat("Alternative methods:\n")
-  cat("  firstSEmax: k =", x$k_firstSEmax, "(most conservative)\n")
-  cat("  globalmax:  k =", x$k_globalmax, "(middle ground)\n")
+  cat("  firstSEmax: k =", x$k_first_se_max, "(most conservative)\n")
+  cat("  globalmax:  k =", x$k_global_max, "(middle ground)\n")
   cat("  firstmax:   k =", x$k_firstmax, "(most liberal)\n\n")
 
   cat("Gap Statistics (first 10):\n")

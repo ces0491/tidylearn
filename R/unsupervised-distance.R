@@ -3,8 +3,11 @@
 #' Compute distance matrices with tidy output
 #'
 #' @param data A data frame or tibble
-#' @param method Character; distance method (default: "euclidean"). Options: "euclidean", "manhattan", "maximum", "gower"
-#' @param cols Columns to include (tidy select). If NULL, uses all numeric columns.
+#' @param method Character; distance method
+#'   (default: "euclidean"). Options: "euclidean",
+#'   "manhattan", "maximum", "gower"
+#' @param cols Columns to include (tidy select).
+#'   If NULL, uses all numeric columns.
 #' @param ... Additional arguments passed to distance functions
 #'
 #' @return A dist object with tidy attributes
@@ -37,7 +40,8 @@ tidy_dist <- function(data, method = "euclidean", cols = NULL, ...) {
 #' Computes Gower distance for mixed data types (numeric, factor, ordered)
 #'
 #' @param data A data frame or tibble
-#' @param weights Optional named vector of variable weights (default: equal weights)
+#' @param weights Optional named vector of variable
+#'   weights (default: equal weights)
 #'
 #' @return A dist object containing Gower distances
 #'
@@ -99,7 +103,8 @@ tidy_gower <- function(data, weights = NULL) {
         # Compute dissimilarity based on variable type
         if (is.numeric(data[[k]])) {
           # Numeric: range-normalized Manhattan distance
-          var_range <- max(data[[k]], na.rm = TRUE) - min(data[[k]], na.rm = TRUE)
+          var_range <- max(data[[k]], na.rm = TRUE) -
+            min(data[[k]], na.rm = TRUE)
 
           if (var_range > 0) {
             d_k <- abs(data[i, k] - data[j, k]) / var_range
@@ -148,7 +153,7 @@ tidy_gower <- function(data, weights = NULL) {
 
   attr(dist_obj, "method") <- "gower"
 
-  return(dist_obj)
+  dist_obj
 }
 
 
@@ -193,7 +198,9 @@ standardize_data <- function(data, center = TRUE, scale = TRUE) {
 #'
 #' @return A list of dist objects named by method
 #' @export
-compare_distances <- function(data, methods = c("euclidean", "manhattan", "maximum")) {
+compare_distances <- function(
+    data,
+    methods = c("euclidean", "manhattan", "maximum")) {
 
   data_numeric <- data %>% dplyr::select(where(is.numeric))
 

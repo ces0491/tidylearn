@@ -9,7 +9,8 @@ visualize_rules(rules_obj, method = "scatter", top_n = 50, ...)
 \arguments{
 \item{rules_obj}{A tidy_apriori object, rules object, or rules tibble}
 
-\item{method}{Visualization method: "scatter" (default), "graph", "grouped", "paracoord"}
+\item{method}{Visualization method: "scatter"
+(default), "graph", "grouped", "paracoord"}
 
 \item{top_n}{Number of top rules to visualize (default: 50)}
 

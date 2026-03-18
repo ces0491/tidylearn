@@ -12,7 +12,8 @@
 \item{...}{Additional arguments (ignored)}
 }
 \value{
-Invisibly returns the input object x, called for side effects (plotting)
+Invisibly returns the input object x,
+called for side effects (plotting)
 }
 \description{
 Plot EDA results

@@ -3,9 +3,13 @@
 #' Performs hierarchical clustering with tidy output
 #'
 #' @param data A data frame, tibble, or dist object
-#' @param method Agglomeration method: "ward.D2", "single", "complete", "average" (default), "mcquitty", "median", "centroid"
-#' @param distance Distance metric if data is not a dist object (default: "euclidean")
-#' @param cols Columns to include (tidy select). If NULL, uses all numeric columns.
+#' @param method Agglomeration method: "ward.D2",
+#'   "single", "complete", "average" (default),
+#'   "mcquitty", "median", "centroid"
+#' @param distance Distance metric if data is not a
+#'   dist object (default: "euclidean")
+#' @param cols Columns to include (tidy select).
+#'   If NULL, uses all numeric columns.
 #'
 #' @return A list of class "tidy_hclust" containing:
 #' \itemize{
@@ -23,7 +27,9 @@
 #' hc_result <- tidy_hclust(mtcars, method = "complete", distance = "manhattan")
 #'
 #' @export
-tidy_hclust <- function(data, method = "average", distance = "euclidean", cols = NULL) {
+tidy_hclust <- function(data, method = "average",
+                        distance = "euclidean",
+                        cols = NULL) {
 
   # Handle dist object
   if (inherits(data, "dist")) {
@@ -154,7 +160,10 @@ tidy_dendrogram <- function(hclust_obj, k = NULL, hang = 0.01, cex = 0.7) {
 
   # Plot dendrogram
   plot(hc_model,
-       main = paste("Hierarchical Clustering Dendrogram\n(", method_label, " linkage)", sep = ""),
+       main = paste0(
+         "Hierarchical Clustering Dendrogram\n(",
+         method_label, " linkage)"
+       ),
        xlab = "",
        ylab = "Height",
        sub = "",
@@ -210,7 +219,7 @@ optimal_hclust_k <- function(hclust_obj, method = "silhouette", max_k = 10) {
     # Use gap statistic
     gap_result <- tidy_gap_stat(
       hclust_obj$data,
-      FUN_cluster = function(data, k) {
+      fun_cluster = function(data, k) {
         hc_temp <- stats::hclust(stats::dist(data), method = hclust_obj$method)
         stats::cutree(hc_temp, k = k)
       },
@@ -252,7 +261,9 @@ print.tidy_hclust <- function(x, ...) {
 #' Fit hierarchical clustering for tidylearn models
 #' @keywords internal
 #' @noRd
-tl_fit_hclust <- function(data, formula = NULL, method = "average", distance = "euclidean", ...) {
+tl_fit_hclust <- function(data, formula = NULL,
+                          method = "average",
+                          distance = "euclidean", ...) {
   # Extract variables to use
   if (!is.null(formula)) {
     vars <- get_formula_vars(formula, data)
@@ -262,7 +273,10 @@ tl_fit_hclust <- function(data, formula = NULL, method = "average", distance = "
   }
 
   # Fit hierarchical clustering using tidy_hclust
-  hc_result <- tidy_hclust(data_for_hc, method = method, distance = distance, ...)
+  hc_result <- tidy_hclust(
+    data_for_hc, method = method,
+    distance = distance, ...
+  )
 
   # Return in expected format
   list(

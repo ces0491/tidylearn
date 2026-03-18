@@ -12,7 +12,10 @@ test_that("PCA models work", {
   # Transform data
   transformed <- predict(model)
   expect_s3_class(transformed, "tbl_df")
-  expect_true(all(grepl("PC", names(transformed)) | names(transformed) == ".obs_id"))
+  expect_true(
+    all(grepl("PC", names(transformed)) |
+          names(transformed) == ".obs_id")
+  )
 })
 
 test_that("K-means clustering works", {
@@ -47,7 +50,7 @@ test_that("CLARA clustering works", {
   skip_if_not_installed("cluster")
 
   # Create larger dataset for CLARA
-  large_data <- iris[rep(1:nrow(iris), 10), 1:4]
+  large_data <- iris[rep(seq_len(nrow(iris)), 10), 1:4]
 
   model <- tl_model(large_data, method = "clara", k = 3, samples = 5)
 
@@ -71,7 +74,7 @@ test_that("Hierarchical clustering works", {
 test_that("DBSCAN clustering works", {
   skip_if_not_installed("dbscan")
 
-  model <- tl_model(iris[, 1:4], method = "dbscan", eps = 0.5, minPts = 5)
+  model <- tl_model(iris[, 1:4], method = "dbscan", eps = 0.5, min_pts = 5)
 
   expect_s3_class(model, "tidylearn_dbscan")
 
@@ -120,7 +123,7 @@ test_that("unsupervised methods handle different data sizes", {
   expect_s3_class(model_small, "tidylearn_kmeans")
 
   # Large dataset
-  large_data <- iris[rep(1:nrow(iris), 5), 1:4]
+  large_data <- iris[rep(seq_len(nrow(iris)), 5), 1:4]
   model_large <- tl_model(large_data, method = "kmeans", k = 3)
   expect_s3_class(model_large, "tidylearn_kmeans")
 })
@@ -140,11 +143,16 @@ test_that("clustering validates k parameter", {
 
 test_that("unsupervised methods work with formula", {
   # PCA with formula
-  model <- tl_model(iris, ~ Sepal.Length + Sepal.Width + Petal.Length + Petal.Width, method = "pca")
+  model <- tl_model(
+    iris,
+    ~ Sepal.Length + Sepal.Width + Petal.Length + Petal.Width,
+    method = "pca"
+  )
 
   expect_s3_class(model, "tidylearn_pca")
 
   # Clustering with formula
-  model2 <- tl_model(iris, ~ Sepal.Length + Sepal.Width, method = "kmeans", k = 3)
+  model2 <- tl_model(iris, ~ Sepal.Length + Sepal.Width,
+                     method = "kmeans", k = 3)
   expect_s3_class(model2, "tidylearn_kmeans")
 })

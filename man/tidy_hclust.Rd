@@ -9,11 +9,15 @@ tidy_hclust(data, method = "average", distance = "euclidean", cols = NULL)
 \arguments{
 \item{data}{A data frame, tibble, or dist object}
 
-\item{method}{Agglomeration method: "ward.D2", "single", "complete", "average" (default), "mcquitty", "median", "centroid"}
+\item{method}{Agglomeration method: "ward.D2",
+"single", "complete", "average" (default),
+"mcquitty", "median", "centroid"}
 
-\item{distance}{Distance metric if data is not a dist object (default: "euclidean")}
+\item{distance}{Distance metric if data is not a
+dist object (default: "euclidean")}
 
-\item{cols}{Columns to include (tidy select). If NULL, uses all numeric columns.}
+\item{cols}{Columns to include (tidy select).
+If NULL, uses all numeric columns.}
 }
 \value{
 A list of class "tidy_hclust" containing:

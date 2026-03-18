@@ -6,14 +6,15 @@
 #' @importFrom randomForest randomForest importance
 #' @importFrom gbm gbm predict.gbm
 #' @importFrom tibble tibble as_tibble
-#' @importFrom dplyr %>% mutate arrange desc
+#' @importFrom dplyr mutate arrange desc
 NULL
 
 #' Fit a decision tree model
 #'
 #' @param data A data frame containing the training data
 #' @param formula A formula specifying the model
-#' @param is_classification Logical indicating if this is a classification problem
+#' @param is_classification Logical indicating if this is a
+#'   classification problem
 #' @param cp Complexity parameter (default: 0.01)
 #' @param minsplit Minimum number of observations in a node for a split
 #' @param maxdepth Maximum depth of the tree
@@ -48,7 +49,8 @@ tl_fit_tree <- function(data, formula, is_classification = FALSE,
 #'
 #' @param model A tidylearn tree model object
 #' @param new_data A data frame containing the new data
-#' @param type Type of prediction: "response" (default), "prob" (for classification), "class" (for classification)
+#' @param type Type of prediction: "response" (default),
+#'   "prob" or "class" (for classification)
 #' @param ... Additional arguments
 #' @return Predictions
 #' @keywords internal
@@ -77,7 +79,11 @@ tl_predict_tree <- function(model, new_data, type = "response", ...) {
       preds <- predict(fit, newdata = new_data, type = "class")
       preds
     } else {
-      stop("Invalid prediction type for classification trees. Use 'prob', 'class', or 'response'.", call. = FALSE)
+      stop(
+        "Invalid prediction type for classification trees. ",
+        "Use 'prob', 'class', or 'response'.",
+        call. = FALSE
+      )
     }
   } else {
     # Regression predictions
@@ -90,7 +96,8 @@ tl_predict_tree <- function(model, new_data, type = "response", ...) {
 #'
 #' @param data A data frame containing the training data
 #' @param formula A formula specifying the model
-#' @param is_classification Logical indicating if this is a classification problem
+#' @param is_classification Logical indicating if this is a
+#'   classification problem
 #' @param ntree Number of trees to grow (default: 500)
 #' @param mtry Number of variables randomly sampled at each split
 #' @param importance Whether to compute variable importance (default: TRUE)
@@ -101,10 +108,6 @@ tl_fit_forest <- function(data, formula, is_classification = FALSE,
                           ntree = 500, mtry = NULL, importance = TRUE, ...) {
   # Check if randomForest is installed
   tl_check_packages("randomForest")
-
-  # Parse the formula
-  response_var <- all.vars(formula)[1]
-  y <- data[[response_var]]
 
   # Set default mtry if not provided
   if (is.null(mtry)) {
@@ -134,7 +137,8 @@ tl_fit_forest <- function(data, formula, is_classification = FALSE,
 #'
 #' @param model A tidylearn forest model object
 #' @param new_data A data frame containing the new data
-#' @param type Type of prediction: "response" (default), "prob" (for classification)
+#' @param type Type of prediction: "response"
+#'   (default), "prob" (for classification)
 #' @param ... Additional arguments
 #' @return Predictions
 #' @keywords internal
@@ -159,7 +163,11 @@ tl_predict_forest <- function(model, new_data, type = "response", ...) {
       preds <- predict(fit, newdata = new_data, type = "response")
       preds
     } else {
-      stop("Invalid prediction type for random forests. Use 'prob', 'class', or 'response'.", call. = FALSE)
+      stop(
+        "Invalid prediction type for random forests. ",
+        "Use 'prob', 'class', or 'response'.",
+        call. = FALSE
+      )
     }
   } else {
     # Regression predictions
@@ -172,18 +180,27 @@ tl_predict_forest <- function(model, new_data, type = "response", ...) {
 #'
 #' @param data A data frame containing the training data
 #' @param formula A formula specifying the model
-#' @param is_classification Logical indicating if this is a classification problem
-#' @param n.trees Number of trees (default: 100)
-#' @param interaction.depth Depth of interactions (default: 3)
+#' @param is_classification Logical indicating if this is a
+#'   classification problem
+#' @param n_trees Number of trees (default: 100)
+#' @param interaction_depth Depth of interactions
+#'   (default: 3)
 #' @param shrinkage Learning rate (default: 0.1)
-#' @param n.minobsinnode Minimum number of observations in terminal nodes (default: 10)
-#' @param cv.folds Number of cross-validation folds (default: 0, no CV)
+#' @param n_minobsinnode Minimum number of observations
+#'   in terminal nodes (default: 10)
+#' @param cv_folds Number of cross-validation folds
+#'   (default: 0, no CV)
 #' @param ... Additional arguments to pass to gbm()
 #' @return A fitted gradient boosting model
 #' @keywords internal
-tl_fit_boost <- function(data, formula, is_classification = FALSE,
-                         n.trees = 100, interaction.depth = 3, shrinkage = 0.1,
-                         n.minobsinnode = 10, cv.folds = 0, ...) {
+tl_fit_boost <- function(
+    data, formula,
+    is_classification = FALSE,
+    n_trees = 100,
+    interaction_depth = 3,
+    shrinkage = 0.1,
+    n_minobsinnode = 10,
+    cv_folds = 0, ...) {
   # Check if gbm is installed
   tl_check_packages("gbm")
 
@@ -211,11 +228,11 @@ tl_fit_boost <- function(data, formula, is_classification = FALSE,
     formula = formula,
     data = data,
     distribution = distribution,
-    n.trees = n.trees,
-    interaction.depth = interaction.depth,
+    n.trees = n_trees,
+    interaction.depth = interaction_depth,
     shrinkage = shrinkage,
-    n.minobsinnode = n.minobsinnode,
-    cv.folds = cv.folds,
+    n.minobsinnode = n_minobsinnode,
+    cv.folds = cv_folds,
     verbose = FALSE,
     ...
   )
@@ -227,24 +244,31 @@ tl_fit_boost <- function(data, formula, is_classification = FALSE,
 #'
 #' @param model A tidylearn boost model object
 #' @param new_data A data frame containing the new data
-#' @param type Type of prediction: "response" (default), "prob" (for classification)
-#' @param n.trees Number of trees to use for prediction (if NULL, uses optimal number)
+#' @param type Type of prediction: "response"
+#'   (default), "prob" (for classification)
+#' @param n_trees Number of trees to use for prediction
+#'   (if NULL, uses optimal number)
 #' @param ... Additional arguments
 #' @return Predictions
 #' @keywords internal
-tl_predict_boost <- function(model, new_data, type = "response", n.trees = NULL, ...) {
+tl_predict_boost <- function(
+    model, new_data,
+    type = "response",
+    n_trees = NULL, ...) {
   # Get the boosting model
   fit <- model$fit
   is_classification <- model$spec$is_classification
 
   # Determine the number of trees to use
-  if (is.null(n.trees)) {
+  if (is.null(n_trees)) {
     if (fit$cv.folds > 0) {
       # Use the optimal number of trees from CV
-      n.trees <- gbm::gbm.perf(fit, method = "cv", plot.it = FALSE)
+      n_trees <- gbm::gbm.perf(
+        fit, method = "cv", plot.it = FALSE
+      )
     } else {
       # Use all trees
-      n.trees <- fit$n.trees
+      n_trees <- fit$n.trees
     }
   }
 
@@ -254,13 +278,19 @@ tl_predict_boost <- function(model, new_data, type = "response", n.trees = NULL,
       # Binary classification
       if (type == "prob") {
         # Get probabilities on the scale of the response
-        probs <- gbm::predict.gbm(fit, newdata = new_data, n.trees = n.trees, type = "response", ...)
+        probs <- gbm::predict.gbm(
+          fit, newdata = new_data,
+          n.trees = n_trees,
+          type = "response", ...
+        )
 
         # Get class levels from training data
         response_var <- all.vars(model$spec$formula)[1]
-        class_levels <- levels(factor(model$data[[response_var]]))
+        class_levels <- levels(
+          factor(model$data[[response_var]])
+        )
 
-        # Create a data frame with probabilities for each class
+        # Create a data frame with probabilities
         prob_df <- tibble::tibble(
           !!class_levels[1] := 1 - probs,
           !!class_levels[2] := probs
@@ -269,25 +299,45 @@ tl_predict_boost <- function(model, new_data, type = "response", n.trees = NULL,
         prob_df
       } else if (type == "class" || type == "response") {
         # Get probabilities
-        probs <- gbm::predict.gbm(fit, newdata = new_data, n.trees = n.trees, type = "response", ...)
+        probs <- gbm::predict.gbm(
+          fit, newdata = new_data,
+          n.trees = n_trees,
+          type = "response", ...
+        )
 
         # Get class levels from training data
         response_var <- all.vars(model$spec$formula)[1]
-        class_levels <- levels(factor(model$data[[response_var]]))
+        class_levels <- levels(
+          factor(model$data[[response_var]])
+        )
 
         # Convert to classes
-        pred_classes <- ifelse(probs > 0.5, class_levels[2], class_levels[1])
-        pred_classes <- factor(pred_classes, levels = class_levels)
+        pred_classes <- ifelse(
+          probs > 0.5,
+          class_levels[2],
+          class_levels[1]
+        )
+        pred_classes <- factor(
+          pred_classes, levels = class_levels
+        )
 
         pred_classes
       } else {
-        stop("Invalid prediction type for boosting. Use 'prob', 'class', or 'response'.", call. = FALSE)
+        stop(
+          "Invalid prediction type for boosting. ",
+          "Use 'prob', 'class', or 'response'.",
+          call. = FALSE
+        )
       }
     } else if (fit$distribution$name == "multinomial") {
       # Multiclass classification
       if (type == "prob") {
         # Get class probabilities
-        probs <- gbm::predict.gbm(fit, newdata = new_data, n.trees = n.trees, type = "response", ...)
+        probs <- gbm::predict.gbm(
+          fit, newdata = new_data,
+          n.trees = n_trees,
+          type = "response", ...
+        )
 
         # Reshape to data frame
         if (is.matrix(probs)) {
@@ -297,39 +347,67 @@ tl_predict_boost <- function(model, new_data, type = "response", n.trees = NULL,
           names(prob_df) <- class_levels
         } else {
           # For single prediction
-          response_var <- all.vars(model$spec$formula)[1]
-          class_levels <- levels(factor(model$data[[response_var]]))
-          prob_df <- as.data.frame(matrix(probs, nrow = 1))
+          response_var <- all.vars(
+            model$spec$formula
+          )[1]
+          class_levels <- levels(
+            factor(model$data[[response_var]])
+          )
+          prob_df <- as.data.frame(
+            matrix(probs, nrow = 1)
+          )
           names(prob_df) <- class_levels
         }
 
         tibble::as_tibble(prob_df)
       } else if (type == "class" || type == "response") {
         # Get class probabilities
-        probs <- gbm::predict.gbm(fit, newdata = new_data, n.trees = n.trees, type = "response", ...)
+        probs <- gbm::predict.gbm(
+          fit, newdata = new_data,
+          n.trees = n_trees,
+          type = "response", ...
+        )
 
         # Convert to classes
         if (is.matrix(probs)) {
           # Find class with highest probability
           class_idx <- apply(probs, 1, which.max)
           class_levels <- colnames(probs)
-          pred_classes <- factor(class_levels[class_idx], levels = class_levels)
+          pred_classes <- factor(
+            class_levels[class_idx],
+            levels = class_levels
+          )
         } else {
           # For single prediction
-          response_var <- all.vars(model$spec$formula)[1]
-          class_levels <- levels(factor(model$data[[response_var]]))
+          response_var <- all.vars(
+            model$spec$formula
+          )[1]
+          class_levels <- levels(
+            factor(model$data[[response_var]])
+          )
           class_idx <- which.max(probs)
-          pred_classes <- factor(class_levels[class_idx], levels = class_levels)
+          pred_classes <- factor(
+            class_levels[class_idx],
+            levels = class_levels
+          )
         }
 
         pred_classes
       } else {
-        stop("Invalid prediction type for boosting. Use 'prob', 'class', or 'response'.", call. = FALSE)
+        stop(
+          "Invalid prediction type for boosting. ",
+          "Use 'prob', 'class', or 'response'.",
+          call. = FALSE
+        )
       }
     }
   } else {
     # Regression predictions
-    preds <- gbm::predict.gbm(fit, newdata = new_data, n.trees = n.trees, type = "response", ...)
+    preds <- gbm::predict.gbm(
+      fit, newdata = new_data,
+      n.trees = n_trees,
+      type = "response", ...
+    )
     preds
   }
 }
@@ -387,7 +465,11 @@ tl_plot_importance <- function(model, top_n = 20, ...) {
       importance = imp$rel.inf
     )
   } else {
-    stop("Variable importance plot not implemented for method: ", method, call. = FALSE)
+    stop(
+      "Variable importance plot not implemented for method: ",
+      method,
+      call. = FALSE
+    )
   }
 
   # Filter and sort
@@ -396,7 +478,13 @@ tl_plot_importance <- function(model, top_n = 20, ...) {
     dplyr::slice_head(n = top_n)
 
   # Create the plot
-  p <- ggplot2::ggplot(importance_df, ggplot2::aes(x = stats::reorder(feature, importance), y = importance)) +
+  p <- ggplot2::ggplot(
+    importance_df,
+    ggplot2::aes(
+      x = stats::reorder(feature, importance),
+      y = importance
+    )
+  ) +
     ggplot2::geom_col(fill = "steelblue") +
     ggplot2::coord_flip() +
     ggplot2::labs(
@@ -431,14 +519,20 @@ tl_plot_tree <- function(model, ...) {
 #'
 #' @param model A tidylearn tree-based model object
 #' @param var Variable name to plot
-#' @param n.pts Number of points for continuous variables (default: 20)
+#' @param n_pts Number of points for continuous
+#'   variables (default: 20)
 #' @param ... Additional arguments
 #' @return A ggplot object
-#' @importFrom ggplot2 ggplot aes geom_line geom_point labs theme_minimal
+#' @importFrom ggplot2 ggplot aes geom_line geom_point
+#' @importFrom ggplot2 labs theme_minimal
 #' @export
-tl_plot_partial_dependence <- function(model, var, n.pts = 20, ...) {
+tl_plot_partial_dependence <- function(model, var, n_pts = 20, ...) {
   if (!model$spec$method %in% c("tree", "forest", "boost")) {
-    stop("Partial dependence plots are currently only implemented for tree-based models", call. = FALSE)
+    stop(
+      "Partial dependence plots are currently ",
+      "only implemented for tree-based models",
+      call. = FALSE
+    )
   }
 
   # Get the data
@@ -446,7 +540,11 @@ tl_plot_partial_dependence <- function(model, var, n.pts = 20, ...) {
 
   # Check if variable exists
   if (!var %in% names(data)) {
-    stop("Variable '", var, "' not found in the model data", call. = FALSE)
+    stop(
+      "Variable '", var,
+      "' not found in the model data",
+      call. = FALSE
+    )
   }
 
   # Get variable values
@@ -458,7 +556,11 @@ tl_plot_partial_dependence <- function(model, var, n.pts = 20, ...) {
     grid_values <- unique(var_values)
   } else {
     # For continuous variables, create a sequence
-    grid_values <- seq(min(var_values, na.rm = TRUE), max(var_values, na.rm = TRUE), length.out = n.pts)
+    grid_values <- seq(
+      min(var_values, na.rm = TRUE),
+      max(var_values, na.rm = TRUE),
+      length.out = n_pts
+    )
   }
 
   # Create prediction grid
@@ -502,27 +604,48 @@ tl_plot_partial_dependence <- function(model, var, n.pts = 20, ...) {
     result
   })
 
+  # Determine y-axis label
+  y_lab <- if (model$spec$is_classification) {
+    "Mean Probability"
+  } else {
+    "Mean Prediction"
+  }
+
   # Create the plot
   if (is.factor(var_values) || is.character(var_values)) {
     # Bar plot for categorical variables
-    p <- ggplot2::ggplot(pred_data, ggplot2::aes(x = var_value, y = y)) +
+    p <- ggplot2::ggplot(
+      pred_data,
+      ggplot2::aes(x = var_value, y = y)
+    ) +
       ggplot2::geom_col(fill = "steelblue") +
       ggplot2::labs(
-        title = paste0("Partial Dependence Plot for ", var),
+        title = paste0(
+          "Partial Dependence Plot for ", var
+        ),
         x = var,
-        y = if (model$spec$is_classification) "Mean Probability" else "Mean Prediction"
+        y = y_lab
       ) +
       ggplot2::theme_minimal() +
-      ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+      ggplot2::theme(
+        axis.text.x = ggplot2::element_text(
+          angle = 45, hjust = 1
+        )
+      )
   } else {
     # Line plot for continuous variables
-    p <- ggplot2::ggplot(pred_data, ggplot2::aes(x = var_value, y = y)) +
+    p <- ggplot2::ggplot(
+      pred_data,
+      ggplot2::aes(x = var_value, y = y)
+    ) +
       ggplot2::geom_line(color = "steelblue") +
       ggplot2::geom_point(color = "steelblue") +
       ggplot2::labs(
-        title = paste0("Partial Dependence Plot for ", var),
+        title = paste0(
+          "Partial Dependence Plot for ", var
+        ),
         x = var,
-        y = if (model$spec$is_classification) "Mean Probability" else "Mean Prediction"
+        y = y_lab
       ) +
       ggplot2::theme_minimal()
   }

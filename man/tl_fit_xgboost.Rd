@@ -28,7 +28,8 @@ tl_fit_xgboost(
 
 \item{formula}{A formula specifying the model}
 
-\item{is_classification}{Logical indicating if this is a classification problem}
+\item{is_classification}{Logical indicating if this is a
+classification problem}
 
 \item{nrounds}{Number of boosting rounds (default: 100)}
 
@@ -40,7 +41,8 @@ tl_fit_xgboost(
 
 \item{colsample_bytree}{Subsample ratio of columns (default: 1)}
 
-\item{min_child_weight}{Minimum sum of instance weight needed in a child (default: 1)}
+\item{min_child_weight}{Minimum sum of instance weight
+needed in a child (default: 1)}
 
 \item{gamma}{Minimum loss reduction to make a further partition (default: 0)}
 

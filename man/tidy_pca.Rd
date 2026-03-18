@@ -9,9 +9,11 @@ tidy_pca(data, cols = NULL, scale = TRUE, center = TRUE, method = "prcomp")
 \arguments{
 \item{data}{A data frame or tibble}
 
-\item{cols}{Columns to include in PCA (tidy select syntax). If NULL, uses all numeric columns.}
+\item{cols}{Columns to include in PCA (tidy select
+syntax). If NULL, uses all numeric columns.}
 
-\item{scale}{Logical; should variables be scaled to unit variance? Default TRUE.}
+\item{scale}{Logical; should variables be scaled to
+unit variance? Default TRUE.}
 
 \item{center}{Logical; should variables be centered? Default TRUE.}
 

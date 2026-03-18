@@ -10,9 +10,10 @@ tidy API.
 
 **What tidylearn does:**
 
+- Reads data from diverse sources (`tl_read()`) — files, databases, cloud, APIs
 - Provides one consistent interface (`tl_model()`) to 20+ ML algorithms
 - Returns tidy tibbles instead of varied output formats
-- Offers unified ggplot2-based visualization across all methods
+- Offers unified ggplot2-based visualization and formatted `gt` tables
 - Enables pipe-friendly workflows with `%>%`
 - Orchestrates complex workflows combining multiple techniques
 
@@ -63,6 +64,34 @@ tidy API.
 | `"dbscan"`  | dbscan               | `dbscan()`                      |
 
 ## Package Structure
+
+### Data Ingestion Module
+
+#### `read.R` - Unified Data Reading
+
+- **`tl_read()`**: Single entry point that auto-detects format and dispatches
+- **`tl_read_csv()`**, **`tl_read_tsv()`**: Delimited files via readr (base R fallback)
+- **`tl_read_excel()`**: Excel files via readxl
+- **`tl_read_parquet()`**: Parquet files via nanoparquet
+- **`tl_read_json()`**: JSON files via jsonlite
+- **`tl_read_rds()`**, **`tl_read_rdata()`**: Native R formats via base R
+- **`tl_read_dir()`**: Scan directories for data files
+- **`tl_read_zip()`**: Extract and read from zip archives
+- Multi-path support: `tl_read(c("a.csv", "b.csv"))` row-binds with `source_file` column
+- All readers return `tidylearn_data` objects (tibble subclass with source metadata)
+
+#### `read-backends.R` - Database and Cloud Readers
+
+- **`tl_read_db()`**: Query any live DBI connection
+- **`tl_read_sqlite()`**: Auto-connect to SQLite files via RSQLite
+- **`tl_read_postgres()`**: PostgreSQL via RPostgres
+- **`tl_read_mysql()`**: MySQL/MariaDB via RMariaDB
+- **`tl_read_bigquery()`**: Google BigQuery via bigrquery
+- **`tl_read_s3()`**: Amazon S3 via paws.storage
+- **`tl_read_github()`**: Raw file download from repositories
+- **`tl_read_kaggle()`**: Dataset download via Kaggle CLI
+
+All backend packages are suggested dependencies, checked at call time.
 
 ### Core Modules
 
@@ -131,6 +160,15 @@ Each module wraps specific packages:
 - `unsupervised-distance.R`: Distance metric utilities
 - `unsupervised-validation.R`: Cluster validation metrics
 
+### Publishing Modules
+
+- `visualization.R`: Unified ggplot2-based plotting — `plot()` dispatches by
+  model type, plus specialized plot functions (`tl_plot_*()`)
+- `tables.R`: Formatted `gt` tables — `tl_table()` dispatches by model type,
+  plus `tl_table_metrics()`, `tl_table_coefficients()`, `tl_table_confusion()`,
+  `tl_table_importance()`, `tl_table_variance()`, `tl_table_loadings()`,
+  `tl_table_clusters()`, `tl_table_comparison()`
+
 ### Supporting Modules
 
 - `pipeline.R`: Advanced modeling pipelines
@@ -139,20 +177,32 @@ Each module wraps specific packages:
 - `interactions.R`: Interaction effects analysis
 - `diagnostics.R`: Model diagnostics
 - `metrics.R`: Evaluation metrics
-- `visualization.R`: Unified ggplot2-based plotting
 - `utils.R`: Helper functions
 
 ## Function Naming Convention
 
+- `tl_read()` / `tl_read_*()`: Data ingestion from any source
 - `tl_model()`: Create any model (main user interface)
 - `tl_*()`: High-level user-facing functions
 - `tl_fit_*()`: Internal fitting functions (call underlying packages)
 - `tl_predict_*()`: Internal prediction functions
 - `tl_plot_*()`: Visualization functions
+- `tl_table()` / `tl_table_*()`: Formatted gt tables
 
 ## Usage Patterns
 
-### Pattern 1: Direct Model Fitting
+### Pattern 1: Full Pipeline
+
+```r
+# Ingest -> Prepare -> Model -> Evaluate -> Publish
+data <- tl_read("sales.csv")
+split <- tl_split(data, prop = 0.7, stratify = "target")
+model <- tl_model(split$train, target ~ ., method = "forest")
+tl_evaluate(model, new_data = split$test)
+tl_table_metrics(model, new_data = split$test)
+```
+
+### Pattern 2: Direct Model Fitting
 
 ```r
 # Wraps randomForest::randomForest()
@@ -162,7 +212,7 @@ model <- tl_model(data, y ~ ., method = "forest")
 randomForest::varImpPlot(model$fit)
 ```
 
-### Pattern 2: Workflow Orchestration
+### Pattern 3: Workflow Orchestration
 
 ```r
 # Coordinates multiple packages
@@ -172,7 +222,7 @@ enriched <- tl_add_cluster_features(reduced$data, response = "y")
 model <- tl_model(enriched, y ~ ., method = "forest")
 ```
 
-### Pattern 3: Automated ML
+### Pattern 4: Automated ML
 
 ```r
 # Tries multiple wrapped packages, returns best
@@ -191,9 +241,12 @@ tidylearn/
 ├── NEWS.md
 ├── cran-comments.md
 ├── PACKAGE_ARCHITECTURE.md  # This file
+├── .lintr                        # Lintr configuration
 ├── R/
-│   ├── core.R                    # Unified interface
 │   ├── utils.R                   # Utilities
+│   ├── read.R                    # Data ingestion dispatcher
+│   ├── read-backends.R           # Database/cloud readers
+│   ├── core.R                    # Unified model interface
 │   ├── preprocessing.R           # Data preparation
 │   ├── integration.R             # Workflow orchestration
 │   ├── workflows.R               # High-level workflows
@@ -205,7 +258,8 @@ tidylearn/
 │   ├── interactions.R            # Interaction effects
 │   ├── diagnostics.R             # Model diagnostics
 │   ├── metrics.R                 # Evaluation metrics
-│   └── visualization.R           # Unified plotting
+│   ├── visualization.R           # Unified plotting
+│   └── tables.R                  # Formatted gt tables
 ├── man/                          # Documentation (auto-generated)
 │   └── figures/
 │       └── logo.png              # Hex sticker
@@ -225,10 +279,13 @@ tidylearn/
 
 ### Optional Dependencies (Suggests)
 
-- keras, tensorflow (deep learning)
-- xgboost (gradient boosting)
-- arules, arulesViz (market basket analysis)
-- shiny, shinydashboard (interactive dashboards)
+- **Data ingestion**: readr, readxl, nanoparquet, jsonlite, DBI, RSQLite,
+  RPostgres, RMariaDB, bigrquery, paws.storage
+- **Tables**: gt
+- **Deep learning**: keras, tensorflow
+- **Gradient boosting**: xgboost
+- **Market basket**: arules, arulesViz
+- **Dashboards**: shiny, shinydashboard
 - Various visualization packages
 
 ## Acknowledgments

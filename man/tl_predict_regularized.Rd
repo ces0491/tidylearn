@@ -11,9 +11,11 @@ tl_predict_regularized(model, new_data, type = "response", lambda = "1se", ...)
 
 \item{new_data}{A data frame containing the new data}
 
-\item{type}{Type of prediction: "response" (default), "class" (for classification), "prob" (for classification)}
+\item{type}{Type of prediction: "response" (default),
+"class" or "prob" (for classification)}
 
-\item{lambda}{Which lambda to use for prediction ("1se" or "min", default: "1se")}
+\item{lambda}{Which lambda to use for prediction
+("1se" or "min", default: "1se")}
 
 \item{...}{Additional arguments}
 }

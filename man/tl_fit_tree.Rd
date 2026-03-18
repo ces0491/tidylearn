@@ -19,7 +19,8 @@ tl_fit_tree(
 
 \item{formula}{A formula specifying the model}
 
-\item{is_classification}{Logical indicating if this is a classification problem}
+\item{is_classification}{Logical indicating if this is a
+classification problem}
 
 \item{cp}{Complexity parameter (default: 0.01)}
 

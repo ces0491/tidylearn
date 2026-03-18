@@ -23,13 +23,15 @@ tl_tune_grid(
 
 \item{method}{The modeling method to tune}
 
-\item{param_grid}{A named list of parameter values to tune}
+\item{param_grid}{A named list of parameter values
+to tune}
 
 \item{folds}{Number of cross-validation folds}
 
 \item{metric}{Metric to optimize}
 
-\item{maximize}{Logical; whether to maximize (TRUE) or minimize (FALSE) the metric}
+\item{maximize}{Logical; whether to maximize (TRUE)
+or minimize (FALSE) the metric}
 
 \item{verbose}{Logical; whether to print progress}
 

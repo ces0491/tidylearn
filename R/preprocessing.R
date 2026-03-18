@@ -1,6 +1,7 @@
 #' Data Preprocessing for tidylearn
 #'
-#' Unified preprocessing functions that work with both supervised and unsupervised workflows
+#' Unified preprocessing functions that work with both
+#' supervised and unsupervised workflows
 
 #' Prepare Data for Machine Learning
 #'
@@ -9,9 +10,12 @@
 #'
 #' @param data A data frame
 #' @param formula Optional formula (for supervised learning)
-#' @param impute_method Method for missing value imputation: "mean", "median", "mode", "knn"
-#' @param scale_method Scaling method: "standardize", "normalize", "robust", "none"
-#' @param encode_categorical Whether to encode categorical variables (default: TRUE)
+#' @param impute_method Method for missing value imputation:
+#'   "mean", "median", "mode", "knn"
+#' @param scale_method Scaling method: "standardize",
+#'   "normalize", "robust", "none"
+#' @param encode_categorical Whether to encode categorical
+#'   variables (default: TRUE)
 #' @param remove_zero_variance Remove zero-variance features (default: TRUE)
 #' @param remove_correlated Remove highly correlated features (default: FALSE)
 #' @param correlation_cutoff Correlation threshold for removal (default: 0.95)
@@ -42,7 +46,8 @@ tl_prepare_data <- function(data, formula = NULL,
   # Separate predictors and response
   if (!is.null(response_var)) {
     response_data <- processed_data[[response_var]]
-    predictor_data <- processed_data %>% dplyr::select(-dplyr::all_of(response_var))
+    predictor_data <- processed_data %>%
+      dplyr::select(-dplyr::all_of(response_var))
   } else {
     response_data <- NULL
     predictor_data <- processed_data
@@ -58,7 +63,12 @@ tl_prepare_data <- function(data, formula = NULL,
 
   # 2. Encode categorical variables
   if (encode_categorical) {
-    cat_vars <- names(predictor_data)[sapply(predictor_data, function(x) is.factor(x) || is.character(x))]
+    cat_vars <- names(predictor_data)[
+      sapply(
+        predictor_data,
+        function(x) is.factor(x) || is.character(x)
+      )
+    ]
 
     if (length(cat_vars) > 0) {
       message("Encoding ", length(cat_vars), " categorical variables")
@@ -73,7 +83,8 @@ tl_prepare_data <- function(data, formula = NULL,
     zero_var_cols <- find_zero_variance(predictor_data)
     if (length(zero_var_cols) > 0) {
       message("Removing ", length(zero_var_cols), " zero-variance features")
-      predictor_data <- predictor_data %>% dplyr::select(-dplyr::all_of(zero_var_cols))
+      predictor_data <- predictor_data %>%
+        dplyr::select(-dplyr::all_of(zero_var_cols))
       preprocessing_steps$zero_variance <- zero_var_cols
     }
   }
@@ -87,7 +98,8 @@ tl_prepare_data <- function(data, formula = NULL,
 
       if (length(high_cor) > 0) {
         message("Removing ", length(high_cor), " highly correlated features")
-        predictor_data <- predictor_data %>% dplyr::select(-dplyr::all_of(high_cor))
+        predictor_data <- predictor_data %>%
+          dplyr::select(-dplyr::all_of(high_cor))
         preprocessing_steps$high_correlation <- high_cor
       }
     }
@@ -99,7 +111,10 @@ tl_prepare_data <- function(data, formula = NULL,
 
     if (length(numeric_cols) > 0) {
       message("Scaling numeric features using method: ", scale_method)
-      scaling_info <- scale_features(predictor_data, numeric_cols, method = scale_method)
+      scaling_info <- scale_features(
+        predictor_data, numeric_cols,
+        method = scale_method
+      )
       predictor_data <- scaling_info$data
       preprocessing_steps$scaling <- scaling_info
     }
@@ -167,7 +182,10 @@ encode_categoricals <- function(data, cat_vars) {
     # One-hot encode if more than 2 levels
     if (nlevels(encoded_data[[var]]) > 2) {
       # Create dummy variables
-      dummies <- stats::model.matrix(~ . - 1, data = data.frame(x = encoded_data[[var]]))
+      dummies <- stats::model.matrix(
+        ~ . - 1,
+        data = data.frame(x = encoded_data[[var]])
+      )
       colnames(dummies) <- paste0(var, "_", gsub("^x", "", colnames(dummies)))
 
       # Remove original column and add dummies

@@ -9,7 +9,8 @@ tl_plot_cv_results(cv_results, metrics = NULL)
 \arguments{
 \item{cv_results}{Cross-validation results from tl_cv function}
 
-\item{metrics}{Character vector of metrics to plot (if NULL, plots all metrics)}
+\item{metrics}{Character vector of metrics to plot
+(if NULL, plots all metrics)}
 }
 \value{
 A ggplot object with cross-validation results
