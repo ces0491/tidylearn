@@ -19,3 +19,10 @@ A tibble of predictions with cluster assignments
 \description{
 Predict from stratified models
 }
+\examples{
+\donttest{
+models <- tl_stratified_models(mtcars, mpg ~ .,
+  cluster_method = "kmeans", k = 2, supervised_method = "linear")
+preds <- predict(models)
+}
+}

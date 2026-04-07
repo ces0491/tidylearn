@@ -21,3 +21,10 @@ Invisibly returns the hclust object (plots as side effect)
 \description{
 Create dendrogram visualization
 }
+\examples{
+\donttest{
+hc <- tidy_hclust(USArrests, method = "ward.D2")
+tidy_dendrogram(hc, k = 3)
+}
+
+}

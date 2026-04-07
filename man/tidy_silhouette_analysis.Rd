@@ -32,3 +32,9 @@ A tibble with k and average silhouette widths
 \description{
 Silhouette Analysis Across Multiple k Values
 }
+\examples{
+\donttest{
+sil_analysis <- tidy_silhouette_analysis(iris[, 1:4], max_k = 6)
+}
+
+}

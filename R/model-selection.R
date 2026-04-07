@@ -17,6 +17,11 @@ NULL
 #' @param steps Maximum number of steps to take
 #' @param ... Additional arguments to pass to step()
 #' @return A selected model
+#' @examples
+#' \donttest{
+#' model <- tl_step_selection(mtcars, mpg ~ ., direction = "backward")
+#' summary(model)
+#' }
 #' @export
 tl_step_selection <- function(data, formula, direction = "backward",
                               criterion = "AIC",
@@ -93,6 +98,13 @@ tl_step_selection <- function(data, formula, direction = "backward",
 #' @param metrics Character vector of metrics to compute
 #' @param ... Additional arguments
 #' @return A tibble with cross-validation results for all models
+#' @examples
+#' \donttest{
+#' m1 <- tl_model(mtcars, mpg ~ wt, method = "linear")
+#' m2 <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+#' cv <- tl_compare_cv(mtcars, list(simple = m1, full = m2), folds = 3)
+#' cv$summary
+#' }
 #' @export
 tl_compare_cv <- function(data, models, folds = 5, metrics = NULL, ...) {
   # Check if all models are tidylearn models
@@ -193,6 +205,13 @@ tl_compare_cv <- function(data, models, folds = 5, metrics = NULL, ...) {
 #'   (if NULL, plots all metrics)
 #' @return A ggplot object
 #' @importFrom ggplot2 ggplot aes geom_boxplot facet_wrap labs theme_minimal
+#' @examples
+#' \donttest{
+#' m1 <- tl_model(mtcars, mpg ~ wt, method = "linear")
+#' m2 <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+#' cv <- tl_compare_cv(mtcars, list(simple = m1, full = m2), folds = 3)
+#' tl_plot_cv_comparison(cv)
+#' }
 #' @export
 tl_plot_cv_comparison <- function(cv_results, metrics = NULL) {
   # Extract fold metrics
@@ -231,6 +250,13 @@ tl_plot_cv_comparison <- function(cv_results, metrics = NULL) {
 #' @param metric Name of the metric to compare
 #' @return A data frame with statistical test results
 #' @importFrom stats t.test wilcox.test p.adjust
+#' @examples
+#' \donttest{
+#' m1 <- tl_model(mtcars, mpg ~ wt, method = "linear")
+#' m2 <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+#' cv <- tl_compare_cv(mtcars, list(simple = m1, full = m2), folds = 3)
+#' tl_test_model_difference(cv, baseline_model = "simple", metric = "rmse")
+#' }
 #' @export
 tl_test_model_difference <- function(
     cv_results,

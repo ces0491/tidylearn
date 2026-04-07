@@ -23,3 +23,9 @@ A ggplot object
 \description{
 Plot variable importance for a regularized model
 }
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ ., method = "lasso")
+tl_plot_importance_regularized(model)
+}
+}

@@ -20,3 +20,10 @@ A ggplot object
 \description{
 Visualize variance explained by each principal component
 }
+\examples{
+\donttest{
+pca <- tidy_pca(USArrests)
+tidy_pca_screeplot(pca)
+}
+
+}

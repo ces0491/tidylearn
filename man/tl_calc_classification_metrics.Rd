@@ -33,3 +33,10 @@ A tibble of evaluation metrics
 \description{
 Calculate classification metrics
 }
+\examples{
+\donttest{
+model <- tl_model(iris, Species ~ ., method = "forest")
+preds <- predict(model)
+tl_calc_classification_metrics(iris$Species, preds$.pred)
+}
+}

@@ -23,3 +23,10 @@ Combined plot grid
 \description{
 Generate a multi-panel summary of clustering results
 }
+\examples{
+\donttest{
+df <- iris[, 1:4]
+df$cluster <- kmeans(df, 3)$cluster
+create_cluster_dashboard(df)
+}
+}

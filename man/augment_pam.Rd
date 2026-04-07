@@ -17,3 +17,10 @@ Original data with cluster column added
 \description{
 Augment Data with PAM Cluster Assignments
 }
+\examples{
+\donttest{
+pm <- tidy_pam(iris[, 1:4], k = 3)
+augmented <- augment_pam(pm, iris)
+}
+
+}

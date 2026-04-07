@@ -502,6 +502,11 @@ tl_plot_importance <- function(model, top_n = 20, ...) {
 #' @param model A tidylearn tree model object
 #' @param ... Additional arguments to pass to rpart.plot()
 #' @return A plot of the decision tree
+#' @examples
+#' \donttest{
+#' model <- tl_model(iris, Species ~ ., method = "tree")
+#' tl_plot_tree(model)
+#' }
 #' @export
 tl_plot_tree <- function(model, ...) {
   # Check if rpart.plot is installed
@@ -525,6 +530,11 @@ tl_plot_tree <- function(model, ...) {
 #' @return A ggplot object
 #' @importFrom ggplot2 ggplot aes geom_line geom_point
 #' @importFrom ggplot2 labs theme_minimal
+#' @examples
+#' \donttest{
+#' model <- tl_model(mtcars, mpg ~ ., method = "forest")
+#' tl_plot_partial_dependence(model, var = "wt")
+#' }
 #' @export
 tl_plot_partial_dependence <- function(model, var, n.pts = 20, ...) {
   if (!model$spec$method %in% c("tree", "forest", "boost")) {

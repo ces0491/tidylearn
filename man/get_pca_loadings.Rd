@@ -17,3 +17,10 @@ A tibble with loadings in wide format
 \description{
 Get PCA Loadings in Wide Format
 }
+\examples{
+\donttest{
+pca <- tidy_pca(USArrests)
+get_pca_loadings(pca, n_components = 2)
+}
+
+}

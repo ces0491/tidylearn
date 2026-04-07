@@ -17,3 +17,9 @@ Invisibly returns the input object x
 \description{
 Print method for tidylearn models
 }
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+print(model)
+}
+}

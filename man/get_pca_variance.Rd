@@ -15,3 +15,10 @@ A tibble with variance statistics
 \description{
 Get Variance Explained Summary
 }
+\examples{
+\donttest{
+pca <- tidy_pca(USArrests)
+get_pca_variance(pca)
+}
+
+}

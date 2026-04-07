@@ -35,3 +35,9 @@ A ggplot object
 \description{
 Plot influence diagnostics
 }
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+tl_plot_influence(model, plot_type = "cook")
+}
+}

@@ -45,11 +45,3 @@ Automatically explores multiple modeling approaches including
 dimensionality reduction, clustering, and various supervised methods.
 Returns the best performing model based on cross-validation.
 }
-\examples{
-\donttest{
-# Automated modeling
-result <- tl_auto_ml(iris, Species ~ .)
-best_model <- result$best_model
-result$leaderboard
-}
-}

@@ -43,6 +43,6 @@ reduced <- tl_reduce_dimensions(
   iris, response = "Species",
   method = "pca", n_components = 3
 )
-model <- tl_model(reduced$data, Species ~ ., method = "logistic")
+model <- tl_model(reduced$data, Species ~ ., method = "tree")
 }
 }

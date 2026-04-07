@@ -17,3 +17,10 @@ Invisibly returns the input object x
 \description{
 Print Method for tidy_gap
 }
+\examples{
+\donttest{
+gap <- tidy_gap_stat(iris[, 1:4], max_k = 6, B = 10)
+print(gap)
+}
+
+}

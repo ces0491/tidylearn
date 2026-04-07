@@ -19,3 +19,10 @@ A tibble with k and corresponding total within-cluster SS
 \description{
 Used for elbow method to determine optimal k
 }
+\examples{
+\donttest{
+wss <- calc_wss(iris[, 1:4], max_k = 6)
+plot(wss$k, wss$tot_withinss, type = "b")
+}
+
+}

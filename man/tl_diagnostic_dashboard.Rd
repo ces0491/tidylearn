@@ -29,3 +29,11 @@ A plot grid with diagnostic plots
 \description{
 Create a comprehensive diagnostic dashboard
 }
+\examples{
+\donttest{
+if (requireNamespace("gridExtra")) {
+  model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+  tl_diagnostic_dashboard(model)
+}
+}
+}

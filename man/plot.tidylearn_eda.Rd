@@ -18,3 +18,9 @@ called for side effects (plotting)
 \description{
 Plot EDA results
 }
+\examples{
+\donttest{
+eda <- tl_explore(iris, response = "Species")
+plot(eda)
+}
+}

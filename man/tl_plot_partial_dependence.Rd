@@ -22,3 +22,9 @@ A ggplot object
 \description{
 Plot partial dependence for tree-based models
 }
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ ., method = "forest")
+tl_plot_partial_dependence(model, var = "wt")
+}
+}

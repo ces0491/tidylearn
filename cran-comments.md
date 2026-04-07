@@ -3,9 +3,8 @@
 ## Minor release (0.3.0)
 
 This release adds a new `tl_read()` family of data ingestion functions,
-enabling users to read data from files, databases, and cloud sources
-into tidy tibbles — completing the tidylearn workflow from data
-extraction to model publishing.
+fixes the classification auto-detection heuristic, and substantially
+expands test coverage.
 
 ### New features
 
@@ -22,11 +21,22 @@ extraction to model publishing.
 * All backend packages are suggested dependencies only
 * New "Data Ingestion with tidylearn" vignette
 
+### Bug fixes
+
+* Fixed classification auto-detection silently misclassifying numeric
+  responses with few unique values
+* Fixed `tl_check_assumptions()` crashing when optional test packages
+  were not installed
+
+### Tests
+
+* Added 150 new tests across visualization, tuning, and diagnostics modules
+* Total test count: 509 passing, 0 failures
+
 ### Code quality
 
 * Package-wide lint cleanup (zero lintr issues)
 * Replaced unsafe `1:n` patterns with `seq_len()` / `seq_along()`
-* Removed unused variables, renamed non-snake_case variables
 
 ### New suggested dependencies
 
@@ -39,7 +49,9 @@ RMariaDB, bigrquery, paws.storage — all on CRAN
 
 ## Test environments
 
-* Windows 11 x64, R 4.5.2
+* local: Windows 11 x64, R 4.5.2
+* GitHub Actions: ubuntu-latest (R release, R devel),
+  macos-latest (R release), windows-latest (R release)
 
 ## Downstream dependencies
 

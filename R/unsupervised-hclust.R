@@ -75,6 +75,13 @@ tidy_hclust <- function(data, method = "average",
 #' @param h Height at which to cut (optional)
 #'
 #' @return A tibble with observation IDs and cluster assignments
+#'
+#' @examples
+#' \donttest{
+#' hc <- tidy_hclust(USArrests, method = "ward.D2")
+#' clusters <- tidy_cutree(hc, k = 3)
+#' }
+#'
 #' @export
 tidy_cutree <- function(hclust_obj, k = NULL, h = NULL) {
 
@@ -115,6 +122,13 @@ tidy_cutree <- function(hclust_obj, k = NULL, h = NULL) {
 #' @param h Height at which to cut (optional)
 #'
 #' @return Original data with cluster column added
+#'
+#' @examples
+#' \donttest{
+#' hc <- tidy_hclust(USArrests, method = "ward.D2")
+#' augmented <- augment_hclust(hc, USArrests, k = 3)
+#' }
+#'
 #' @export
 augment_hclust <- function(hclust_obj, data, k = NULL, h = NULL) {
 
@@ -145,6 +159,13 @@ augment_hclust <- function(hclust_obj, data, k = NULL, h = NULL) {
 #' @param cex Label size (default: 0.7)
 #'
 #' @return Invisibly returns the hclust object (plots as side effect)
+#'
+#' @examples
+#' \donttest{
+#' hc <- tidy_hclust(USArrests, method = "ward.D2")
+#' tidy_dendrogram(hc, k = 3)
+#' }
+#'
 #' @export
 tidy_dendrogram <- function(hclust_obj, k = NULL, hang = 0.01, cex = 0.7) {
 
@@ -188,6 +209,13 @@ tidy_dendrogram <- function(hclust_obj, k = NULL, hang = 0.01, cex = 0.7) {
 #' @param max_k Maximum number of clusters to test (default: 10)
 #'
 #' @return A list with optimal k and evaluation results
+#'
+#' @examples
+#' \donttest{
+#' hc <- tidy_hclust(USArrests, method = "ward.D2")
+#' opt <- optimal_hclust_k(hc, method = "silhouette", max_k = 6)
+#' }
+#'
 #' @export
 optimal_hclust_k <- function(hclust_obj, method = "silhouette", max_k = 10) {
 
@@ -242,6 +270,13 @@ optimal_hclust_k <- function(hclust_obj, method = "silhouette", max_k = 10) {
 #' @param ... Additional arguments (ignored)
 #'
 #' @return Invisibly returns the input object x
+#'
+#' @examples
+#' \donttest{
+#' hc <- tidy_hclust(USArrests, method = "ward.D2")
+#' print(hc)
+#' }
+#'
 #' @export
 print.tidy_hclust <- function(x, ...) {
   cat("Tidy Hierarchical Clustering\n")

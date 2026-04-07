@@ -17,3 +17,9 @@ A list of dist objects named by method
 \description{
 Compute distances using multiple methods for comparison
 }
+\examples{
+\donttest{
+dists <- compare_distances(iris[, 1:4], methods = c("euclidean", "manhattan"))
+}
+
+}

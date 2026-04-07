@@ -26,3 +26,11 @@ A data frame with statistical test results
 \description{
 Perform statistical comparison of models using cross-validation
 }
+\examples{
+\donttest{
+m1 <- tl_model(mtcars, mpg ~ wt, method = "linear")
+m2 <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+cv <- tl_compare_cv(mtcars, list(simple = m1, full = m2), folds = 3)
+tl_test_model_difference(cv, baseline_model = "simple", metric = "rmse")
+}
+}

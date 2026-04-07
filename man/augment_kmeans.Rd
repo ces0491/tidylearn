@@ -17,3 +17,10 @@ Original data with cluster column added
 \description{
 Augment Data with K-Means Cluster Assignments
 }
+\examples{
+\donttest{
+km <- tidy_kmeans(iris[, 1:4], k = 3)
+augmented <- augment_kmeans(km, iris)
+}
+
+}

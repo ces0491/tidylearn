@@ -20,3 +20,11 @@ A Shiny app object
 \description{
 Create interactive visualization dashboard for a model
 }
+\examples{
+\donttest{
+if (requireNamespace("shiny")) {
+  model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+  app <- tl_dashboard(model)
+}
+}
+}

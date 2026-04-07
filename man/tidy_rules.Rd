@@ -15,3 +15,14 @@ A tibble with one row per rule
 \description{
 Convert Association Rules to Tidy Tibble
 }
+\examples{
+\donttest{
+if (requireNamespace("arules", quietly = TRUE)) {
+  data("Groceries", package = "arules")
+  rules_obj <- arules::apriori(Groceries,
+    parameter = list(supp = 0.001, conf = 0.5))
+  rules_tbl <- tidy_rules(rules_obj)
+}
+}
+
+}

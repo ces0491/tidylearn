@@ -84,7 +84,14 @@ new_tidylearn_data <- function(data, source, format, timestamp = Sys.time()) {
 #'
 #' @param x A \code{tidylearn_data} object.
 #' @param ... Additional arguments passed to the tibble print method.
-#'
+#' @return Invisibly returns \code{x}.
+#' @examples
+#' \donttest{
+#' f <- tempfile(fileext = ".csv")
+#' write.csv(iris, f, row.names = FALSE)
+#' d <- tl_read(f)
+#' print(d)
+#' }
 #' @export
 print.tidylearn_data <- function(x, ...) {
   cat("-- tidylearn data ---------\n")

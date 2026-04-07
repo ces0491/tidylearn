@@ -11,6 +11,12 @@
 #' @param ... Additional arguments passed to distance functions
 #'
 #' @return A dist object with tidy attributes
+#'
+#' @examples
+#' \donttest{
+#' d <- tidy_dist(iris[, 1:4], method = "euclidean")
+#' }
+#'
 #' @export
 tidy_dist <- function(data, method = "euclidean", cols = NULL, ...) {
 
@@ -166,6 +172,12 @@ tidy_gower <- function(data, weights = NULL) {
 #' @param scale Logical; scale variables to unit variance? (default: TRUE)
 #'
 #' @return A tibble with standardized numeric variables
+#'
+#' @examples
+#' \donttest{
+#' std <- standardize_data(iris[, 1:4])
+#' }
+#'
 #' @export
 standardize_data <- function(data, center = TRUE, scale = TRUE) {
 
@@ -197,6 +209,12 @@ standardize_data <- function(data, center = TRUE, scale = TRUE) {
 #' @param methods Character vector of methods to compare
 #'
 #' @return A list of dist objects named by method
+#'
+#' @examples
+#' \donttest{
+#' dists <- compare_distances(iris[, 1:4], methods = c("euclidean", "manhattan"))
+#' }
+#'
 #' @export
 compare_distances <- function(
     data,

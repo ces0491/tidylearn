@@ -46,3 +46,14 @@ A list with the best model and tuning results
 \description{
 Tune a deep learning model
 }
+\examples{
+\dontrun{
+if (requireNamespace("keras", quietly = TRUE)) {
+  result <- tl_tune_deep(iris, Species ~ .,
+    is_classification = TRUE,
+    hidden_layers_options = list(c(10), c(10, 5)),
+    learning_rates = c(0.01, 0.001), batch_sizes = c(32),
+    epochs = 5)
+}
+}
+}

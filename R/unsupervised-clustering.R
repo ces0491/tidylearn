@@ -79,6 +79,13 @@ tidy_kmeans <- function(data, k, cols = NULL, nstart = 25, iter_max = 100,
 #' @param data Original data frame
 #'
 #' @return Original data with cluster column added
+#'
+#' @examples
+#' \donttest{
+#' km <- tidy_kmeans(iris[, 1:4], k = 3)
+#' augmented <- augment_kmeans(km, iris)
+#' }
+#'
 #' @export
 augment_kmeans <- function(kmeans_obj, data) {
 
@@ -190,6 +197,13 @@ tidy_pam <- function(data, k, metric = "euclidean", cols = NULL) {
 #' @param data Original data frame
 #'
 #' @return Original data with cluster column added
+#'
+#' @examples
+#' \donttest{
+#' pm <- tidy_pam(iris[, 1:4], k = 3)
+#' augmented <- augment_pam(pm, iris)
+#' }
+#'
 #' @export
 augment_pam <- function(pam_obj, data) {
 
@@ -283,6 +297,13 @@ tidy_clara <- function(data, k, metric = "euclidean",
 #' @param nstart Number of random starts for each k (default: 25)
 #'
 #' @return A tibble with k and corresponding total within-cluster SS
+#'
+#' @examples
+#' \donttest{
+#' wss <- calc_wss(iris[, 1:4], max_k = 6)
+#' plot(wss$k, wss$tot_withinss, type = "b")
+#' }
+#'
 #' @export
 calc_wss <- function(data, max_k = 10, nstart = 25) {
 
@@ -314,6 +335,12 @@ calc_wss <- function(data, max_k = 10, nstart = 25) {
 #' @param methods Vector of methods: "silhouette", "gap", "wss" (default: all)
 #'
 #' @return A list with results from each method
+#'
+#' @examples
+#' \donttest{
+#' opt <- optimal_clusters(iris[, 1:4], max_k = 6, methods = "wss")
+#' }
+#'
 #' @export
 optimal_clusters <- function(
     data, max_k = 10,
@@ -346,6 +373,13 @@ optimal_clusters <- function(
 #' @param ... Additional arguments (ignored)
 #'
 #' @return Invisibly returns the input object x
+#'
+#' @examples
+#' \donttest{
+#' km <- tidy_kmeans(iris[, 1:4], k = 3)
+#' print(km)
+#' }
+#'
 #' @export
 print.tidy_kmeans <- function(x, ...) {
   cat("Tidy K-Means Clustering\n")
@@ -370,6 +404,13 @@ print.tidy_kmeans <- function(x, ...) {
 #' @param ... Additional arguments (ignored)
 #'
 #' @return Invisibly returns the input object x
+#'
+#' @examples
+#' \donttest{
+#' pm <- tidy_pam(iris[, 1:4], k = 3)
+#' print(pm)
+#' }
+#'
 #' @export
 print.tidy_pam <- function(x, ...) {
   cat("Tidy PAM Clustering\n")

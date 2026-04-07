@@ -15,3 +15,13 @@ A list with summary statistics
 \description{
 Get summary statistics about rules
 }
+\examples{
+\donttest{
+if (requireNamespace("arules", quietly = TRUE)) {
+  data("Groceries", package = "arules")
+  res <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
+  summarize_rules(res)
+}
+}
+
+}

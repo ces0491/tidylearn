@@ -30,3 +30,8 @@ A list with outlier detection results
 \description{
 Detect outliers in the data
 }
+\examples{
+\donttest{
+tl_detect_outliers(mtcars, variables = c("mpg", "wt"), method = "iqr")
+}
+}

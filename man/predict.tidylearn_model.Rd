@@ -25,3 +25,10 @@ Predictions as a tibble
 \description{
 Unified prediction interface for both supervised and unsupervised models
 }
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+predict(model)
+predict(model, new_data = mtcars[1:5, ])
+}
+}

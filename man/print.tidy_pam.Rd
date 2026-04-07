@@ -17,3 +17,10 @@ Invisibly returns the input object x
 \description{
 Print Method for tidy_pam
 }
+\examples{
+\donttest{
+pm <- tidy_pam(iris[, 1:4], k = 3)
+print(pm)
+}
+
+}

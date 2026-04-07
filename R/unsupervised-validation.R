@@ -12,6 +12,13 @@
 #'   \item cluster_avg: average silhouette width by cluster
 #' }
 #'
+#' @examples
+#' \donttest{
+#' km <- kmeans(iris[, 1:4], centers = 3, nstart = 25)
+#' d <- dist(iris[, 1:4])
+#' sil <- tidy_silhouette(km$cluster, d)
+#' }
+#'
 #' @export
 tidy_silhouette <- function(clusters, dist_mat) {
 
@@ -64,6 +71,12 @@ tidy_silhouette <- function(clusters, dist_mat) {
 #' @param linkage_method If hclust, linkage method (default: "average")
 #'
 #' @return A tibble with k and average silhouette widths
+#'
+#' @examples
+#' \donttest{
+#' sil_analysis <- tidy_silhouette_analysis(iris[, 1:4], max_k = 6)
+#' }
+#'
 #' @export
 tidy_silhouette_analysis <- function(data, max_k = 10, method = "kmeans",
                                      nstart = 25, dist_method = "euclidean",
@@ -109,6 +122,15 @@ tidy_silhouette_analysis <- function(data, max_k = 10, method = "kmeans",
 #'   from tidy_silhouette_analysis
 #'
 #' @return A ggplot object
+#'
+#' @examples
+#' \donttest{
+#' km <- kmeans(iris[, 1:4], centers = 3, nstart = 25)
+#' d <- dist(iris[, 1:4])
+#' sil <- tidy_silhouette(km$cluster, d)
+#' plot_silhouette(sil)
+#' }
+#'
 #' @export
 plot_silhouette <- function(sil_obj) {
 
@@ -144,7 +166,7 @@ plot_silhouette <- function(sil_obj) {
     optimal_k <- attr(sil_obj, "optimal_k")
 
     p <- ggplot2::ggplot(sil_obj, ggplot2::aes(x = k, y = avg_sil_width)) +
-      ggplot2::geom_line(color = "steelblue", size = 1) +
+      ggplot2::geom_line(color = "steelblue", linewidth = 1) +
       ggplot2::geom_point(color = "steelblue", size = 3) +
       ggplot2::geom_point(
         data = sil_obj %>% dplyr::filter(k == optimal_k),
@@ -180,6 +202,13 @@ plot_silhouette <- function(sil_obj) {
 #' @param nstart If using kmeans, number of random starts (default: 25)
 #'
 #' @return A list of class "tidy_gap" containing gap statistics
+#'
+#' @examples
+#' \donttest{
+#' gap <- tidy_gap_stat(iris[, 1:4], max_k = 6, B = 10)
+#' gap$recommended_k
+#' }
+#'
 #' @export
 tidy_gap_stat <- function(data, FUN_cluster = NULL,
                           max_k = 10, B = 50,
@@ -241,6 +270,13 @@ tidy_gap_stat <- function(data, FUN_cluster = NULL,
 #'   selection methods? (default: FALSE)
 #'
 #' @return A ggplot object
+#'
+#' @examples
+#' \donttest{
+#' gap <- tidy_gap_stat(iris[, 1:4], max_k = 6, B = 10)
+#' plot_gap_stat(gap)
+#' }
+#'
 #' @export
 plot_gap_stat <- function(gap_obj, show_methods = FALSE) {
 
@@ -251,7 +287,7 @@ plot_gap_stat <- function(gap_obj, show_methods = FALSE) {
   gap_data <- gap_obj$gap_data
 
   p <- ggplot2::ggplot(gap_data, ggplot2::aes(x = k, y = gap)) +
-    ggplot2::geom_line(color = "steelblue", size = 1) +
+    ggplot2::geom_line(color = "steelblue", linewidth = 1) +
     ggplot2::geom_point(color = "steelblue", size = 3) +
     ggplot2::geom_errorbar(
       ggplot2::aes(ymin = gap - SE.sim, ymax = gap + SE.sim),
@@ -323,6 +359,14 @@ plot_gap_stat <- function(gap_obj, show_methods = FALSE) {
 #' @param dist_mat Distance matrix (for silhouette)
 #'
 #' @return A tibble with validation metrics
+#'
+#' @examples
+#' \donttest{
+#' km <- kmeans(iris[, 1:4], centers = 3, nstart = 25)
+#' d <- dist(iris[, 1:4])
+#' metrics <- calc_validation_metrics(km$cluster, iris[, 1:4], d)
+#' }
+#'
 #' @export
 calc_validation_metrics <- function(clusters, data = NULL, dist_mat = NULL) {
 
@@ -374,6 +418,14 @@ calc_validation_metrics <- function(clusters, data = NULL, dist_mat = NULL) {
 #' @param dist_mat Distance matrix
 #'
 #' @return A tibble comparing all clustering results
+#'
+#' @examples
+#' \donttest{
+#' km3 <- kmeans(iris[, 1:4], 3, nstart = 25)$cluster
+#' km4 <- kmeans(iris[, 1:4], 4, nstart = 25)$cluster
+#' compare_clusterings(list(k3 = km3, k4 = km4), iris[, 1:4])
+#' }
+#'
 #' @export
 compare_clusterings <- function(cluster_list, data, dist_mat = NULL) {
 
@@ -398,6 +450,15 @@ compare_clusterings <- function(cluster_list, data, dist_mat = NULL) {
 #' @param ... Additional arguments (ignored)
 #'
 #' @return Invisibly returns the input object x
+#'
+#' @examples
+#' \donttest{
+#' km <- kmeans(iris[, 1:4], centers = 3, nstart = 25)
+#' d <- dist(iris[, 1:4])
+#' sil <- tidy_silhouette(km$cluster, d)
+#' print(sil)
+#' }
+#'
 #' @export
 print.tidy_silhouette <- function(x, ...) {
   cat("Tidy Silhouette Analysis\n")
@@ -423,6 +484,13 @@ print.tidy_silhouette <- function(x, ...) {
 #' @param ... Additional arguments (ignored)
 #'
 #' @return Invisibly returns the input object x
+#'
+#' @examples
+#' \donttest{
+#' gap <- tidy_gap_stat(iris[, 1:4], max_k = 6, B = 10)
+#' print(gap)
+#' }
+#'
 #' @export
 print.tidy_gap <- function(x, ...) {
   cat("Tidy Gap Statistic\n")

@@ -19,3 +19,11 @@ A tibble comparing all clustering results
 \description{
 Compare Multiple Clustering Results
 }
+\examples{
+\donttest{
+km3 <- kmeans(iris[, 1:4], 3, nstart = 25)$cluster
+km4 <- kmeans(iris[, 1:4], 4, nstart = 25)$cluster
+compare_clusterings(list(k3 = km3, k4 = km4), iris[, 1:4])
+}
+
+}

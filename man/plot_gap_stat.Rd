@@ -18,3 +18,10 @@ A ggplot object
 \description{
 Plot Gap Statistic
 }
+\examples{
+\donttest{
+gap <- tidy_gap_stat(iris[, 1:4], max_k = 6, B = 10)
+plot_gap_stat(gap)
+}
+
+}

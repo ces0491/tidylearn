@@ -19,3 +19,9 @@ A tibble with standardized numeric variables
 \description{
 Center and/or scale numeric variables
 }
+\examples{
+\donttest{
+std <- standardize_data(iris[, 1:4])
+}
+
+}

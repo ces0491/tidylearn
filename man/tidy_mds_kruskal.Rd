@@ -19,3 +19,10 @@ A tidy_mds object
 \description{
 Performs Kruskal's isoMDS
 }
+\examples{
+\donttest{
+d <- dist(USArrests)
+mds <- tidy_mds_kruskal(d)
+}
+
+}

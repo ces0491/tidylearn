@@ -21,3 +21,9 @@ A ggplot object
 \description{
 Visualize k-NN distances to help choose eps
 }
+\examples{
+\donttest{
+plot_knn_dist(iris[, 1:4], k = 5)
+}
+
+}

@@ -17,3 +17,10 @@ Invisibly returns the input object x
 \description{
 Print Method for tidy_dbscan
 }
+\examples{
+\donttest{
+db <- tidy_dbscan(iris[, 1:4], eps = 0.5, minPts = 5)
+print(db)
+}
+
+}

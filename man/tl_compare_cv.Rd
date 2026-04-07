@@ -23,3 +23,11 @@ A tibble with cross-validation results for all models
 \description{
 Compare models using cross-validation
 }
+\examples{
+\donttest{
+m1 <- tl_model(mtcars, mpg ~ wt, method = "linear")
+m2 <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+cv <- tl_compare_cv(mtcars, list(simple = m1, full = m2), folds = 3)
+cv$summary
+}
+}

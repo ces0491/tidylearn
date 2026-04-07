@@ -24,7 +24,7 @@
 #' @examples
 #' \donttest{
 #' processed <- tl_prepare_data(iris, Species ~ ., scale_method = "standardize")
-#' model <- tl_model(processed$data, Species ~ ., method = "logistic")
+#' model <- tl_model(processed$data, Species ~ ., method = "tree")
 #' }
 tl_prepare_data <- function(data, formula = NULL,
                             impute_method = "mean",

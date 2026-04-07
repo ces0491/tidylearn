@@ -19,3 +19,10 @@ A tidy_mds object
 \description{
 Performs Sammon's non-linear mapping
 }
+\examples{
+\donttest{
+d <- dist(USArrests)
+mds <- tidy_mds_sammon(d)
+}
+
+}

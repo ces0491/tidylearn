@@ -43,3 +43,10 @@ A list with the best model and tuning results
 \description{
 Tune hyperparameters for a model using grid search
 }
+\examples{
+\donttest{
+model <- tl_tune_grid(iris, Species ~ ., method = "tree",
+  param_grid = list(cp = c(0.01, 0.1), minsplit = c(10, 20)),
+  folds = 2, verbose = FALSE)
+}
+}

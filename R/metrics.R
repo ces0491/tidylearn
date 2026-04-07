@@ -17,6 +17,12 @@ NULL
 #'   for threshold-dependent metrics
 #' @param ... Additional arguments
 #' @return A tibble of evaluation metrics
+#' @examples
+#' \donttest{
+#' model <- tl_model(iris, Species ~ ., method = "forest")
+#' preds <- predict(model)
+#' tl_calc_classification_metrics(iris$Species, preds$.pred)
+#' }
 #' @export
 tl_calc_classification_metrics <- function(
     actuals, predicted,
@@ -232,6 +238,11 @@ tl_evaluate_thresholds <- function(actuals, probs, thresholds, pos_class) {
 #'   (if NULL, uses training data)
 #' @param ... Additional arguments
 #' @return A tibble of evaluation metrics
+#' @examples
+#' \donttest{
+#' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+#' tl_evaluate(model)
+#' }
 #' @export
 tl_evaluate <- function(object, new_data = NULL, ...) {
   if (is.null(new_data)) {
@@ -284,6 +295,11 @@ tl_evaluate <- function(object, new_data = NULL, ...) {
 #' @param folds Number of cross-validation folds
 #' @param ... Additional arguments
 #' @return Cross-validation results
+#' @examples
+#' \donttest{
+#' cv <- tl_cv(mtcars, mpg ~ wt + hp, method = "linear", folds = 3)
+#' cv$summary
+#' }
 #' @export
 tl_cv <- function(data, formula, method, folds = 5, ...) {
   n <- nrow(data)

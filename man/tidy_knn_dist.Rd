@@ -20,3 +20,9 @@ A tibble with observation IDs and k-NN distances
 \description{
 Calculate distances to k-th nearest neighbor for each point
 }
+\examples{
+\donttest{
+knn <- tidy_knn_dist(iris[, 1:4], k = 5)
+}
+
+}

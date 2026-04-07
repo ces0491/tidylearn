@@ -17,3 +17,9 @@ A plot of the decision tree
 \description{
 Plot a decision tree
 }
+\examples{
+\donttest{
+model <- tl_model(iris, Species ~ ., method = "tree")
+tl_plot_tree(model)
+}
+}

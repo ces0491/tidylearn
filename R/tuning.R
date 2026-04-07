@@ -21,6 +21,12 @@ NULL
 #' @param verbose Logical; whether to print progress
 #' @param ... Additional arguments passed to tl_model
 #' @return A list with the best model and tuning results
+#' @examples
+#' \donttest{
+#' model <- tl_tune_grid(iris, Species ~ ., method = "tree",
+#'   param_grid = list(cp = c(0.01, 0.1), minsplit = c(10, 20)),
+#'   folds = 2, verbose = FALSE)
+#' }
 #' @export
 tl_tune_grid <- function(data, formula, method,
                          param_grid, folds = 5,
@@ -35,9 +41,7 @@ tl_tune_grid <- function(data, formula, method,
   # Determine if classification or regression
   response_var <- all.vars(formula)[1]
   y <- data[[response_var]]
-  is_classification <- is.factor(y) ||
-    is.character(y) ||
-    (is.numeric(y) && length(unique(y)) <= 10)
+  is_classification <- is.factor(y) || is.character(y)
 
   # Default metric based on problem type
   if (is.null(metric)) {
@@ -254,6 +258,12 @@ tl_tune_grid <- function(data, formula, method,
 #' @param seed Random seed for reproducibility
 #' @param ... Additional arguments passed to tl_model
 #' @return A list with the best model and tuning results
+#' @examples
+#' \donttest{
+#' model <- tl_tune_random(mtcars, mpg ~ ., method = "tree",
+#'   param_space = list(cp = c(0.01, 0.1), minsplit = c(10, 20)),
+#'   n_iter = 3, folds = 2, verbose = FALSE)
+#' }
 #' @export
 tl_tune_random <- function(data, formula, method,
                            param_space,
@@ -279,9 +289,7 @@ tl_tune_random <- function(data, formula, method,
   # Determine if classification or regression
   response_var <- all.vars(formula)[1]
   y <- data[[response_var]]
-  is_classification <- is.factor(y) ||
-    is.character(y) ||
-    (is.numeric(y) && length(unique(y)) <= 10)
+  is_classification <- is.factor(y) || is.character(y)
 
   # Default metric based on problem type
   if (is.null(metric)) {
@@ -552,6 +560,13 @@ tl_tune_random <- function(data, formula, method,
 #' @param plot_type Type of plot: "scatter", "grid",
 #'   "parallel", "importance"
 #' @return A ggplot object
+#' @examples
+#' \donttest{
+#' model <- tl_tune_grid(iris, Species ~ ., method = "tree",
+#'   param_grid = list(cp = c(0.01, 0.1), minsplit = c(10, 20)),
+#'   folds = 2, verbose = FALSE)
+#' tl_plot_tuning_results(model)
+#' }
 #' @importFrom ggplot2 ggplot aes geom_point geom_tile
 #'   scale_fill_gradient2 labs theme_minimal
 #' @export
@@ -910,6 +925,11 @@ tl_plot_tuning_results <- function(model,
 #' @param is_classification Whether the task is
 #'   classification or regression
 #' @return A named list of parameter values to tune
+#' @examples
+#' \donttest{
+#' grid <- tl_default_param_grid("tree", size = "small")
+#' grid <- tl_default_param_grid("forest", size = "medium")
+#' }
 #' @export
 tl_default_param_grid <- function(method,
                                   size = "medium",

@@ -22,3 +22,13 @@ Visualization (side effect) or ggplot object
 \description{
 Create visualizations of association rules
 }
+\examples{
+\donttest{
+if (requireNamespace("arules", quietly = TRUE)) {
+  data("Groceries", package = "arules")
+  res <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
+  visualize_rules(res, method = "scatter")
+}
+}
+
+}

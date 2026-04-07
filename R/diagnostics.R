@@ -16,6 +16,11 @@ NULL
 #' @param threshold_leverage Leverage threshold (default: 2*(p+1)/n)
 #' @param threshold_dffits DFFITS threshold (default: 2*sqrt((p+1)/n))
 #' @return A data frame with influence measures
+#' @examples
+#' \donttest{
+#' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+#' tl_influence_measures(model)
+#' }
 #' @export
 tl_influence_measures <- function(model, threshold_cook = NULL,
                                   threshold_leverage = NULL,
@@ -108,6 +113,11 @@ tl_influence_measures <- function(model, threshold_cook = NULL,
 #' @param n_labels Number of points to label (default: 3)
 #' @param label_size Text size for labels (default: 3)
 #' @return A ggplot object
+#' @examples
+#' \donttest{
+#' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+#' tl_plot_influence(model, plot_type = "cook")
+#' }
 #' @export
 tl_plot_influence <- function(model,
                               plot_type = "cook",
@@ -292,6 +302,11 @@ tl_plot_influence <- function(model,
 #' @param test Logical; whether to perform statistical tests
 #' @param verbose Logical; whether to print test results and explanations
 #' @return A list with assumption check results
+#' @examples
+#' \donttest{
+#' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+#' tl_check_assumptions(model)
+#' }
 #' @export
 tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
   # Check if model is supported
@@ -618,8 +633,11 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
   }
 
   # Add overall assessment
-  checks <- sapply(assumptions, function(x) x$check)
-  checks <- checks[!is.null(checks)]
+  checks <- Filter(
+    Negate(is.null),
+    lapply(assumptions, function(x) x$check)
+  )
+  checks <- unlist(checks)
 
   if (length(checks) > 0) {
     overall_status <- if (all(checks)) {
@@ -653,6 +671,13 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
 #' @param include_performance Logical; whether to include performance metrics
 #' @param arrange_plots Layout arrangement (e.g., "grid", "row", "column")
 #' @return A plot grid with diagnostic plots
+#' @examples
+#' \donttest{
+#' if (requireNamespace("gridExtra")) {
+#'   model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+#'   tl_diagnostic_dashboard(model)
+#' }
+#' }
 #' @export
 tl_diagnostic_dashboard <- function(model, include_influence = TRUE,
                                     include_assumptions = TRUE,
@@ -687,7 +712,8 @@ tl_diagnostic_dashboard <- function(model, include_influence = TRUE,
     ggplot2::theme_minimal()
 
   # Add scale-location plot
-  plots$scale_location <- tl_plot_diagnostics(model, which = 3)[[1]]
+  diag_plots <- tl_plot_diagnostics(model, which = 3)
+  plots$scale_location <- diag_plots[["scale_location"]]
 
   # Add influence plots if requested
   if (include_influence) {
@@ -804,6 +830,10 @@ tl_diagnostic_dashboard <- function(model, include_influence = TRUE,
 #' @param threshold Threshold for outlier detection
 #' @param plot Logical; whether to create a plot of outliers
 #' @return A list with outlier detection results
+#' @examples
+#' \donttest{
+#' tl_detect_outliers(mtcars, variables = c("mpg", "wt"), method = "iqr")
+#' }
 #' @export
 tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
                                threshold = NULL, plot = TRUE) {

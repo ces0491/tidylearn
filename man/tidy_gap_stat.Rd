@@ -23,3 +23,10 @@ A list of class "tidy_gap" containing gap statistics
 \description{
 Compute gap statistic for determining optimal number of clusters
 }
+\examples{
+\donttest{
+gap <- tidy_gap_stat(iris[, 1:4], max_k = 6, B = 10)
+gap$recommended_k
+}
+
+}

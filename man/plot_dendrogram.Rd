@@ -23,3 +23,9 @@ Invisibly returns hclust object (plots as side effect)
 \description{
 Enhanced dendrogram with colored cluster rectangles
 }
+\examples{
+\donttest{
+hc <- hclust(dist(iris[, 1:4]))
+plot_dendrogram(hc, k = 3)
+}
+}

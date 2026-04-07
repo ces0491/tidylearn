@@ -17,3 +17,10 @@ Invisibly returns the input object x
 \description{
 Print Method for tidy_kmeans
 }
+\examples{
+\donttest{
+km <- tidy_kmeans(iris[, 1:4], k = 3)
+print(km)
+}
+
+}

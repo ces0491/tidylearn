@@ -21,3 +21,10 @@ Original data with cluster column added
 \description{
 Add cluster assignments to original data
 }
+\examples{
+\donttest{
+hc <- tidy_hclust(USArrests, method = "ward.D2")
+augmented <- augment_hclust(hc, USArrests, k = 3)
+}
+
+}

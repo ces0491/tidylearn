@@ -23,3 +23,10 @@ A ggplot object
 \description{
 Visualize MDS results
 }
+\examples{
+\donttest{
+mds <- tidy_mds(USArrests, method = "classical")
+plot_mds(mds)
+}
+
+}

@@ -17,3 +17,9 @@ Invisibly returns the pipeline
 \description{
 Summarize a tidylearn pipeline
 }
+\examples{
+\donttest{
+pipe <- tl_pipeline(iris, Species ~ .)
+summary(pipe)
+}
+}

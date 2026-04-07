@@ -17,3 +17,9 @@ Invisibly returns the input object x
 \description{
 Print EDA results
 }
+\examples{
+\donttest{
+eda <- tl_explore(iris, response = "Species")
+print(eda)
+}
+}

@@ -19,3 +19,10 @@ Original data with PC scores added
 \description{
 Add PC scores to the original dataset
 }
+\examples{
+\donttest{
+pca <- tidy_pca(USArrests)
+augmented <- augment_pca(pca, USArrests, n_components = 2)
+}
+
+}

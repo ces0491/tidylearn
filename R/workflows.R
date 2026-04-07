@@ -19,13 +19,6 @@
 #' @param metric Evaluation metric (default: auto-selected based on task)
 #' @return Best model with performance comparison
 #' @export
-#' @examples
-#' \donttest{
-#' # Automated modeling
-#' result <- tl_auto_ml(iris, Species ~ .)
-#' best_model <- result$best_model
-#' result$leaderboard
-#' }
 tl_auto_ml <- function(data, formula, task = "auto",
                        use_reduction = TRUE, use_clustering = TRUE,
                        time_budget = 300, cv_folds = 5, metric = NULL) {
@@ -340,6 +333,11 @@ tl_explore <- function(data, response = NULL,
 #' @param x A tidylearn_eda object
 #' @param ... Additional arguments (ignored)
 #' @return Invisibly returns the input object x
+#' @examples
+#' \donttest{
+#' eda <- tl_explore(iris, response = "Species")
+#' print(eda)
+#' }
 #' @export
 print.tidylearn_eda <- function(x, ...) {
   cat("tidylearn Exploratory Data Analysis\n")
@@ -362,6 +360,11 @@ print.tidylearn_eda <- function(x, ...) {
 #' @param ... Additional arguments (ignored)
 #' @return Invisibly returns the input object x,
 #'   called for side effects (plotting)
+#' @examples
+#' \donttest{
+#' eda <- tl_explore(iris, response = "Species")
+#' plot(eda)
+#' }
 #' @export
 plot.tidylearn_eda <- function(x, ...) {
   # Get PCA scores for visualization
@@ -448,7 +451,8 @@ tl_optimal_clusters <- function(data, k_range = 2:6, method = "silhouette") {
 #' @export
 #' @examples
 #' \donttest{
-#' model <- tl_transfer_learning(iris, Species ~ ., pretrain_method = "pca")
+#' model <- tl_transfer_learning(iris, Species ~ .,
+#'   pretrain_method = "pca", supervised_method = "tree")
 #' }
 tl_transfer_learning <- function(data, formula, pretrain_method = "pca",
                                  supervised_method = "logistic", ...) {
@@ -488,6 +492,12 @@ tl_transfer_learning <- function(data, formula, pretrain_method = "pca",
 #' @param new_data New data for predictions
 #' @param ... Additional arguments
 #' @return A tibble of predictions
+#' @examples
+#' \donttest{
+#' model <- tl_transfer_learning(iris, Species ~ .,
+#'   pretrain_method = "pca", supervised_method = "tree")
+#' preds <- predict(model, iris[1:5, ])
+#' }
 #' @export
 predict.tidylearn_transfer <- function(object, new_data, ...) {
   # Transform new data using pre-trained model

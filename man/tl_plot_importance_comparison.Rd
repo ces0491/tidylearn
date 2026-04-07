@@ -19,3 +19,10 @@ A ggplot object with feature importance comparison
 \description{
 Plot feature importance across multiple models
 }
+\examples{
+\donttest{
+m1 <- tl_model(iris, Species ~ ., method = "forest")
+m2 <- tl_model(iris, Species ~ ., method = "boost")
+tl_plot_importance_comparison(m1, m2, names = c("Forest", "Boost"))
+}
+}

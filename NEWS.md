@@ -49,6 +49,32 @@
   databases, cloud sources, multi-file reading, and the full pipeline
 * Updated "Getting Started" vignette to include `tl_read()` in the workflow
 
+## Bug Fixes
+
+* Fixed classification auto-detection silently treating numeric responses
+  with <= 10 unique values as classification. The response must now be a
+  factor or character for classification; a helpful message is emitted when
+  a low-cardinality numeric response is detected.
+* Fixed `tl_check_assumptions()` crashing with "list object cannot be
+  coerced to logical" when some assumption checks returned NULL (e.g.,
+  when optional test packages were not installed).
+* Added missing `@return` tag to `print.tidylearn_data()`.
+* Replaced deprecated ggplot2 `size` parameter with `linewidth` in all
+  `geom_line()` calls across visualization, classification, PCA, DBSCAN,
+  and validation plotting functions.
+
+## Tests
+
+* Added test suite for visualization module (26 tests) — plot dispatch,
+  regression/classification plots, lift/gain charts, model comparison,
+  unsupervised visualization, and Shiny dashboard.
+* Added test suite for tuning module (49 tests) — `tl_default_param_grid`,
+  `tl_tune_grid`, `tl_tune_random`, `tl_plot_tuning_results`, and input
+  validation.
+* Added test suite for diagnostics module (75 tests) — influence measures,
+  influence plots, assumption checking, and outlier detection across all
+  methods (IQR, z-score, Cook's, Mahalanobis).
+
 ## Code Quality
 
 * Package-wide lint cleanup — all R source files, tests, and vignettes

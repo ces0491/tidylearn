@@ -23,3 +23,9 @@ Cross-validation results
 \description{
 Cross-validation for tidylearn models
 }
+\examples{
+\donttest{
+cv <- tl_cv(mtcars, mpg ~ wt + hp, method = "linear", folds = 3)
+cv$summary
+}
+}

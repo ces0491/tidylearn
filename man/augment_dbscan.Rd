@@ -17,3 +17,10 @@ Original data with cluster information added
 \description{
 Augment Data with DBSCAN Cluster Assignments
 }
+\examples{
+\donttest{
+db <- tidy_dbscan(iris[, 1:4], eps = 0.5, minPts = 5)
+augmented <- augment_dbscan(db, iris)
+}
+
+}

@@ -75,6 +75,17 @@ tidy_apriori <- function(transactions, support = 0.01, confidence = 0.5,
 #' @param rules A rules object from arules
 #'
 #' @return A tibble with one row per rule
+#'
+#' @examples
+#' \donttest{
+#' if (requireNamespace("arules", quietly = TRUE)) {
+#'   data("Groceries", package = "arules")
+#'   rules_obj <- arules::apriori(Groceries,
+#'     parameter = list(supp = 0.001, conf = 0.5))
+#'   rules_tbl <- tidy_rules(rules_obj)
+#' }
+#' }
+#'
 #' @export
 tidy_rules <- function(rules) {
 
@@ -114,6 +125,16 @@ tidy_rules <- function(rules) {
 #' @param decreasing Sort in decreasing order? (default: TRUE)
 #'
 #' @return A tibble of top rules
+#'
+#' @examples
+#' \donttest{
+#' if (requireNamespace("arules", quietly = TRUE)) {
+#'   data("Groceries", package = "arules")
+#'   res <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
+#'   inspect_rules(res, by = "lift", n = 5)
+#' }
+#' }
+#'
 #' @export
 inspect_rules <- function(rules_obj, by = "lift", n = 10, decreasing = TRUE) {
 
@@ -157,6 +178,16 @@ inspect_rules <- function(rules_obj, by = "lift", n = 10, decreasing = TRUE) {
 #' @param where Character; "lhs", "rhs", or "both" (default: "both")
 #'
 #' @return A tibble of filtered rules
+#'
+#' @examples
+#' \donttest{
+#' if (requireNamespace("arules", quietly = TRUE)) {
+#'   data("Groceries", package = "arules")
+#'   res <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
+#'   filter_rules_by_item(res, "whole milk", where = "rhs")
+#' }
+#' }
+#'
 #' @export
 filter_rules_by_item <- function(rules_obj, item, where = "both") {
 
@@ -196,6 +227,16 @@ filter_rules_by_item <- function(rules_obj, item, where = "both") {
 #' @param top_n Number of top associations to return (default: 10)
 #'
 #' @return A tibble of related items with association metrics
+#'
+#' @examples
+#' \donttest{
+#' if (requireNamespace("arules", quietly = TRUE)) {
+#'   data("Groceries", package = "arules")
+#'   res <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
+#'   find_related_items(res, "whole milk", min_lift = 1.5)
+#' }
+#' }
+#'
 #' @export
 find_related_items <- function(rules_obj, item, min_lift = 1.5, top_n = 10) {
 
@@ -227,6 +268,16 @@ find_related_items <- function(rules_obj, item, min_lift = 1.5, top_n = 10) {
 #' @param rules_obj A tidy_apriori object or rules tibble
 #'
 #' @return A list with summary statistics
+#'
+#' @examples
+#' \donttest{
+#' if (requireNamespace("arules", quietly = TRUE)) {
+#'   data("Groceries", package = "arules")
+#'   res <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
+#'   summarize_rules(res)
+#' }
+#' }
+#'
 #' @export
 summarize_rules <- function(rules_obj) {
 
@@ -280,6 +331,16 @@ summarize_rules <- function(rules_obj) {
 #' @param ... Additional arguments passed to plot() for rules visualization
 #'
 #' @return Visualization (side effect) or ggplot object
+#'
+#' @examples
+#' \donttest{
+#' if (requireNamespace("arules", quietly = TRUE)) {
+#'   data("Groceries", package = "arules")
+#'   res <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
+#'   visualize_rules(res, method = "scatter")
+#' }
+#' }
+#'
 #' @export
 visualize_rules <- function(rules_obj, method = "scatter", top_n = 50, ...) {
 
@@ -351,6 +412,16 @@ visualize_rules <- function(rules_obj, method = "scatter", top_n = 50, ...) {
 #' @param min_confidence Minimum confidence threshold (default: 0.5)
 #'
 #' @return A tibble with recommended items and metrics
+#'
+#' @examples
+#' \donttest{
+#' if (requireNamespace("arules", quietly = TRUE)) {
+#'   data("Groceries", package = "arules")
+#'   res <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
+#'   recommend_products(res, basket = c("whole milk", "butter"))
+#' }
+#' }
+#'
 #' @export
 recommend_products <- function(rules_obj, basket,
                                top_n = 5,
@@ -386,6 +457,16 @@ recommend_products <- function(rules_obj, basket,
 #' @param ... Additional arguments (ignored)
 #'
 #' @return Invisibly returns the input object x
+#'
+#' @examples
+#' \donttest{
+#' if (requireNamespace("arules", quietly = TRUE)) {
+#'   data("Groceries", package = "arules")
+#'   res <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
+#'   print(res)
+#' }
+#' }
+#'
 #' @export
 print.tidy_apriori <- function(x, ...) {
   cat("Tidy Apriori Results\n")

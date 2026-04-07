@@ -20,3 +20,9 @@ Shows the cross-validation error as a function of
 lambda for ridge, lasso, or elastic net models fitted
 with cv.glmnet.
 }
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ ., method = "ridge")
+tl_plot_regularization_cv(model)
+}
+}

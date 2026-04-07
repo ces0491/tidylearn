@@ -59,6 +59,14 @@ tidy_mds <- function(data, method = "classical",
 #' @param add_rownames Preserve row names from distance matrix (default: TRUE)
 #'
 #' @return A tidy_mds object
+#'
+#' @examples
+#' \donttest{
+#' d <- dist(USArrests)
+#' mds <- tidy_mds_classical(d)
+#' print(mds)
+#' }
+#'
 #' @export
 tidy_mds_classical <- function(dist_mat, ndim = 2, add_rownames = TRUE) {
 
@@ -113,6 +121,13 @@ tidy_mds_classical <- function(dist_mat, ndim = 2, add_rownames = TRUE) {
 #' @param ... Additional arguments passed to smacof::mds()
 #'
 #' @return A tidy_mds object
+#'
+#' @examples
+#' \donttest{
+#' d <- dist(USArrests)
+#' mds <- tidy_mds_smacof(d, type = "ratio")
+#' }
+#'
 #' @export
 tidy_mds_smacof <- function(dist_mat, ndim = 2, type = "ratio", ...) {
 
@@ -157,6 +172,13 @@ tidy_mds_smacof <- function(dist_mat, ndim = 2, type = "ratio", ...) {
 #' @param ... Additional arguments passed to MASS::sammon()
 #'
 #' @return A tidy_mds object
+#'
+#' @examples
+#' \donttest{
+#' d <- dist(USArrests)
+#' mds <- tidy_mds_sammon(d)
+#' }
+#'
 #' @export
 tidy_mds_sammon <- function(dist_mat, ndim = 2, ...) {
 
@@ -199,6 +221,13 @@ tidy_mds_sammon <- function(dist_mat, ndim = 2, ...) {
 #' @param ... Additional arguments passed to MASS::isoMDS()
 #'
 #' @return A tidy_mds object
+#'
+#' @examples
+#' \donttest{
+#' d <- dist(USArrests)
+#' mds <- tidy_mds_kruskal(d)
+#' }
+#'
 #' @export
 tidy_mds_kruskal <- function(dist_mat, ndim = 2, ...) {
 
@@ -243,6 +272,13 @@ tidy_mds_kruskal <- function(dist_mat, ndim = 2, ...) {
 #' @param dim_y Which dimension for y-axis (default: 2)
 #'
 #' @return A ggplot object
+#'
+#' @examples
+#' \donttest{
+#' mds <- tidy_mds(USArrests, method = "classical")
+#' plot_mds(mds)
+#' }
+#'
 #' @export
 plot_mds <- function(mds_obj, color_by = NULL, label_points = TRUE,
                      dim_x = 1, dim_y = 2) {
@@ -306,6 +342,13 @@ plot_mds <- function(mds_obj, color_by = NULL, label_points = TRUE,
 #' @param ... Additional arguments (ignored)
 #'
 #' @return Invisibly returns the input object x
+#'
+#' @examples
+#' \donttest{
+#' mds <- tidy_mds(USArrests, method = "classical")
+#' print(mds)
+#' }
+#'
 #' @export
 print.tidy_mds <- function(x, ...) {
   cat("Tidy MDS Analysis\n")

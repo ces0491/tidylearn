@@ -20,3 +20,9 @@ A ggplot object
 \description{
 Plot regularization path for a regularized model
 }
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ ., method = "lasso")
+tl_plot_regularization_path(model)
+}
+}

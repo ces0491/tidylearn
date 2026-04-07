@@ -19,3 +19,11 @@ A tidy_mds object
 \description{
 Performs classical multidimensional scaling using cmdscale()
 }
+\examples{
+\donttest{
+d <- dist(USArrests)
+mds <- tidy_mds_classical(d)
+print(mds)
+}
+
+}

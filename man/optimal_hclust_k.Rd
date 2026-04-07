@@ -19,3 +19,10 @@ A list with optimal k and evaluation results
 \description{
 Use silhouette or gap statistic to find optimal k
 }
+\examples{
+\donttest{
+hc <- tidy_hclust(USArrests, method = "ward.D2")
+opt <- optimal_hclust_k(hc, method = "silhouette", max_k = 6)
+}
+
+}

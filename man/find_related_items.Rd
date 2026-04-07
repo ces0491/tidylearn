@@ -21,3 +21,13 @@ A tibble of related items with association metrics
 \description{
 Find items frequently purchased with a given item
 }
+\examples{
+\donttest{
+if (requireNamespace("arules", quietly = TRUE)) {
+  data("Groceries", package = "arules")
+  res <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
+  find_related_items(res, "whole milk", min_lift = 1.5)
+}
+}
+
+}

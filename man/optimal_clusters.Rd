@@ -19,3 +19,9 @@ A list with results from each method
 \description{
 Use multiple methods to suggest optimal k
 }
+\examples{
+\donttest{
+opt <- optimal_clusters(iris[, 1:4], max_k = 6, methods = "wss")
+}
+
+}

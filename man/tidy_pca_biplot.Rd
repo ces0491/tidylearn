@@ -35,3 +35,10 @@ A ggplot object
 \description{
 Visualize both observations and variables in PC space
 }
+\examples{
+\donttest{
+pca <- tidy_pca(USArrests)
+tidy_pca_biplot(pca)
+}
+
+}

@@ -33,3 +33,8 @@ A tidylearn model with important interactions
 \description{
 Find important interactions automatically
 }
+\examples{
+\donttest{
+model <- tl_auto_interactions(mtcars, mpg ~ wt + hp + cyl, top_n = 2)
+}
+}

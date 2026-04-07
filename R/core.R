@@ -138,14 +138,15 @@ tl_model_supervised <- function(data, formula, method, ...) {
 
   # Determine if classification or regression
   y <- data[[response_var]]
-  is_classification <- is.factor(y) ||
-    is.character(y) ||
-    (is.numeric(y) && length(unique(y)) <= 10)
+  is_classification <- is.factor(y) || is.character(y)
 
-  if (is_classification && is.numeric(y)) {
-    warning(
-      "Response appears to be categorical but is ",
-      "stored as numeric. Consider converting to factor."
+  if (!is_classification && is.numeric(y) &&
+        length(unique(y)) <= 10) {
+    message(
+      "Note: Response '", response_var, "' has ",
+      length(unique(y)), " unique numeric values. ",
+      "Treating as regression. Convert to factor ",
+      "for classification."
     )
   }
 
@@ -250,6 +251,12 @@ tl_model_unsupervised <- function(data, formula = NULL, method, ...) {
 #'   depending on method.
 #' @param ... Additional arguments
 #' @return Predictions as a tibble
+#' @examples
+#' \donttest{
+#' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+#' predict(model)
+#' predict(model, new_data = mtcars[1:5, ])
+#' }
 #' @export
 predict.tidylearn_model <- function(object,
                                     new_data = NULL,
@@ -394,6 +401,11 @@ predict_unsupervised <- function(object, new_data, type = "response", ...) {
 #' @param x A tidylearn model object
 #' @param ... Additional arguments (ignored)
 #' @return Invisibly returns the input object x
+#' @examples
+#' \donttest{
+#' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+#' print(model)
+#' }
 #' @export
 print.tidylearn_model <- function(x, ...) {
   cat("tidylearn Model\n")
@@ -422,6 +434,11 @@ print.tidylearn_model <- function(x, ...) {
 #' @param object A tidylearn model object
 #' @param ... Additional arguments (ignored)
 #' @return Invisibly returns the input object
+#' @examples
+#' \donttest{
+#' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+#' summary(model)
+#' }
 #' @export
 summary.tidylearn_model <- function(object, ...) {
   print(object)
@@ -533,6 +550,11 @@ tl_plot_unsupervised <- function(model, type = "auto", ...) {
 #' @param type Plot type (default: "auto")
 #' @param ... Additional arguments passed to plotting functions
 #' @return A ggplot2 object or NULL, called primarily for side effects
+#' @examples
+#' \donttest{
+#' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+#' plot(model, type = "actual_predicted")
+#' }
 #' @export
 plot.tidylearn_model <- function(x, type = "auto", ...) {
   if (inherits(x, "tidylearn_supervised")) {
@@ -544,6 +566,8 @@ plot.tidylearn_model <- function(x, type = "auto", ...) {
 
 #' Get tidylearn version information
 #' @return A package_version object containing the version number
+#' @examples
+#' tl_version()
 #' @export
 tl_version <- function() {
   packageVersion("tidylearn")

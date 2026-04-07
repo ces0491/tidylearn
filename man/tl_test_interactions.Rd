@@ -42,3 +42,9 @@ A data frame with interaction test results
 \description{
 Test for significant interactions between variables
 }
+\examples{
+\donttest{
+results <- tl_test_interactions(mtcars, mpg ~ wt + hp + cyl,
+  var1 = "wt", var2 = "hp")
+}
+}

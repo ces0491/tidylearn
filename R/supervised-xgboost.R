@@ -245,6 +245,13 @@ tl_predict_xgboost <- function(model, new_data,
 #' @param importance_type Type of importance: "gain", "cover", "frequency"
 #' @param ... Additional arguments
 #' @return A ggplot object
+#' @examples
+#' \donttest{
+#' if (requireNamespace("xgboost", quietly = TRUE)) {
+#'   model <- tl_model(mtcars, mpg ~ ., method = "xgboost")
+#'   tl_plot_xgboost_importance(model)
+#' }
+#' }
 #' @export
 tl_plot_xgboost_importance <- function(model, top_n = 10,
                                        importance_type = "gain",
@@ -518,6 +525,13 @@ tl_tune_xgboost <- function(data, formula, is_classification = FALSE,
 #' @param n_samples Number of samples to use (default: 100, NULL for all)
 #' @param trees_idx Trees to include (default: NULL, uses all trees)
 #' @return A data frame with SHAP values
+#' @examples
+#' \donttest{
+#' if (requireNamespace("xgboost", quietly = TRUE)) {
+#'   model <- tl_model(mtcars, mpg ~ ., method = "xgboost")
+#'   shap <- tl_xgboost_shap(model, n_samples = 20)
+#' }
+#' }
 #' @export
 tl_xgboost_shap <- function(model, data = NULL,
                             n_samples = 100,

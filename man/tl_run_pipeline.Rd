@@ -17,3 +17,10 @@ A tidylearn pipeline with results
 \description{
 Run a tidylearn pipeline
 }
+\examples{
+\donttest{
+pipe <- tl_pipeline(iris, Species ~ .,
+  models = list(tree = list(method = "tree")))
+pipe <- tl_run_pipeline(pipe, verbose = FALSE)
+}
+}

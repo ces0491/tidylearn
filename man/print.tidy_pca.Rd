@@ -17,3 +17,10 @@ Invisibly returns the input object x
 \description{
 Print Method for tidy_pca
 }
+\examples{
+\donttest{
+pca <- tidy_pca(USArrests)
+print(pca)
+}
+
+}

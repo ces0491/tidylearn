@@ -15,3 +15,11 @@ A tidylearn pipeline object
 \description{
 Load a pipeline from disk
 }
+\examples{
+\donttest{
+pipe <- tl_pipeline(iris, Species ~ .)
+f <- tempfile(fileext = ".rds")
+tl_save_pipeline(pipe, f)
+pipe2 <- tl_load_pipeline(f)
+}
+}

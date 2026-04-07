@@ -32,3 +32,10 @@ A tidylearn pipeline object
 \description{
 Create a modeling pipeline
 }
+\examples{
+\donttest{
+pipe <- tl_pipeline(iris, Species ~ .,
+  models = list(tree = list(method = "tree")))
+print(pipe)
+}
+}

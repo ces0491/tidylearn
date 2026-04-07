@@ -19,3 +19,10 @@ A tibble with observation IDs and cluster assignments
 \description{
 Cut dendrogram to obtain cluster assignments
 }
+\examples{
+\donttest{
+hc <- tidy_hclust(USArrests, method = "ward.D2")
+clusters <- tidy_cutree(hc, k = 3)
+}
+
+}

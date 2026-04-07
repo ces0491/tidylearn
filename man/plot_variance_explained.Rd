@@ -18,3 +18,9 @@ A ggplot object
 \description{
 Create combined scree plot showing individual and cumulative variance
 }
+\examples{
+\donttest{
+model <- tl_model(iris[, 1:4], method = "pca")
+plot_variance_explained(model$fit$variance_explained)
+}
+}

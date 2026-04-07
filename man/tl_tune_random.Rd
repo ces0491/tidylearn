@@ -51,3 +51,10 @@ A list with the best model and tuning results
 \description{
 Tune hyperparameters using random search
 }
+\examples{
+\donttest{
+model <- tl_tune_random(mtcars, mpg ~ ., method = "tree",
+  param_space = list(cp = c(0.01, 0.1), minsplit = c(10, 20)),
+  n_iter = 3, folds = 2, verbose = FALSE)
+}
+}

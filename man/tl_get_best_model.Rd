@@ -15,3 +15,11 @@ The best tidylearn model
 \description{
 Get the best model from a pipeline
 }
+\examples{
+\donttest{
+pipe <- tl_pipeline(iris, Species ~ .,
+  models = list(tree = list(method = "tree")))
+pipe <- tl_run_pipeline(pipe, verbose = FALSE)
+best <- tl_get_best_model(pipe)
+}
+}

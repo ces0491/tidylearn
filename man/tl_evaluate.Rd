@@ -20,3 +20,9 @@ A tibble of evaluation metrics
 \description{
 Evaluate a tidylearn model
 }
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+tl_evaluate(model)
+}
+}

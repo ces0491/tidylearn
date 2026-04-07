@@ -23,7 +23,7 @@
 #'   iris, response = "Species",
 #'   method = "pca", n_components = 3
 #' )
-#' model <- tl_model(reduced$data, Species ~ ., method = "logistic")
+#' model <- tl_model(reduced$data, Species ~ ., method = "tree")
 #' }
 tl_reduce_dimensions <- function(data,
                                  response = NULL,
@@ -171,7 +171,7 @@ tl_add_cluster_features <- function(data,
 #' labeled_idx <- sample(nrow(iris), size = 15)
 #' model <- tl_semisupervised(iris, Species ~ ., labeled_indices = labeled_idx,
 #'   cluster_method = "kmeans",
-#'   supervised_method = "logistic"
+#'   supervised_method = "tree"
 #' )
 #' }
 tl_semisupervised <- function(data, formula, labeled_indices,
@@ -374,6 +374,12 @@ tl_stratified_models <- function(data, formula, cluster_method = "kmeans",
 #' @param new_data New data for predictions
 #' @param ... Additional arguments
 #' @return A tibble of predictions with cluster assignments
+#' @examples
+#' \donttest{
+#' models <- tl_stratified_models(mtcars, mpg ~ .,
+#'   cluster_method = "kmeans", k = 2, supervised_method = "linear")
+#' preds <- predict(models)
+#' }
 #' @export
 predict.tidylearn_stratified <- function(object, new_data = NULL, ...) {
   if (is.null(new_data)) {

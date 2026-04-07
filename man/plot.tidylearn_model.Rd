@@ -19,3 +19,9 @@ A ggplot2 object or NULL, called primarily for side effects
 \description{
 Plot method for tidylearn models
 }
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+plot(model, type = "actual_predicted")
+}
+}

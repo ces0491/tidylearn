@@ -19,3 +19,10 @@ A tibble with parameter combinations and resulting cluster counts
 \description{
 Test multiple eps and minPts combinations
 }
+\examples{
+\donttest{
+params <- explore_dbscan_params(iris[, 1:4],
+  eps_values = c(0.3, 0.5, 0.8), minPts_values = c(3, 5))
+}
+
+}

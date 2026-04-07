@@ -19,3 +19,9 @@ A ggplot object
 \description{
 Plot total within-cluster sum of squares vs number of clusters
 }
+\examples{
+\donttest{
+wss <- data.frame(k = 2:6, tot_withinss = c(150, 90, 60, 50, 45))
+plot_elbow(wss)
+}
+}

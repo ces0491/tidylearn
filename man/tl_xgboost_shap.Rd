@@ -22,3 +22,11 @@ A data frame with SHAP values
 \description{
 Generate SHAP values for XGBoost model interpretation
 }
+\examples{
+\donttest{
+if (requireNamespace("xgboost", quietly = TRUE)) {
+  model <- tl_model(mtcars, mpg ~ ., method = "xgboost")
+  shap <- tl_xgboost_shap(model, n_samples = 20)
+}
+}
+}

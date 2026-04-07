@@ -19,3 +19,9 @@ A list with assumption check results
 \description{
 Check model assumptions
 }
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+tl_check_assumptions(model)
+}
+}

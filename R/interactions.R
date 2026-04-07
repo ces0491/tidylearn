@@ -20,6 +20,11 @@ NULL
 #' @param mixed_only Logical; whether to only test numeric-categorical pairs
 #' @param alpha Significance level for interaction tests
 #' @return A data frame with interaction test results
+#' @examples
+#' \donttest{
+#' results <- tl_test_interactions(mtcars, mpg ~ wt + hp + cyl,
+#'   var1 = "wt", var2 = "hp")
+#' }
 #' @export
 tl_test_interactions <- function(data, formula, var1 = NULL, var2 = NULL,
                                  all_pairs = FALSE, categorical_only = FALSE,
@@ -315,6 +320,10 @@ tl_plot_interaction <- function(model, var1, var2,
 #' @param exclude_vars Character vector of variables to exclude
 #'   from interaction testing
 #' @return A tidylearn model with important interactions
+#' @examples
+#' \donttest{
+#' model <- tl_auto_interactions(mtcars, mpg ~ wt + hp + cyl, top_n = 2)
+#' }
 #' @export
 tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
                                  max_p_value = 0.05, exclude_vars = NULL) {

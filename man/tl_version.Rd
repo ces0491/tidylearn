@@ -12,3 +12,6 @@ A package_version object containing the version number
 \description{
 Get tidylearn version information
 }
+\examples{
+tl_version()
+}

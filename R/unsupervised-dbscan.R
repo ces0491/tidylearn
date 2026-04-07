@@ -105,6 +105,12 @@ tidy_dbscan <- function(data, eps, minPts = 5,
 #'   If NULL, uses all numeric columns.
 #'
 #' @return A tibble with observation IDs and k-NN distances
+#'
+#' @examples
+#' \donttest{
+#' knn <- tidy_knn_dist(iris[, 1:4], k = 5)
+#' }
+#'
 #' @export
 tidy_knn_dist <- function(data, k = 4, cols = NULL) {
 
@@ -196,6 +202,12 @@ suggest_eps <- function(data, minPts = 5,
 #' @param percentile Percentile for suggestion (default: 0.95)
 #'
 #' @return A ggplot object
+#'
+#' @examples
+#' \donttest{
+#' plot_knn_dist(iris[, 1:4], k = 5)
+#' }
+#'
 #' @export
 plot_knn_dist <- function(data, k = 4,
                           add_suggestion = TRUE,
@@ -216,7 +228,7 @@ plot_knn_dist <- function(data, k = 4,
     knn_data,
     ggplot2::aes(x = seq_along(knn_dist), y = knn_dist)
   ) +
-    ggplot2::geom_line(color = "steelblue", size = 1) +
+    ggplot2::geom_line(color = "steelblue", linewidth = 1) +
     ggplot2::labs(
       title = paste0("k-NN Distance Plot (k = ", k, ")"),
       subtitle = "Look for 'elbow' or 'knee' to determine eps",
@@ -255,6 +267,13 @@ plot_knn_dist <- function(data, k = 4,
 #' @param data Original data frame
 #'
 #' @return Original data with cluster information added
+#'
+#' @examples
+#' \donttest{
+#' db <- tidy_dbscan(iris[, 1:4], eps = 0.5, minPts = 5)
+#' augmented <- augment_dbscan(db, iris)
+#' }
+#'
 #' @export
 augment_dbscan <- function(dbscan_obj, data) {
 
@@ -282,6 +301,13 @@ augment_dbscan <- function(dbscan_obj, data) {
 #' @param minPts_values Vector of minPts values to test
 #'
 #' @return A tibble with parameter combinations and resulting cluster counts
+#'
+#' @examples
+#' \donttest{
+#' params <- explore_dbscan_params(iris[, 1:4],
+#'   eps_values = c(0.3, 0.5, 0.8), minPts_values = c(3, 5))
+#' }
+#'
 #' @export
 explore_dbscan_params <- function(data, eps_values, minPts_values) {
 
@@ -322,6 +348,13 @@ explore_dbscan_params <- function(data, eps_values, minPts_values) {
 #' @param ... Additional arguments (ignored)
 #'
 #' @return Invisibly returns the input object x
+#'
+#' @examples
+#' \donttest{
+#' db <- tidy_dbscan(iris[, 1:4], eps = 0.5, minPts = 5)
+#' print(db)
+#' }
+#'
 #' @export
 print.tidy_dbscan <- function(x, ...) {
   cat("Tidy DBSCAN Clustering\n")

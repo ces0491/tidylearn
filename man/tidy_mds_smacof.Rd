@@ -22,3 +22,10 @@ A tidy_mds object
 \description{
 Performs MDS using SMACOF algorithm from the smacof package
 }
+\examples{
+\donttest{
+d <- dist(USArrests)
+mds <- tidy_mds_smacof(d, type = "ratio")
+}
+
+}

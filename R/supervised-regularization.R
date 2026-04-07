@@ -401,6 +401,11 @@ tl_predict_elastic_net <- function(model, new_data,
 #'   (default: 5)
 #' @param ... Additional arguments
 #' @return A ggplot object
+#' @examples
+#' \donttest{
+#' model <- tl_model(mtcars, mpg ~ ., method = "lasso")
+#' tl_plot_regularization_path(model)
+#' }
 #' @importFrom ggplot2 ggplot aes geom_line
 #'   scale_x_log10 labs theme_minimal
 #' @export
@@ -530,6 +535,11 @@ tl_plot_regularization_path <- function(model,
 #'   (ridge, lasso, or elastic_net)
 #' @param ... Additional arguments (currently unused)
 #' @return A ggplot object showing CV error vs lambda
+#' @examples
+#' \donttest{
+#' model <- tl_model(mtcars, mpg ~ ., method = "ridge")
+#' tl_plot_regularization_cv(model)
+#' }
 #' @importFrom ggplot2 ggplot aes geom_point geom_line
 #'   geom_ribbon scale_x_log10 labs theme_minimal
 #' @export
@@ -618,6 +628,11 @@ tl_plot_regularization_cv <- function(model, ...) {
 #'   (default: 20)
 #' @param ... Additional arguments
 #' @return A ggplot object
+#' @examples
+#' \donttest{
+#' model <- tl_model(mtcars, mpg ~ ., method = "lasso")
+#' tl_plot_importance_regularized(model)
+#' }
 #' @importFrom ggplot2 ggplot aes geom_col coord_flip
 #'   labs theme_minimal
 #' @export

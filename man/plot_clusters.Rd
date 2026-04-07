@@ -36,3 +36,10 @@ A ggplot object
 Visualize clustering results using first two dimensions
 or specified dimensions
 }
+\examples{
+\donttest{
+km <- tidy_kmeans(iris[, 1:4], k = 3)
+clustered <- augment_kmeans(km, iris[, 1:4])
+plot_clusters(clustered)
+}
+}

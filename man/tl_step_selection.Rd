@@ -36,3 +36,9 @@ A selected model
 \description{
 Perform stepwise selection on a linear model
 }
+\examples{
+\donttest{
+model <- tl_step_selection(mtcars, mpg ~ ., direction = "backward")
+summary(model)
+}
+}

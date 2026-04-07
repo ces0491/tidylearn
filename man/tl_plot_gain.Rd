@@ -23,3 +23,11 @@ A ggplot object with gain chart
 \description{
 Plot gain chart for a classification model
 }
+\examples{
+\donttest{
+iris_bin <- iris[iris$Species != "setosa", ]
+iris_bin$Species <- factor(iris_bin$Species)
+model <- tl_model(iris_bin, Species ~ ., method = "logistic")
+tl_plot_gain(model)
+}
+}

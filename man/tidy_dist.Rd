@@ -24,3 +24,9 @@ A dist object with tidy attributes
 \description{
 Compute distance matrices with tidy output
 }
+\examples{
+\donttest{
+d <- tidy_dist(iris[, 1:4], method = "euclidean")
+}
+
+}

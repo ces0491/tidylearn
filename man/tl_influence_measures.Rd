@@ -26,3 +26,9 @@ A data frame with influence measures
 \description{
 Calculate influence measures for a linear model
 }
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+tl_influence_measures(model)
+}
+}

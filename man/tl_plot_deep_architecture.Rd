@@ -17,3 +17,11 @@ A plot of the deep learning model architecture
 \description{
 Plot deep learning model architecture
 }
+\examples{
+\dontrun{
+if (requireNamespace("keras", quietly = TRUE)) {
+  model <- tl_model(iris, Species ~ ., method = "deep", epochs = 5)
+  tl_plot_deep_architecture(model)
+}
+}
+}

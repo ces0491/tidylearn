@@ -156,6 +156,13 @@ tl_predict_nn <- function(model, new_data, type = "response", ...) {
 #' @param model A tidylearn neural network model object
 #' @param ... Additional arguments
 #' @return A ggplot object with neural network architecture
+#' @examples
+#' \donttest{
+#' if (requireNamespace("NeuralNetTools", quietly = TRUE)) {
+#'   model <- tl_model(iris, Species ~ ., method = "nn", size = 3)
+#'   tl_plot_nn_architecture(model)
+#' }
+#' }
 #' @importFrom ggplot2 ggplot aes geom_segment geom_point geom_text theme_void
 #' @export
 tl_plot_nn_architecture <- function(model, ...) {

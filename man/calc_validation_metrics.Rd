@@ -19,3 +19,11 @@ A tibble with validation metrics
 \description{
 Comprehensive validation metrics for a clustering result
 }
+\examples{
+\donttest{
+km <- kmeans(iris[, 1:4], centers = 3, nstart = 25)
+d <- dist(iris[, 1:4])
+metrics <- calc_validation_metrics(km$cluster, iris[, 1:4], d)
+}
+
+}

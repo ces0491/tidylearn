@@ -17,3 +17,9 @@ Invisible NULL
 \description{
 Save a pipeline to disk
 }
+\examples{
+\donttest{
+pipe <- tl_pipeline(iris, Species ~ .)
+tl_save_pipeline(pipe, tempfile(fileext = ".rds"))
+}
+}

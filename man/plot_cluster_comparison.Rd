@@ -21,3 +21,11 @@ A grid of ggplot objects
 \description{
 Compare multiple clustering results side-by-side
 }
+\examples{
+\donttest{
+df <- iris[, 1:4]
+df$km3 <- kmeans(df, 3)$cluster
+df$km4 <- kmeans(df, 4)$cluster
+plot_cluster_comparison(df, c("km3", "km4"), "Sepal.Length", "Sepal.Width")
+}
+}

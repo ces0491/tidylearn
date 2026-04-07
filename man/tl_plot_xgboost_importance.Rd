@@ -21,3 +21,11 @@ A ggplot object
 \description{
 Plot feature importance for an XGBoost model
 }
+\examples{
+\donttest{
+if (requireNamespace("xgboost", quietly = TRUE)) {
+  model <- tl_model(mtcars, mpg ~ ., method = "xgboost")
+  tl_plot_xgboost_importance(model)
+}
+}
+}

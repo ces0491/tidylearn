@@ -17,3 +17,9 @@ Invisibly returns the input object
 \description{
 Summary method for tidylearn models
 }
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+summary(model)
+}
+}

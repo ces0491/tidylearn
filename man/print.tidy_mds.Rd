@@ -17,3 +17,10 @@ Invisibly returns the input object x
 \description{
 Print Method for tidy_mds
 }
+\examples{
+\donttest{
+mds <- tidy_mds(USArrests, method = "classical")
+print(mds)
+}
+
+}

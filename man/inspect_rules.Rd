@@ -21,3 +21,13 @@ A tibble of top rules
 \description{
 View rules sorted by various quality measures
 }
+\examples{
+\donttest{
+if (requireNamespace("arules", quietly = TRUE)) {
+  data("Groceries", package = "arules")
+  res <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
+  inspect_rules(res, by = "lift", n = 5)
+}
+}
+
+}
