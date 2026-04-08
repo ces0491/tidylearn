@@ -617,13 +617,29 @@ tl_xgboost_shap <- function(model, data = NULL,
 #' @return A ggplot object with SHAP summary
 #' @importFrom ggplot2 ggplot aes geom_point
 #'   scale_color_gradient labs theme_minimal
+#' @examples
+#' \donttest{
+#' if (requireNamespace("xgboost", quietly = TRUE)) {
+#'   model <- tl_model(mtcars, mpg ~ ., method = "xgboost")
+#'   tl_plot_xgboost_shap_summary(model, n_samples = 20)
+#' }
+#' }
 #' @export
 tl_plot_xgboost_shap_summary <- function(model,
                                          data = NULL,
                                          top_n = 10,
                                          n_samples = 100) {
-  # Calculate SHAP values
-  shap_df <- tl_xgboost_shap(model, data, n_samples)
+  # Resolve data and handle sampling here so feature values and SHAP values
+
+  # come from exactly the same rows
+  use_data <- if (is.null(data)) model$data else data
+  if (!is.null(n_samples) && n_samples < nrow(use_data)) {
+    sample_idx <- sample(nrow(use_data), n_samples)
+    use_data <- use_data[sample_idx, , drop = FALSE]
+  }
+
+  # Calculate SHAP values on the (already-sampled) data; pass n_samples = NULL
+  shap_df <- tl_xgboost_shap(model, use_data, n_samples = NULL)
 
   # Convert wide to long format for plotting
   feature_cols <- attr(model$fit, "feature_names")
@@ -638,16 +654,16 @@ tl_plot_xgboost_shap_summary <- function(model,
 
   # Limit to top features
   if (length(sorted_features) > top_n) {
-    top_features <- sorted_features[1:top_n]
+    top_features <- sorted_features[seq_len(top_n)]
   } else {
     top_features <- sorted_features
   }
 
-  # Prepare data for plotting
+  # Prepare data for plotting (use_data has the same rows as shap_df)
   plot_data <- NULL
   for (feat in top_features) {
-    # Get feature values and SHAP values
-    feat_vals <- if (feat %in% names(model$data)) model$data[[feat]] else NA
+    # Get feature values from the sampled data (same rows as SHAP values)
+    feat_vals <- if (feat %in% names(use_data)) use_data[[feat]] else NA
     shap_vals <- shap_df[[feat]]
 
     # Combine into data frame

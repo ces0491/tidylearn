@@ -23,3 +23,11 @@ A ggplot object with SHAP summary
 \description{
 Plot SHAP summary for XGBoost model
 }
+\examples{
+\donttest{
+if (requireNamespace("xgboost", quietly = TRUE)) {
+  model <- tl_model(mtcars, mpg ~ ., method = "xgboost")
+  tl_plot_xgboost_shap_summary(model, n_samples = 20)
+}
+}
+}

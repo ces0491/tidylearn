@@ -662,7 +662,7 @@ tl_check_kaggle_cli <- function() {
   if (is.null(result)) {
     stop("Kaggle CLI not found. Install it with: pip install kaggle\n",
          "Then configure credentials: ",
-         "https://github.com/Kaggle/kaggle-api#api-credentials",
+         "https://github.com/Kaggle/kaggle-cli#api-credentials",
          call. = FALSE)
   }
   invisible(TRUE)

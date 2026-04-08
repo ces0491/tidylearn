@@ -20,7 +20,9 @@ Run a tidylearn pipeline
 \examples{
 \donttest{
 pipe <- tl_pipeline(iris, Species ~ .,
-  models = list(tree = list(method = "tree")))
+  models = list(tree = list(method = "tree")),
+  evaluation = list(metrics = "accuracy", validation = "cv",
+    cv_folds = 2, best_metric = "accuracy"))
 pipe <- tl_run_pipeline(pipe, verbose = FALSE)
 }
 }

@@ -22,3 +22,9 @@ A ggplot object
 \description{
 Create confidence and prediction interval plots
 }
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ wt, method = "linear")
+tl_plot_intervals(model)
+}
+}

@@ -51,6 +51,55 @@
 
 ## Bug Fixes
 
+### Workflow and Pipeline Fixes
+
+* Fixed `tl_transfer_learning()` hanging indefinitely when used with PCA
+  pre-training. The `.obs_id` row-identifier column from PCA output was
+  being included in the supervised formula, creating a massive dummy-variable
+  matrix. The column is now stripped before both training and prediction.
+* Fixed `tl_run_pipeline()` failing with "attempt to select less than one
+  element" when all cross-validation metrics were NA. Root cause: `scale()`
+  returned matrix columns instead of vectors, causing downstream metric
+  computation to produce NaN. Added `as.vector()` wrapper and hardened the
+  best-model selection to handle all-NA metric values gracefully.
+* Overhauled `tl_auto_ml()` time budget enforcement. The budget now controls
+  which models are attempted: budgets under 30s skip slow C-level models
+  (forest, SVM, XGBoost) entirely, and cross-validation is skipped when
+  remaining time is tight. Baseline model order changed to fast-first
+  (tree, logistic/linear, then forest). See `?tl_auto_ml` for full details
+  on budget tiers.
+
+### Interaction and Prediction Fixes
+
+* Fixed `tl_interaction_effects()` crashing with "unused argument (se.fit)"
+  because tidylearn's `predict()` method does not support `se.fit`. Now uses
+  `stats::predict()` on the raw model object for confidence intervals. Also
+  fixed an invalid formula in the internal slope calculation.
+* Fixed `tl_plot_interaction()` expecting `fit`/`lwr`/`upr` columns from
+  `predict()` output. Now correctly handles tidylearn's `.pred` tibble
+  format.
+
+### Visualization Fixes
+
+* Fixed `tl_plot_intervals()` calling non-existent `tl_prediction_intervals()`
+  function. Now computes confidence and prediction intervals directly via
+  `stats::predict(..., interval = "confidence")` and
+  `stats::predict(..., interval = "prediction")`.
+* Fixed `tl_plot_svm_boundary()` erroring with "at least two predictor
+  variables required" when using `response ~ .` formulas. The function now
+  resolves predictors from data column names instead of `all.vars()`, which
+  does not expand `.`. Also switched from `geom_contour_filled` (which
+  failed on discrete class predictions) to `geom_raster`.
+* Fixed `tl_plot_svm_tuning()` passing `NULL` entries in the `ranges` list
+  to `e1071::tune()`, which caused "NA/NaN/Inf in foreign function call"
+  errors. Tuning ranges are now built conditionally based on the kernel type.
+* Fixed `tl_plot_xgboost_shap_summary()` failing with "arguments imply
+  differing number of rows" when `n_samples` differed from `nrow(data)`.
+  Sampling is now performed before SHAP computation so that feature values
+  and SHAP values always have the same number of rows.
+
+### Other Fixes
+
 * Fixed classification auto-detection silently treating numeric responses
   with <= 10 unique values as classification. The response must now be a
   factor or character for classification; a helpful message is emitted when
@@ -58,6 +107,8 @@
 * Fixed `tl_check_assumptions()` crashing with "list object cannot be
   coerced to logical" when some assumption checks returned NULL (e.g.,
   when optional test packages were not installed).
+* Fixed SVM default `gamma` calculation to use predictor count only
+  (`1 / (ncol(data) - 1)`) instead of including the response column.
 * Added missing `@return` tag to `print.tidylearn_data()`.
 * Replaced deprecated ggplot2 `size` parameter with `linewidth` in all
   `geom_line()` calls across visualization, classification, PCA, DBSCAN,

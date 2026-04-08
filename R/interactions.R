@@ -208,15 +208,19 @@ tl_plot_interaction <- function(model, var1, var2,
   # Make predictions
   predictions <- predict(model, grid, ...)
 
-  # Add predictions to grid
-  if (is.data.frame(predictions)) {
-    # Multiple columns (e.g., confidence intervals)
+  # Add predictions to grid -- tidylearn predict returns tibble with .pred
+  if (is.data.frame(predictions) && ".pred" %in% names(predictions)) {
+    grid$prediction <- predictions$.pred
+    y_col <- "prediction"
+    lower_col <- NULL
+    upper_col <- NULL
+  } else if (is.data.frame(predictions)) {
+    # Non-tidylearn output (e.g., confidence intervals with fit/lwr/upr)
     grid <- cbind(grid, predictions)
-    y_col <- "fit"
-    lower_col <- "lwr"
-    upper_col <- "upr"
+    y_col <- if ("fit" %in% names(predictions)) "fit" else names(predictions)[1]
+    lower_col <- if ("lwr" %in% names(predictions)) "lwr" else NULL
+    upper_col <- if ("upr" %in% names(predictions)) "upr" else NULL
   } else {
-    # Single column
     grid$prediction <- predictions
     y_col <- "prediction"
     lower_col <- NULL
@@ -468,15 +472,17 @@ tl_interaction_effects <- function(model, var, by_var,
       }
     }
 
-    # Make predictions
+    # Make predictions -- use raw model for se.fit (tidylearn predict
+    # doesn't support it), and extract .pred for the plain case
     if (intervals) {
-      preds <- predict(model, grid, se.fit = TRUE)
-      grid$fit <- preds$fit
-      grid$se <- preds$se.fit
+      raw_preds <- stats::predict(model$fit, newdata = grid, se.fit = TRUE)
+      grid$fit <- as.vector(raw_preds$fit)
+      grid$se <- as.vector(raw_preds$se.fit)
       grid$lower <- grid$fit - 1.96 * grid$se
       grid$upper <- grid$fit + 1.96 * grid$se
     } else {
-      grid$fit <- predict(model, grid)
+      preds <- predict(model, grid)
+      grid$fit <- if (is.data.frame(preds)) preds$.pred else preds
     }
 
     # Add by_value label
@@ -516,7 +522,8 @@ tl_interaction_effects <- function(model, var, by_var,
       }
 
       # Fit linear model to get slope
-      slope_model <- lm(fit ~ .data[[var]], data = sub_grid)
+      slope_formula <- stats::as.formula(paste("fit ~", var))
+      slope_model <- lm(slope_formula, data = sub_grid)
       slope_coef <- coef(summary(slope_model))
 
       data.frame(

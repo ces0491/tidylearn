@@ -612,8 +612,8 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
 
   # Print summary if verbose
   if (verbose) {
-    cat("Model Assumptions Check Summary:\n")
-    cat("--------------------------------\n")
+    message("Model Assumptions Check Summary:")
+    message("--------------------------------")
     for (name in names(assumptions)) {
       check <- assumptions[[name]]
       check_status <- if (is.null(check$check)) {
@@ -624,11 +624,11 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
         "VIOLATED"
       }
 
-      cat(paste0(
+      message(
         check$assumption, ": ", check_status, "\n",
         "  Details: ", check$details, "\n",
-        "  Recommendation: ", check$recommendation, "\n\n"
-      ))
+        "  Recommendation: ", check$recommendation, "\n"
+      )
     }
   }
 

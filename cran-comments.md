@@ -3,8 +3,8 @@
 ## Minor release (0.3.0)
 
 This release adds a new `tl_read()` family of data ingestion functions,
-fixes the classification auto-detection heuristic, and substantially
-expands test coverage.
+fixes 12 bugs across workflows, pipelines, interactions, and visualizations,
+and substantially expands test coverage.
 
 ### New features
 
@@ -23,10 +23,25 @@ expands test coverage.
 
 ### Bug fixes
 
+* Fixed `tl_transfer_learning()` hanging due to `.obs_id` column from PCA
+  output being included in the supervised formula
+* Fixed `tl_run_pipeline()` failing when all CV metrics were NA (`scale()`
+  returning matrix columns, NaN metric handling)
+* Overhauled `tl_auto_ml()` time budget enforcement -- budget now gates
+  which models are attempted and whether CV runs
+* Fixed `tl_interaction_effects()` and `tl_plot_interaction()` predict
+  interface mismatches with tidylearn's `.pred` tibble output
+* Fixed `tl_plot_intervals()` calling non-existent function; now uses
+  `stats::predict()` directly for confidence/prediction intervals
+* Fixed `tl_plot_svm_boundary()` failing on `response ~ .` formulas and
+  on discrete class predictions
+* Fixed `tl_plot_svm_tuning()` passing NULL entries to `e1071::tune()`
+* Fixed `tl_plot_xgboost_shap_summary()` row count mismatch when sampling
 * Fixed classification auto-detection silently misclassifying numeric
   responses with few unique values
 * Fixed `tl_check_assumptions()` crashing when optional test packages
   were not installed
+* Fixed SVM default gamma to use predictor count only
 
 ### Tests
 
@@ -41,7 +56,7 @@ expands test coverage.
 ### New suggested dependencies
 
 readr, readxl, nanoparquet, jsonlite, DBI, RSQLite, RPostgres,
-RMariaDB, bigrquery, paws.storage — all on CRAN
+RMariaDB, bigrquery, paws.storage -- all on CRAN
 
 ## R CMD check results
 

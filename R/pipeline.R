@@ -103,7 +103,9 @@ tl_pipeline <- function(data, formula,
 #' @examples
 #' \donttest{
 #' pipe <- tl_pipeline(iris, Species ~ .,
-#'   models = list(tree = list(method = "tree")))
+#'   models = list(tree = list(method = "tree")),
+#'   evaluation = list(metrics = "accuracy", validation = "cv",
+#'     cv_folds = 2, best_metric = "accuracy"))
 #' pipe <- tl_run_pipeline(pipe, verbose = FALSE)
 #' }
 #' @export
@@ -169,9 +171,9 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
     numeric_cols <- sapply(processed_data, is.numeric)
     numeric_cols[response_var] <- FALSE  # Don't standardize response
 
-    # Standardize each numeric column
+    # Standardize each numeric column (as.vector avoids matrix-column)
     for (col in names(processed_data)[numeric_cols]) {
-      processed_data[[col]] <- scale(processed_data[[col]])
+      processed_data[[col]] <- as.vector(scale(processed_data[[col]]))
     }
   }
 
@@ -358,17 +360,19 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
         metric_row <- result$avg_metrics$metric ==
           best_metric
         if (any(metric_row)) {
-          result$avg_metrics$mean_value[metric_row]
+          val <- result$avg_metrics$mean_value[metric_row]
+          if (is.nan(val) || is.na(val)) NA_real_ else val
         } else {
-          NA
+          NA_real_
         }
       } else {
         metric_row <- result$test_metrics$metric ==
           best_metric
         if (any(metric_row)) {
-          result$test_metrics$value[metric_row]
+          val <- result$test_metrics$value[metric_row]
+          if (is.nan(val) || is.na(val)) NA_real_ else val
         } else {
-          NA
+          NA_real_
         }
       }
     }
@@ -382,21 +386,19 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
   is_higher_better <- best_metric %in%
     metrics_higher_better
 
-  # Find best model
-  if (is_higher_better) {
-    best_idx <- which.max(metric_values)
-  } else {
-    best_idx <- which.min(metric_values)
-  }
-
-  if (length(best_idx) == 0) {
-    # All metrics were NA — fall back to first model
+  # Find best model (use na.rm-safe which.max/which.min)
+  valid_values <- !is.na(metric_values)
+  if (!any(valid_values)) {
     best_idx <- 1L
     warning(
       "Could not determine best model from metric '",
-      best_metric, "'. Using first model.",
+      best_metric, "' -- all values NA. Using first model.",
       call. = FALSE
     )
+  } else if (is_higher_better) {
+    best_idx <- which.max(metric_values)
+  } else {
+    best_idx <- which.min(metric_values)
   }
 
   best_model_name <- names(model_results)[best_idx]
@@ -426,7 +428,9 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
 #' @examples
 #' \donttest{
 #' pipe <- tl_pipeline(iris, Species ~ .,
-#'   models = list(tree = list(method = "tree")))
+#'   models = list(tree = list(method = "tree")),
+#'   evaluation = list(metrics = "accuracy", validation = "cv",
+#'     cv_folds = 2, best_metric = "accuracy"))
 #' pipe <- tl_run_pipeline(pipe, verbose = FALSE)
 #' best <- tl_get_best_model(pipe)
 #' }

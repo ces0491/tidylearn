@@ -33,6 +33,6 @@ features) before supervised learning
 \examples{
 \donttest{
 model <- tl_transfer_learning(iris, Species ~ .,
-  pretrain_method = "pca", supervised_method = "tree")
+  pretrain_method = "pca", supervised_method = "logistic")
 }
 }
