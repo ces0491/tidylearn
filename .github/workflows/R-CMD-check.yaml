@@ -27,11 +27,6 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
-      # Mimic CRAN behavior: skip \donttest{} examples and skip_on_cran()
-      # tests. The donttest examples train multiple ML models (randomForest,
-      # xgboost, e1071 SVM) which exceed CI runner time limits. These are
-      # validated locally before each push; CRAN runs them during review.
-      NOT_CRAN: false
 
     steps:
       - uses: actions/checkout@v4
@@ -48,15 +43,14 @@ jobs:
         with:
           extra-packages: any::rcmdcheck
           needs: check
-        env:
-          # Skip heavyweight Suggests that need compilation or external
-          # runtimes. R CMD check with _R_CHECK_FORCE_SUGGESTS_=false
-          # handles missing Suggests gracefully.
-          _R_CHECK_FORCE_SUGGESTS_: false
 
       - uses: r-lib/actions/check-r-package@v2
         with:
           upload-snapshots: true
           build_args: 'c("--no-manual","--compact-vignettes=gs+qpdf")'
         env:
-          _R_CHECK_FORCE_SUGGESTS_: false
+          # \donttest{} examples train full ML models (randomForest, xgboost,
+          # SVM, AutoML) that hang CI runners for 1h+. R CMD check runs these
+          # via --run-donttest by default. Skip them in CI; CRAN validates
+          # them during submission review. Validated locally before each push.
+          _R_CHECK_DONTTEST_EXAMPLES_: false
