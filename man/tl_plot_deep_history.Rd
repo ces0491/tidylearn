@@ -15,7 +15,7 @@ tl_plot_deep_history(model, metrics = c("loss", "val_loss"), ...)
 \item{...}{Additional arguments}
 }
 \value{
-A ggplot object with training history
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot deep learning model training history

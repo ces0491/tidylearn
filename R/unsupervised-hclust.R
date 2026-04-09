@@ -74,7 +74,8 @@ tidy_hclust <- function(data, method = "average",
 #' @param k Number of clusters (optional)
 #' @param h Height at which to cut (optional)
 #'
-#' @return A tibble with observation IDs and cluster assignments
+#' @return A tibble with columns \code{.obs_id} (observation identifier) and
+#'   \code{cluster} (integer cluster assignment).
 #'
 #' @examples
 #' \donttest{
@@ -121,7 +122,8 @@ tidy_cutree <- function(hclust_obj, k = NULL, h = NULL) {
 #' @param k Number of clusters (optional)
 #' @param h Height at which to cut (optional)
 #'
-#' @return Original data with cluster column added
+#' @return A tibble containing the original \code{data} with an additional
+#'   \code{cluster} integer column indicating cluster assignments.
 #'
 #' @examples
 #' \donttest{
@@ -158,7 +160,8 @@ augment_hclust <- function(hclust_obj, data, k = NULL, h = NULL) {
 #' @param hang Fraction of plot height to hang labels (default: 0.01)
 #' @param cex Label size (default: 0.7)
 #'
-#' @return Invisibly returns the hclust object (plots as side effect)
+#' @return The \code{\link[stats]{hclust}} object, returned invisibly. The
+#'   dendrogram is plotted as a side effect.
 #'
 #' @examples
 #' \donttest{
@@ -208,7 +211,14 @@ tidy_dendrogram <- function(hclust_obj, k = NULL, hang = 0.01, cex = 0.7) {
 #' @param method Character; "silhouette" (default) or "gap"
 #' @param max_k Maximum number of clusters to test (default: 10)
 #'
-#' @return A list with optimal k and evaluation results
+#' @return A list containing:
+#' \itemize{
+#'   \item optimal_k: the recommended number of clusters
+#'   \item method: the evaluation method used
+#'   \item values: numeric vector of evaluation scores (for silhouette)
+#'   \item k_range: integer vector of k values tested (for silhouette)
+#' }
+#' If \code{method = "gap"}, returns a \code{tidy_gap} object instead.
 #'
 #' @examples
 #' \donttest{
@@ -269,7 +279,7 @@ optimal_hclust_k <- function(hclust_obj, method = "silhouette", max_k = 10) {
 #' @param x A tidy_hclust object
 #' @param ... Additional arguments (ignored)
 #'
-#' @return Invisibly returns the input object x
+#' @return The input object \code{x}, returned invisibly.
 #'
 #' @examples
 #' \donttest{

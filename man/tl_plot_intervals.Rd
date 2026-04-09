@@ -17,7 +17,7 @@ tl_plot_intervals(model, new_data = NULL, level = 0.95, ...)
 \item{...}{Additional arguments}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Create confidence and prediction interval plots

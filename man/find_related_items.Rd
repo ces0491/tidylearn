@@ -16,7 +16,8 @@ find_related_items(rules_obj, item, min_lift = 1.5, top_n = 10)
 \item{top_n}{Number of top associations to return (default: 10)}
 }
 \value{
-A tibble of related items with association metrics
+A tibble of rules involving the specified \code{item}, filtered by
+\code{min_lift} and sorted by lift in descending order.
 }
 \description{
 Find items frequently purchased with a given item

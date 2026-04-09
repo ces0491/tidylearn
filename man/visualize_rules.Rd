@@ -17,7 +17,9 @@ visualize_rules(rules_obj, method = "scatter", top_n = 50, ...)
 \item{...}{Additional arguments passed to plot() for rules visualization}
 }
 \value{
-Visualization (side effect) or ggplot object
+A \code{\link[ggplot2]{ggplot}} object when \code{method = "scatter"}.
+For other methods, the plot is produced as a side effect via
+\pkg{arulesViz}.
 }
 \description{
 Create visualizations of association rules

@@ -13,7 +13,10 @@ NULL
 #' @param models A list of models to train
 #' @param evaluation A list of evaluation criteria
 #' @param ... Additional arguments
-#' @return A tidylearn pipeline object
+#' @return A \code{tidylearn_pipeline} object (S3 list) with components
+#'   \code{$formula}, \code{$data}, \code{$preprocessing},
+#'   \code{$models}, \code{$evaluation}, and \code{$results}
+#'   (initially \code{NULL}; populated after \code{\link{tl_run_pipeline}}).
 #' @examples
 #' \donttest{
 #' pipe <- tl_pipeline(iris, Species ~ .,
@@ -99,7 +102,12 @@ tl_pipeline <- function(data, formula,
 #'
 #' @param pipeline A tidylearn pipeline object
 #' @param verbose Logical; whether to print progress
-#' @return A tidylearn pipeline with results
+#' @return The input \code{tidylearn_pipeline} object with its
+#'   \code{$results} component populated. Results include
+#'   \code{$processed_data}, \code{$model_results} (a named list of
+#'   per-model fits and metrics), \code{$best_model_name},
+#'   \code{$best_model} (the winning \code{tidylearn_model}), and
+#'   \code{$metric_values}.
 #' @examples
 #' \donttest{
 #' pipe <- tl_pipeline(iris, Species ~ .,
@@ -424,7 +432,8 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
 #' Get the best model from a pipeline
 #'
 #' @param pipeline A tidylearn pipeline object with results
-#' @return The best tidylearn model
+#' @return The best \code{tidylearn_model} object from the pipeline,
+#'   selected by the metric specified in \code{evaluation$best_metric}.
 #' @examples
 #' \donttest{
 #' pipe <- tl_pipeline(iris, Species ~ .,
@@ -452,7 +461,9 @@ tl_get_best_model <- function(pipeline) {
 #' @param pipeline A tidylearn pipeline object with results
 #' @param metrics Character vector of metrics to compare
 #'   (if NULL, uses all available)
-#' @return A comparison plot of model performance
+#' @return A \code{\link[ggplot2]{ggplot}} object showing a faceted bar
+#'   chart comparing metric values across models, with the best model
+#'   highlighted.
 #' @importFrom ggplot2 ggplot aes geom_col facet_wrap labs theme_minimal
 #' @export
 tl_compare_pipeline_models <- function(pipeline, metrics = NULL) {
@@ -569,7 +580,9 @@ tl_compare_pipeline_models <- function(pipeline, metrics = NULL) {
 #' @param type Type of prediction (default: "response")
 #' @param model_name Name of model to use (if NULL, uses the best model)
 #' @param ... Additional arguments passed to predict
-#' @return Predictions
+#' @return A \link[tibble]{tibble} with a \code{.pred} column containing
+#'   predictions from the selected (or best) pipeline model, after
+#'   applying the same preprocessing steps used during training.
 #' @export
 tl_predict_pipeline <- function(pipeline,
                                 new_data,
@@ -681,7 +694,8 @@ tl_predict_pipeline <- function(pipeline,
 #'
 #' @param pipeline A tidylearn pipeline object
 #' @param file Path to save the pipeline
-#' @return Invisible NULL
+#' @return Called for its side effect of saving to disk; returns
+#'   \code{NULL} invisibly.
 #' @examples
 #' \donttest{
 #' pipe <- tl_pipeline(iris, Species ~ .)
@@ -703,7 +717,8 @@ tl_save_pipeline <- function(pipeline, file) {
 #' Load a pipeline from disk
 #'
 #' @param file Path to the pipeline file
-#' @return A tidylearn pipeline object
+#' @return A \code{tidylearn_pipeline} object previously saved with
+#'   \code{\link{tl_save_pipeline}}.
 #' @examples
 #' \donttest{
 #' pipe <- tl_pipeline(iris, Species ~ .)
@@ -728,7 +743,7 @@ tl_load_pipeline <- function(file) {
 #'
 #' @param x A tidylearn pipeline object
 #' @param ... Additional arguments (not used)
-#' @return Invisibly returns the pipeline
+#' @return The input pipeline object \code{x}, returned invisibly.
 #' @examples
 #' \donttest{
 #' pipe <- tl_pipeline(iris, Species ~ .)
@@ -792,7 +807,8 @@ print.tidylearn_pipeline <- function(x, ...) {
 #'
 #' @param object A tidylearn pipeline object
 #' @param ... Additional arguments (not used)
-#' @return Invisibly returns the pipeline
+#' @return The input pipeline \code{object}, returned invisibly. Called
+#'   for its side effect of printing detailed pipeline and model results.
 #' @examples
 #' \donttest{
 #' pipe <- tl_pipeline(iris, Species ~ .)

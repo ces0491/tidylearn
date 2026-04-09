@@ -29,7 +29,7 @@ or scatter plots)}
 "parallel", "importance"}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot hyperparameter tuning results

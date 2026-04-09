@@ -14,7 +14,8 @@ calc_wss(data, max_k = 10, nstart = 25)
 \item{nstart}{Number of random starts for each k (default: 25)}
 }
 \value{
-A tibble with k and corresponding total within-cluster SS
+A tibble with columns \code{k} (number of clusters) and
+\code{tot_withinss} (total within-cluster sum of squares).
 }
 \description{
 Used for elbow method to determine optimal k

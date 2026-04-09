@@ -70,7 +70,9 @@ tidy_silhouette <- function(clusters, dist_mat) {
 #' @param dist_method Distance metric (default: "euclidean")
 #' @param linkage_method If hclust, linkage method (default: "average")
 #'
-#' @return A tibble with k and average silhouette widths
+#' @return A tibble with columns \code{k} and \code{avg_sil_width}. The
+#'   \code{"optimal_k"} attribute contains the k with the highest average
+#'   silhouette width.
 #'
 #' @examples
 #' \donttest{
@@ -121,7 +123,7 @@ tidy_silhouette_analysis <- function(data, max_k = 10, method = "kmeans",
 #' @param sil_obj A tidy_silhouette object or tibble
 #'   from tidy_silhouette_analysis
 #'
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #'
 #' @examples
 #' \donttest{
@@ -201,7 +203,15 @@ plot_silhouette <- function(sil_obj) {
 #' @param B Number of bootstrap samples (default: 50)
 #' @param nstart If using kmeans, number of random starts (default: 25)
 #'
-#' @return A list of class "tidy_gap" containing gap statistics
+#' @return A list of class \code{"tidy_gap"} containing:
+#' \itemize{
+#'   \item gap_data: tibble with gap statistics for each k
+#'   \item k_firstSEmax: optimal k via firstSEmax method (most conservative)
+#'   \item k_globalmax: optimal k via globalmax method
+#'   \item k_firstmax: optimal k via firstmax method
+#'   \item recommended_k: recommended k (uses firstSEmax)
+#'   \item model: the \code{\link[cluster]{clusGap}} result
+#' }
 #'
 #' @examples
 #' \donttest{
@@ -269,7 +279,7 @@ tidy_gap_stat <- function(data, FUN_cluster = NULL,
 #' @param show_methods Logical; show all three k
 #'   selection methods? (default: FALSE)
 #'
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #'
 #' @examples
 #' \donttest{
@@ -358,7 +368,10 @@ plot_gap_stat <- function(gap_obj, show_methods = FALSE) {
 #' @param data Original data frame (for WSS calculation)
 #' @param dist_mat Distance matrix (for silhouette)
 #'
-#' @return A tibble with validation metrics
+#' @return A single-row tibble with columns \code{k}, \code{min_size},
+#'   \code{max_size}, \code{avg_size}, and optionally \code{avg_silhouette},
+#'   \code{min_silhouette} (if \code{dist_mat} provided), and \code{total_wss}
+#'   (if \code{data} provided).
 #'
 #' @examples
 #' \donttest{
@@ -417,7 +430,9 @@ calc_validation_metrics <- function(clusters, data = NULL, dist_mat = NULL) {
 #' @param data Original data
 #' @param dist_mat Distance matrix
 #'
-#' @return A tibble comparing all clustering results
+#' @return A tibble with one row per clustering method and columns for each
+#'   validation metric (see \code{\link{calc_validation_metrics}}), plus a
+#'   \code{method} column identifying the clustering.
 #'
 #' @examples
 #' \donttest{
@@ -449,7 +464,7 @@ compare_clusterings <- function(cluster_list, data, dist_mat = NULL) {
 #' @param x A tidy_silhouette object
 #' @param ... Additional arguments (ignored)
 #'
-#' @return Invisibly returns the input object x
+#' @return The input object \code{x}, returned invisibly.
 #'
 #' @examples
 #' \donttest{
@@ -483,7 +498,7 @@ print.tidy_silhouette <- function(x, ...) {
 #' @param x A tidy_gap object
 #' @param ... Additional arguments (ignored)
 #'
-#' @return Invisibly returns the input object x
+#' @return The input object \code{x}, returned invisibly.
 #'
 #' @examples
 #' \donttest{

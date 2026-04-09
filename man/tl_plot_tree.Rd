@@ -12,7 +12,8 @@ tl_plot_tree(model, ...)
 \item{...}{Additional arguments to pass to rpart.plot()}
 }
 \value{
-A plot of the decision tree
+The return value of \code{\link[rpart.plot]{rpart.plot}}, called
+for its side effect of drawing the tree.
 }
 \description{
 Plot a decision tree

@@ -14,7 +14,8 @@
 \item{...}{Additional arguments}
 }
 \value{
-A tibble of predictions with cluster assignments
+A \link[tibble]{tibble} with a \code{.pred} column containing
+predictions and a \code{.cluster} column with cluster assignments.
 }
 \description{
 Predict from stratified models

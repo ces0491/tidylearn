@@ -17,7 +17,7 @@ tl_plot_model_comparison(..., new_data = NULL, metrics = NULL, names = NULL)
 \item{names}{Optional character vector of model names}
 }
 \value{
-A ggplot object with model comparison
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot model comparison

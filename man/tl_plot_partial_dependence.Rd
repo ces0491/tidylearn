@@ -17,7 +17,7 @@ variables (default: 20)}
 \item{...}{Additional arguments}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot partial dependence for tree-based models

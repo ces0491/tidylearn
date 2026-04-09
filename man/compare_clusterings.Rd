@@ -14,7 +14,9 @@ compare_clusterings(cluster_list, data, dist_mat = NULL)
 \item{dist_mat}{Distance matrix}
 }
 \value{
-A tibble comparing all clustering results
+A tibble with one row per clustering method and columns for each
+validation metric (see \code{\link{calc_validation_metrics}}), plus a
+\code{method} column identifying the clustering.
 }
 \description{
 Compare Multiple Clustering Results

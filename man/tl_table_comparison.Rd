@@ -17,7 +17,7 @@ training data of the first model.}
 \item{digits}{Number of decimal places (default: 4)}
 }
 \value{
-A gt table object
+A \code{\link[gt]{gt}} table object.
 }
 \description{
 Evaluates multiple tidylearn models and presents the results side-by-side

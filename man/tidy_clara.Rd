@@ -18,7 +18,13 @@ tidy_clara(data, k, metric = "euclidean", samples = 50, sampsize = NULL)
 \item{sampsize}{Sample size (default: min(n, 40 + 2*k))}
 }
 \value{
-A list of class "tidy_clara" containing clustering results
+A list of class \code{"tidy_clara"} containing:
+\itemize{
+\item clusters: tibble with observation IDs and cluster assignments
+\item medoids: tibble of medoid values
+\item silhouette_avg: average silhouette width
+\item model: original \code{\link[cluster]{clara}} object
+}
 }
 \description{
 Performs CLARA clustering (scalable version of PAM)

@@ -19,7 +19,15 @@
 #' @param remove_zero_variance Remove zero-variance features (default: TRUE)
 #' @param remove_correlated Remove highly correlated features (default: FALSE)
 #' @param correlation_cutoff Correlation threshold for removal (default: 0.95)
-#' @return A list containing processed data and preprocessing metadata
+#' @return A list with components:
+#'   \describe{
+#'     \item{\code{data}}{The processed data frame.}
+#'     \item{\code{original_data}}{The original unprocessed data frame.}
+#'     \item{\code{preprocessing_steps}}{A list of metadata for each
+#'       preprocessing step applied (imputation values, encoding maps,
+#'       scaling parameters, etc.).}
+#'     \item{\code{formula}}{The formula passed in (or \code{NULL}).}
+#'   }
 #' @export
 #' @examples
 #' \donttest{
@@ -306,7 +314,11 @@ scale_features <- function(data, numeric_cols, method = "standardize") {
 #' @param prop Proportion for training set (default: 0.8)
 #' @param stratify Column name for stratified splitting
 #' @param seed Random seed for reproducibility
-#' @return A list with train and test data frames
+#' @return A list with two elements:
+#'   \describe{
+#'     \item{\code{$train}}{A data frame containing the training subset.}
+#'     \item{\code{$test}}{A data frame containing the test subset.}
+#'   }
 #' @export
 #' @examples
 #' \donttest{

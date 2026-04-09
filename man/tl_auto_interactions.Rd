@@ -28,7 +28,11 @@ tl_auto_interactions(
 from interaction testing}
 }
 \value{
-A tidylearn model with important interactions
+A tidylearn model object (class \code{"tidylearn_model"}) fitted
+with the top significant interaction terms added to the formula.
+The interaction test results and selected interactions are stored as
+attributes \code{"interaction_tests"} and
+\code{"selected_interactions"}.
 }
 \description{
 Find important interactions automatically

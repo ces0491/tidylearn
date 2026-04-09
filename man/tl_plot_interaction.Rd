@@ -30,7 +30,7 @@ tl_plot_interaction(
 \item{...}{Additional arguments to pass to predict()}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot interaction effects

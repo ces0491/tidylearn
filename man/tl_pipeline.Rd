@@ -27,7 +27,10 @@ tl_pipeline(
 \item{...}{Additional arguments}
 }
 \value{
-A tidylearn pipeline object
+A \code{tidylearn_pipeline} object (S3 list) with components
+\code{$formula}, \code{$data}, \code{$preprocessing},
+\code{$models}, \code{$evaluation}, and \code{$results}
+(initially \code{NULL}; populated after \code{\link{tl_run_pipeline}}).
 }
 \description{
 Create a modeling pipeline

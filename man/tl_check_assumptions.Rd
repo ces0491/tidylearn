@@ -14,7 +14,13 @@ tl_check_assumptions(model, test = TRUE, verbose = TRUE)
 \item{verbose}{Logical; whether to print test results and explanations}
 }
 \value{
-A list with assumption check results
+A named list with one element per assumption checked
+(\code{linearity}, \code{independence}, \code{homoscedasticity},
+\code{normality}, \code{multicollinearity}, \code{outliers}), each
+containing \code{assumption} (character label), \code{check} (logical
+or \code{NULL}), \code{details} (character), and
+\code{recommendation} (character). An additional \code{overall} element
+summarises the number of assumptions checked, violated, and satisfied.
 }
 \description{
 Check model assumptions

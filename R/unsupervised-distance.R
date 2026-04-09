@@ -10,7 +10,8 @@
 #'   If NULL, uses all numeric columns.
 #' @param ... Additional arguments passed to distance functions
 #'
-#' @return A dist object with tidy attributes
+#' @return A \code{\link[stats]{dist}} object containing the computed
+#'   distance matrix.
 #'
 #' @examples
 #' \donttest{
@@ -49,7 +50,8 @@ tidy_dist <- function(data, method = "euclidean", cols = NULL, ...) {
 #' @param weights Optional named vector of variable
 #'   weights (default: equal weights)
 #'
-#' @return A dist object containing Gower distances
+#' @return A \code{\link[stats]{dist}} object containing Gower distances, with
+#'   the \code{method} attribute set to \code{"gower"}.
 #'
 #' @details
 #' Gower distance handles mixed data types:
@@ -171,7 +173,8 @@ tidy_gower <- function(data, weights = NULL) {
 #' @param center Logical; center variables? (default: TRUE)
 #' @param scale Logical; scale variables to unit variance? (default: TRUE)
 #'
-#' @return A tibble with standardized numeric variables
+#' @return A tibble with numeric variables centered and/or scaled as specified;
+#'   non-numeric columns are returned unchanged.
 #'
 #' @examples
 #' \donttest{
@@ -208,7 +211,7 @@ standardize_data <- function(data, center = TRUE, scale = TRUE) {
 #' @param data A data frame or tibble
 #' @param methods Character vector of methods to compare
 #'
-#' @return A list of dist objects named by method
+#' @return A named list of \code{\link[stats]{dist}} objects, one per method.
 #'
 #' @examples
 #' \donttest{

@@ -15,7 +15,7 @@ tl_plot_regularization_path(model, label_n = 5, ...)
 \item{...}{Additional arguments}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot regularization path for a regularized model

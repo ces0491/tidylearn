@@ -12,7 +12,12 @@ tl_run_pipeline(pipeline, verbose = TRUE)
 \item{verbose}{Logical; whether to print progress}
 }
 \value{
-A tidylearn pipeline with results
+The input \code{tidylearn_pipeline} object with its
+\code{$results} component populated. Results include
+\code{$processed_data}, \code{$model_results} (a named list of
+per-model fits and metrics), \code{$best_model_name},
+\code{$best_model} (the winning \code{tidylearn_model}), and
+\code{$metric_values}.
 }
 \description{
 Run a tidylearn pipeline

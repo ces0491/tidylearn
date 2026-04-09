@@ -13,7 +13,7 @@ tl_plot_regularization_cv(model, ...)
 \item{...}{Additional arguments (currently unused)}
 }
 \value{
-A ggplot object showing CV error vs lambda
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Shows the cross-validation error as a function of

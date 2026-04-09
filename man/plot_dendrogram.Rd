@@ -18,7 +18,8 @@ plot_dendrogram(
 \item{title}{Plot title}
 }
 \value{
-Invisibly returns hclust object (plots as side effect)
+Invisibly returns the \code{\link[stats]{hclust}} object. The
+dendrogram is drawn as a side effect.
 }
 \description{
 Enhanced dendrogram with colored cluster rectangles

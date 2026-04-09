@@ -14,7 +14,15 @@
 #' @param method Dimensionality reduction method: "pca", "mds"
 #' @param n_components Number of components to retain
 #' @param ... Additional arguments for the dimensionality reduction method
-#' @return A list containing the transformed data and the reduction model
+#' @return A list with components:
+#'   \describe{
+#'     \item{data}{The transformed data frame with reduced-dimension columns
+#'       and the response variable (if provided).}
+#'     \item{reduction_model}{The fitted tidylearn dimensionality reduction
+#'       model.}
+#'     \item{original_data}{The original input data frame.}
+#'     \item{response}{The response variable name, or \code{NULL}.}
+#'   }
 #' @export
 #' @examples
 #' \donttest{
@@ -97,7 +105,9 @@ tl_reduce_dimensions <- function(data,
 #' @param response Response variable name (will be excluded from clustering)
 #' @param method Clustering method: "kmeans", "pam", "hclust", "dbscan"
 #' @param ... Additional arguments for clustering
-#' @return Original data with cluster assignment column(s) added
+#' @return The original data frame with an additional factor column named
+#'   \code{cluster_<method>} containing cluster assignments. The fitted
+#'   cluster model is stored as an attribute \code{"cluster_model"}.
 #' @export
 #' @examples
 #' \donttest{
@@ -163,7 +173,11 @@ tl_add_cluster_features <- function(data,
 #' @param cluster_method Clustering method for label propagation
 #' @param supervised_method Supervised learning method for final model
 #' @param ... Additional arguments
-#' @return A tidylearn model trained on pseudo-labeled data
+#' @return A tidylearn model object with additional class
+#'   \code{"tidylearn_semisupervised"}, trained on pseudo-labeled data. The
+#'   model includes a \code{semisupervised_info} element with
+#'   \code{labeled_indices}, \code{cluster_model}, and
+#'   \code{label_mapping}.
 #' @export
 #' @examples
 #' \donttest{
@@ -251,7 +265,11 @@ tl_semisupervised <- function(data, formula, labeled_indices,
 #' @param action Action to take: "remove", "flag", "downweight"
 #' @param supervised_method Supervised learning method
 #' @param ... Additional arguments
-#' @return A tidylearn model or list with model and anomaly info
+#' @return A tidylearn model object with additional class
+#'   \code{"tidylearn_anomaly_aware"}. The model includes an
+#'   \code{anomaly_info} element with \code{anomaly_model},
+#'   \code{is_anomaly} (logical vector), \code{n_anomalies}, and
+#'   \code{action}.
 #' @export
 #' @examples
 #' \donttest{
@@ -327,7 +345,14 @@ tl_anomaly_aware <- function(data, formula, response,
 #' @param k Number of clusters
 #' @param supervised_method Supervised learning method
 #' @param ... Additional arguments
-#' @return A list of models (one per cluster) plus cluster assignments
+#' @return A list with class \code{"tidylearn_stratified"} containing:
+#'   \describe{
+#'     \item{cluster_model}{The fitted clustering model.}
+#'     \item{supervised_models}{Named list of tidylearn models, one per
+#'       cluster.}
+#'     \item{formula}{The model formula.}
+#'     \item{data}{The original training data.}
+#'   }
 #' @export
 #' @examples
 #' \donttest{
@@ -373,7 +398,8 @@ tl_stratified_models <- function(data, formula, cluster_method = "kmeans",
 #' @param object A tidylearn_stratified model object
 #' @param new_data New data for predictions
 #' @param ... Additional arguments
-#' @return A tibble of predictions with cluster assignments
+#' @return A \link[tibble]{tibble} with a \code{.pred} column containing
+#'   predictions and a \code{.cluster} column with cluster assignments.
 #' @examples
 #' \donttest{
 #' models <- tl_stratified_models(mtcars, mpg ~ .,

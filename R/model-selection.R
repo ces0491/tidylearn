@@ -16,7 +16,10 @@ NULL
 #' @param trace Logical; whether to print progress
 #' @param steps Maximum number of steps to take
 #' @param ... Additional arguments to pass to step()
-#' @return A selected model
+#' @return A \code{tidylearn_model} object of class
+#'   \code{tidylearn_linear} wrapping the selected \code{\link[stats]{lm}}
+#'   model. Access the underlying model via \code{$fit} and the selected
+#'   formula via \code{$spec$formula}.
 #' @examples
 #' \donttest{
 #' model <- tl_step_selection(mtcars, mpg ~ ., direction = "backward")
@@ -97,7 +100,16 @@ tl_step_selection <- function(data, formula, direction = "backward",
 #' @param folds Number of cross-validation folds
 #' @param metrics Character vector of metrics to compute
 #' @param ... Additional arguments
-#' @return A tibble with cross-validation results for all models
+#' @return A list with two elements:
+#'   \describe{
+#'     \item{\code{$fold_metrics}}{A data frame with columns
+#'       \code{metric}, \code{value}, \code{fold}, and \code{model}
+#'       containing per-fold results for every model.}
+#'     \item{\code{$summary}}{A data frame with columns \code{model},
+#'       \code{metric}, \code{mean_value}, \code{sd_value},
+#'       \code{min_value}, and \code{max_value} summarizing
+#'       cross-validation performance.}
+#'   }
 #' @examples
 #' \donttest{
 #' m1 <- tl_model(mtcars, mpg ~ wt, method = "linear")
@@ -203,7 +215,8 @@ tl_compare_cv <- function(data, models, folds = 5, metrics = NULL, ...) {
 #' @param cv_results Results from tl_compare_cv function
 #' @param metrics Character vector of metrics to plot
 #'   (if NULL, plots all metrics)
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object showing boxplots of
+#'   cross-validation metric distributions for each model.
 #' @importFrom ggplot2 ggplot aes geom_boxplot facet_wrap labs theme_minimal
 #' @examples
 #' \donttest{
@@ -248,7 +261,10 @@ tl_plot_cv_comparison <- function(cv_results, metrics = NULL) {
 #' @param baseline_model Name of the model to use as baseline for comparison
 #' @param test Type of statistical test: "t.test" or "wilcox"
 #' @param metric Name of the metric to compare
-#' @return A data frame with statistical test results
+#' @return A data frame with columns \code{metric}, \code{model},
+#'   \code{baseline}, \code{mean_diff}, \code{p_value}, and
+#'   \code{p_adj} (Holm-adjusted p-value) containing pairwise
+#'   statistical comparisons against the baseline model.
 #' @importFrom stats t.test wilcox.test p.adjust
 #' @examples
 #' \donttest{

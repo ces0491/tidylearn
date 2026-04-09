@@ -12,7 +12,7 @@
 \item{...}{Additional arguments (ignored)}
 }
 \value{
-Invisibly returns the input object x
+The input object \code{x}, returned invisibly.
 }
 \description{
 Print Method for tidy_pam

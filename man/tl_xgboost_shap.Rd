@@ -17,7 +17,9 @@ tl_xgboost_shap(model, data = NULL, n_samples = 100, trees_idx = NULL)
 \item{trees_idx}{Trees to include (default: NULL, uses all trees)}
 }
 \value{
-A data frame with SHAP values
+A data frame with one column of SHAP values per feature, a
+\code{BIAS} column, a \code{row_id} column, and the original data columns
+appended for reference.
 }
 \description{
 Generate SHAP values for XGBoost model interpretation

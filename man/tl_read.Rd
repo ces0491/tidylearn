@@ -26,8 +26,9 @@ to CSV; use \code{format = "tsv"} to override.}
 informational messages. Default is \code{FALSE}.}
 }
 \value{
-A \code{tidylearn_data} object (tibble
-subclass with source metadata).
+A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
+with attributes \code{tl_source}, \code{tl_format}, and
+\code{tl_timestamp}.
 }
 \description{
 Auto-detects the data format from the file extension or source pattern and

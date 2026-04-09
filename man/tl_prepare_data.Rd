@@ -36,7 +36,15 @@ variables (default: TRUE)}
 \item{correlation_cutoff}{Correlation threshold for removal (default: 0.95)}
 }
 \value{
-A list containing processed data and preprocessing metadata
+A list with components:
+\describe{
+\item{\code{data}}{The processed data frame.}
+\item{\code{original_data}}{The original unprocessed data frame.}
+\item{\code{preprocessing_steps}}{A list of metadata for each
+preprocessing step applied (imputation values, encoding maps,
+scaling parameters, etc.).}
+\item{\code{formula}}{The formula passed in (or \code{NULL}).}
+}
 }
 \description{
 Unified preprocessing functions that work with both

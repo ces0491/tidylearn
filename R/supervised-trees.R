@@ -501,7 +501,8 @@ tl_plot_importance <- function(model, top_n = 20, ...) {
 #'
 #' @param model A tidylearn tree model object
 #' @param ... Additional arguments to pass to rpart.plot()
-#' @return A plot of the decision tree
+#' @return The return value of \code{\link[rpart.plot]{rpart.plot}}, called
+#'   for its side effect of drawing the tree.
 #' @examples
 #' \donttest{
 #' model <- tl_model(iris, Species ~ ., method = "tree")
@@ -527,7 +528,7 @@ tl_plot_tree <- function(model, ...) {
 #' @param n.pts Number of points for continuous
 #'   variables (default: 20)
 #' @param ... Additional arguments
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @importFrom ggplot2 ggplot aes geom_line geom_point
 #' @importFrom ggplot2 labs theme_minimal
 #' @examples

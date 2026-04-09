@@ -104,7 +104,9 @@ tidy_dbscan <- function(data, eps, minPts = 5,
 #' @param cols Columns to include (tidy select).
 #'   If NULL, uses all numeric columns.
 #'
-#' @return A tibble with observation IDs and k-NN distances
+#' @return A tibble with columns \code{.obs_id} (observation identifier),
+#'   \code{knn_dist} (distance to k-th nearest neighbor), and \code{rank}
+#'   (rank of the k-NN distance).
 #'
 #' @examples
 #' \donttest{
@@ -201,7 +203,7 @@ suggest_eps <- function(data, minPts = 5,
 #' @param add_suggestion Add suggested eps line? (default: TRUE)
 #' @param percentile Percentile for suggestion (default: 0.95)
 #'
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #'
 #' @examples
 #' \donttest{
@@ -266,7 +268,9 @@ plot_knn_dist <- function(data, k = 4,
 #' @param dbscan_obj A tidy_dbscan object
 #' @param data Original data frame
 #'
-#' @return Original data with cluster information added
+#' @return A tibble containing the original \code{data} with additional columns
+#'   \code{cluster} (factor), \code{is_noise} (logical), and \code{is_core}
+#'   (logical).
 #'
 #' @examples
 #' \donttest{
@@ -300,7 +304,8 @@ augment_dbscan <- function(dbscan_obj, data) {
 #' @param eps_values Vector of eps values to test
 #' @param minPts_values Vector of minPts values to test
 #'
-#' @return A tibble with parameter combinations and resulting cluster counts
+#' @return A tibble with columns \code{eps}, \code{minPts}, \code{n_clusters},
+#'   \code{n_noise}, and \code{prop_noise} for each parameter combination.
 #'
 #' @examples
 #' \donttest{
@@ -347,7 +352,7 @@ explore_dbscan_params <- function(data, eps_values, minPts_values) {
 #' @param x A tidy_dbscan object
 #' @param ... Additional arguments (ignored)
 #'
-#' @return Invisibly returns the input object x
+#' @return The input object \code{x}, returned invisibly.
 #'
 #' @examples
 #' \donttest{

@@ -28,7 +28,10 @@ for threshold-dependent metrics}
 \item{...}{Additional arguments}
 }
 \value{
-A tibble of evaluation metrics
+A \link[tibble]{tibble} with columns \code{metric} (character)
+and \code{value} (numeric) containing the requested classification
+metrics. When \code{thresholds} are supplied, additional rows are
+appended with threshold-specific metric names.
 }
 \description{
 Calculate classification metrics

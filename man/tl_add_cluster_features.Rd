@@ -16,7 +16,9 @@ tl_add_cluster_features(data, response = NULL, method = "kmeans", ...)
 \item{...}{Additional arguments for clustering}
 }
 \value{
-Original data with cluster assignment column(s) added
+The original data frame with an additional factor column named
+\code{cluster_<method>} containing cluster assignments. The fitted
+cluster model is stored as an attribute \code{"cluster_model"}.
 }
 \description{
 Add cluster assignments as features for supervised learning.

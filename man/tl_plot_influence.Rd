@@ -30,7 +30,7 @@ tl_plot_influence(
 \item{label_size}{Text size for labels (default: 3)}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot influence diagnostics

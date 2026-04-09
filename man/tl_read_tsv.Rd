@@ -13,7 +13,9 @@ tl_read_tsv(path, ...)
 \code{utils::read.delim()}.}
 }
 \value{
-A \code{tidylearn_data} object.
+A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
+with attributes \code{tl_source}, \code{tl_format}, and
+\code{tl_timestamp}.
 }
 \description{
 Reads a tab-separated file into a

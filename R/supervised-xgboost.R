@@ -244,7 +244,7 @@ tl_predict_xgboost <- function(model, new_data,
 #' @param top_n Number of top features to display (default: 10)
 #' @param importance_type Type of importance: "gain", "cover", "frequency"
 #' @param ... Additional arguments
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @examples
 #' \donttest{
 #' if (requireNamespace("xgboost", quietly = TRUE)) {
@@ -289,7 +289,8 @@ tl_plot_xgboost_importance <- function(model, top_n = 10,
 #' @param model A tidylearn XGBoost model object
 #' @param tree_index Index of the tree to plot (default: 0, first tree)
 #' @param ... Additional arguments
-#' @return Tree visualization
+#' @return The return value of \code{\link[xgboost]{xgb.plot.tree}}, a
+#'   tree diagram rendered via the \pkg{DiagrammeR} package.
 #' @export
 tl_plot_xgboost_tree <- function(model, tree_index = 0, ...) {
   # Check if model is an XGBoost model
@@ -315,7 +316,11 @@ tl_plot_xgboost_tree <- function(model, tree_index = 0, ...) {
 #' @param early_stopping_rounds Early stopping rounds (default: 10)
 #' @param verbose Logical indicating whether to print progress (default: TRUE)
 #' @param ... Additional arguments
-#' @return A list with the best model and tuning results
+#' @return A \code{tidylearn_model} object (the refit on full data using the
+#'   best hyperparameters) with an attribute \code{"tuning_results"} containing
+#'   a list with elements \code{param_grid}, \code{results} (per-combination CV
+#'   output), \code{best_params}, \code{best_iteration}, \code{best_score}, and
+#'   \code{minimize}.
 #' @export
 tl_tune_xgboost <- function(data, formula, is_classification = FALSE,
                             param_grid = NULL, cv_folds = 5,
@@ -524,7 +529,9 @@ tl_tune_xgboost <- function(data, formula, is_classification = FALSE,
 #'   (default: NULL, uses training data)
 #' @param n_samples Number of samples to use (default: 100, NULL for all)
 #' @param trees_idx Trees to include (default: NULL, uses all trees)
-#' @return A data frame with SHAP values
+#' @return A data frame with one column of SHAP values per feature, a
+#'   \code{BIAS} column, a \code{row_id} column, and the original data columns
+#'   appended for reference.
 #' @examples
 #' \donttest{
 #' if (requireNamespace("xgboost", quietly = TRUE)) {
@@ -614,7 +621,7 @@ tl_xgboost_shap <- function(model, data = NULL,
 #' @param top_n Number of top features to display (default: 10)
 #' @param n_samples Number of samples to use
 #'   (default: 100, NULL for all)
-#' @return A ggplot object with SHAP summary
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @importFrom ggplot2 ggplot aes geom_point
 #'   scale_color_gradient labs theme_minimal
 #' @examples
@@ -734,7 +741,7 @@ tl_plot_xgboost_shap_summary <- function(model,
 #'   (default: NULL, uses training data)
 #' @param n_samples Number of samples to use
 #'   (default: 100, NULL for all)
-#' @return A ggplot object with SHAP dependence plot
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @importFrom ggplot2 ggplot aes geom_point
 #'   geom_smooth scale_color_gradient labs theme_minimal
 #' @export

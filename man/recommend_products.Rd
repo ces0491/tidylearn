@@ -16,7 +16,9 @@ recommend_products(rules_obj, basket, top_n = 5, min_confidence = 0.5)
 \item{min_confidence}{Minimum confidence threshold (default: 0.5)}
 }
 \value{
-A tibble with recommended items and metrics
+A tibble with columns \code{rhs} (recommended item),
+\code{confidence}, \code{lift}, and \code{support}, sorted by lift in
+descending order.
 }
 \description{
 Get product recommendations based on basket contents

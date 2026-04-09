@@ -18,7 +18,7 @@ plot_mds(mds_obj, color_by = NULL, label_points = TRUE, dim_x = 1, dim_y = 2)
 \item{dim_y}{Which dimension for y-axis (default: 2)}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Visualize MDS results

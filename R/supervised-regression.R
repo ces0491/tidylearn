@@ -433,7 +433,7 @@ tl_plot_residuals <- function(model, type = "fitted", ...) {
 #'   (if NULL, uses training data)
 #' @param level Confidence level (default: 0.95)
 #' @param ... Additional arguments
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @importFrom ggplot2 ggplot aes geom_point geom_ribbon
 #'   labs theme_minimal
 #' @examples

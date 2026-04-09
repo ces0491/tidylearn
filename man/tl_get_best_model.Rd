@@ -10,7 +10,8 @@ tl_get_best_model(pipeline)
 \item{pipeline}{A tidylearn pipeline object with results}
 }
 \value{
-The best tidylearn model
+The best \code{tidylearn_model} object from the pipeline,
+selected by the metric specified in \code{evaluation$best_metric}.
 }
 \description{
 Get the best model from a pipeline

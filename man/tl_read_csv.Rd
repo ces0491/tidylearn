@@ -13,7 +13,9 @@ tl_read_csv(path, ...)
 \code{utils::read.csv()}.}
 }
 \value{
-A \code{tidylearn_data} object.
+A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
+with attributes \code{tl_source}, \code{tl_format}, and
+\code{tl_timestamp}.
 }
 \description{
 Reads a CSV file into a \code{tidylearn_data} object. Uses \pkg{readr} when

@@ -32,7 +32,7 @@ using named parameters.}
 \item{...}{Additional arguments passed to \code{DBI::dbConnect()}.}
 }
 \value{
-A \code{tidylearn_data} object.
+A \code{tidylearn_data} object containing the query results.
 }
 \description{
 Connects to a MySQL or MariaDB database, executes a SQL query, and returns

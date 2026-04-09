@@ -15,7 +15,9 @@ integer (the position of the sheet). Defaults to the first sheet.}
 \item{...}{Additional arguments passed to \code{readxl::read_excel()}.}
 }
 \value{
-A \code{tidylearn_data} object.
+A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
+with attributes \code{tl_source}, \code{tl_format}, and
+\code{tl_timestamp}.
 }
 \description{
 Reads an Excel file (\code{.xls}, \code{.xlsx}, or \code{.xlsm}) into a

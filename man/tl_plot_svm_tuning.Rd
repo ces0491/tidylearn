@@ -12,7 +12,7 @@ tl_plot_svm_tuning(model, ...)
 \item{...}{Additional arguments}
 }
 \value{
-A ggplot object with tuning results
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot SVM tuning results

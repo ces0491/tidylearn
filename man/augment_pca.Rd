@@ -14,7 +14,8 @@ augment_pca(pca_obj, data, n_components = NULL)
 \item{n_components}{Number of PCs to add (default: all)}
 }
 \value{
-Original data with PC scores added
+A tibble containing the original \code{data} with additional columns
+for each principal component score (named \code{PC1}, \code{PC2}, etc.).
 }
 \description{
 Add PC scores to the original dataset

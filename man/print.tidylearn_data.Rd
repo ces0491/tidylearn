@@ -12,7 +12,7 @@
 \item{...}{Additional arguments passed to the tibble print method.}
 }
 \value{
-Invisibly returns \code{x}.
+The input object \code{x}, returned invisibly.
 }
 \description{
 Print a tidylearn_data object

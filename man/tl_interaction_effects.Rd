@@ -18,7 +18,11 @@ tl_interaction_effects(model, var, by_var, at_values = NULL, intervals = TRUE)
 \item{intervals}{Logical; whether to include confidence intervals}
 }
 \value{
-A data frame with marginal effects
+For numeric \code{var}: a list with \code{effects} (data frame of
+predicted values across the variable range for each level of
+\code{by_var}) and \code{slopes} (data frame with estimated slopes and
+standard errors per level). For categorical \code{var}: a data frame of
+predicted values at each factor level for each level of \code{by_var}.
 }
 \description{
 Calculate partial effects based on a model with interactions

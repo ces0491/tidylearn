@@ -246,7 +246,7 @@ tl_predict_deep <- function(model, new_data,
 #' @param metrics Which metrics to plot
 #'   (default: c("loss", "val_loss"))
 #' @param ... Additional arguments
-#' @return A ggplot object with training history
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @examples
 #' \dontrun{
 #' if (requireNamespace("keras", quietly = TRUE)) {
@@ -331,7 +331,8 @@ tl_plot_deep_history <- function(model,
 #'
 #' @param model A tidylearn deep learning model object
 #' @param ... Additional arguments
-#' @return A plot of the deep learning model architecture
+#' @return The return value of \code{keras::plot_model()}, an architecture
+#'   diagram of the Keras model.
 #' @examples
 #' \dontrun{
 #' if (requireNamespace("keras", quietly = TRUE)) {
@@ -377,7 +378,11 @@ tl_plot_deep_architecture <- function(model, ...) {
 #' @param validation_split Proportion of data for validation
 #'   (default: 0.2)
 #' @param ... Additional arguments
-#' @return A list with the best model and tuning results
+#' @return A list with elements \code{model} (the best fitted deep learning
+#'   model), \code{best_hidden_layers} (optimal layer configuration),
+#'   \code{best_learning_rate}, \code{best_batch_size}, and
+#'   \code{tuning_results} (a data frame of all hyperparameter combinations
+#'   and their validation losses).
 #' @examples
 #' \dontrun{
 #' if (requireNamespace("keras", quietly = TRUE)) {

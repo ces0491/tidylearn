@@ -20,7 +20,9 @@ depending on method.}
 \item{...}{Additional arguments}
 }
 \value{
-Predictions as a tibble
+A \link[tibble]{tibble} with a \code{.pred} column containing
+predictions. For classification with \code{type = "prob"}, returns
+columns for each class probability.
 }
 \description{
 Unified prediction interface for both supervised and unsupervised models

@@ -363,7 +363,7 @@ create_leaderboard <- function(results, metric, task) {
 #' Print auto ML results
 #' @param x A tidylearn_automl object
 #' @param ... Additional arguments (ignored)
-#' @return Invisibly returns the input object x
+#' @return The input object \code{x}, returned invisibly.
 #' @export
 print.tidylearn_automl <- function(x, ...) {
   cat("tidylearn Auto ML Results\n")
@@ -391,7 +391,17 @@ print.tidylearn_automl <- function(x, ...) {
 #' @param response Optional response variable for colored visualizations
 #' @param max_components Maximum PCA components to compute (default: 5)
 #' @param k_range Range of k values for clustering (default: 2:6)
-#' @return An EDA object with multiple analyses
+#' @return A list with class \code{"tidylearn_eda"} containing:
+#'   \describe{
+#'     \item{data}{The original data frame.}
+#'     \item{response}{The response variable name, or \code{NULL}.}
+#'     \item{pca}{The fitted PCA model.}
+#'     \item{optimal_k}{List with optimal cluster count results.}
+#'     \item{kmeans}{The fitted k-means model.}
+#'     \item{hclust}{The fitted hierarchical clustering model.}
+#'     \item{summary}{List with \code{n_obs}, \code{n_vars},
+#'       \code{n_components}, and \code{best_k}.}
+#'   }
 #' @export
 #' @examples
 #' \donttest{
@@ -450,7 +460,7 @@ tl_explore <- function(data, response = NULL,
 #' Print EDA results
 #' @param x A tidylearn_eda object
 #' @param ... Additional arguments (ignored)
-#' @return Invisibly returns the input object x
+#' @return The input object \code{x}, returned invisibly.
 #' @examples
 #' \donttest{
 #' eda <- tl_explore(iris, response = "Species")
@@ -476,8 +486,8 @@ print.tidylearn_eda <- function(x, ...) {
 #' Plot EDA results
 #' @param x A tidylearn_eda object
 #' @param ... Additional arguments (ignored)
-#' @return Invisibly returns the input object x,
-#'   called for side effects (plotting)
+#' @return The input object \code{x}, returned invisibly. Called for its
+#'   side effect of plotting a PCA scatter plot coloured by cluster.
 #' @examples
 #' \donttest{
 #' eda <- tl_explore(iris, response = "Species")
@@ -565,7 +575,13 @@ tl_optimal_clusters <- function(data, k_range = 2:6, method = "silhouette") {
 #' @param pretrain_method Pre-training method: "pca", "autoencoder"
 #' @param supervised_method Supervised learning method
 #' @param ... Additional arguments
-#' @return A transfer learning model
+#' @return A list with class \code{"tidylearn_transfer"} containing:
+#'   \describe{
+#'     \item{pretrain_model}{The fitted dimensionality reduction model.}
+#'     \item{supervised_model}{The fitted supervised tidylearn model.}
+#'     \item{formula}{The model formula.}
+#'     \item{method}{The supervised learning method used.}
+#'   }
 #' @export
 #' @examples
 #' \donttest{
@@ -618,7 +634,8 @@ tl_transfer_learning <- function(data, formula, pretrain_method = "pca",
 #' @param object A tidylearn_transfer model object
 #' @param new_data New data for predictions
 #' @param ... Additional arguments
-#' @return A tibble of predictions
+#' @return A \link[tibble]{tibble} with a \code{.pred} column containing
+#'   predictions.
 #' @examples
 #' \donttest{
 #' model <- tl_transfer_learning(iris, Species ~ .,

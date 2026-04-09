@@ -400,7 +400,7 @@ tl_predict_elastic_net <- function(model, new_data,
 #' @param label_n Number of top features to label
 #'   (default: 5)
 #' @param ... Additional arguments
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @examples
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ ., method = "lasso")
@@ -534,7 +534,7 @@ tl_plot_regularization_path <- function(model,
 #' @param model A tidylearn regularized model object
 #'   (ridge, lasso, or elastic_net)
 #' @param ... Additional arguments (currently unused)
-#' @return A ggplot object showing CV error vs lambda
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @examples
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ ., method = "ridge")
@@ -627,7 +627,7 @@ tl_plot_regularization_cv <- function(model, ...) {
 #' @param top_n Number of top features to display
 #'   (default: 20)
 #' @param ... Additional arguments
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @examples
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ ., method = "lasso")

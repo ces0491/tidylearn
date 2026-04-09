@@ -16,7 +16,7 @@ tl_table_importance(model, top_n = 20, digits = 2, ...)
 \item{...}{Additional arguments (currently unused)}
 }
 \value{
-A gt table object
+A \code{\link[gt]{gt}} table object.
 }
 \description{
 Produces a styled gt table of feature importance with a colour gradient.

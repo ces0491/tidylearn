@@ -16,7 +16,7 @@ tl_plot_xgboost_importance(model, top_n = 10, importance_type = "gain", ...)
 \item{...}{Additional arguments}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot feature importance for an XGBoost model

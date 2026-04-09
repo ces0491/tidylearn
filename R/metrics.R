@@ -16,7 +16,10 @@ NULL
 #' @param thresholds Optional vector of thresholds to evaluate
 #'   for threshold-dependent metrics
 #' @param ... Additional arguments
-#' @return A tibble of evaluation metrics
+#' @return A \link[tibble]{tibble} with columns \code{metric} (character)
+#'   and \code{value} (numeric) containing the requested classification
+#'   metrics. When \code{thresholds} are supplied, additional rows are
+#'   appended with threshold-specific metric names.
 #' @examples
 #' \donttest{
 #' model <- tl_model(iris, Species ~ ., method = "forest")
@@ -237,7 +240,10 @@ tl_evaluate_thresholds <- function(actuals, probs, thresholds, pos_class) {
 #' @param new_data Optional new data for evaluation
 #'   (if NULL, uses training data)
 #' @param ... Additional arguments
-#' @return A tibble of evaluation metrics
+#' @return A \link[tibble]{tibble} with columns \code{metric} (character)
+#'   and \code{value} (numeric). For regression models, includes
+#'   \code{rmse}, \code{mae}, and \code{rsq}. For classification models,
+#'   includes \code{accuracy}.
 #' @examples
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
@@ -294,7 +300,15 @@ tl_evaluate <- function(object, new_data = NULL, ...) {
 #' @param method Modeling method
 #' @param folds Number of cross-validation folds
 #' @param ... Additional arguments
-#' @return Cross-validation results
+#' @return A list with two elements:
+#'   \describe{
+#'     \item{\code{$folds}}{A list of per-fold evaluation
+#'       \link[tibble]{tibble}s, each with \code{metric} and
+#'       \code{value} columns.}
+#'     \item{\code{$summary}}{A \link[tibble]{tibble} with columns
+#'       \code{metric}, \code{mean}, and \code{sd} summarizing
+#'       performance across folds.}
+#'   }
 #' @examples
 #' \donttest{
 #' cv <- tl_cv(mtcars, mpg ~ wt + hp, method = "linear", folds = 3)

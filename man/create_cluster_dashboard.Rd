@@ -18,7 +18,9 @@ create_cluster_dashboard(
 \item{validation_metrics}{Optional tibble of validation metrics}
 }
 \value{
-Combined plot grid
+Invisibly returns a list of \code{\link[ggplot2]{ggplot}} objects. The
+combined plot grid is drawn as a side effect via
+\code{\link[gridExtra]{grid.arrange}}.
 }
 \description{
 Generate a multi-panel summary of clustering results

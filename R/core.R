@@ -62,8 +62,11 @@ NULL
 #'   "pam"/"clara" (cluster), "hclust" (stats::hclust),
 #'   "dbscan" (dbscan).
 #' @param ... Additional arguments passed to the underlying model function
-#' @return A tidylearn model object containing the fitted
-#'   model (\code{$fit}), specification, and training data
+#' @return A \code{tidylearn_model} object (S3) containing the fitted model
+#'   (\code{$fit}), model specification (\code{$spec}), and training data
+#'   (\code{$data}). The object also inherits from a method-specific class
+#'   (e.g., \code{tidylearn_linear}) and a paradigm class
+#'   (\code{tidylearn_supervised} or \code{tidylearn_unsupervised}).
 #' @export
 #' @examples
 #' \donttest{
@@ -250,7 +253,9 @@ tl_model_unsupervised <- function(data, formula = NULL, method, ...) {
 #'   unsupervised: "scores", "clusters", "transform"
 #'   depending on method.
 #' @param ... Additional arguments
-#' @return Predictions as a tibble
+#' @return A \link[tibble]{tibble} with a \code{.pred} column containing
+#'   predictions. For classification with \code{type = "prob"}, returns
+#'   columns for each class probability.
 #' @examples
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
@@ -400,7 +405,7 @@ predict_unsupervised <- function(object, new_data, type = "response", ...) {
 #' Print method for tidylearn models
 #' @param x A tidylearn model object
 #' @param ... Additional arguments (ignored)
-#' @return Invisibly returns the input object x
+#' @return The input object \code{x}, returned invisibly.
 #' @examples
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
@@ -433,7 +438,8 @@ print.tidylearn_model <- function(x, ...) {
 #' Summary method for tidylearn models
 #' @param object A tidylearn model object
 #' @param ... Additional arguments (ignored)
-#' @return Invisibly returns the input object
+#' @return The input \code{object}, returned invisibly. Called for its
+#'   side effect of printing model summary and training performance.
 #' @examples
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
@@ -549,7 +555,8 @@ tl_plot_unsupervised <- function(model, type = "auto", ...) {
 #' @param x A tidylearn model object
 #' @param type Plot type (default: "auto")
 #' @param ... Additional arguments passed to plotting functions
-#' @return A ggplot2 object or NULL, called primarily for side effects
+#' @return A \code{\link[ggplot2]{ggplot}} object. The specific plot depends
+#'   on the model paradigm and \code{type} argument.
 #' @examples
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")

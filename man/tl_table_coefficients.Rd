@@ -16,7 +16,7 @@ tl_table_coefficients(model, lambda = "1se", digits = 4, ...)
 \item{...}{Additional arguments (currently unused)}
 }
 \value{
-A gt table object
+A \code{\link[gt]{gt}} table object.
 }
 \description{
 Produces a styled gt table of model coefficients. Supports linear,

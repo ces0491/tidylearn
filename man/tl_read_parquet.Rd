@@ -12,7 +12,9 @@ tl_read_parquet(path, ...)
 \item{...}{Additional arguments passed to \code{nanoparquet::read_parquet()}.}
 }
 \value{
-A \code{tidylearn_data} object.
+A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
+with attributes \code{tl_source}, \code{tl_format}, and
+\code{tl_timestamp}.
 }
 \description{
 Reads a Parquet file into a \code{tidylearn_data} object. Requires the

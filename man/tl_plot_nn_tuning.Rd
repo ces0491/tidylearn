@@ -12,7 +12,7 @@ tl_plot_nn_tuning(model, ...)
 \item{...}{Additional arguments}
 }
 \value{
-A ggplot object with training history
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot neural network training history

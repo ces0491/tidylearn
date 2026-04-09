@@ -18,7 +18,7 @@ configuration.}
 \item{...}{Additional arguments passed to the format-specific reader.}
 }
 \value{
-A \code{tidylearn_data} object.
+A \code{tidylearn_data} object containing the downloaded data.
 }
 \description{
 Downloads a file from an S3 bucket and reads it into a \code{tidylearn_data}

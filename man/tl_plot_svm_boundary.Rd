@@ -19,7 +19,7 @@ for the grid (default: 100)}
 \item{...}{Additional arguments}
 }
 \value{
-A ggplot object with decision boundary
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot SVM decision boundary

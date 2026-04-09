@@ -15,7 +15,10 @@ tl_evaluate(object, new_data = NULL, ...)
 \item{...}{Additional arguments}
 }
 \value{
-A tibble of evaluation metrics
+A \link[tibble]{tibble} with columns \code{metric} (character)
+and \code{value} (numeric). For regression models, includes
+\code{rmse}, \code{mae}, and \code{rsq}. For classification models,
+includes \code{accuracy}.
 }
 \description{
 Evaluate a tidylearn model

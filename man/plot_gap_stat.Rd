@@ -13,7 +13,7 @@ plot_gap_stat(gap_obj, show_methods = FALSE)
 selection methods? (default: FALSE)}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot Gap Statistic

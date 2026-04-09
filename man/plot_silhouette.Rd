@@ -11,7 +11,7 @@ plot_silhouette(sil_obj)
 from tidy_silhouette_analysis}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot Silhouette Analysis

@@ -21,7 +21,10 @@ tl_test_model_difference(
 \item{metric}{Name of the metric to compare}
 }
 \value{
-A data frame with statistical test results
+A data frame with columns \code{metric}, \code{model},
+\code{baseline}, \code{mean_diff}, \code{p_value}, and
+\code{p_adj} (Holm-adjusted p-value) containing pairwise
+statistical comparisons against the baseline model.
 }
 \description{
 Perform statistical comparison of models using cross-validation

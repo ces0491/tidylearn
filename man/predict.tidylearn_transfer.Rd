@@ -14,7 +14,8 @@
 \item{...}{Additional arguments}
 }
 \value{
-A tibble of predictions
+A \link[tibble]{tibble} with a \code{.pred} column containing
+predictions.
 }
 \description{
 Predict with transfer learning model

@@ -14,7 +14,8 @@ tidy_cutree(hclust_obj, k = NULL, h = NULL)
 \item{h}{Height at which to cut (optional)}
 }
 \value{
-A tibble with observation IDs and cluster assignments
+A tibble with columns \code{.obs_id} (observation identifier) and
+\code{cluster} (integer cluster assignment).
 }
 \description{
 Cut dendrogram to obtain cluster assignments

@@ -25,8 +25,11 @@ Unsupervised: "pca" (stats::prcomp),
 \item{...}{Additional arguments passed to the underlying model function}
 }
 \value{
-A tidylearn model object containing the fitted
-model (\code{$fit}), specification, and training data
+A \code{tidylearn_model} object (S3) containing the fitted model
+(\code{$fit}), model specification (\code{$spec}), and training data
+(\code{$data}). The object also inherits from a method-specific class
+(e.g., \code{tidylearn_linear}) and a paradigm class
+(\code{tidylearn_supervised} or \code{tidylearn_unsupervised}).
 }
 \description{
 Unified interface for creating machine learning models

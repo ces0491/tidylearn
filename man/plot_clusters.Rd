@@ -30,7 +30,7 @@ plot_clusters(
 \item{color_noise_black}{If TRUE, color noise points (cluster 0) black}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Visualize clustering results using first two dimensions

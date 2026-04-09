@@ -27,7 +27,9 @@ tidy_silhouette_analysis(
 \item{linkage_method}{If hclust, linkage method (default: "average")}
 }
 \value{
-A tibble with k and average silhouette widths
+A tibble with columns \code{k} and \code{avg_sil_width}. The
+\code{"optimal_k"} attribute contains the k with the highest average
+silhouette width.
 }
 \description{
 Silhouette Analysis Across Multiple k Values

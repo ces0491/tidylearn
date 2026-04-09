@@ -12,7 +12,7 @@ plot_cluster_sizes(clusters, title = "Cluster Size Distribution")
 \item{title}{Plot title (default: "Cluster Size Distribution")}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Create bar plot of cluster sizes

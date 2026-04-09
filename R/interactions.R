@@ -19,7 +19,10 @@ NULL
 #' @param numeric_only Logical; whether to only test numeric variables
 #' @param mixed_only Logical; whether to only test numeric-categorical pairs
 #' @param alpha Significance level for interaction tests
-#' @return A data frame with interaction test results
+#' @return A data frame with one row per tested interaction pair, containing
+#'   columns \code{var1}, \code{var2}, \code{p_value}, \code{significant}
+#'   (logical), \code{delta_r2} (change in R-squared), and
+#'   \code{f_statistic}, sorted by \code{p_value} ascending.
 #' @examples
 #' \donttest{
 #' results <- tl_test_interactions(mtcars, mpg ~ wt + hp + cyl,
@@ -121,7 +124,7 @@ tl_test_interactions <- function(data, formula, var1 = NULL, var2 = NULL,
 #' @param fixed_values Named list of values for other variables in the model
 #' @param confidence Logical; whether to show confidence intervals
 #' @param ... Additional arguments to pass to predict()
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @export
 tl_plot_interaction <- function(model, var1, var2,
                                 n_points = 100,
@@ -323,7 +326,11 @@ tl_plot_interaction <- function(model, var1, var2,
 #' @param max_p_value Maximum p-value for significance
 #' @param exclude_vars Character vector of variables to exclude
 #'   from interaction testing
-#' @return A tidylearn model with important interactions
+#' @return A tidylearn model object (class \code{"tidylearn_model"}) fitted
+#'   with the top significant interaction terms added to the formula.
+#'   The interaction test results and selected interactions are stored as
+#'   attributes \code{"interaction_tests"} and
+#'   \code{"selected_interactions"}.
 #' @examples
 #' \donttest{
 #' model <- tl_auto_interactions(mtcars, mpg ~ wt + hp + cyl, top_n = 2)
@@ -389,7 +396,11 @@ tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
 #' @param by_var Variable to calculate effects by (interaction variable)
 #' @param at_values Named list of values at which to hold other variables
 #' @param intervals Logical; whether to include confidence intervals
-#' @return A data frame with marginal effects
+#' @return For numeric \code{var}: a list with \code{effects} (data frame of
+#'   predicted values across the variable range for each level of
+#'   \code{by_var}) and \code{slopes} (data frame with estimated slopes and
+#'   standard errors per level). For categorical \code{var}: a data frame of
+#'   predicted values at each factor level for each level of \code{by_var}.
 #' @export
 tl_interaction_effects <- function(model, var, by_var,
                                    at_values = NULL,

@@ -84,7 +84,7 @@ new_tidylearn_data <- function(data, source, format, timestamp = Sys.time()) {
 #'
 #' @param x A \code{tidylearn_data} object.
 #' @param ... Additional arguments passed to the tibble print method.
-#' @return Invisibly returns \code{x}.
+#' @return The input object \code{x}, returned invisibly.
 #' @examples
 #' \donttest{
 #' f <- tempfile(fileext = ".csv")
@@ -177,8 +177,9 @@ tl_detect_format <- function(source) {
 #' @param .quiet Logical. If \code{TRUE}, suppresses
 #'   informational messages. Default is \code{FALSE}.
 #'
-#' @return A \code{tidylearn_data} object (tibble
-#'   subclass with source metadata).
+#' @return A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
+#'   with attributes \code{tl_source}, \code{tl_format}, and
+#'   \code{tl_timestamp}.
 #'
 #' @examples
 #' \donttest{
@@ -330,7 +331,8 @@ tl_read_multi <- function(paths, ..., format = NULL, .quiet = FALSE) {
 #' @param .quiet Suppress messages. Default is \code{FALSE}.
 #' @param ... Additional arguments passed to the format-specific reader.
 #'
-#' @return A \code{tidylearn_data} object with a \code{source_file} column.
+#' @return A \code{tidylearn_data} object with an additional
+#'   \code{source_file} column identifying the origin of each row.
 #'
 #' @examples
 #' \donttest{
@@ -406,7 +408,11 @@ tl_read_dir <- function(path, pattern = NULL, format = NULL,
 #' @param .quiet Suppress messages. Default is \code{FALSE}.
 #' @param ... Additional arguments passed to the format-specific reader.
 #'
-#' @return A \code{tidylearn_data} object.
+#' @return A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
+#'   with attributes \code{tl_source}, \code{tl_format}, and
+#'   \code{tl_timestamp}. The archive is extracted to a temporary directory
+#'   that is cleaned up automatically. If multiple data files are found,
+#'   a \code{source_file} column identifies the origin of each row.
 #'
 #' @examples
 #' \donttest{
@@ -495,7 +501,9 @@ tl_read_zip <- function(path, file = NULL, format = NULL,
 #' @param ... Additional arguments passed to \code{readr::read_csv()} or
 #'   \code{utils::read.csv()}.
 #'
-#' @return A \code{tidylearn_data} object.
+#' @return A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
+#'   with attributes \code{tl_source}, \code{tl_format}, and
+#'   \code{tl_timestamp}.
 #'
 #' @examples
 #' \donttest{
@@ -527,7 +535,9 @@ tl_read_csv <- function(path, ...) {
 #' @param ... Additional arguments passed to \code{readr::read_tsv()} or
 #'   \code{utils::read.delim()}.
 #'
-#' @return A \code{tidylearn_data} object.
+#' @return A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
+#'   with attributes \code{tl_source}, \code{tl_format}, and
+#'   \code{tl_timestamp}.
 #'
 #' @examples
 #' \donttest{
@@ -559,7 +569,9 @@ tl_read_tsv <- function(path, ...) {
 #'   integer (the position of the sheet). Defaults to the first sheet.
 #' @param ... Additional arguments passed to \code{readxl::read_excel()}.
 #'
-#' @return A \code{tidylearn_data} object.
+#' @return A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
+#'   with attributes \code{tl_source}, \code{tl_format}, and
+#'   \code{tl_timestamp}.
 #'
 #' @examples
 #' \donttest{
@@ -584,7 +596,9 @@ tl_read_excel <- function(path, sheet = 1, ...) {
 #'
 #' @param path Path to an RDS file.
 #'
-#' @return A \code{tidylearn_data} object.
+#' @return A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
+#'   with attributes \code{tl_source}, \code{tl_format}, and
+#'   \code{tl_timestamp}.
 #'
 #' @examples
 #' \donttest{
@@ -621,7 +635,9 @@ tl_read_rds <- function(path) {
 #'   errors if there are multiple data frames.
 #' @param ... Currently unused.
 #'
-#' @return A \code{tidylearn_data} object.
+#' @return A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
+#'   with attributes \code{tl_source}, \code{tl_format}, and
+#'   \code{tl_timestamp}.
 #'
 #' @examples
 #' \donttest{
@@ -688,7 +704,9 @@ tl_read_rdata <- function(path, name = NULL, ...) {
 #' @param path Path to a Parquet file.
 #' @param ... Additional arguments passed to \code{nanoparquet::read_parquet()}.
 #'
-#' @return A \code{tidylearn_data} object.
+#' @return A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
+#'   with attributes \code{tl_source}, \code{tl_format}, and
+#'   \code{tl_timestamp}.
 #'
 #' @examples
 #' \donttest{
@@ -716,7 +734,9 @@ tl_read_parquet <- function(path, ...) {
 #'   \code{TRUE}.
 #' @param ... Additional arguments passed to \code{jsonlite::fromJSON()}.
 #'
-#' @return A \code{tidylearn_data} object.
+#' @return A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
+#'   with attributes \code{tl_source}, \code{tl_format}, and
+#'   \code{tl_timestamp}.
 #'
 #' @examples
 #' \donttest{

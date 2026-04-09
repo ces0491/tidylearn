@@ -14,7 +14,8 @@ standardize_data(data, center = TRUE, scale = TRUE)
 \item{scale}{Logical; scale variables to unit variance? (default: TRUE)}
 }
 \value{
-A tibble with standardized numeric variables
+A tibble with numeric variables centered and/or scaled as specified;
+non-numeric columns are returned unchanged.
 }
 \description{
 Center and/or scale numeric variables

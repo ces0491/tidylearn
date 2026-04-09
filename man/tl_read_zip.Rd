@@ -19,7 +19,11 @@ Supports partial matching.}
 \item{...}{Additional arguments passed to the format-specific reader.}
 }
 \value{
-A \code{tidylearn_data} object.
+A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
+with attributes \code{tl_source}, \code{tl_format}, and
+\code{tl_timestamp}. The archive is extracted to a temporary directory
+that is cleaned up automatically. If multiple data files are found,
+a \code{source_file} column identifies the origin of each row.
 }
 \description{
 Extracts a zip archive to a temporary directory and reads the contents.

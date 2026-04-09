@@ -12,7 +12,8 @@ get_pca_loadings(pca_obj, n_components = NULL)
 \item{n_components}{Number of components to include (default: all)}
 }
 \value{
-A tibble with loadings in wide format
+A tibble with one row per variable and one column per principal
+component, containing the loading values.
 }
 \description{
 Get PCA Loadings in Wide Format

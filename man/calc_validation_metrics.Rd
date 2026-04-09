@@ -14,7 +14,10 @@ calc_validation_metrics(clusters, data = NULL, dist_mat = NULL)
 \item{dist_mat}{Distance matrix (for silhouette)}
 }
 \value{
-A tibble with validation metrics
+A single-row tibble with columns \code{k}, \code{min_size},
+\code{max_size}, \code{avg_size}, and optionally \code{avg_silhouette},
+\code{min_silhouette} (if \code{dist_mat} provided), and \code{total_wss}
+(if \code{data} provided).
 }
 \description{
 Comprehensive validation metrics for a clustering result

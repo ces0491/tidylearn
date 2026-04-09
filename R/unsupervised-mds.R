@@ -58,7 +58,15 @@ tidy_mds <- function(data, method = "classical",
 #' @param ndim Number of dimensions (default: 2)
 #' @param add_rownames Preserve row names from distance matrix (default: TRUE)
 #'
-#' @return A tidy_mds object
+#' @return A list of class \code{"tidy_mds"} containing:
+#' \itemize{
+#'   \item config: tibble of MDS coordinates
+#'   \item stress: \code{NA} (not applicable for classical MDS)
+#'   \item gof: goodness-of-fit (proportion of variance retained)
+#'   \item eigenvalues: numeric vector of eigenvalues
+#'   \item method: \code{"Classical MDS"}
+#'   \item model: the \code{\link[stats]{cmdscale}} result
+#' }
 #'
 #' @examples
 #' \donttest{
@@ -120,7 +128,13 @@ tidy_mds_classical <- function(dist_mat, ndim = 2, add_rownames = TRUE) {
 #'   for non-metric (default: "ratio")
 #' @param ... Additional arguments passed to smacof::mds()
 #'
-#' @return A tidy_mds object
+#' @return A list of class \code{"tidy_mds"} containing:
+#' \itemize{
+#'   \item config: tibble of MDS coordinates
+#'   \item stress: stress value from the SMACOF algorithm
+#'   \item method: character string describing the MDS type
+#'   \item model: the \code{\link[smacof]{mds}} result
+#' }
 #'
 #' @examples
 #' \donttest{
@@ -171,7 +185,13 @@ tidy_mds_smacof <- function(dist_mat, ndim = 2, type = "ratio", ...) {
 #' @param ndim Number of dimensions (default: 2)
 #' @param ... Additional arguments passed to MASS::sammon()
 #'
-#' @return A tidy_mds object
+#' @return A list of class \code{"tidy_mds"} containing:
+#' \itemize{
+#'   \item config: tibble of MDS coordinates
+#'   \item stress: Sammon stress value
+#'   \item method: \code{"Sammon Mapping"}
+#'   \item model: the \code{\link[MASS]{sammon}} result
+#' }
 #'
 #' @examples
 #' \donttest{
@@ -220,7 +240,13 @@ tidy_mds_sammon <- function(dist_mat, ndim = 2, ...) {
 #' @param ndim Number of dimensions (default: 2)
 #' @param ... Additional arguments passed to MASS::isoMDS()
 #'
-#' @return A tidy_mds object
+#' @return A list of class \code{"tidy_mds"} containing:
+#' \itemize{
+#'   \item config: tibble of MDS coordinates
+#'   \item stress: Kruskal stress value
+#'   \item method: \code{"Kruskal's isoMDS"}
+#'   \item model: the \code{\link[MASS]{isoMDS}} result
+#' }
 #'
 #' @examples
 #' \donttest{
@@ -271,7 +297,7 @@ tidy_mds_kruskal <- function(dist_mat, ndim = 2, ...) {
 #' @param dim_x Which dimension for x-axis (default: 1)
 #' @param dim_y Which dimension for y-axis (default: 2)
 #'
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #'
 #' @examples
 #' \donttest{
@@ -341,7 +367,7 @@ plot_mds <- function(mds_obj, color_by = NULL, label_points = TRUE,
 #' @param x A tidy_mds object
 #' @param ... Additional arguments (ignored)
 #'
-#' @return Invisibly returns the input object x
+#' @return The input object \code{x}, returned invisibly.
 #'
 #' @examples
 #' \donttest{

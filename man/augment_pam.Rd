@@ -12,7 +12,8 @@ augment_pam(pam_obj, data)
 \item{data}{Original data frame}
 }
 \value{
-Original data with cluster column added
+A tibble containing the original \code{data} with an additional
+\code{cluster} factor column indicating cluster assignments.
 }
 \description{
 Augment Data with PAM Cluster Assignments

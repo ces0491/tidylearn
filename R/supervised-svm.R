@@ -191,7 +191,7 @@ tl_predict_svm <- function(model, new_data,
 #' @param grid_size Number of points in each dimension
 #'   for the grid (default: 100)
 #' @param ... Additional arguments
-#' @return A ggplot object with decision boundary
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @importFrom ggplot2 ggplot aes geom_point geom_contour
 #'   scale_fill_gradient2 labs theme_minimal
 #' @examples
@@ -363,7 +363,7 @@ tl_plot_svm_boundary <- function(model,
 #'
 #' @param model A tidylearn SVM model object
 #' @param ... Additional arguments
-#' @return A ggplot object with tuning results
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @importFrom ggplot2 ggplot aes geom_tile
 #'   scale_fill_gradient2 labs theme_minimal
 #' @examples

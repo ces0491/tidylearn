@@ -16,7 +16,8 @@ augment_hclust(hclust_obj, data, k = NULL, h = NULL)
 \item{h}{Height at which to cut (optional)}
 }
 \value{
-Original data with cluster column added
+A tibble containing the original \code{data} with an additional
+\code{cluster} integer column indicating cluster assignments.
 }
 \description{
 Add cluster assignments to original data

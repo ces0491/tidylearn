@@ -53,6 +53,7 @@ Keras
 kmeans
 knn
 kruskal
+Kruskal's
 leaderboard
 Leaderboard
 lifecycle
@@ -100,6 +101,7 @@ RPostgres
 RSQLite
 sammon
 Sammon
+Sammon's
 scalable
 se
 serialisation

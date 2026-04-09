@@ -74,7 +74,8 @@ tidy_apriori <- function(transactions, support = 0.01, confidence = 0.5,
 #'
 #' @param rules A rules object from arules
 #'
-#' @return A tibble with one row per rule
+#' @return A tibble with columns \code{rule_id}, \code{lhs}, \code{rhs}, and
+#'   quality measures (e.g., \code{support}, \code{confidence}, \code{lift}).
 #'
 #' @examples
 #' \donttest{
@@ -124,7 +125,8 @@ tidy_rules <- function(rules) {
 #' @param n Number of rules to display (default: 10)
 #' @param decreasing Sort in decreasing order? (default: TRUE)
 #'
-#' @return A tibble of top rules
+#' @return A tibble of the top \code{n} rules sorted by the specified quality
+#'   measure.
 #'
 #' @examples
 #' \donttest{
@@ -177,7 +179,8 @@ inspect_rules <- function(rules_obj, by = "lift", n = 10, decreasing = TRUE) {
 #' @param item Character; item to filter by
 #' @param where Character; "lhs", "rhs", or "both" (default: "both")
 #'
-#' @return A tibble of filtered rules
+#' @return A tibble of rules containing the specified \code{item} in the
+#'   requested position.
 #'
 #' @examples
 #' \donttest{
@@ -226,7 +229,8 @@ filter_rules_by_item <- function(rules_obj, item, where = "both") {
 #' @param min_lift Minimum lift threshold (default: 1.5)
 #' @param top_n Number of top associations to return (default: 10)
 #'
-#' @return A tibble of related items with association metrics
+#' @return A tibble of rules involving the specified \code{item}, filtered by
+#'   \code{min_lift} and sorted by lift in descending order.
 #'
 #' @examples
 #' \donttest{
@@ -267,7 +271,9 @@ find_related_items <- function(rules_obj, item, min_lift = 1.5, top_n = 10) {
 #'
 #' @param rules_obj A tidy_apriori object or rules tibble
 #'
-#' @return A list with summary statistics
+#' @return A list with \code{n_rules} and summary statistics (\code{min},
+#'   \code{max}, \code{mean}, \code{median}) for \code{support},
+#'   \code{confidence}, and \code{lift}.
 #'
 #' @examples
 #' \donttest{
@@ -330,7 +336,9 @@ summarize_rules <- function(rules_obj) {
 #' @param top_n Number of top rules to visualize (default: 50)
 #' @param ... Additional arguments passed to plot() for rules visualization
 #'
-#' @return Visualization (side effect) or ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object when \code{method = "scatter"}.
+#'   For other methods, the plot is produced as a side effect via
+#'   \pkg{arulesViz}.
 #'
 #' @examples
 #' \donttest{
@@ -411,7 +419,9 @@ visualize_rules <- function(rules_obj, method = "scatter", top_n = 50, ...) {
 #' @param top_n Number of recommendations to return (default: 5)
 #' @param min_confidence Minimum confidence threshold (default: 0.5)
 #'
-#' @return A tibble with recommended items and metrics
+#' @return A tibble with columns \code{rhs} (recommended item),
+#'   \code{confidence}, \code{lift}, and \code{support}, sorted by lift in
+#'   descending order.
 #'
 #' @examples
 #' \donttest{
@@ -456,7 +466,7 @@ recommend_products <- function(rules_obj, basket,
 #' @param x A tidy_apriori object
 #' @param ... Additional arguments (ignored)
 #'
-#' @return Invisibly returns the input object x
+#' @return The input object \code{x}, returned invisibly.
 #'
 #' @examples
 #' \donttest{

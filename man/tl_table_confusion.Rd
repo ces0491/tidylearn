@@ -14,7 +14,7 @@ tl_table_confusion(model, new_data = NULL, ...)
 \item{...}{Additional arguments (currently unused)}
 }
 \value{
-A gt table object
+A \code{\link[gt]{gt}} table object.
 }
 \description{
 Produces a styled gt confusion matrix with correct predictions highlighted.

@@ -10,7 +10,9 @@ tl_read_rds(path)
 \item{path}{Path to an RDS file.}
 }
 \value{
-A \code{tidylearn_data} object.
+A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
+with attributes \code{tl_source}, \code{tl_format}, and
+\code{tl_timestamp}.
 }
 \description{
 Reads an RDS file into a \code{tidylearn_data} object. Uses base R

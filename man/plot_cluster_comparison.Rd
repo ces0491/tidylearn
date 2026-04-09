@@ -16,7 +16,8 @@ plot_cluster_comparison(data, cluster_cols, x_col, y_col)
 \item{y_col}{Y-axis variable}
 }
 \value{
-A grid of ggplot objects
+The return value of \code{\link[gridExtra]{grid.arrange}}, a
+\code{\link[gtable]{gtable}} drawn as a side effect.
 }
 \description{
 Compare multiple clustering results side-by-side

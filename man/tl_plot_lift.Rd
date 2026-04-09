@@ -18,7 +18,7 @@ tl_plot_lift(model, new_data = NULL, bins = 10, ...)
 \item{...}{Additional arguments}
 }
 \value{
-A ggplot object with lift chart
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot lift chart for a classification model

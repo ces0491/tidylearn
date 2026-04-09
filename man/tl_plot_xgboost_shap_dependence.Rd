@@ -26,7 +26,7 @@ tl_plot_xgboost_shap_dependence(
 (default: 100, NULL for all)}
 }
 \value{
-A ggplot object with SHAP dependence plot
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot SHAP dependence for a specific feature

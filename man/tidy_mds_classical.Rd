@@ -14,7 +14,15 @@ tidy_mds_classical(dist_mat, ndim = 2, add_rownames = TRUE)
 \item{add_rownames}{Preserve row names from distance matrix (default: TRUE)}
 }
 \value{
-A tidy_mds object
+A list of class \code{"tidy_mds"} containing:
+\itemize{
+\item config: tibble of MDS coordinates
+\item stress: \code{NA} (not applicable for classical MDS)
+\item gof: goodness-of-fit (proportion of variance retained)
+\item eigenvalues: numeric vector of eigenvalues
+\item method: \code{"Classical MDS"}
+\item model: the \code{\link[stats]{cmdscale}} result
+}
 }
 \description{
 Performs classical multidimensional scaling using cmdscale()

@@ -13,7 +13,8 @@ tl_plot_cv_comparison(cv_results, metrics = NULL)
 (if NULL, plots all metrics)}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object showing boxplots of
+cross-validation metric distributions for each model.
 }
 \description{
 Plot comparison of cross-validation results

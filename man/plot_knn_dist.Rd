@@ -16,7 +16,7 @@ plot_knn_dist(data, k = 4, add_suggestion = TRUE, percentile = 0.95)
 \item{percentile}{Percentile for suggestion (default: 0.95)}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Visualize k-NN distances to help choose eps

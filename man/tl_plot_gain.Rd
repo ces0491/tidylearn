@@ -18,7 +18,7 @@ tl_plot_gain(model, new_data = NULL, bins = 10, ...)
 \item{...}{Additional arguments}
 }
 \value{
-A ggplot object with gain chart
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot gain chart for a classification model

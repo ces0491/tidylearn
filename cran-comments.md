@@ -60,7 +60,10 @@ RMariaDB, bigrquery, paws.storage -- all on CRAN
 
 ## R CMD check results
 
-0 errors | 0 warnings | 0 notes
+0 errors | 0 warnings | 1 note
+
+The only NOTE is "unable to verify current time" — a transient network
+issue unrelated to the package.
 
 ## Test environments
 

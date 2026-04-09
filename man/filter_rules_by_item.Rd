@@ -14,7 +14,8 @@ filter_rules_by_item(rules_obj, item, where = "both")
 \item{where}{Character; "lhs", "rhs", or "both" (default: "both")}
 }
 \value{
-A tibble of filtered rules
+A tibble of rules containing the specified \code{item} in the
+requested position.
 }
 \description{
 Subset rules containing specific items

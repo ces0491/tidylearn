@@ -13,7 +13,7 @@ plot_variance_explained(variance_tbl, threshold = 0.8)
 (default: 0.8 for 80\%)}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Create combined scree plot showing individual and cumulative variance

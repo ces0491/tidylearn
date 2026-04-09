@@ -77,7 +77,7 @@ tl_model_info <- function(model) {
 #'   "coefficients", "confusion", "importance". For unsupervised models:
 #'   "variance", "loadings", "clusters". MDS models are not supported.
 #' @param ... Additional arguments passed to the underlying table function
-#' @return A gt table object
+#' @return A \code{\link[gt]{gt}} table object.
 #' @export
 #' @examples
 #' \donttest{
@@ -171,7 +171,7 @@ tl_table_unsupervised <- function(model, type = "auto", ...) {
 #' @param new_data Optional test data. If NULL, uses training data.
 #' @param digits Number of decimal places (default: 4)
 #' @param ... Additional arguments passed to \code{tl_evaluate}
-#' @return A gt table object
+#' @return A \code{\link[gt]{gt}} table object.
 #' @export
 #' @examples
 #' \donttest{
@@ -206,7 +206,7 @@ tl_table_metrics <- function(model, new_data = NULL, digits = 4, ...) {
 #' @param lambda For regularised models: "1se" (default) or "min"
 #' @param digits Number of decimal places (default: 4)
 #' @param ... Additional arguments (currently unused)
-#' @return A gt table object
+#' @return A \code{\link[gt]{gt}} table object.
 #' @export
 #' @examples
 #' \donttest{
@@ -312,7 +312,7 @@ tl_table_coefficients <- function(model, lambda = "1se", digits = 4, ...) {
 #' @param model A tidylearn classification model
 #' @param new_data Optional test data. If NULL, uses training data.
 #' @param ... Additional arguments (currently unused)
-#' @return A gt table object
+#' @return A \code{\link[gt]{gt}} table object.
 #' @export
 #' @examples
 #' \donttest{
@@ -371,7 +371,7 @@ tl_table_confusion <- function(model, new_data = NULL, ...) {
 #' @param top_n Maximum number of features to display (default: 20)
 #' @param digits Number of decimal places (default: 2)
 #' @param ... Additional arguments (currently unused)
-#' @return A gt table object
+#' @return A \code{\link[gt]{gt}} table object.
 #' @export
 #' @examples
 #' \donttest{
@@ -422,7 +422,7 @@ tl_table_importance <- function(model, top_n = 20, digits = 2, ...) {
 #' @param n_components Maximum number of components to show (default: all)
 #' @param digits Number of decimal places (default: 4)
 #' @param ... Additional arguments (currently unused)
-#' @return A gt table object
+#' @return A \code{\link[gt]{gt}} table object.
 #' @export
 #' @examples
 #' \donttest{
@@ -471,7 +471,7 @@ tl_table_variance <- function(model, n_components = NULL, digits = 4, ...) {
 #' @param n_components Number of components to show (default: all)
 #' @param digits Number of decimal places (default: 3)
 #' @param ... Additional arguments (currently unused)
-#' @return A gt table object
+#' @return A \code{\link[gt]{gt}} table object.
 #' @export
 #' @examples
 #' \donttest{
@@ -518,7 +518,7 @@ tl_table_loadings <- function(model, n_components = NULL, digits = 3, ...) {
 #' @param k For hclust models, the number of clusters to cut (default: 3)
 #' @param digits Number of decimal places (default: 2)
 #' @param ... Additional arguments (currently unused)
-#' @return A gt table object
+#' @return A \code{\link[gt]{gt}} table object.
 #' @export
 #' @examples
 #' \donttest{
@@ -602,7 +602,7 @@ tl_table_clusters <- function(model, k = 3, digits = 2, ...) {
 #'   training data of the first model.
 #' @param names Optional character vector of model names
 #' @param digits Number of decimal places (default: 4)
-#' @return A gt table object
+#' @return A \code{\link[gt]{gt}} table object.
 #' @export
 #' @examples
 #' \donttest{

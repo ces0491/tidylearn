@@ -21,7 +21,13 @@ tl_influence_measures(
 \item{threshold_dffits}{DFFITS threshold (default: 2*sqrt((p+1)/n))}
 }
 \value{
-A data frame with influence measures
+A data frame with one row per observation containing influence
+measures: \code{cooks_distance}, \code{leverage}, \code{dffits},
+\code{std_residual}, \code{stud_residual}, boolean flags for each
+threshold (\code{is_cook_influential}, \code{is_leverage_influential},
+\code{is_dffits_influential}, \code{is_outlier}), per-coefficient
+\code{dfbetas_*} columns, and an overall \code{is_influential} flag.
+Threshold values are stored as attributes.
 }
 \description{
 Calculate influence measures for a linear model

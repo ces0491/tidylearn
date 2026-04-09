@@ -15,7 +15,13 @@ NULL
 #' @param threshold_cook Cook's distance threshold (default: 4/n)
 #' @param threshold_leverage Leverage threshold (default: 2*(p+1)/n)
 #' @param threshold_dffits DFFITS threshold (default: 2*sqrt((p+1)/n))
-#' @return A data frame with influence measures
+#' @return A data frame with one row per observation containing influence
+#'   measures: \code{cooks_distance}, \code{leverage}, \code{dffits},
+#'   \code{std_residual}, \code{stud_residual}, boolean flags for each
+#'   threshold (\code{is_cook_influential}, \code{is_leverage_influential},
+#'   \code{is_dffits_influential}, \code{is_outlier}), per-coefficient
+#'   \code{dfbetas_*} columns, and an overall \code{is_influential} flag.
+#'   Threshold values are stored as attributes.
 #' @examples
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
@@ -112,7 +118,7 @@ tl_influence_measures <- function(model, threshold_cook = NULL,
 #' @param threshold_dffits DFFITS threshold (default: 2*sqrt((p+1)/n))
 #' @param n_labels Number of points to label (default: 3)
 #' @param label_size Text size for labels (default: 3)
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @examples
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
@@ -301,7 +307,13 @@ tl_plot_influence <- function(model,
 #' @param model A tidylearn model object
 #' @param test Logical; whether to perform statistical tests
 #' @param verbose Logical; whether to print test results and explanations
-#' @return A list with assumption check results
+#' @return A named list with one element per assumption checked
+#'   (\code{linearity}, \code{independence}, \code{homoscedasticity},
+#'   \code{normality}, \code{multicollinearity}, \code{outliers}), each
+#'   containing \code{assumption} (character label), \code{check} (logical
+#'   or \code{NULL}), \code{details} (character), and
+#'   \code{recommendation} (character). An additional \code{overall} element
+#'   summarises the number of assumptions checked, violated, and satisfied.
 #' @examples
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
@@ -670,7 +682,8 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
 #' @param include_assumptions Logical; whether to include assumption checks
 #' @param include_performance Logical; whether to include performance metrics
 #' @param arrange_plots Layout arrangement (e.g., "grid", "row", "column")
-#' @return A plot grid with diagnostic plots
+#' @return A \code{\link[gridExtra]{grid.arrange}} object (a
+#'   \code{\link[grid]{grob}}) containing the arranged diagnostic plots.
 #' @examples
 #' \donttest{
 #' if (requireNamespace("gridExtra")) {
@@ -829,7 +842,21 @@ tl_diagnostic_dashboard <- function(model, include_influence = TRUE,
 #'   "iqr", "mahalanobis"
 #' @param threshold Threshold for outlier detection
 #' @param plot Logical; whether to create a plot of outliers
-#' @return A list with outlier detection results
+#' @return A list with outlier detection results:
+#'   \describe{
+#'     \item{method}{The detection method used (character).}
+#'     \item{method_name}{Human-readable method name (character).}
+#'     \item{threshold}{The threshold value used (numeric).}
+#'     \item{threshold_label}{Formatted threshold description (character).}
+#'     \item{outlier_flags}{A logical matrix (observations x variables).}
+#'     \item{any_outlier}{Logical vector indicating if each observation is an
+#'       outlier in any variable.}
+#'     \item{outlier_counts}{List with \code{total}, \code{by_variable}, and
+#'       \code{by_observation} counts.}
+#'     \item{outlier_indices}{Integer vector of outlier row indices.}
+#'     \item{plot}{A \code{\link[ggplot2]{ggplot}} object, or \code{NULL} if
+#'       \code{plot = FALSE}.}
+#'   }
 #' @examples
 #' \donttest{
 #' tl_detect_outliers(mtcars, variables = c("mpg", "wt"), method = "iqr")

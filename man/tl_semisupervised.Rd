@@ -27,7 +27,11 @@ tl_semisupervised(
 \item{...}{Additional arguments}
 }
 \value{
-A tidylearn model trained on pseudo-labeled data
+A tidylearn model object with additional class
+\code{"tidylearn_semisupervised"}, trained on pseudo-labeled data. The
+model includes a \code{semisupervised_info} element with
+\code{labeled_indices}, \code{cluster_model}, and
+\code{label_mapping}.
 }
 \description{
 Train a supervised model with limited labels by first clustering the data

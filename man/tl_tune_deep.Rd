@@ -41,7 +41,11 @@ layer configurations to try}
 \item{...}{Additional arguments}
 }
 \value{
-A list with the best model and tuning results
+A list with elements \code{model} (the best fitted deep learning
+model), \code{best_hidden_layers} (optimal layer configuration),
+\code{best_learning_rate}, \code{best_batch_size}, and
+\code{tuning_results} (a data frame of all hyperparameter combinations
+and their validation losses).
 }
 \description{
 Tune a deep learning model

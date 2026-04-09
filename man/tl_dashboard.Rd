@@ -15,7 +15,7 @@ tl_dashboard(model, new_data = NULL, ...)
 \item{...}{Additional arguments}
 }
 \value{
-A Shiny app object
+A \code{\link[shiny]{shinyApp}} object.
 }
 \description{
 Create interactive visualization dashboard for a model

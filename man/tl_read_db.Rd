@@ -15,7 +15,7 @@ tl_read_db(conn, query, ...)
 \item{...}{Additional arguments passed to \code{DBI::dbGetQuery()}.}
 }
 \value{
-A \code{tidylearn_data} object.
+A \code{tidylearn_data} object containing the query results.
 }
 \description{
 Executes a SQL query against an existing \pkg{DBI} connection and returns

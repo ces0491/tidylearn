@@ -16,7 +16,7 @@ tl_table_clusters(model, k = 3, digits = 2, ...)
 \item{...}{Additional arguments (currently unused)}
 }
 \value{
-A gt table object
+A \code{\link[gt]{gt}} table object.
 }
 \description{
 Produces a styled gt table showing cluster sizes and mean feature values.

@@ -18,7 +18,15 @@ tidy_gap_stat(data, FUN_cluster = NULL, max_k = 10, B = 50, nstart = 25)
 \item{nstart}{If using kmeans, number of random starts (default: 25)}
 }
 \value{
-A list of class "tidy_gap" containing gap statistics
+A list of class \code{"tidy_gap"} containing:
+\itemize{
+\item gap_data: tibble with gap statistics for each k
+\item k_firstSEmax: optimal k via firstSEmax method (most conservative)
+\item k_globalmax: optimal k via globalmax method
+\item k_firstmax: optimal k via firstmax method
+\item recommended_k: recommended k (uses firstSEmax)
+\item model: the \code{\link[cluster]{clusGap}} result
+}
 }
 \description{
 Compute gap statistic for determining optimal number of clusters
