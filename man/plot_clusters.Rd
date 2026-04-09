@@ -30,9 +30,16 @@ plot_clusters(
 \item{color_noise_black}{If TRUE, color noise points (cluster 0) black}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Visualize clustering results using first two dimensions
 or specified dimensions
+}
+\examples{
+\donttest{
+km <- tidy_kmeans(iris[, 1:4], k = 3)
+clustered <- augment_kmeans(km, iris[, 1:4])
+plot_clusters(clustered)
+}
 }

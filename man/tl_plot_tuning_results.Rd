@@ -29,8 +29,16 @@ or scatter plots)}
 "parallel", "importance"}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot hyperparameter tuning results
+}
+\examples{
+\donttest{
+model <- tl_tune_grid(iris, Species ~ ., method = "tree",
+  param_grid = list(cp = c(0.01, 0.1), minsplit = c(10, 20)),
+  folds = 2, verbose = FALSE)
+tl_plot_tuning_results(model)
+}
 }

@@ -12,9 +12,15 @@
 \item{...}{Additional arguments (ignored)}
 }
 \value{
-Invisibly returns the input object x,
-called for side effects (plotting)
+The input object \code{x}, returned invisibly. Called for its
+side effect of plotting a PCA scatter plot coloured by cluster.
 }
 \description{
 Plot EDA results
+}
+\examples{
+\donttest{
+eda <- tl_explore(iris, response = "Species")
+plot(eda)
+}
 }

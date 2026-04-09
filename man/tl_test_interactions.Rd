@@ -37,8 +37,17 @@ tl_test_interactions(
 \item{alpha}{Significance level for interaction tests}
 }
 \value{
-A data frame with interaction test results
+A data frame with one row per tested interaction pair, containing
+columns \code{var1}, \code{var2}, \code{p_value}, \code{significant}
+(logical), \code{delta_r2} (change in R-squared), and
+\code{f_statistic}, sorted by \code{p_value} ascending.
 }
 \description{
 Test for significant interactions between variables
+}
+\examples{
+\donttest{
+results <- tl_test_interactions(mtcars, mpg ~ wt + hp + cyl,
+  var1 = "wt", var2 = "hp")
+}
 }

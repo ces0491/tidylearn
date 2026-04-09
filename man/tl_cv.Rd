@@ -18,8 +18,22 @@ tl_cv(data, formula, method, folds = 5, ...)
 \item{...}{Additional arguments}
 }
 \value{
-Cross-validation results
+A list with two elements:
+\describe{
+\item{\code{$folds}}{A list of per-fold evaluation
+\link[tibble]{tibble}s, each with \code{metric} and
+\code{value} columns.}
+\item{\code{$summary}}{A \link[tibble]{tibble} with columns
+\code{metric}, \code{mean}, and \code{sd} summarizing
+performance across folds.}
+}
 }
 \description{
 Cross-validation for tidylearn models
+}
+\examples{
+\donttest{
+cv <- tl_cv(mtcars, mpg ~ wt + hp, method = "linear", folds = 3)
+cv$summary
+}
 }

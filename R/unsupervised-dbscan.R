@@ -104,7 +104,15 @@ tidy_dbscan <- function(data, eps, minPts = 5,
 #' @param cols Columns to include (tidy select).
 #'   If NULL, uses all numeric columns.
 #'
-#' @return A tibble with observation IDs and k-NN distances
+#' @return A tibble with columns \code{.obs_id} (observation identifier),
+#'   \code{knn_dist} (distance to k-th nearest neighbor), and \code{rank}
+#'   (rank of the k-NN distance).
+#'
+#' @examples
+#' \donttest{
+#' knn <- tidy_knn_dist(iris[, 1:4], k = 5)
+#' }
+#'
 #' @export
 tidy_knn_dist <- function(data, k = 4, cols = NULL) {
 
@@ -195,7 +203,13 @@ suggest_eps <- function(data, minPts = 5,
 #' @param add_suggestion Add suggested eps line? (default: TRUE)
 #' @param percentile Percentile for suggestion (default: 0.95)
 #'
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
+#'
+#' @examples
+#' \donttest{
+#' plot_knn_dist(iris[, 1:4], k = 5)
+#' }
+#'
 #' @export
 plot_knn_dist <- function(data, k = 4,
                           add_suggestion = TRUE,
@@ -216,7 +230,7 @@ plot_knn_dist <- function(data, k = 4,
     knn_data,
     ggplot2::aes(x = seq_along(knn_dist), y = knn_dist)
   ) +
-    ggplot2::geom_line(color = "steelblue", size = 1) +
+    ggplot2::geom_line(color = "steelblue", linewidth = 1) +
     ggplot2::labs(
       title = paste0("k-NN Distance Plot (k = ", k, ")"),
       subtitle = "Look for 'elbow' or 'knee' to determine eps",
@@ -254,7 +268,16 @@ plot_knn_dist <- function(data, k = 4,
 #' @param dbscan_obj A tidy_dbscan object
 #' @param data Original data frame
 #'
-#' @return Original data with cluster information added
+#' @return A tibble containing the original \code{data} with additional columns
+#'   \code{cluster} (factor), \code{is_noise} (logical), and \code{is_core}
+#'   (logical).
+#'
+#' @examples
+#' \donttest{
+#' db <- tidy_dbscan(iris[, 1:4], eps = 0.5, minPts = 5)
+#' augmented <- augment_dbscan(db, iris)
+#' }
+#'
 #' @export
 augment_dbscan <- function(dbscan_obj, data) {
 
@@ -281,7 +304,15 @@ augment_dbscan <- function(dbscan_obj, data) {
 #' @param eps_values Vector of eps values to test
 #' @param minPts_values Vector of minPts values to test
 #'
-#' @return A tibble with parameter combinations and resulting cluster counts
+#' @return A tibble with columns \code{eps}, \code{minPts}, \code{n_clusters},
+#'   \code{n_noise}, and \code{prop_noise} for each parameter combination.
+#'
+#' @examples
+#' \donttest{
+#' params <- explore_dbscan_params(iris[, 1:4],
+#'   eps_values = c(0.3, 0.5, 0.8), minPts_values = c(3, 5))
+#' }
+#'
 #' @export
 explore_dbscan_params <- function(data, eps_values, minPts_values) {
 
@@ -321,7 +352,14 @@ explore_dbscan_params <- function(data, eps_values, minPts_values) {
 #' @param x A tidy_dbscan object
 #' @param ... Additional arguments (ignored)
 #'
-#' @return Invisibly returns the input object x
+#' @return The input object \code{x}, returned invisibly.
+#'
+#' @examples
+#' \donttest{
+#' db <- tidy_dbscan(iris[, 1:4], eps = 0.5, minPts = 5)
+#' print(db)
+#' }
+#'
 #' @export
 print.tidy_dbscan <- function(x, ...) {
   cat("Tidy DBSCAN Clustering\n")

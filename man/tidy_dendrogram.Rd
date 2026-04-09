@@ -16,8 +16,16 @@ tidy_dendrogram(hclust_obj, k = NULL, hang = 0.01, cex = 0.7)
 \item{cex}{Label size (default: 0.7)}
 }
 \value{
-Invisibly returns the hclust object (plots as side effect)
+The \code{\link[stats]{hclust}} object, returned invisibly. The
+dendrogram is plotted as a side effect.
 }
 \description{
 Create dendrogram visualization
+}
+\examples{
+\donttest{
+hc <- tidy_hclust(USArrests, method = "ward.D2")
+tidy_dendrogram(hc, k = 3)
+}
+
 }

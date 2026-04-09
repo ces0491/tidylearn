@@ -25,8 +25,27 @@ tl_detect_outliers(
 \item{plot}{Logical; whether to create a plot of outliers}
 }
 \value{
-A list with outlier detection results
+A list with outlier detection results:
+\describe{
+\item{method}{The detection method used (character).}
+\item{method_name}{Human-readable method name (character).}
+\item{threshold}{The threshold value used (numeric).}
+\item{threshold_label}{Formatted threshold description (character).}
+\item{outlier_flags}{A logical matrix (observations x variables).}
+\item{any_outlier}{Logical vector indicating if each observation is an
+outlier in any variable.}
+\item{outlier_counts}{List with \code{total}, \code{by_variable}, and
+\code{by_observation} counts.}
+\item{outlier_indices}{Integer vector of outlier row indices.}
+\item{plot}{A \code{\link[ggplot2]{ggplot}} object, or \code{NULL} if
+\code{plot = FALSE}.}
+}
 }
 \description{
 Detect outliers in the data
+}
+\examples{
+\donttest{
+tl_detect_outliers(mtcars, variables = c("mpg", "wt"), method = "iqr")
+}
 }

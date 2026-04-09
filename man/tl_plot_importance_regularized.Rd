@@ -18,8 +18,14 @@ tl_plot_importance_regularized(model, lambda = "1se", top_n = 20, ...)
 \item{...}{Additional arguments}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot variable importance for a regularized model
+}
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ ., method = "lasso")
+tl_plot_importance_regularized(model)
+}
 }

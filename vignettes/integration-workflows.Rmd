@@ -50,7 +50,9 @@ head(reduced$data)
 ```
 
 ```{r}
-# Train classifier on reduced features (remove .obs_id column first)
+# Train classifier on reduced features.
+# PCA output includes a .obs_id row-identifier column — drop it before
+# modeling so it isn't treated as a predictor in the formula.
 reduced_data <- reduced$data %>% select(-starts_with(".obs"))
 model_reduced <- tl_model(reduced_data, Species ~ ., method = "logistic")
 print(model_reduced)

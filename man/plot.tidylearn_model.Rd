@@ -14,8 +14,15 @@
 \item{...}{Additional arguments passed to plotting functions}
 }
 \value{
-A ggplot2 object or NULL, called primarily for side effects
+A \code{\link[ggplot2]{ggplot}} object. The specific plot depends
+on the model paradigm and \code{type} argument.
 }
 \description{
 Plot method for tidylearn models
+}
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+plot(model, type = "actual_predicted")
+}
 }

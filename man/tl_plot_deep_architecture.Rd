@@ -12,8 +12,17 @@ tl_plot_deep_architecture(model, ...)
 \item{...}{Additional arguments}
 }
 \value{
-A plot of the deep learning model architecture
+The return value of \code{keras::plot_model()}, an architecture
+diagram of the Keras model.
 }
 \description{
 Plot deep learning model architecture
+}
+\examples{
+\dontrun{
+if (requireNamespace("keras", quietly = TRUE)) {
+  model <- tl_model(iris, Species ~ ., method = "deep", epochs = 5)
+  tl_plot_deep_architecture(model)
+}
+}
 }

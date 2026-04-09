@@ -12,8 +12,15 @@ tl_save_pipeline(pipeline, file)
 \item{file}{Path to save the pipeline}
 }
 \value{
-Invisible NULL
+Called for its side effect of saving to disk; returns
+\code{NULL} invisibly.
 }
 \description{
 Save a pipeline to disk
+}
+\examples{
+\donttest{
+pipe <- tl_pipeline(iris, Species ~ .)
+tl_save_pipeline(pipe, tempfile(fileext = ".rds"))
+}
 }

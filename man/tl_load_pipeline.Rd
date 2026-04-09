@@ -10,8 +10,17 @@ tl_load_pipeline(file)
 \item{file}{Path to the pipeline file}
 }
 \value{
-A tidylearn pipeline object
+A \code{tidylearn_pipeline} object previously saved with
+\code{\link{tl_save_pipeline}}.
 }
 \description{
 Load a pipeline from disk
+}
+\examples{
+\donttest{
+pipe <- tl_pipeline(iris, Species ~ .)
+f <- tempfile(fileext = ".rds")
+tl_save_pipeline(pipe, f)
+pipe2 <- tl_load_pipeline(f)
+}
 }

@@ -10,8 +10,20 @@ summarize_rules(rules_obj)
 \item{rules_obj}{A tidy_apriori object or rules tibble}
 }
 \value{
-A list with summary statistics
+A list with \code{n_rules} and summary statistics (\code{min},
+\code{max}, \code{mean}, \code{median}) for \code{support},
+\code{confidence}, and \code{lift}.
 }
 \description{
 Get summary statistics about rules
+}
+\examples{
+\donttest{
+if (requireNamespace("arules", quietly = TRUE)) {
+  data("Groceries", package = "arules")
+  res <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
+  summarize_rules(res)
+}
+}
+
 }

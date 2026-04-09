@@ -162,7 +162,7 @@ tl_plot_roc <- function(model, new_data = NULL, ...) {
 
     # Create the plot
     p <- ggplot2::ggplot(roc_data, ggplot2::aes(x = fpr, y = tpr)) +
-      ggplot2::geom_line(color = "blue", size = 1) +
+      ggplot2::geom_line(color = "blue", linewidth = 1) +
       ggplot2::geom_abline(
         intercept = 0, slope = 1,
         linetype = "dashed", color = "gray"
@@ -290,7 +290,7 @@ tl_plot_precision_recall <- function(model, new_data = NULL, ...) {
 
     # Create the plot
     p <- ggplot2::ggplot(pr_data, ggplot2::aes(x = recall, y = precision)) +
-      ggplot2::geom_line(color = "blue", size = 1) +
+      ggplot2::geom_line(color = "blue", linewidth = 1) +
       ggplot2::labs(
         title = "Precision-Recall Curve",
         subtitle = paste0("Area Under PR Curve = ", round(pr_auc, 3)),

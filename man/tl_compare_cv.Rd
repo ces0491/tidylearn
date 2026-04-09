@@ -18,8 +18,25 @@ tl_compare_cv(data, models, folds = 5, metrics = NULL, ...)
 \item{...}{Additional arguments}
 }
 \value{
-A tibble with cross-validation results for all models
+A list with two elements:
+\describe{
+\item{\code{$fold_metrics}}{A data frame with columns
+\code{metric}, \code{value}, \code{fold}, and \code{model}
+containing per-fold results for every model.}
+\item{\code{$summary}}{A data frame with columns \code{model},
+\code{metric}, \code{mean_value}, \code{sd_value},
+\code{min_value}, and \code{max_value} summarizing
+cross-validation performance.}
+}
 }
 \description{
 Compare models using cross-validation
+}
+\examples{
+\donttest{
+m1 <- tl_model(mtcars, mpg ~ wt, method = "linear")
+m2 <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+cv <- tl_compare_cv(mtcars, list(simple = m1, full = m2), folds = 3)
+cv$summary
+}
 }

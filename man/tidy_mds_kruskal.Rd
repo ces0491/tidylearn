@@ -14,8 +14,21 @@ tidy_mds_kruskal(dist_mat, ndim = 2, ...)
 \item{...}{Additional arguments passed to MASS::isoMDS()}
 }
 \value{
-A tidy_mds object
+A list of class \code{"tidy_mds"} containing:
+\itemize{
+\item config: tibble of MDS coordinates
+\item stress: Kruskal stress value
+\item method: \code{"Kruskal's isoMDS"}
+\item model: the \code{\link[MASS]{isoMDS}} result
+}
 }
 \description{
 Performs Kruskal's isoMDS
+}
+\examples{
+\donttest{
+d <- dist(USArrests)
+mds <- tidy_mds_kruskal(d)
+}
+
 }

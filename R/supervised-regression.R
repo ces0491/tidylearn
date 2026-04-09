@@ -433,9 +433,14 @@ tl_plot_residuals <- function(model, type = "fitted", ...) {
 #'   (if NULL, uses training data)
 #' @param level Confidence level (default: 0.95)
 #' @param ... Additional arguments
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @importFrom ggplot2 ggplot aes geom_point geom_ribbon
 #'   labs theme_minimal
+#' @examples
+#' \donttest{
+#' model <- tl_model(mtcars, mpg ~ wt, method = "linear")
+#' tl_plot_intervals(model)
+#' }
 #' @export
 tl_plot_intervals <- function(model,
                               new_data = NULL,
@@ -459,20 +464,21 @@ tl_plot_intervals <- function(model,
   # Sort data by x variable for smooth curves
   sorted_data <- new_data[order(new_data[[x_var]]), ]
 
-  # Calculate intervals
-  intervals <- tl_prediction_intervals(
-    model, sorted_data, level = level
-  )
+  # Calculate confidence and prediction intervals from the raw model
+  conf_int <- stats::predict(model$fit, newdata = sorted_data,
+                             interval = "confidence", level = level)
+  pred_int <- stats::predict(model$fit, newdata = sorted_data,
+                             interval = "prediction", level = level)
 
   # Create plot data
   plot_data <- tibble::tibble(
     x = sorted_data[[x_var]],
     y = sorted_data[[y_var]],
-    pred = intervals$prediction,
-    conf_lower = intervals$conf_lower,
-    conf_upper = intervals$conf_upper,
-    pred_lower = intervals$pred_lower,
-    pred_upper = intervals$pred_upper
+    pred = conf_int[, "fit"],
+    conf_lower = conf_int[, "lwr"],
+    conf_upper = conf_int[, "upr"],
+    pred_lower = pred_int[, "lwr"],
+    pred_upper = pred_int[, "upr"]
   )
 
   # Create the plot
@@ -496,7 +502,7 @@ tl_plot_intervals <- function(model,
     # Fitted line
     ggplot2::geom_line(
       ggplot2::aes(y = pred),
-      color = "blue", size = 1
+      color = "blue", linewidth = 1
     ) +
     # Actual points
     ggplot2::geom_point(

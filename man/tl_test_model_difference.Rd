@@ -21,8 +21,19 @@ tl_test_model_difference(
 \item{metric}{Name of the metric to compare}
 }
 \value{
-A data frame with statistical test results
+A data frame with columns \code{metric}, \code{model},
+\code{baseline}, \code{mean_diff}, \code{p_value}, and
+\code{p_adj} (Holm-adjusted p-value) containing pairwise
+statistical comparisons against the baseline model.
 }
 \description{
 Perform statistical comparison of models using cross-validation
+}
+\examples{
+\donttest{
+m1 <- tl_model(mtcars, mpg ~ wt, method = "linear")
+m2 <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+cv <- tl_compare_cv(mtcars, list(simple = m1, full = m2), folds = 3)
+tl_test_model_difference(cv, baseline_model = "simple", metric = "rmse")
+}
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/workflows.R
 \name{tl_auto_ml}
 \alias{tl_auto_ml}
-\title{High-Level Workflows for Common Machine Learning Patterns}
+\title{Auto ML: Automated Machine Learning Workflow}
 \usage{
 tl_auto_ml(
   data,
@@ -26,30 +26,66 @@ tl_auto_ml(
 
 \item{use_clustering}{Whether to add cluster features (default: TRUE)}
 
-\item{time_budget}{Time budget in seconds (default: 300)}
+\item{time_budget}{Time budget in seconds (default: 300). Controls which
+models are attempted and whether cross-validation is used for evaluation.
+The budget is checked \strong{between} model fits, not during them -- once a
+model starts training it runs to completion because R cannot safely
+interrupt C-level code (e.g. randomForest, xgboost, e1071).
 
-\item{cv_folds}{Number of cross-validation folds (default: 5)}
+How the budget shapes the workflow:
+\itemize{
+\item \strong{Under 30s}: Only fast models are attempted (tree, logistic/linear).
+Cross-validation is skipped; models are ranked on training-set metrics
+only. Expect 2 models in the leaderboard. Use this for quick sanity
+checks or interactive exploration.
+\item \strong{30--120s}: All baseline models are attempted including random
+forest. Cross-validation runs when enough time remains after each
+model fit; otherwise training metrics are used. Advanced models
+(SVM, XGBoost / ridge, lasso) are attempted if 40\\% of the budget
+remains after baselines. Dimensionality reduction and clustering
+pipelines run if enabled and 10\\% of the budget remains.
+\item \strong{120s+ (recommended)}: The full pipeline runs -- all baselines,
+advanced models, PCA-augmented variants, and cluster-augmented
+variants, each with cross-validation. Expect 9--11 models in the
+leaderboard.
+}
 
-\item{metric}{Evaluation metric (default: auto-selected based on task)}
+Because individual model fits (especially forest, SVM, XGBoost with CV)
+can take 5--30s each depending on data size, the actual wall-clock time
+may modestly exceed the budget by the duration of the last model that
+was started before the budget expired.}
+
+\item{cv_folds}{Number of cross-validation folds (default: 5). Reducing
+this (e.g. to 2 or 3) is an effective way to stay closer to the time
+budget since CV is typically the most expensive step.}
+
+\item{metric}{Evaluation metric (default: auto-selected based on task).
+For classification: "accuracy"; for regression: "rmse".}
 }
 \value{
-Best model with performance comparison
+A list with class \code{"tidylearn_automl"} containing:
+\describe{
+\item{best_model}{The best tidylearn model object}
+\item{models}{Named list of all successfully trained models}
+\item{leaderboard}{Tibble ranking models by the chosen metric}
+\item{task}{Detected or specified task type}
+\item{metric}{Metric used for ranking}
+\item{runtime}{Total elapsed time as a difftime object}
+}
 }
 \description{
-These functions provide end-to-end workflows that showcase tidylearn's
-ability to seamlessly combine multiple learning paradigms
-Auto ML: Automated Machine Learning Workflow
-}
-\details{
 Automatically explores multiple modeling approaches including
 dimensionality reduction, clustering, and various supervised methods.
 Returns the best performing model based on cross-validation.
 }
 \examples{
 \donttest{
-# Automated modeling
-result <- tl_auto_ml(iris, Species ~ .)
-best_model <- result$best_model
+# Quick run with fast models only (< 30s budget skips forest/SVM/XGBoost)
+result <- tl_auto_ml(iris, Species ~ .,
+  time_budget = 10,
+  use_reduction = FALSE,
+  use_clustering = FALSE,
+  cv_folds = 2)
 result$leaderboard
 }
 }

@@ -16,7 +16,7 @@ tl_table_metrics(model, new_data = NULL, digits = 4, ...)
 \item{...}{Additional arguments passed to \code{tl_evaluate}}
 }
 \value{
-A gt table object
+A \code{\link[gt]{gt}} table object.
 }
 \description{
 Produces a styled gt table of model evaluation metrics from

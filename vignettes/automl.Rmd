@@ -72,51 +72,92 @@ print(result_reg$best_model)
 
 ## How AutoML Works
 
-The `tl_auto_ml()` function follows a systematic approach:
+The `tl_auto_ml()` function follows a four-phase pipeline. Which phases
+actually run -- and how thoroughly -- depends on the `time_budget` and the
+toggle parameters `use_reduction` and `use_clustering`.
 
-1. **Baseline Models**: Trains standard models (logistic, tree, forest for classification; linear, tree, forest for regression)
-2. **Dimensionality Reduction**: Applies PCA and trains models on reduced features
-3. **Cluster Features**: Adds cluster assignments as features
-4. **Advanced Models**: If time allows, tries additional methods
+| Phase | What it does | Models added (classification) | Models added (regression) |
+|-------|-------------|-------------------------------|---------------------------|
+| 1. Baselines | Trains standard models | tree, logistic, forest | tree, linear, forest |
+| 2. PCA variants | PCA preprocessing + baseline methods | pca\_tree, pca\_logistic, pca\_forest | pca\_tree, pca\_linear, pca\_forest |
+| 3. Cluster variants | Adds cluster assignments as features | clustered\_tree, clustered\_logistic, clustered\_forest | clustered\_tree, clustered\_linear, clustered\_forest |
+| 4. Advanced | Tries heavier methods | svm, xgboost | ridge, lasso |
+
+Each model is first fit on the full training data, then (if budget allows)
+evaluated with k-fold cross-validation. When time is tight, models fall back
+to training-set metrics instead of CV.
+
+## Understanding the Time Budget
+
+The `time_budget` parameter (in seconds) is the most important knob for
+controlling the speed/thoroughness trade-off. It is checked **between** model
+fits, not during them. Once a model starts training it runs to completion,
+because many of the wrapped packages (randomForest, xgboost, e1071) execute
+C-level code that R cannot safely interrupt mid-execution. This means the
+actual wall-clock time may modestly exceed the budget by the duration of the
+last model that started before the budget expired.
+
+### Budget tiers at a glance
+
+| Budget | Baselines | CV | PCA/Cluster variants | Advanced models | Typical models | Use case |
+|--------|-----------|-----|----------------------|-----------------|----------------|----------|
+| < 30 s | tree + logistic/linear only | No (training metrics) | No | No | 2 | Quick sanity check, interactive use |
+| 30--120 s | tree + logistic/linear + forest | When time remains | If enabled and > 10 % budget left | If > 40 % budget left | 3--7 | Development iteration, notebook exploration |
+| 120 s+ | All | Yes | Yes (if enabled) | Yes | 9--11 | Thorough comparison, final model selection |
+
+The "forest" baseline and all advanced models (SVM, XGBoost, ridge, lasso)
+involve C-level code that typically takes 3--15 seconds per fit depending on
+data size. They are only attempted when `time_budget >= 30`.
+
+### Why CV is the expensive step
+
+A single `tl_model()` call fits one model. Cross-validation
+(`tl_cv(folds = 5)`) fits **five** models on subsets, so it
+costs roughly 5x the time. The function checks the remaining
+budget after each model fit and skips CV when it would likely
+exceed the budget, falling back to training-set evaluation instead.
+Reducing `cv_folds` (e.g. from 5 to 2) is the most effective way to
+stay closer to the budget while still getting out-of-sample estimates.
+
+### Practical examples
 
 ```{r, eval=FALSE}
-# AutoML with all features enabled
-result_full <- tl_auto_ml(
-  data = iris,
-  formula = Species ~ .,
-  task = "auto",                    # Automatically detect task type
-  use_reduction = TRUE,             # Try PCA preprocessing
-  use_clustering = TRUE,            # Add cluster features
-  time_budget = 120,                # 2 minutes
-  cv_folds = 5,                     # Cross-validation folds
-  metric = NULL                     # Auto-select metric
-)
+# Quick sanity check -- 2 fast models, no CV, done in ~1s
+quick <- tl_auto_ml(iris, Species ~ .,
+                    time_budget = 10,
+                    use_reduction = FALSE,
+                    use_clustering = FALSE)
+quick$leaderboard
+#> baseline_tree, baseline_logistic
+
+# Development iteration -- baselines + forest, some CV
+medium <- tl_auto_ml(iris, Species ~ .,
+                     time_budget = 60,
+                     cv_folds = 3)
+medium$leaderboard
+#> 5--7 models depending on data size
+
+# Thorough search -- all phases, full CV
+thorough <- tl_auto_ml(iris, Species ~ .,
+                       time_budget = 300,
+                       cv_folds = 5)
+thorough$leaderboard
+#> 9--11 models with cross-validated scores
 ```
 
 ## Task Type Detection
 
-AutoML automatically detects the task type:
+AutoML automatically detects the task type from the response variable:
 
 ```{r, eval=FALSE}
-# Task type is automatically detected
-result_auto <- tl_auto_ml(iris, Species ~ ., task = "auto")
-# Detects: Classification (factor response)
+# Factor/character response -> classification
+result_class <- tl_auto_ml(iris, Species ~ ., task = "auto")
 
-result_auto_reg <- tl_auto_ml(mtcars, mpg ~ ., task = "auto")
-# Detects: Regression (numeric response)
+# Numeric response -> regression
+result_reg <- tl_auto_ml(mtcars, mpg ~ ., task = "auto")
 ```
 
 ## Controlling the Search
-
-### Time Budget
-
-```{r, eval=FALSE}
-# Quick search (30 seconds)
-quick_result <- tl_auto_ml(iris, Species ~ ., time_budget = 30)
-
-# Thorough search (10 minutes)
-thorough_result <- tl_auto_ml(iris, Species ~ ., time_budget = 600)
-```
 
 ### Feature Engineering Options
 
@@ -176,9 +217,9 @@ pca_forest <- result$models$pca_forest
 # View performance comparison
 leaderboard <- result$leaderboard
 
-# Sort by performance
+# Sort by score (higher is better for accuracy, lower for RMSE)
 leaderboard <- leaderboard %>%
-  arrange(desc(performance))
+  arrange(desc(score))
 
 print(leaderboard)
 ```
@@ -297,12 +338,13 @@ quick_automl <- tl_auto_ml(split$train, Species ~ .,
                            use_reduction = TRUE,
                            use_clustering = FALSE)
 
-# Analyze what worked
-best_approach <- quick_automl$best_model$spec$method
+# Analyze what worked — best model name is in the leaderboard
+best_name <- quick_automl$leaderboard$model[1]
+best_method <- quick_automl$best_model$spec$method
+cat("Best model:", best_name, "(method:", best_method, ")\n")
 
-# Second pass: focus on promising approaches
-if (grepl("pca", names(quick_automl$best_model)[1])) {
-  # If PCA worked well, focus on dimensionality reduction
+# Second pass: if a PCA variant won, invest more in reduction
+if (grepl("^pca_", best_name)) {
   refined_automl <- tl_auto_ml(split$train, Species ~ .,
                                time_budget = 60,
                                use_reduction = TRUE,
@@ -315,7 +357,7 @@ if (grepl("pca", names(quick_automl$best_model)[1])) {
 ```{r, eval=FALSE}
 # Get top 3 models
 top_models <- automl_iris$leaderboard %>%
-  arrange(desc(performance)) %>%
+  arrange(desc(score)) %>%
   head(3)
 
 # Make predictions with each
@@ -357,13 +399,20 @@ result_reg <- tl_auto_ml(mtcars, mpg ~ .,
 
 ## Best Practices
 
-1. **Set appropriate time budget**: Start with 60-120 seconds for initial exploration
-2. **Use cross-validation**: More folds give better estimates but take longer
-3. **Preprocess when needed**: Handle missing values before AutoML
-4. **Split your data**: Always evaluate on held-out test data
-5. **Examine multiple models**: The "best" model may not always be robust
-6. **Consider ensemble approaches**: Combine top models for better performance
-7. **Monitor time vs performance**: Longer searches don't always yield better results
+1. **Start fast, then expand**: Use `time_budget = 10` to verify the pipeline
+   runs, then increase to 60--120s for real evaluation, and 300s for final
+   model selection.
+2. **Reduce `cv_folds` before reducing `time_budget`**: Going from 5-fold to
+   2-fold CV cuts evaluation time by ~60% while still providing out-of-sample
+   estimates. A 30s budget with `cv_folds = 2` is often more useful than a
+   30s budget with the default 5 folds (which will skip CV entirely).
+3. **Preprocess when needed**: Handle missing values before AutoML.
+4. **Split your data**: Always evaluate on held-out test data.
+5. **Examine multiple models**: The "best" model may not always be robust.
+6. **Consider ensemble approaches**: Combine top models for better performance.
+7. **Understand training-set metrics**: When CV is skipped (short budgets),
+   the leaderboard uses training-set metrics which are optimistically biased.
+   These are useful for ranking but not for reporting final performance.
 
 ## When to Use AutoML
 
@@ -384,31 +433,52 @@ result_reg <- tl_auto_ml(mtcars, mpg ~ .,
 
 ## Troubleshooting
 
-### AutoML runs too slowly
+### AutoML takes longer than `time_budget`
+
+The budget is checked **between** model fits. A single random forest or
+XGBoost fit can take 5--30 seconds depending on data size, and R cannot
+safely interrupt C-level code mid-execution. To stay closer to the budget:
 
 ```{r, eval=FALSE}
-# Reduce time budget
-quick_result <- tl_auto_ml(data, formula, time_budget = 30)
+# 1. Reduce CV folds (biggest impact)
+fast_result <- tl_auto_ml(data, formula,
+                          cv_folds = 2,
+                          time_budget = 30)
 
-# Reduce CV folds
-fast_result <- tl_auto_ml(data, formula, cv_folds = 3)
-
-# Disable feature engineering
+# 2. Disable slow phases
 baseline_result <- tl_auto_ml(data, formula,
                               use_reduction = FALSE,
-                              use_clustering = FALSE)
+                              use_clustering = FALSE,
+                              time_budget = 30)
+
+# 3. Use a budget under 30s to skip forest/SVM/XGBoost entirely
+quick_result <- tl_auto_ml(data, formula, time_budget = 10)
+```
+
+### Leaderboard scores are all NA
+
+This happens when the evaluation metric isn't found in the results.
+The most common cause is using training-set evaluation (short budget)
+where the metric names differ from CV output. Try increasing the budget
+so that CV runs, or specify the metric explicitly:
+
+```{r, eval=FALSE}
+result <- tl_auto_ml(data, formula,
+                     metric = "accuracy",  # or "rmse" for regression
+                     time_budget = 60)
 ```
 
 ### Not enough models tried
 
 ```{r, eval=FALSE}
-# Increase time budget
+# Increase time budget to unlock all phases
 thorough_result <- tl_auto_ml(data, formula, time_budget = 300)
 
 # Ensure feature engineering is enabled
 full_result <- tl_auto_ml(data, formula,
                           use_reduction = TRUE,
-                          use_clustering = TRUE)
+                          use_clustering = TRUE,
+                          time_budget = 300)
 ```
 
 ## Summary

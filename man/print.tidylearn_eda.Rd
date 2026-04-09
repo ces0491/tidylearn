@@ -12,8 +12,14 @@
 \item{...}{Additional arguments (ignored)}
 }
 \value{
-Invisibly returns the input object x
+The input object \code{x}, returned invisibly.
 }
 \description{
 Print EDA results
+}
+\examples{
+\donttest{
+eda <- tl_explore(iris, response = "Species")
+print(eda)
+}
 }

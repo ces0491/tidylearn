@@ -14,7 +14,8 @@ tl_plot_xgboost_tree(model, tree_index = 0, ...)
 \item{...}{Additional arguments}
 }
 \value{
-Tree visualization
+The return value of \code{\link[xgboost]{xgb.plot.tree}}, a
+tree diagram rendered via the \pkg{DiagrammeR} package.
 }
 \description{
 Plot XGBoost tree visualization

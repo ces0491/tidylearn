@@ -14,7 +14,7 @@ tl_read_sqlite(path, query, ...)
 \item{...}{Additional arguments passed to \code{DBI::dbGetQuery()}.}
 }
 \value{
-A \code{tidylearn_data} object.
+A \code{tidylearn_data} object containing the query results.
 }
 \description{
 Opens a SQLite database file, executes a SQL query, and returns the result

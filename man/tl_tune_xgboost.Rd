@@ -34,7 +34,11 @@ classification problem}
 \item{...}{Additional arguments}
 }
 \value{
-A list with the best model and tuning results
+A \code{tidylearn_model} object (the refit on full data using the
+best hyperparameters) with an attribute \code{"tuning_results"} containing
+a list with elements \code{param_grid}, \code{results} (per-combination CV
+output), \code{best_params}, \code{best_iteration}, \code{best_score}, and
+\code{minimize}.
 }
 \description{
 Tune XGBoost hyperparameters

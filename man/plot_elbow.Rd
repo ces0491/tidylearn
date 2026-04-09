@@ -14,8 +14,14 @@ plot_elbow(wss_data, add_line = FALSE, suggested_k = NULL)
 \item{suggested_k}{If add_line=TRUE, which k to highlight}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot total within-cluster sum of squares vs number of clusters
+}
+\examples{
+\donttest{
+wss <- data.frame(k = 2:6, tot_withinss = c(150, 90, 60, 50, 45))
+plot_elbow(wss)
+}
 }

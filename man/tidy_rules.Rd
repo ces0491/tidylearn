@@ -10,8 +10,20 @@ tidy_rules(rules)
 \item{rules}{A rules object from arules}
 }
 \value{
-A tibble with one row per rule
+A tibble with columns \code{rule_id}, \code{lhs}, \code{rhs}, and
+quality measures (e.g., \code{support}, \code{confidence}, \code{lift}).
 }
 \description{
 Convert Association Rules to Tidy Tibble
+}
+\examples{
+\donttest{
+if (requireNamespace("arules", quietly = TRUE)) {
+  data("Groceries", package = "arules")
+  rules_obj <- arules::apriori(Groceries,
+    parameter = list(supp = 0.001, conf = 0.5))
+  rules_tbl <- tidy_rules(rules_obj)
+}
+}
+
 }

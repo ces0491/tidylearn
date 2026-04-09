@@ -35,7 +35,7 @@ NULL
 #' @param query A SQL query string.
 #' @param ... Additional arguments passed to \code{DBI::dbGetQuery()}.
 #'
-#' @return A \code{tidylearn_data} object.
+#' @return A \code{tidylearn_data} object containing the query results.
 #'
 #' @examples
 #' \donttest{
@@ -78,7 +78,7 @@ tl_read_db <- function(conn, query, ...) {
 #' @param query A SQL query string.
 #' @param ... Additional arguments passed to \code{DBI::dbGetQuery()}.
 #'
-#' @return A \code{tidylearn_data} object.
+#' @return A \code{tidylearn_data} object containing the query results.
 #'
 #' @examples
 #' \donttest{
@@ -124,7 +124,7 @@ tl_read_sqlite <- function(path, query, ...) {
 #' @param port Port number. Default is 5432.
 #' @param ... Additional arguments passed to \code{DBI::dbConnect()}.
 #'
-#' @return A \code{tidylearn_data} object.
+#' @return A \code{tidylearn_data} object containing the query results.
 #'
 #' @examples
 #' \donttest{
@@ -220,7 +220,7 @@ tl_read_postgres <- function(dsn, query, dbname = NULL, user = NULL,
 #' @param port Port number. Default is 3306.
 #' @param ... Additional arguments passed to \code{DBI::dbConnect()}.
 #'
-#' @return A \code{tidylearn_data} object.
+#' @return A \code{tidylearn_data} object containing the query results.
 #'
 #' @examples
 #' \donttest{
@@ -314,7 +314,7 @@ tl_read_mysql <- function(dsn, query, dbname = NULL, user = NULL,
 #' @param ... Additional arguments passed to
 #'   \code{bigrquery::bq_project_query()}.
 #'
-#' @return A \code{tidylearn_data} object.
+#' @return A \code{tidylearn_data} object containing the query results.
 #'
 #' @examples
 #' \donttest{
@@ -379,7 +379,7 @@ tl_read_bigquery <- function(project, query, dataset = NULL, ...) {
 #'   configuration.
 #' @param ... Additional arguments passed to the format-specific reader.
 #'
-#' @return A \code{tidylearn_data} object.
+#' @return A \code{tidylearn_data} object containing the downloaded data.
 #'
 #' @examples
 #' \donttest{
@@ -474,7 +474,7 @@ tl_read_s3 <- function(source, format = NULL, region = NULL, ...) {
 #' @param ref Branch, tag, or commit SHA. Default is \code{"main"}.
 #' @param ... Additional arguments passed to the format-specific reader.
 #'
-#' @return A \code{tidylearn_data} object.
+#' @return A \code{tidylearn_data} object containing the downloaded data.
 #'
 #' @examples
 #' \donttest{
@@ -561,7 +561,7 @@ tl_read_github <- function(source, path = NULL, ref = "main", ...) {
 #' @param type Either \code{"dataset"} (default) or \code{"competition"}.
 #' @param ... Additional arguments passed to the format-specific reader.
 #'
-#' @return A \code{tidylearn_data} object.
+#' @return A \code{tidylearn_data} object containing the downloaded data.
 #'
 #' @examples
 #' \donttest{
@@ -662,7 +662,7 @@ tl_check_kaggle_cli <- function() {
   if (is.null(result)) {
     stop("Kaggle CLI not found. Install it with: pip install kaggle\n",
          "Then configure credentials: ",
-         "https://github.com/Kaggle/kaggle-api#api-credentials",
+         "https://github.com/Kaggle/kaggle-cli#api-credentials",
          call. = FALSE)
   }
   invisible(TRUE)

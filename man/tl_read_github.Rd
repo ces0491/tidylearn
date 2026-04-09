@@ -17,7 +17,7 @@ tl_read_github(source, path = NULL, ref = "main", ...)
 \item{...}{Additional arguments passed to the format-specific reader.}
 }
 \value{
-A \code{tidylearn_data} object.
+A \code{tidylearn_data} object containing the downloaded data.
 }
 \description{
 Downloads a raw file from a GitHub repository and reads it into a

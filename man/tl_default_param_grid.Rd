@@ -16,8 +16,17 @@ tl_default_param_grid(method, size = "medium", is_classification = TRUE)
 classification or regression}
 }
 \value{
-A named list of parameter values to tune
+A named list of parameter values suitable for passing to
+\code{\link{tl_tune_grid}} or \code{\link{tl_tune_random}}. Each
+element is a numeric or character vector of candidate values for
+that hyperparameter.
 }
 \description{
 Create pre-defined parameter grids for common models
+}
+\examples{
+\donttest{
+grid <- tl_default_param_grid("tree", size = "small")
+grid <- tl_default_param_grid("forest", size = "medium")
+}
 }

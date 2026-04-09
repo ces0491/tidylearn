@@ -17,8 +17,15 @@ tl_plot_model_comparison(..., new_data = NULL, metrics = NULL, names = NULL)
 \item{names}{Optional character vector of model names}
 }
 \value{
-A ggplot object with model comparison
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot model comparison
+}
+\examples{
+\donttest{
+m1 <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+m2 <- tl_model(mtcars, mpg ~ wt + hp, method = "lasso")
+tl_plot_model_comparison(m1, m2, names = c("Linear", "Lasso"))
+}
 }

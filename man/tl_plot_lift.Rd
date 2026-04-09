@@ -18,8 +18,16 @@ tl_plot_lift(model, new_data = NULL, bins = 10, ...)
 \item{...}{Additional arguments}
 }
 \value{
-A ggplot object with lift chart
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot lift chart for a classification model
+}
+\examples{
+\donttest{
+iris_bin <- iris[iris$Species != "setosa", ]
+iris_bin$Species <- factor(iris_bin$Species)
+model <- tl_model(iris_bin, Species ~ ., method = "logistic")
+tl_plot_lift(model)
+}
 }

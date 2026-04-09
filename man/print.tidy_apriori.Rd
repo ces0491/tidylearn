@@ -12,8 +12,18 @@
 \item{...}{Additional arguments (ignored)}
 }
 \value{
-Invisibly returns the input object x
+The input object \code{x}, returned invisibly.
 }
 \description{
 Print Method for tidy_apriori
+}
+\examples{
+\donttest{
+if (requireNamespace("arules", quietly = TRUE)) {
+  data("Groceries", package = "arules")
+  res <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
+  print(res)
+}
+}
+
 }

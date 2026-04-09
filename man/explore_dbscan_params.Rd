@@ -14,8 +14,16 @@ explore_dbscan_params(data, eps_values, minPts_values)
 \item{minPts_values}{Vector of minPts values to test}
 }
 \value{
-A tibble with parameter combinations and resulting cluster counts
+A tibble with columns \code{eps}, \code{minPts}, \code{n_clusters},
+\code{n_noise}, and \code{prop_noise} for each parameter combination.
 }
 \description{
 Test multiple eps and minPts combinations
+}
+\examples{
+\donttest{
+params <- explore_dbscan_params(iris[, 1:4],
+  eps_values = c(0.3, 0.5, 0.8), minPts_values = c(3, 5))
+}
+
 }

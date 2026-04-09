@@ -16,7 +16,11 @@ tl_split(data, prop = 0.8, stratify = NULL, seed = NULL)
 \item{seed}{Random seed for reproducibility}
 }
 \value{
-A list with train and test data frames
+A list with two elements:
+\describe{
+\item{\code{$train}}{A data frame containing the training subset.}
+\item{\code{$test}}{A data frame containing the test subset.}
+}
 }
 \description{
 Split data into train and test sets

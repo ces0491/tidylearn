@@ -12,8 +12,15 @@
 \item{...}{Additional arguments (ignored)}
 }
 \value{
-Invisibly returns the input object
+The input \code{object}, returned invisibly. Called for its
+side effect of printing model summary and training performance.
 }
 \description{
 Summary method for tidylearn models
+}
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+summary(model)
+}
 }

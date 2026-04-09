@@ -16,7 +16,7 @@ tl_table_variance(model, n_components = NULL, digits = 4, ...)
 \item{...}{Additional arguments (currently unused)}
 }
 \value{
-A gt table object
+A \code{\link[gt]{gt}} table object.
 }
 \description{
 Produces a styled gt table of variance explained by each principal component,

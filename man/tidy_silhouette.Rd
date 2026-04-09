@@ -22,3 +22,11 @@ A list of class "tidy_silhouette" containing:
 \description{
 Compute silhouette statistics for cluster validation
 }
+\examples{
+\donttest{
+km <- kmeans(iris[, 1:4], centers = 3, nstart = 25)
+d <- dist(iris[, 1:4])
+sil <- tidy_silhouette(km$cluster, d)
+}
+
+}

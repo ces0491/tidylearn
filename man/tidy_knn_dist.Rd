@@ -15,8 +15,16 @@ tidy_knn_dist(data, k = 4, cols = NULL)
 If NULL, uses all numeric columns.}
 }
 \value{
-A tibble with observation IDs and k-NN distances
+A tibble with columns \code{.obs_id} (observation identifier),
+\code{knn_dist} (distance to k-th nearest neighbor), and \code{rank}
+(rank of the k-NN distance).
 }
 \description{
 Calculate distances to k-th nearest neighbor for each point
+}
+\examples{
+\donttest{
+knn <- tidy_knn_dist(iris[, 1:4], k = 5)
+}
+
 }

@@ -155,7 +155,16 @@ tl_predict_nn <- function(model, new_data, type = "response", ...) {
 #'
 #' @param model A tidylearn neural network model object
 #' @param ... Additional arguments
-#' @return A ggplot object with neural network architecture
+#' @return The return value of \code{\link[NeuralNetTools]{plotnet}}, called for
+#'   its side effect of drawing the network diagram, or \code{NULL} if the
+#'   \pkg{NeuralNetTools} package is not installed.
+#' @examples
+#' \donttest{
+#' if (requireNamespace("NeuralNetTools", quietly = TRUE)) {
+#'   model <- tl_model(iris, Species ~ ., method = "nn", size = 3)
+#'   tl_plot_nn_architecture(model)
+#' }
+#' }
 #' @importFrom ggplot2 ggplot aes geom_segment geom_point geom_text theme_void
 #' @export
 tl_plot_nn_architecture <- function(model, ...) {
@@ -190,7 +199,10 @@ tl_plot_nn_architecture <- function(model, ...) {
 #' @param decays Vector of weight decay parameters to try
 #' @param folds Number of cross-validation folds (default: 5)
 #' @param ... Additional arguments to pass to nnet()
-#' @return A list with the best model and tuning results
+#' @return A list with elements \code{model} (the best fitted \code{nnet}
+#'   model), \code{best_size} (optimal hidden-layer size), \code{best_decay}
+#'   (optimal weight decay), and \code{tuning_results} (a data frame of all
+#'   parameter combinations and their cross-validated errors).
 #' @export
 tl_tune_nn <- function(data, formula, is_classification = FALSE,
                        sizes = c(1, 2, 5, 10), decays = c(0, 0.001, 0.01, 0.1),
@@ -308,7 +320,7 @@ tl_tune_nn <- function(data, formula, is_classification = FALSE,
 #'
 #' @param model A tidylearn neural network model object
 #' @param ... Additional arguments
-#' @return A ggplot object with training history
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @importFrom ggplot2 ggplot aes geom_line labs theme_minimal
 #' @export
 tl_plot_nn_tuning <- function(model, ...) {

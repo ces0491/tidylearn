@@ -17,8 +17,14 @@ variables (default: 20)}
 \item{...}{Additional arguments}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot partial dependence for tree-based models
+}
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ ., method = "forest")
+tl_plot_partial_dependence(model, var = "wt")
+}
 }

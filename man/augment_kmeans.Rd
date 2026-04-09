@@ -12,8 +12,16 @@ augment_kmeans(kmeans_obj, data)
 \item{data}{Original data frame}
 }
 \value{
-Original data with cluster column added
+A tibble containing the original \code{data} with an additional
+\code{cluster} factor column indicating cluster assignments.
 }
 \description{
 Augment Data with K-Means Cluster Assignments
+}
+\examples{
+\donttest{
+km <- tidy_kmeans(iris[, 1:4], k = 3)
+augmented <- augment_kmeans(km, iris)
+}
+
 }

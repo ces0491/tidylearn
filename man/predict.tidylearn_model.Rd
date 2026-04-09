@@ -20,8 +20,17 @@ depending on method.}
 \item{...}{Additional arguments}
 }
 \value{
-Predictions as a tibble
+A \link[tibble]{tibble} with a \code{.pred} column containing
+predictions. For classification with \code{type = "prob"}, returns
+columns for each class probability.
 }
 \description{
 Unified prediction interface for both supervised and unsupervised models
+}
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+predict(model)
+predict(model, new_data = mtcars[1:5, ])
+}
 }

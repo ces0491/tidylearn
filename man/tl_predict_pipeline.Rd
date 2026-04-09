@@ -24,7 +24,9 @@ tl_predict_pipeline(
 \item{...}{Additional arguments passed to predict}
 }
 \value{
-Predictions
+A \link[tibble]{tibble} with a \code{.pred} column containing
+predictions from the selected (or best) pipeline model, after
+applying the same preprocessing steps used during training.
 }
 \description{
 Make predictions using a pipeline

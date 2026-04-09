@@ -14,8 +14,18 @@ compare_clusterings(cluster_list, data, dist_mat = NULL)
 \item{dist_mat}{Distance matrix}
 }
 \value{
-A tibble comparing all clustering results
+A tibble with one row per clustering method and columns for each
+validation metric (see \code{\link{calc_validation_metrics}}), plus a
+\code{method} column identifying the clustering.
 }
 \description{
 Compare Multiple Clustering Results
+}
+\examples{
+\donttest{
+km3 <- kmeans(iris[, 1:4], 3, nstart = 25)$cluster
+km4 <- kmeans(iris[, 1:4], 4, nstart = 25)$cluster
+compare_clusterings(list(k3 = km3, k4 = km4), iris[, 1:4])
+}
+
 }

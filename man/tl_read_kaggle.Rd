@@ -20,7 +20,7 @@ the dataset contains exactly one file, it is read automatically.}
 \item{...}{Additional arguments passed to the format-specific reader.}
 }
 \value{
-A \code{tidylearn_data} object.
+A \code{tidylearn_data} object containing the downloaded data.
 }
 \description{
 Downloads a dataset file from Kaggle using the Kaggle CLI and reads it into

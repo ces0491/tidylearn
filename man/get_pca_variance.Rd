@@ -10,8 +10,16 @@ get_pca_variance(pca_obj)
 \item{pca_obj}{A tidy_pca object}
 }
 \value{
-A tibble with variance statistics
+A tibble with columns \code{component}, \code{sdev},
+\code{variance}, \code{prop_variance}, and \code{cum_variance}.
 }
 \description{
 Get Variance Explained Summary
+}
+\examples{
+\donttest{
+pca <- tidy_pca(USArrests)
+get_pca_variance(pca)
+}
+
 }

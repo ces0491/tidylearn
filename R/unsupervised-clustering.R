@@ -78,7 +78,15 @@ tidy_kmeans <- function(data, k, cols = NULL, nstart = 25, iter_max = 100,
 #' @param kmeans_obj A tidy_kmeans object
 #' @param data Original data frame
 #'
-#' @return Original data with cluster column added
+#' @return A tibble containing the original \code{data} with an additional
+#'   \code{cluster} factor column indicating cluster assignments.
+#'
+#' @examples
+#' \donttest{
+#' km <- tidy_kmeans(iris[, 1:4], k = 3)
+#' augmented <- augment_kmeans(km, iris)
+#' }
+#'
 #' @export
 augment_kmeans <- function(kmeans_obj, data) {
 
@@ -189,7 +197,15 @@ tidy_pam <- function(data, k, metric = "euclidean", cols = NULL) {
 #' @param pam_obj A tidy_pam object
 #' @param data Original data frame
 #'
-#' @return Original data with cluster column added
+#' @return A tibble containing the original \code{data} with an additional
+#'   \code{cluster} factor column indicating cluster assignments.
+#'
+#' @examples
+#' \donttest{
+#' pm <- tidy_pam(iris[, 1:4], k = 3)
+#' augmented <- augment_pam(pm, iris)
+#' }
+#'
 #' @export
 augment_pam <- function(pam_obj, data) {
 
@@ -214,7 +230,13 @@ augment_pam <- function(pam_obj, data) {
 #' @param samples Number of samples to draw (default: 50)
 #' @param sampsize Sample size (default: min(n, 40 + 2*k))
 #'
-#' @return A list of class "tidy_clara" containing clustering results
+#' @return A list of class \code{"tidy_clara"} containing:
+#' \itemize{
+#'   \item clusters: tibble with observation IDs and cluster assignments
+#'   \item medoids: tibble of medoid values
+#'   \item silhouette_avg: average silhouette width
+#'   \item model: original \code{\link[cluster]{clara}} object
+#' }
 #'
 #' @examples
 #' \donttest{
@@ -282,7 +304,15 @@ tidy_clara <- function(data, k, metric = "euclidean",
 #' @param max_k Maximum number of clusters to test (default: 10)
 #' @param nstart Number of random starts for each k (default: 25)
 #'
-#' @return A tibble with k and corresponding total within-cluster SS
+#' @return A tibble with columns \code{k} (number of clusters) and
+#'   \code{tot_withinss} (total within-cluster sum of squares).
+#'
+#' @examples
+#' \donttest{
+#' wss <- calc_wss(iris[, 1:4], max_k = 6)
+#' plot(wss$k, wss$tot_withinss, type = "b")
+#' }
+#'
 #' @export
 calc_wss <- function(data, max_k = 10, nstart = 25) {
 
@@ -313,7 +343,20 @@ calc_wss <- function(data, max_k = 10, nstart = 25) {
 #' @param max_k Maximum k to test (default: 10)
 #' @param methods Vector of methods: "silhouette", "gap", "wss" (default: all)
 #'
-#' @return A list with results from each method
+#' @return A list of class \code{"optimal_k_results"} containing one or more of:
+#' \itemize{
+#'   \item wss: tibble from \code{\link{calc_wss}} (if "wss" method used)
+#'   \item silhouette: tibble from \code{\link{tidy_silhouette_analysis}}
+#'     (if "silhouette" method used)
+#'   \item gap: a \code{tidy_gap} object from \code{\link{tidy_gap_stat}}
+#'     (if "gap" method used)
+#' }
+#'
+#' @examples
+#' \donttest{
+#' opt <- optimal_clusters(iris[, 1:4], max_k = 6, methods = "wss")
+#' }
+#'
 #' @export
 optimal_clusters <- function(
     data, max_k = 10,
@@ -345,7 +388,14 @@ optimal_clusters <- function(
 #' @param x A tidy_kmeans object
 #' @param ... Additional arguments (ignored)
 #'
-#' @return Invisibly returns the input object x
+#' @return The input object \code{x}, returned invisibly.
+#'
+#' @examples
+#' \donttest{
+#' km <- tidy_kmeans(iris[, 1:4], k = 3)
+#' print(km)
+#' }
+#'
 #' @export
 print.tidy_kmeans <- function(x, ...) {
   cat("Tidy K-Means Clustering\n")
@@ -369,7 +419,14 @@ print.tidy_kmeans <- function(x, ...) {
 #' @param x A tidy_pam object
 #' @param ... Additional arguments (ignored)
 #'
-#' @return Invisibly returns the input object x
+#' @return The input object \code{x}, returned invisibly.
+#'
+#' @examples
+#' \donttest{
+#' pm <- tidy_pam(iris[, 1:4], k = 3)
+#' print(pm)
+#' }
+#'
 #' @export
 print.tidy_pam <- function(x, ...) {
   cat("Tidy PAM Clustering\n")

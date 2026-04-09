@@ -12,8 +12,18 @@ tl_plot_nn_architecture(model, ...)
 \item{...}{Additional arguments}
 }
 \value{
-A ggplot object with neural network architecture
+The return value of \code{\link[NeuralNetTools]{plotnet}}, called for
+its side effect of drawing the network diagram, or \code{NULL} if the
+\pkg{NeuralNetTools} package is not installed.
 }
 \description{
 Plot neural network architecture
+}
+\examples{
+\donttest{
+if (requireNamespace("NeuralNetTools", quietly = TRUE)) {
+  model <- tl_model(iris, Species ~ ., method = "nn", size = 3)
+  tl_plot_nn_architecture(model)
+}
+}
 }

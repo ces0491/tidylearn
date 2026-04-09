@@ -12,8 +12,14 @@ compare_distances(data, methods = c("euclidean", "manhattan", "maximum"))
 \item{methods}{Character vector of methods to compare}
 }
 \value{
-A list of dist objects named by method
+A named list of \code{\link[stats]{dist}} objects, one per method.
 }
 \description{
 Compute distances using multiple methods for comparison
+}
+\examples{
+\donttest{
+dists <- compare_distances(iris[, 1:4], methods = c("euclidean", "manhattan"))
+}
+
 }

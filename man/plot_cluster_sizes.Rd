@@ -12,8 +12,14 @@ plot_cluster_sizes(clusters, title = "Cluster Size Distribution")
 \item{title}{Plot title (default: "Cluster Size Distribution")}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Create bar plot of cluster sizes
+}
+\examples{
+\donttest{
+clusters <- kmeans(iris[, 1:4], 3)$cluster
+plot_cluster_sizes(clusters)
+}
 }

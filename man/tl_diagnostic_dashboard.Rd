@@ -24,8 +24,17 @@ tl_diagnostic_dashboard(
 \item{arrange_plots}{Layout arrangement (e.g., "grid", "row", "column")}
 }
 \value{
-A plot grid with diagnostic plots
+A \code{\link[gridExtra]{grid.arrange}} object (a
+\code{\link[grid]{grob}}) containing the arranged diagnostic plots.
 }
 \description{
 Create a comprehensive diagnostic dashboard
+}
+\examples{
+\donttest{
+if (requireNamespace("gridExtra")) {
+  model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+  tl_diagnostic_dashboard(model)
+}
+}
 }

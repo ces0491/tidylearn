@@ -16,7 +16,17 @@ tl_explore(data, response = NULL, max_components = 5, k_range = 2:6)
 \item{k_range}{Range of k values for clustering (default: 2:6)}
 }
 \value{
-An EDA object with multiple analyses
+A list with class \code{"tidylearn_eda"} containing:
+\describe{
+\item{data}{The original data frame.}
+\item{response}{The response variable name, or \code{NULL}.}
+\item{pca}{The fitted PCA model.}
+\item{optimal_k}{List with optimal cluster count results.}
+\item{kmeans}{The fitted k-means model.}
+\item{hclust}{The fitted hierarchical clustering model.}
+\item{summary}{List with \code{n_obs}, \code{n_vars},
+\code{n_components}, and \code{best_k}.}
+}
 }
 \description{
 Comprehensive EDA combining unsupervised learning techniques

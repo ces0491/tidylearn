@@ -14,8 +14,21 @@ optimal_clusters(data, max_k = 10, methods = c("silhouette", "gap", "wss"))
 \item{methods}{Vector of methods: "silhouette", "gap", "wss" (default: all)}
 }
 \value{
-A list with results from each method
+A list of class \code{"optimal_k_results"} containing one or more of:
+\itemize{
+\item wss: tibble from \code{\link{calc_wss}} (if "wss" method used)
+\item silhouette: tibble from \code{\link{tidy_silhouette_analysis}}
+(if "silhouette" method used)
+\item gap: a \code{tidy_gap} object from \code{\link{tidy_gap_stat}}
+(if "gap" method used)
+}
 }
 \description{
 Use multiple methods to suggest optimal k
+}
+\examples{
+\donttest{
+opt <- optimal_clusters(iris[, 1:4], max_k = 6, methods = "wss")
+}
+
 }

@@ -17,8 +17,21 @@ for non-metric (default: "ratio")}
 \item{...}{Additional arguments passed to smacof::mds()}
 }
 \value{
-A tidy_mds object
+A list of class \code{"tidy_mds"} containing:
+\itemize{
+\item config: tibble of MDS coordinates
+\item stress: stress value from the SMACOF algorithm
+\item method: character string describing the MDS type
+\item model: the \code{\link[smacof]{mds}} result
+}
 }
 \description{
 Performs MDS using SMACOF algorithm from the smacof package
+}
+\examples{
+\donttest{
+d <- dist(USArrests)
+mds <- tidy_mds_smacof(d, type = "ratio")
+}
+
 }

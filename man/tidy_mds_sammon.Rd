@@ -14,8 +14,21 @@ tidy_mds_sammon(dist_mat, ndim = 2, ...)
 \item{...}{Additional arguments passed to MASS::sammon()}
 }
 \value{
-A tidy_mds object
+A list of class \code{"tidy_mds"} containing:
+\itemize{
+\item config: tibble of MDS coordinates
+\item stress: Sammon stress value
+\item method: \code{"Sammon Mapping"}
+\item model: the \code{\link[MASS]{sammon}} result
+}
 }
 \description{
 Performs Sammon's non-linear mapping
+}
+\examples{
+\donttest{
+d <- dist(USArrests)
+mds <- tidy_mds_sammon(d)
+}
+
 }

@@ -270,19 +270,16 @@ Downloads raw files directly from a repository. Accepts full URLs or
 `owner/repo` shorthand:
 
 ```{r github, eval = FALSE}
-# Full URL
-data <- tl_read_github(
-  "https://github.com/user/repo/blob/main/data/dataset.csv"
+# Read a CSV from a public GitHub repository
+data <- tl_read_github("tidyverse/dplyr",
+  path = "data-raw/starwars.csv", ref = "main"
 )
-
-# Shorthand
-data <- tl_read_github("user/repo", path = "data/dataset.csv", ref = "main")
 ```
 
 ### Kaggle
 
 Downloads datasets via the
-[Kaggle CLI](https://github.com/Kaggle/kaggle-api). Install with
+[Kaggle CLI](https://github.com/Kaggle/kaggle-cli). Install with
 `pip install kaggle` and configure your API credentials:
 
 ```{r kaggle, eval = FALSE}

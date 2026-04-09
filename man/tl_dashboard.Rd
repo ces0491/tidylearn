@@ -15,8 +15,16 @@ tl_dashboard(model, new_data = NULL, ...)
 \item{...}{Additional arguments}
 }
 \value{
-A Shiny app object
+A \code{\link[shiny]{shinyApp}} object.
 }
 \description{
 Create interactive visualization dashboard for a model
+}
+\examples{
+\donttest{
+if (requireNamespace("shiny")) {
+  model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+  app <- tl_dashboard(model)
+}
+}
 }

@@ -11,8 +11,17 @@ plot_silhouette(sil_obj)
 from tidy_silhouette_analysis}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot Silhouette Analysis
+}
+\examples{
+\donttest{
+km <- kmeans(iris[, 1:4], centers = 3, nstart = 25)
+d <- dist(iris[, 1:4])
+sil <- tidy_silhouette(km$cluster, d)
+plot_silhouette(sil)
+}
+
 }

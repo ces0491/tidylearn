@@ -16,7 +16,7 @@ tl_table_loadings(model, n_components = NULL, digits = 3, ...)
 \item{...}{Additional arguments (currently unused)}
 }
 \value{
-A gt table object
+A \code{\link[gt]{gt}} table object.
 }
 \description{
 Produces a styled gt table of variable loadings on each principal component,

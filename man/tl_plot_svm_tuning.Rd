@@ -12,8 +12,17 @@ tl_plot_svm_tuning(model, ...)
 \item{...}{Additional arguments}
 }
 \value{
-A ggplot object with tuning results
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot SVM tuning results
+}
+\examples{
+\donttest{
+if (requireNamespace("e1071", quietly = TRUE)) {
+  model <- tl_model(iris, Species ~ ., method = "svm",
+    kernel = "linear", tune = TRUE, tune_folds = 2)
+  tl_plot_svm_tuning(model)
+}
+}
 }

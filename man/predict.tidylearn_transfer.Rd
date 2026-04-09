@@ -14,8 +14,16 @@
 \item{...}{Additional arguments}
 }
 \value{
-A tibble of predictions
+A \link[tibble]{tibble} with a \code{.pred} column containing
+predictions.
 }
 \description{
 Predict with transfer learning model
+}
+\examples{
+\donttest{
+model <- tl_transfer_learning(iris, Species ~ .,
+  pretrain_method = "pca", supervised_method = "logistic")
+preds <- predict(model, iris[1:5, ])
+}
 }

@@ -12,8 +12,14 @@
 \item{...}{Additional arguments (ignored)}
 }
 \value{
-Invisibly returns the input object x
+The input object \code{x}, returned invisibly.
 }
 \description{
 Print method for tidylearn models
+}
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+print(model)
+}
 }

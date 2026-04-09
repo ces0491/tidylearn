@@ -30,8 +30,15 @@ tidy_pca_biplot(
 \item{label_vars}{Logical; label variables? (default: TRUE)}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Visualize both observations and variables in PC space
+}
+\examples{
+\donttest{
+pca <- tidy_pca(USArrests)
+tidy_pca_biplot(pca)
+}
+
 }

@@ -18,8 +18,14 @@ plot_distance_heatmap(
 \item{title}{Plot title}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Visualize distance matrix as heatmap
+}
+\examples{
+\donttest{
+d <- dist(iris[1:20, 1:4])
+plot_distance_heatmap(d)
+}
 }

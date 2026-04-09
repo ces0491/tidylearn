@@ -10,8 +10,19 @@ tl_get_best_model(pipeline)
 \item{pipeline}{A tidylearn pipeline object with results}
 }
 \value{
-The best tidylearn model
+The best \code{tidylearn_model} object from the pipeline,
+selected by the metric specified in \code{evaluation$best_metric}.
 }
 \description{
 Get the best model from a pipeline
+}
+\examples{
+\donttest{
+pipe <- tl_pipeline(iris, Species ~ .,
+  models = list(tree = list(method = "tree")),
+  evaluation = list(metrics = "accuracy", validation = "cv",
+    cv_folds = 2, best_metric = "accuracy"))
+pipe <- tl_run_pipeline(pipe, verbose = FALSE)
+best <- tl_get_best_model(pipe)
+}
 }

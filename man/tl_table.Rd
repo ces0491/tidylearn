@@ -16,7 +16,7 @@ tl_table(model, type = "auto", ...)
 \item{...}{Additional arguments passed to the underlying table function}
 }
 \value{
-A gt table object
+A \code{\link[gt]{gt}} table object.
 }
 \description{
 Dispatches to the appropriate table function based on model type and

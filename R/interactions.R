@@ -19,7 +19,15 @@ NULL
 #' @param numeric_only Logical; whether to only test numeric variables
 #' @param mixed_only Logical; whether to only test numeric-categorical pairs
 #' @param alpha Significance level for interaction tests
-#' @return A data frame with interaction test results
+#' @return A data frame with one row per tested interaction pair, containing
+#'   columns \code{var1}, \code{var2}, \code{p_value}, \code{significant}
+#'   (logical), \code{delta_r2} (change in R-squared), and
+#'   \code{f_statistic}, sorted by \code{p_value} ascending.
+#' @examples
+#' \donttest{
+#' results <- tl_test_interactions(mtcars, mpg ~ wt + hp + cyl,
+#'   var1 = "wt", var2 = "hp")
+#' }
 #' @export
 tl_test_interactions <- function(data, formula, var1 = NULL, var2 = NULL,
                                  all_pairs = FALSE, categorical_only = FALSE,
@@ -116,7 +124,7 @@ tl_test_interactions <- function(data, formula, var1 = NULL, var2 = NULL,
 #' @param fixed_values Named list of values for other variables in the model
 #' @param confidence Logical; whether to show confidence intervals
 #' @param ... Additional arguments to pass to predict()
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @export
 tl_plot_interaction <- function(model, var1, var2,
                                 n_points = 100,
@@ -203,15 +211,19 @@ tl_plot_interaction <- function(model, var1, var2,
   # Make predictions
   predictions <- predict(model, grid, ...)
 
-  # Add predictions to grid
-  if (is.data.frame(predictions)) {
-    # Multiple columns (e.g., confidence intervals)
+  # Add predictions to grid -- tidylearn predict returns tibble with .pred
+  if (is.data.frame(predictions) && ".pred" %in% names(predictions)) {
+    grid$prediction <- predictions$.pred
+    y_col <- "prediction"
+    lower_col <- NULL
+    upper_col <- NULL
+  } else if (is.data.frame(predictions)) {
+    # Non-tidylearn output (e.g., confidence intervals with fit/lwr/upr)
     grid <- cbind(grid, predictions)
-    y_col <- "fit"
-    lower_col <- "lwr"
-    upper_col <- "upr"
+    y_col <- if ("fit" %in% names(predictions)) "fit" else names(predictions)[1]
+    lower_col <- if ("lwr" %in% names(predictions)) "lwr" else NULL
+    upper_col <- if ("upr" %in% names(predictions)) "upr" else NULL
   } else {
-    # Single column
     grid$prediction <- predictions
     y_col <- "prediction"
     lower_col <- NULL
@@ -314,7 +326,15 @@ tl_plot_interaction <- function(model, var1, var2,
 #' @param max_p_value Maximum p-value for significance
 #' @param exclude_vars Character vector of variables to exclude
 #'   from interaction testing
-#' @return A tidylearn model with important interactions
+#' @return A tidylearn model object (class \code{"tidylearn_model"}) fitted
+#'   with the top significant interaction terms added to the formula.
+#'   The interaction test results and selected interactions are stored as
+#'   attributes \code{"interaction_tests"} and
+#'   \code{"selected_interactions"}.
+#' @examples
+#' \donttest{
+#' model <- tl_auto_interactions(mtcars, mpg ~ wt + hp + cyl, top_n = 2)
+#' }
 #' @export
 tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
                                  max_p_value = 0.05, exclude_vars = NULL) {
@@ -376,7 +396,11 @@ tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
 #' @param by_var Variable to calculate effects by (interaction variable)
 #' @param at_values Named list of values at which to hold other variables
 #' @param intervals Logical; whether to include confidence intervals
-#' @return A data frame with marginal effects
+#' @return For numeric \code{var}: a list with \code{effects} (data frame of
+#'   predicted values across the variable range for each level of
+#'   \code{by_var}) and \code{slopes} (data frame with estimated slopes and
+#'   standard errors per level). For categorical \code{var}: a data frame of
+#'   predicted values at each factor level for each level of \code{by_var}.
 #' @export
 tl_interaction_effects <- function(model, var, by_var,
                                    at_values = NULL,
@@ -459,15 +483,17 @@ tl_interaction_effects <- function(model, var, by_var,
       }
     }
 
-    # Make predictions
+    # Make predictions -- use raw model for se.fit (tidylearn predict
+    # doesn't support it), and extract .pred for the plain case
     if (intervals) {
-      preds <- predict(model, grid, se.fit = TRUE)
-      grid$fit <- preds$fit
-      grid$se <- preds$se.fit
+      raw_preds <- stats::predict(model$fit, newdata = grid, se.fit = TRUE)
+      grid$fit <- as.vector(raw_preds$fit)
+      grid$se <- as.vector(raw_preds$se.fit)
       grid$lower <- grid$fit - 1.96 * grid$se
       grid$upper <- grid$fit + 1.96 * grid$se
     } else {
-      grid$fit <- predict(model, grid)
+      preds <- predict(model, grid)
+      grid$fit <- if (is.data.frame(preds)) preds$.pred else preds
     }
 
     # Add by_value label
@@ -507,7 +533,8 @@ tl_interaction_effects <- function(model, var, by_var,
       }
 
       # Fit linear model to get slope
-      slope_model <- lm(fit ~ .data[[var]], data = sub_grid)
+      slope_formula <- stats::as.formula(paste("fit ~", var))
+      slope_model <- lm(slope_formula, data = sub_grid)
       slope_coef <- coef(summary(slope_model))
 
       data.frame(

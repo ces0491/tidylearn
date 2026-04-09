@@ -16,7 +16,9 @@ errors if there are multiple data frames.}
 \item{...}{Currently unused.}
 }
 \value{
-A \code{tidylearn_data} object.
+A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
+with attributes \code{tl_source}, \code{tl_format}, and
+\code{tl_timestamp}.
 }
 \description{
 Reads an RData (\code{.rdata} or \code{.rda}) file

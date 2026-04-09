@@ -16,8 +16,16 @@ tl_plot_xgboost_importance(model, top_n = 10, importance_type = "gain", ...)
 \item{...}{Additional arguments}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot feature importance for an XGBoost model
+}
+\examples{
+\donttest{
+if (requireNamespace("xgboost", quietly = TRUE)) {
+  model <- tl_model(mtcars, mpg ~ ., method = "xgboost")
+  tl_plot_xgboost_importance(model)
+}
+}
 }

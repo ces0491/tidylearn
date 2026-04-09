@@ -38,8 +38,19 @@ or minimize (FALSE) the metric}
 \item{...}{Additional arguments passed to tl_model}
 }
 \value{
-A list with the best model and tuning results
+A tidylearn model object fitted with the best hyperparameters.
+Tuning results are stored as an attribute \code{"tuning_results"},
+a list containing \code{param_grid}, \code{results} (data frame of
+all evaluated combinations), \code{best_params}, \code{best_metric},
+\code{metric}, and \code{maximize}.
 }
 \description{
 Tune hyperparameters for a model using grid search
+}
+\examples{
+\donttest{
+model <- tl_tune_grid(iris, Species ~ ., method = "tree",
+  param_grid = list(cp = c(0.01, 0.1), minsplit = c(10, 20)),
+  folds = 2, verbose = FALSE)
+}
 }

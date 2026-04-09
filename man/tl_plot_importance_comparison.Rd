@@ -14,8 +14,15 @@ tl_plot_importance_comparison(..., top_n = 10, names = NULL)
 \item{names}{Optional character vector of model names}
 }
 \value{
-A ggplot object with feature importance comparison
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot feature importance across multiple models
+}
+\examples{
+\donttest{
+m1 <- tl_model(iris, Species ~ ., method = "forest")
+m2 <- tl_model(iris, Species ~ ., method = "boost")
+tl_plot_importance_comparison(m1, m2, names = c("Forest", "Boost"))
+}
 }

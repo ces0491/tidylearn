@@ -31,8 +31,17 @@ tl_step_selection(
 \item{...}{Additional arguments to pass to step()}
 }
 \value{
-A selected model
+A \code{tidylearn_model} object of class
+\code{tidylearn_linear} wrapping the selected \code{\link[stats]{lm}}
+model. Access the underlying model via \code{$fit} and the selected
+formula via \code{$spec$formula}.
 }
 \description{
 Perform stepwise selection on a linear model
+}
+\examples{
+\donttest{
+model <- tl_step_selection(mtcars, mpg ~ ., direction = "backward")
+summary(model)
+}
 }

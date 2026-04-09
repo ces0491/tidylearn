@@ -14,8 +14,19 @@ filter_rules_by_item(rules_obj, item, where = "both")
 \item{where}{Character; "lhs", "rhs", or "both" (default: "both")}
 }
 \value{
-A tibble of filtered rules
+A tibble of rules containing the specified \code{item} in the
+requested position.
 }
 \description{
 Subset rules containing specific items
+}
+\examples{
+\donttest{
+if (requireNamespace("arules", quietly = TRUE)) {
+  data("Groceries", package = "arules")
+  res <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
+  filter_rules_by_item(res, "whole milk", where = "rhs")
+}
+}
+
 }

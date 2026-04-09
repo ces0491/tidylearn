@@ -16,8 +16,19 @@ inspect_rules(rules_obj, by = "lift", n = 10, decreasing = TRUE)
 \item{decreasing}{Sort in decreasing order? (default: TRUE)}
 }
 \value{
-A tibble of top rules
+A tibble of the top \code{n} rules sorted by the specified quality
+measure.
 }
 \description{
 View rules sorted by various quality measures
+}
+\examples{
+\donttest{
+if (requireNamespace("arules", quietly = TRUE)) {
+  data("Groceries", package = "arules")
+  res <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
+  inspect_rules(res, by = "lift", n = 5)
+}
+}
+
 }

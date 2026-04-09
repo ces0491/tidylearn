@@ -14,7 +14,13 @@ NULL
 #' @param ... tidylearn model objects to compare
 #' @param top_n Number of top features to display (default: 10)
 #' @param names Optional character vector of model names
-#' @return A ggplot object with feature importance comparison
+#' @return A \code{\link[ggplot2]{ggplot}} object.
+#' @examples
+#' \donttest{
+#' m1 <- tl_model(iris, Species ~ ., method = "forest")
+#' m2 <- tl_model(iris, Species ~ ., method = "boost")
+#' tl_plot_importance_comparison(m1, m2, names = c("Forest", "Boost"))
+#' }
 #' @export
 tl_plot_importance_comparison <- function(..., top_n = 10, names = NULL) {
   # Get models
@@ -218,7 +224,13 @@ tl_extract_importance_regularized <- function(model, lambda = "1se") {
 #'   (if NULL, uses training data)
 #' @param metrics Character vector of metrics to compute
 #' @param names Optional character vector of model names
-#' @return A ggplot object with model comparison
+#' @return A \code{\link[ggplot2]{ggplot}} object.
+#' @examples
+#' \donttest{
+#' m1 <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+#' m2 <- tl_model(mtcars, mpg ~ wt + hp, method = "lasso")
+#' tl_plot_model_comparison(m1, m2, names = c("Linear", "Lasso"))
+#' }
 #' @export
 tl_plot_model_comparison <- function(
     ...,
@@ -311,7 +323,7 @@ tl_plot_model_comparison <- function(
 #' @param cv_results Cross-validation results from tl_cv function
 #' @param metrics Character vector of metrics to plot
 #'   (if NULL, plots all metrics)
-#' @return A ggplot object with cross-validation results
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @export
 tl_plot_cv_results <- function(cv_results, metrics = NULL) {
   # Extract fold metrics
@@ -359,7 +371,14 @@ tl_plot_cv_results <- function(cv_results, metrics = NULL) {
 #' @param new_data Optional data frame for evaluation
 #'   (if NULL, uses training data)
 #' @param ... Additional arguments
-#' @return A Shiny app object
+#' @return A \code{\link[shiny]{shinyApp}} object.
+#' @examples
+#' \donttest{
+#' if (requireNamespace("shiny")) {
+#'   model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+#'   app <- tl_dashboard(model)
+#' }
+#' }
 #' @export
 tl_dashboard <- function(model, new_data = NULL, ...) {
   # Check if required packages are installed
@@ -635,9 +654,16 @@ tl_dashboard <- function(model, new_data = NULL, ...) {
 #' @param bins Number of bins for grouping predictions
 #'   (default: 10)
 #' @param ... Additional arguments
-#' @return A ggplot object with lift chart
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @importFrom ggplot2 ggplot aes geom_line geom_point
 #' @importFrom ggplot2 geom_hline labs theme_minimal
+#' @examples
+#' \donttest{
+#' iris_bin <- iris[iris$Species != "setosa", ]
+#' iris_bin$Species <- factor(iris_bin$Species)
+#' model <- tl_model(iris_bin, Species ~ ., method = "logistic")
+#' tl_plot_lift(model)
+#' }
 #' @export
 tl_plot_lift <- function(model, new_data = NULL, bins = 10, ...) {
   if (!model$spec$is_classification) {
@@ -751,9 +777,16 @@ tl_plot_lift <- function(model, new_data = NULL, bins = 10, ...) {
 #' @param bins Number of bins for grouping predictions
 #'   (default: 10)
 #' @param ... Additional arguments
-#' @return A ggplot object with gain chart
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @importFrom ggplot2 ggplot aes geom_line geom_point
 #' @importFrom ggplot2 geom_abline labs theme_minimal
+#' @examples
+#' \donttest{
+#' iris_bin <- iris[iris$Species != "setosa", ]
+#' iris_bin$Species <- factor(iris_bin$Species)
+#' model <- tl_model(iris_bin, Species ~ ., method = "logistic")
+#' tl_plot_gain(model)
+#' }
 #' @export
 tl_plot_gain <- function(model, new_data = NULL, bins = 10, ...) {
   if (!model$spec$is_classification) {
@@ -845,7 +878,7 @@ tl_plot_gain <- function(model, new_data = NULL, bins = 10, ...) {
         y = cumulative_pct_responders
       )
     ) +
-      ggplot2::geom_line(color = "blue", size = 1) +
+      ggplot2::geom_line(color = "blue", linewidth = 1) +
       ggplot2::geom_point(color = "blue", size = 3) +
       ggplot2::geom_abline(
         intercept = 0,
@@ -885,7 +918,13 @@ tl_plot_gain <- function(model, new_data = NULL, bins = 10, ...) {
 #' @param title Plot title
 #' @param color_noise_black If TRUE, color noise points (cluster 0) black
 #'
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
+#' @examples
+#' \donttest{
+#' km <- tidy_kmeans(iris[, 1:4], k = 3)
+#' clustered <- augment_kmeans(km, iris[, 1:4])
+#' plot_clusters(clustered)
+#' }
 #' @export
 plot_clusters <- function(data,
                           cluster_col = "cluster",
@@ -964,12 +1003,17 @@ plot_clusters <- function(data,
 #' @param add_line Add vertical line at suggested optimal k? (default: FALSE)
 #' @param suggested_k If add_line=TRUE, which k to highlight
 #'
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
+#' @examples
+#' \donttest{
+#' wss <- data.frame(k = 2:6, tot_withinss = c(150, 90, 60, 50, 45))
+#' plot_elbow(wss)
+#' }
 #' @export
 plot_elbow <- function(wss_data, add_line = FALSE, suggested_k = NULL) {
 
   p <- ggplot2::ggplot(wss_data, ggplot2::aes(x = k, y = tot_withinss)) +
-    ggplot2::geom_line(color = "steelblue", size = 1) +
+    ggplot2::geom_line(color = "steelblue", linewidth = 1) +
     ggplot2::geom_point(color = "steelblue", size = 3) +
     ggplot2::labs(
       title = "Elbow Method - Total Within-Cluster Sum of Squares",
@@ -1009,7 +1053,15 @@ plot_elbow <- function(wss_data, add_line = FALSE, suggested_k = NULL) {
 #' @param x_col X-axis variable
 #' @param y_col Y-axis variable
 #'
-#' @return A grid of ggplot objects
+#' @return The return value of \code{\link[gridExtra]{grid.arrange}}, a
+#'   \code{\link[gtable]{gtable}} drawn as a side effect.
+#' @examples
+#' \donttest{
+#' df <- iris[, 1:4]
+#' df$km3 <- kmeans(df, 3)$cluster
+#' df$km4 <- kmeans(df, 4)$cluster
+#' plot_cluster_comparison(df, c("km3", "km4"), "Sepal.Length", "Sepal.Width")
+#' }
 #' @export
 plot_cluster_comparison <- function(data, cluster_cols, x_col, y_col) {
 
@@ -1033,7 +1085,12 @@ plot_cluster_comparison <- function(data, cluster_cols, x_col, y_col) {
 #' @param clusters Vector of cluster assignments
 #' @param title Plot title (default: "Cluster Size Distribution")
 #'
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
+#' @examples
+#' \donttest{
+#' clusters <- kmeans(iris[, 1:4], 3)$cluster
+#' plot_cluster_sizes(clusters)
+#' }
 #' @export
 plot_cluster_sizes <- function(clusters, title = "Cluster Size Distribution") {
 
@@ -1064,7 +1121,12 @@ plot_cluster_sizes <- function(clusters, title = "Cluster Size Distribution") {
 #' @param threshold Horizontal line for variance threshold
 #'   (default: 0.8 for 80%)
 #'
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
+#' @examples
+#' \donttest{
+#' model <- tl_model(iris[, 1:4], method = "pca")
+#' plot_variance_explained(model$fit$variance_explained)
+#' }
 #' @export
 plot_variance_explained <- function(variance_tbl, threshold = 0.8) {
 
@@ -1086,7 +1148,7 @@ plot_variance_explained <- function(variance_tbl, threshold = 0.8) {
     ggplot2::geom_line(
       ggplot2::aes(y = cum_variance),
       color = "red",
-      size = 1
+      linewidth = 1
     ) +
     ggplot2::geom_point(
       ggplot2::aes(y = cum_variance),
@@ -1121,7 +1183,13 @@ plot_variance_explained <- function(variance_tbl, threshold = 0.8) {
 #' @param k Number of clusters to highlight
 #' @param title Plot title
 #'
-#' @return Invisibly returns hclust object (plots as side effect)
+#' @return Invisibly returns the \code{\link[stats]{hclust}} object. The
+#'   dendrogram is drawn as a side effect.
+#' @examples
+#' \donttest{
+#' hc <- hclust(dist(iris[, 1:4]))
+#' plot_dendrogram(hc, k = 3)
+#' }
 #' @export
 plot_dendrogram <- function(hclust_obj,
                             k = NULL,
@@ -1151,7 +1219,15 @@ plot_dendrogram <- function(hclust_obj,
 #' @param cluster_col Cluster column name
 #' @param validation_metrics Optional tibble of validation metrics
 #'
-#' @return Combined plot grid
+#' @return Invisibly returns a list of \code{\link[ggplot2]{ggplot}} objects. The
+#'   combined plot grid is drawn as a side effect via
+#'   \code{\link[gridExtra]{grid.arrange}}.
+#' @examples
+#' \donttest{
+#' df <- iris[, 1:4]
+#' df$cluster <- kmeans(df, 3)$cluster
+#' create_cluster_dashboard(df)
+#' }
 #' @export
 create_cluster_dashboard <- function(data,
                                      cluster_col = "cluster",
@@ -1214,7 +1290,12 @@ create_cluster_dashboard <- function(data,
 #' @param cluster_order Optional vector to reorder observations by cluster
 #' @param title Plot title
 #'
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
+#' @examples
+#' \donttest{
+#' d <- dist(iris[1:20, 1:4])
+#' plot_distance_heatmap(d)
+#' }
 #' @export
 plot_distance_heatmap <- function(dist_mat,
                                   cluster_order = NULL,

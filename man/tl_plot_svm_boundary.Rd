@@ -19,8 +19,17 @@ for the grid (default: 100)}
 \item{...}{Additional arguments}
 }
 \value{
-A ggplot object with decision boundary
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot SVM decision boundary
+}
+\examples{
+\donttest{
+if (requireNamespace("e1071", quietly = TRUE)) {
+  model <- tl_model(iris, Species ~ ., method = "svm")
+  tl_plot_svm_boundary(model,
+    x_var = "Sepal.Length", y_var = "Sepal.Width")
+}
+}
 }

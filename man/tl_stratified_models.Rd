@@ -27,7 +27,14 @@ tl_stratified_models(
 \item{...}{Additional arguments}
 }
 \value{
-A list of models (one per cluster) plus cluster assignments
+A list with class \code{"tidylearn_stratified"} containing:
+\describe{
+\item{cluster_model}{The fitted clustering model.}
+\item{supervised_models}{Named list of tidylearn models, one per
+cluster.}
+\item{formula}{The model formula.}
+\item{data}{The original training data.}
+}
 }
 \description{
 Create cluster-specific supervised models for heterogeneous data

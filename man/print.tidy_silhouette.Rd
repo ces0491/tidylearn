@@ -12,8 +12,17 @@
 \item{...}{Additional arguments (ignored)}
 }
 \value{
-Invisibly returns the input object x
+The input object \code{x}, returned invisibly.
 }
 \description{
 Print Method for tidy_silhouette
+}
+\examples{
+\donttest{
+km <- kmeans(iris[, 1:4], centers = 3, nstart = 25)
+d <- dist(iris[, 1:4])
+sil <- tidy_silhouette(km$cluster, d)
+print(sil)
+}
+
 }

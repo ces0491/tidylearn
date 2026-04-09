@@ -13,8 +13,15 @@ plot_gap_stat(gap_obj, show_methods = FALSE)
 selection methods? (default: FALSE)}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot Gap Statistic
+}
+\examples{
+\donttest{
+gap <- tidy_gap_stat(iris[, 1:4], max_k = 6, B = 10)
+plot_gap_stat(gap)
+}
+
 }

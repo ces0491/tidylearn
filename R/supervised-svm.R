@@ -36,9 +36,11 @@ tl_fit_svm <- function(data, formula,
   # Check if e1071 is installed
   tl_check_packages("e1071")
 
-  # Set default gamma if not provided
+
+  # Set default gamma if not provided (use predictor count, not total columns)
   if (is.null(gamma)) {
-    gamma <- 1 / ncol(data)
+    n_predictors <- ncol(data) - 1L
+    gamma <- 1 / max(n_predictors, 1L)
   }
 
   # Determine SVM type based on problem type
@@ -62,25 +64,23 @@ tl_fit_svm <- function(data, formula,
 
   if (tune) {
     # Tune hyperparameters using cross-validation
+    tune_ranges <- list(
+      cost = c(0.1, 1, 10, 100)
+    )
+    if (kernel != "linear") {
+      tune_ranges$gamma <- c(0.001, 0.01, 0.1, 1)
+    }
+    if (kernel == "polynomial") {
+      tune_ranges$degree <- c(2, 3, 4)
+    }
+
     tune_result <- e1071::tune(
       svm,
       train.x = formula,
       data = data,
       type = svm_type,
       kernel = kernel,
-      ranges = list(
-        cost = c(0.1, 1, 10, 100),
-        gamma = if (kernel != "linear") {
-          c(0.001, 0.01, 0.1, 1)
-        } else {
-          NULL
-        },
-        degree = if (kernel == "polynomial") {
-          c(2, 3, 4)
-        } else {
-          NULL
-        }
-      ),
+      ranges = tune_ranges,
       tunecontrol = e1071::tune.control(
         cross = tune_folds
       )
@@ -191,9 +191,17 @@ tl_predict_svm <- function(model, new_data,
 #' @param grid_size Number of points in each dimension
 #'   for the grid (default: 100)
 #' @param ... Additional arguments
-#' @return A ggplot object with decision boundary
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @importFrom ggplot2 ggplot aes geom_point geom_contour
 #'   scale_fill_gradient2 labs theme_minimal
+#' @examples
+#' \donttest{
+#' if (requireNamespace("e1071", quietly = TRUE)) {
+#'   model <- tl_model(iris, Species ~ ., method = "svm")
+#'   tl_plot_svm_boundary(model,
+#'     x_var = "Sepal.Length", y_var = "Sepal.Width")
+#' }
+#' }
 #' @export
 tl_plot_svm_boundary <- function(model,
                                  x_var = NULL,
@@ -221,12 +229,17 @@ tl_plot_svm_boundary <- function(model,
   formula <- model$spec$formula
   response_var <- all.vars(formula)[1]
 
-  # If x_var and y_var are not specified, use first two
+  # If x_var and y_var are not specified, use first two predictors
   if (is.null(x_var) || is.null(y_var)) {
-    predictor_vars <- all.vars(formula)[-1]
+    # Use data columns instead of all.vars() -- all.vars(y ~ .) returns only "y"
+    predictor_vars <- setdiff(names(data), response_var)
+    # Keep only numeric predictors for the boundary grid
+    predictor_vars <- predictor_vars[
+      vapply(data[predictor_vars], is.numeric, logical(1))
+    ]
     if (length(predictor_vars) < 2) {
       stop(
-        "At least two predictor variables are ",
+        "At least two numeric predictor variables are ",
         "required for decision boundary plot",
         call. = FALSE
       )
@@ -278,82 +291,52 @@ tl_plot_svm_boundary <- function(model,
     }
   }
 
-  # Make predictions on the grid
-  if (model$fit$type == "C-classification") {
-    # For classification, get probabilities or decision values
-    if (model$fit$probability) {
-      # Use probabilities
-      probs <- attr(
-        predict(
-          model$fit, newdata = grid_data,
-          probability = TRUE
-        ),
-        "probabilities"
-      )
+  # Make predictions on the grid -- always produce predicted class labels
+  preds <- predict(model$fit, newdata = grid_data)
+  grid_data$pred_class <- as.character(preds)
 
-      # For binary classification
-      if (ncol(probs) == 2) {
-        pos_class <- colnames(probs)[2]
-        grid_data$pred <- probs[, pos_class]
-      } else {
-        # For multiclass, use predicted class
-        preds <- predict(
-          model$fit, newdata = grid_data
-        )
-        grid_data$pred <- as.integer(preds)
-      }
-    } else {
-      # Use decision values
-      decision_values <- attr(
-        predict(
-          model$fit, newdata = grid_data,
-          decision.values = TRUE
-        ),
-        "decision.values"
-      )
-
-      # For binary classification
-      if (is.vector(decision_values)) {
-        grid_data$pred <- decision_values
-      } else {
-        # For multiclass, use predicted class
-        preds <- predict(
-          model$fit, newdata = grid_data
-        )
-        grid_data$pred <- as.integer(preds)
-      }
+  # For binary classification, also get numeric probability for contour line
+  has_numeric_pred <- FALSE
+  if (model$fit$type == "C-classification" && model$fit$probability) {
+    probs <- attr(
+      predict(model$fit, newdata = grid_data, probability = TRUE),
+      "probabilities"
+    )
+    if (!is.null(probs) && ncol(probs) == 2) {
+      grid_data$pred_prob <- probs[, 2]
+      has_numeric_pred <- TRUE
     }
-  } else {
-    # For regression, use predicted values
-    preds <- predict(model$fit, newdata = grid_data)
-    grid_data$pred <- preds
   }
 
-  # Create plot
+  # Create plot using geom_raster for decision regions
   p <- ggplot2::ggplot() +
-    # Add decision boundary contours
-    ggplot2::geom_contour_filled(
+    ggplot2::geom_raster(
       data = grid_data,
       ggplot2::aes(
         x = .data[[x_var]],
         y = .data[[y_var]],
-        z = pred
+        fill = .data[["pred_class"]]
       ),
       alpha = 0.3
-    ) +
-    # Add decision boundary line
-    ggplot2::geom_contour(
+    )
+
+  # Add decision boundary contour line for binary classification
+  if (has_numeric_pred) {
+    p <- p + ggplot2::geom_contour(
       data = grid_data,
       ggplot2::aes(
         x = .data[[x_var]],
         y = .data[[y_var]],
-        z = pred
+        z = .data[["pred_prob"]]
       ),
       breaks = 0.5,
       color = "black",
       linewidth = 1
-    ) +
-    # Add original data points
+    )
+  }
+
+  # Add original data points
+  p <- p +
     ggplot2::geom_point(
       data = data,
       ggplot2::aes(
@@ -380,9 +363,17 @@ tl_plot_svm_boundary <- function(model,
 #'
 #' @param model A tidylearn SVM model object
 #' @param ... Additional arguments
-#' @return A ggplot object with tuning results
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @importFrom ggplot2 ggplot aes geom_tile
 #'   scale_fill_gradient2 labs theme_minimal
+#' @examples
+#' \donttest{
+#' if (requireNamespace("e1071", quietly = TRUE)) {
+#'   model <- tl_model(iris, Species ~ ., method = "svm",
+#'     kernel = "linear", tune = TRUE, tune_folds = 2)
+#'   tl_plot_svm_tuning(model)
+#' }
+#' }
 #' @export
 tl_plot_svm_tuning <- function(model, ...) {
   if (model$spec$method != "svm") {

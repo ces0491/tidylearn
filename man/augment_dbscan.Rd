@@ -12,8 +12,17 @@ augment_dbscan(dbscan_obj, data)
 \item{data}{Original data frame}
 }
 \value{
-Original data with cluster information added
+A tibble containing the original \code{data} with additional columns
+\code{cluster} (factor), \code{is_noise} (logical), and \code{is_core}
+(logical).
 }
 \description{
 Augment Data with DBSCAN Cluster Assignments
+}
+\examples{
+\donttest{
+db <- tidy_dbscan(iris[, 1:4], eps = 0.5, minPts = 5)
+augmented <- augment_dbscan(db, iris)
+}
+
 }

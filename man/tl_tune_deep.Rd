@@ -41,8 +41,23 @@ layer configurations to try}
 \item{...}{Additional arguments}
 }
 \value{
-A list with the best model and tuning results
+A list with elements \code{model} (the best fitted deep learning
+model), \code{best_hidden_layers} (optimal layer configuration),
+\code{best_learning_rate}, \code{best_batch_size}, and
+\code{tuning_results} (a data frame of all hyperparameter combinations
+and their validation losses).
 }
 \description{
 Tune a deep learning model
+}
+\examples{
+\dontrun{
+if (requireNamespace("keras", quietly = TRUE)) {
+  result <- tl_tune_deep(iris, Species ~ .,
+    is_classification = TRUE,
+    hidden_layers_options = list(c(10), c(10, 5)),
+    learning_rates = c(0.01, 0.001), batch_sizes = c(32),
+    epochs = 5)
+}
+}
 }

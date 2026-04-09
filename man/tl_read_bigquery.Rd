@@ -17,7 +17,7 @@ tl_read_bigquery(project, query, dataset = NULL, ...)
 \code{bigrquery::bq_project_query()}.}
 }
 \value{
-A \code{tidylearn_data} object.
+A \code{tidylearn_data} object containing the query results.
 }
 \description{
 Executes a SQL query against Google BigQuery and returns the result as a

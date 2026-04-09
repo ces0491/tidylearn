@@ -48,3 +48,9 @@ jobs:
         with:
           upload-snapshots: true
           build_args: 'c("--no-manual","--compact-vignettes=gs+qpdf")'
+        env:
+          # \donttest{} examples train full ML models (randomForest, xgboost,
+          # SVM, AutoML) that hang CI runners for 1h+. R CMD check runs these
+          # via --run-donttest by default. Skip them in CI; CRAN validates
+          # them during submission review. Validated locally before each push.
+          _R_CHECK_DONTTEST_EXAMPLES_: false

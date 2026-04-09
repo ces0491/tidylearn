@@ -20,7 +20,17 @@ NULL
 #'   or minimize (FALSE) the metric
 #' @param verbose Logical; whether to print progress
 #' @param ... Additional arguments passed to tl_model
-#' @return A list with the best model and tuning results
+#' @return A tidylearn model object fitted with the best hyperparameters.
+#'   Tuning results are stored as an attribute \code{"tuning_results"},
+#'   a list containing \code{param_grid}, \code{results} (data frame of
+#'   all evaluated combinations), \code{best_params}, \code{best_metric},
+#'   \code{metric}, and \code{maximize}.
+#' @examples
+#' \donttest{
+#' model <- tl_tune_grid(iris, Species ~ ., method = "tree",
+#'   param_grid = list(cp = c(0.01, 0.1), minsplit = c(10, 20)),
+#'   folds = 2, verbose = FALSE)
+#' }
 #' @export
 tl_tune_grid <- function(data, formula, method,
                          param_grid, folds = 5,
@@ -35,9 +45,7 @@ tl_tune_grid <- function(data, formula, method,
   # Determine if classification or regression
   response_var <- all.vars(formula)[1]
   y <- data[[response_var]]
-  is_classification <- is.factor(y) ||
-    is.character(y) ||
-    (is.numeric(y) && length(unique(y)) <= 10)
+  is_classification <- is.factor(y) || is.character(y)
 
   # Default metric based on problem type
   if (is.null(metric)) {
@@ -253,7 +261,17 @@ tl_tune_grid <- function(data, formula, method,
 #' @param verbose Logical; whether to print progress
 #' @param seed Random seed for reproducibility
 #' @param ... Additional arguments passed to tl_model
-#' @return A list with the best model and tuning results
+#' @return A tidylearn model object fitted with the best hyperparameters.
+#'   Tuning results are stored as an attribute \code{"tuning_results"},
+#'   a list containing \code{param_space}, \code{results} (data frame of
+#'   all evaluated iterations), \code{best_params}, \code{best_metric},
+#'   \code{metric}, and \code{maximize}.
+#' @examples
+#' \donttest{
+#' model <- tl_tune_random(mtcars, mpg ~ ., method = "tree",
+#'   param_space = list(cp = c(0.01, 0.1), minsplit = c(10, 20)),
+#'   n_iter = 3, folds = 2, verbose = FALSE)
+#' }
 #' @export
 tl_tune_random <- function(data, formula, method,
                            param_space,
@@ -279,9 +297,7 @@ tl_tune_random <- function(data, formula, method,
   # Determine if classification or regression
   response_var <- all.vars(formula)[1]
   y <- data[[response_var]]
-  is_classification <- is.factor(y) ||
-    is.character(y) ||
-    (is.numeric(y) && length(unique(y)) <= 10)
+  is_classification <- is.factor(y) || is.character(y)
 
   # Default metric based on problem type
   if (is.null(metric)) {
@@ -551,7 +567,14 @@ tl_tune_random <- function(data, formula, method,
 #'   or scatter plots)
 #' @param plot_type Type of plot: "scatter", "grid",
 #'   "parallel", "importance"
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
+#' @examples
+#' \donttest{
+#' model <- tl_tune_grid(iris, Species ~ ., method = "tree",
+#'   param_grid = list(cp = c(0.01, 0.1), minsplit = c(10, 20)),
+#'   folds = 2, verbose = FALSE)
+#' tl_plot_tuning_results(model)
+#' }
 #' @importFrom ggplot2 ggplot aes geom_point geom_tile
 #'   scale_fill_gradient2 labs theme_minimal
 #' @export
@@ -909,7 +932,15 @@ tl_plot_tuning_results <- function(model,
 #' @param size Grid size: "small", "medium", "large"
 #' @param is_classification Whether the task is
 #'   classification or regression
-#' @return A named list of parameter values to tune
+#' @return A named list of parameter values suitable for passing to
+#'   \code{\link{tl_tune_grid}} or \code{\link{tl_tune_random}}. Each
+#'   element is a numeric or character vector of candidate values for
+#'   that hyperparameter.
+#' @examples
+#' \donttest{
+#' grid <- tl_default_param_grid("tree", size = "small")
+#' grid <- tl_default_param_grid("forest", size = "medium")
+#' }
 #' @export
 tl_default_param_grid <- function(method,
                                   size = "medium",

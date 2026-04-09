@@ -27,7 +27,11 @@ tl_semisupervised(
 \item{...}{Additional arguments}
 }
 \value{
-A tidylearn model trained on pseudo-labeled data
+A tidylearn model object with additional class
+\code{"tidylearn_semisupervised"}, trained on pseudo-labeled data. The
+model includes a \code{semisupervised_info} element with
+\code{labeled_indices}, \code{cluster_model}, and
+\code{label_mapping}.
 }
 \description{
 Train a supervised model with limited labels by first clustering the data
@@ -39,7 +43,7 @@ and propagating labels within clusters.
 labeled_idx <- sample(nrow(iris), size = 15)
 model <- tl_semisupervised(iris, Species ~ ., labeled_indices = labeled_idx,
   cluster_method = "kmeans",
-  supervised_method = "logistic"
+  supervised_method = "tree"
 )
 }
 }

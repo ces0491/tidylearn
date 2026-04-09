@@ -244,7 +244,14 @@ tl_predict_xgboost <- function(model, new_data,
 #' @param top_n Number of top features to display (default: 10)
 #' @param importance_type Type of importance: "gain", "cover", "frequency"
 #' @param ... Additional arguments
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
+#' @examples
+#' \donttest{
+#' if (requireNamespace("xgboost", quietly = TRUE)) {
+#'   model <- tl_model(mtcars, mpg ~ ., method = "xgboost")
+#'   tl_plot_xgboost_importance(model)
+#' }
+#' }
 #' @export
 tl_plot_xgboost_importance <- function(model, top_n = 10,
                                        importance_type = "gain",
@@ -282,7 +289,8 @@ tl_plot_xgboost_importance <- function(model, top_n = 10,
 #' @param model A tidylearn XGBoost model object
 #' @param tree_index Index of the tree to plot (default: 0, first tree)
 #' @param ... Additional arguments
-#' @return Tree visualization
+#' @return The return value of \code{\link[xgboost]{xgb.plot.tree}}, a
+#'   tree diagram rendered via the \pkg{DiagrammeR} package.
 #' @export
 tl_plot_xgboost_tree <- function(model, tree_index = 0, ...) {
   # Check if model is an XGBoost model
@@ -308,7 +316,11 @@ tl_plot_xgboost_tree <- function(model, tree_index = 0, ...) {
 #' @param early_stopping_rounds Early stopping rounds (default: 10)
 #' @param verbose Logical indicating whether to print progress (default: TRUE)
 #' @param ... Additional arguments
-#' @return A list with the best model and tuning results
+#' @return A \code{tidylearn_model} object (the refit on full data using the
+#'   best hyperparameters) with an attribute \code{"tuning_results"} containing
+#'   a list with elements \code{param_grid}, \code{results} (per-combination CV
+#'   output), \code{best_params}, \code{best_iteration}, \code{best_score}, and
+#'   \code{minimize}.
 #' @export
 tl_tune_xgboost <- function(data, formula, is_classification = FALSE,
                             param_grid = NULL, cv_folds = 5,
@@ -517,7 +529,16 @@ tl_tune_xgboost <- function(data, formula, is_classification = FALSE,
 #'   (default: NULL, uses training data)
 #' @param n_samples Number of samples to use (default: 100, NULL for all)
 #' @param trees_idx Trees to include (default: NULL, uses all trees)
-#' @return A data frame with SHAP values
+#' @return A data frame with one column of SHAP values per feature, a
+#'   \code{BIAS} column, a \code{row_id} column, and the original data columns
+#'   appended for reference.
+#' @examples
+#' \donttest{
+#' if (requireNamespace("xgboost", quietly = TRUE)) {
+#'   model <- tl_model(mtcars, mpg ~ ., method = "xgboost")
+#'   shap <- tl_xgboost_shap(model, n_samples = 20)
+#' }
+#' }
 #' @export
 tl_xgboost_shap <- function(model, data = NULL,
                             n_samples = 100,
@@ -600,16 +621,32 @@ tl_xgboost_shap <- function(model, data = NULL,
 #' @param top_n Number of top features to display (default: 10)
 #' @param n_samples Number of samples to use
 #'   (default: 100, NULL for all)
-#' @return A ggplot object with SHAP summary
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @importFrom ggplot2 ggplot aes geom_point
 #'   scale_color_gradient labs theme_minimal
+#' @examples
+#' \donttest{
+#' if (requireNamespace("xgboost", quietly = TRUE)) {
+#'   model <- tl_model(mtcars, mpg ~ ., method = "xgboost")
+#'   tl_plot_xgboost_shap_summary(model, n_samples = 20)
+#' }
+#' }
 #' @export
 tl_plot_xgboost_shap_summary <- function(model,
                                          data = NULL,
                                          top_n = 10,
                                          n_samples = 100) {
-  # Calculate SHAP values
-  shap_df <- tl_xgboost_shap(model, data, n_samples)
+  # Resolve data and handle sampling here so feature values and SHAP values
+
+  # come from exactly the same rows
+  use_data <- if (is.null(data)) model$data else data
+  if (!is.null(n_samples) && n_samples < nrow(use_data)) {
+    sample_idx <- sample(nrow(use_data), n_samples)
+    use_data <- use_data[sample_idx, , drop = FALSE]
+  }
+
+  # Calculate SHAP values on the (already-sampled) data; pass n_samples = NULL
+  shap_df <- tl_xgboost_shap(model, use_data, n_samples = NULL)
 
   # Convert wide to long format for plotting
   feature_cols <- attr(model$fit, "feature_names")
@@ -624,16 +661,16 @@ tl_plot_xgboost_shap_summary <- function(model,
 
   # Limit to top features
   if (length(sorted_features) > top_n) {
-    top_features <- sorted_features[1:top_n]
+    top_features <- sorted_features[seq_len(top_n)]
   } else {
     top_features <- sorted_features
   }
 
-  # Prepare data for plotting
+  # Prepare data for plotting (use_data has the same rows as shap_df)
   plot_data <- NULL
   for (feat in top_features) {
-    # Get feature values and SHAP values
-    feat_vals <- if (feat %in% names(model$data)) model$data[[feat]] else NA
+    # Get feature values from the sampled data (same rows as SHAP values)
+    feat_vals <- if (feat %in% names(use_data)) use_data[[feat]] else NA
     shap_vals <- shap_df[[feat]]
 
     # Combine into data frame
@@ -704,7 +741,7 @@ tl_plot_xgboost_shap_summary <- function(model,
 #'   (default: NULL, uses training data)
 #' @param n_samples Number of samples to use
 #'   (default: 100, NULL for all)
-#' @return A ggplot object with SHAP dependence plot
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @importFrom ggplot2 ggplot aes geom_point
 #'   geom_smooth scale_color_gradient labs theme_minimal
 #' @export

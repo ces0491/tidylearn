@@ -13,7 +13,9 @@ tl_compare_pipeline_models(pipeline, metrics = NULL)
 (if NULL, uses all available)}
 }
 \value{
-A comparison plot of model performance
+A \code{\link[ggplot2]{ggplot}} object showing a faceted bar
+chart comparing metric values across models, with the best model
+highlighted.
 }
 \description{
 Compare models from a pipeline

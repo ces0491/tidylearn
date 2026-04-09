@@ -13,7 +13,7 @@ tl_plot_cv_results(cv_results, metrics = NULL)
 (if NULL, plots all metrics)}
 }
 \value{
-A ggplot object with cross-validation results
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot cross-validation results

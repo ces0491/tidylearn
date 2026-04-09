@@ -30,8 +30,14 @@ tl_plot_influence(
 \item{label_size}{Text size for labels (default: 3)}
 }
 \value{
-A ggplot object
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 Plot influence diagnostics
+}
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+tl_plot_influence(model, plot_type = "cook")
+}
 }

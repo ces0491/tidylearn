@@ -19,8 +19,15 @@ If NULL, uses all numeric columns.}
 \item{...}{Additional arguments passed to distance functions}
 }
 \value{
-A dist object with tidy attributes
+A \code{\link[stats]{dist}} object containing the computed
+distance matrix.
 }
 \description{
 Compute distance matrices with tidy output
+}
+\examples{
+\donttest{
+d <- tidy_dist(iris[, 1:4], method = "euclidean")
+}
+
 }

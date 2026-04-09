@@ -32,7 +32,8 @@ with matching extensions are read.}
 \item{...}{Additional arguments passed to the format-specific reader.}
 }
 \value{
-A \code{tidylearn_data} object with a \code{source_file} column.
+A \code{tidylearn_data} object with an additional
+\code{source_file} column identifying the origin of each row.
 }
 \description{
 Scans a directory for files matching a pattern or format, reads each one,

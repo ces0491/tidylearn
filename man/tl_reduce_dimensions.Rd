@@ -24,7 +24,15 @@ tl_reduce_dimensions(
 \item{...}{Additional arguments for the dimensionality reduction method}
 }
 \value{
-A list containing the transformed data and the reduction model
+A list with components:
+\describe{
+\item{data}{The transformed data frame with reduced-dimension columns
+and the response variable (if provided).}
+\item{reduction_model}{The fitted tidylearn dimensionality reduction
+model.}
+\item{original_data}{The original input data frame.}
+\item{response}{The response variable name, or \code{NULL}.}
+}
 }
 \description{
 These functions demonstrate the power of tidylearn's unified approach by
@@ -43,6 +51,6 @@ reduced <- tl_reduce_dimensions(
   iris, response = "Species",
   method = "pca", n_components = 3
 )
-model <- tl_model(reduced$data, Species ~ ., method = "logistic")
+model <- tl_model(reduced$data, Species ~ ., method = "tree")
 }
 }

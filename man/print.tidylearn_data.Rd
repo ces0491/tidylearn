@@ -11,6 +11,17 @@
 
 \item{...}{Additional arguments passed to the tibble print method.}
 }
+\value{
+The input object \code{x}, returned invisibly.
+}
 \description{
 Print a tidylearn_data object
+}
+\examples{
+\donttest{
+f <- tempfile(fileext = ".csv")
+write.csv(iris, f, row.names = FALSE)
+d <- tl_read(f)
+print(d)
+}
 }

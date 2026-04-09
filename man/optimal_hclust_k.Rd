@@ -14,8 +14,22 @@ optimal_hclust_k(hclust_obj, method = "silhouette", max_k = 10)
 \item{max_k}{Maximum number of clusters to test (default: 10)}
 }
 \value{
-A list with optimal k and evaluation results
+A list containing:
+\itemize{
+\item optimal_k: the recommended number of clusters
+\item method: the evaluation method used
+\item values: numeric vector of evaluation scores (for silhouette)
+\item k_range: integer vector of k values tested (for silhouette)
+}
+If \code{method = "gap"}, returns a \code{tidy_gap} object instead.
 }
 \description{
 Use silhouette or gap statistic to find optimal k
+}
+\examples{
+\donttest{
+hc <- tidy_hclust(USArrests, method = "ward.D2")
+opt <- optimal_hclust_k(hc, method = "silhouette", max_k = 6)
+}
+
 }

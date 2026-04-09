@@ -14,8 +14,16 @@
 \item{...}{Additional arguments}
 }
 \value{
-A tibble of predictions with cluster assignments
+A \link[tibble]{tibble} with a \code{.pred} column containing
+predictions and a \code{.cluster} column with cluster assignments.
 }
 \description{
 Predict from stratified models
+}
+\examples{
+\donttest{
+models <- tl_stratified_models(mtcars, mpg ~ .,
+  cluster_method = "kmeans", k = 2, supervised_method = "linear")
+preds <- predict(models)
+}
 }

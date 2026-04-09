@@ -12,8 +12,15 @@
 \item{...}{Additional arguments (not used)}
 }
 \value{
-Invisibly returns the pipeline
+The input pipeline \code{object}, returned invisibly. Called
+for its side effect of printing detailed pipeline and model results.
 }
 \description{
 Summarize a tidylearn pipeline
+}
+\examples{
+\donttest{
+pipe <- tl_pipeline(iris, Species ~ .)
+summary(pipe)
+}
 }

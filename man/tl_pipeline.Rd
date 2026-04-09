@@ -27,8 +27,18 @@ tl_pipeline(
 \item{...}{Additional arguments}
 }
 \value{
-A tidylearn pipeline object
+A \code{tidylearn_pipeline} object (S3 list) with components
+\code{$formula}, \code{$data}, \code{$preprocessing},
+\code{$models}, \code{$evaluation}, and \code{$results}
+(initially \code{NULL}; populated after \code{\link{tl_run_pipeline}}).
 }
 \description{
 Create a modeling pipeline
+}
+\examples{
+\donttest{
+pipe <- tl_pipeline(iris, Species ~ .,
+  models = list(tree = list(method = "tree")))
+print(pipe)
+}
 }

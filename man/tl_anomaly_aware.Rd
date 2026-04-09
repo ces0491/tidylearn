@@ -31,7 +31,11 @@ tl_anomaly_aware(
 \item{...}{Additional arguments}
 }
 \value{
-A tidylearn model or list with model and anomaly info
+A tidylearn model object with additional class
+\code{"tidylearn_anomaly_aware"}. The model includes an
+\code{anomaly_info} element with \code{anomaly_model},
+\code{is_anomaly} (logical vector), \code{n_anomalies}, and
+\code{action}.
 }
 \description{
 Detect outliers using DBSCAN or other methods, then optionally

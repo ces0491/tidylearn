@@ -112,7 +112,15 @@ tidy_pca <- function(data, cols = NULL, scale = TRUE,
 #' @param pca_obj A tidy_pca object
 #' @param n_components Number of components to include (default: all)
 #'
-#' @return A tibble with loadings in wide format
+#' @return A tibble with one row per variable and one column per principal
+#'   component, containing the loading values.
+#'
+#' @examples
+#' \donttest{
+#' pca <- tidy_pca(USArrests)
+#' get_pca_loadings(pca, n_components = 2)
+#' }
+#'
 #' @export
 get_pca_loadings <- function(pca_obj, n_components = NULL) {
   if (!inherits(pca_obj, "tidy_pca")) {
@@ -139,7 +147,15 @@ get_pca_loadings <- function(pca_obj, n_components = NULL) {
 #'
 #' @param pca_obj A tidy_pca object
 #'
-#' @return A tibble with variance statistics
+#' @return A tibble with columns \code{component}, \code{sdev},
+#'   \code{variance}, \code{prop_variance}, and \code{cum_variance}.
+#'
+#' @examples
+#' \donttest{
+#' pca <- tidy_pca(USArrests)
+#' get_pca_variance(pca)
+#' }
+#'
 #' @export
 get_pca_variance <- function(pca_obj) {
   if (!inherits(pca_obj, "tidy_pca")) {
@@ -158,7 +174,15 @@ get_pca_variance <- function(pca_obj) {
 #' @param data Original data frame
 #' @param n_components Number of PCs to add (default: all)
 #'
-#' @return Original data with PC scores added
+#' @return A tibble containing the original \code{data} with additional columns
+#'   for each principal component score (named \code{PC1}, \code{PC2}, etc.).
+#'
+#' @examples
+#' \donttest{
+#' pca <- tidy_pca(USArrests)
+#' augmented <- augment_pca(pca, USArrests, n_components = 2)
+#' }
+#'
 #' @export
 augment_pca <- function(pca_obj, data, n_components = NULL) {
   if (!inherits(pca_obj, "tidy_pca")) {
@@ -184,7 +208,14 @@ augment_pca <- function(pca_obj, data, n_components = NULL) {
 #' @param add_line Logical; add horizontal line at
 #'   eigenvalue = 1? (for Kaiser criterion)
 #'
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
+#'
+#' @examples
+#' \donttest{
+#' pca <- tidy_pca(USArrests)
+#' tidy_pca_screeplot(pca)
+#' }
+#'
 #' @export
 tidy_pca_screeplot <- function(pca_obj, type = "proportion", add_line = TRUE) {
   if (!inherits(pca_obj, "tidy_pca")) {
@@ -198,7 +229,7 @@ tidy_pca_screeplot <- function(pca_obj, type = "proportion", add_line = TRUE) {
       var_data,
       ggplot2::aes(x = seq_along(component), y = prop_variance)
     ) +
-      ggplot2::geom_line(color = "steelblue", size = 1) +
+      ggplot2::geom_line(color = "steelblue", linewidth = 1) +
       ggplot2::geom_point(color = "steelblue", size = 3) +
       ggplot2::labs(
         title = "Scree Plot - Proportion of Variance Explained",
@@ -210,7 +241,7 @@ tidy_pca_screeplot <- function(pca_obj, type = "proportion", add_line = TRUE) {
       var_data,
       ggplot2::aes(x = seq_along(component), y = variance)
     ) +
-      ggplot2::geom_line(color = "steelblue", size = 1) +
+      ggplot2::geom_line(color = "steelblue", linewidth = 1) +
       ggplot2::geom_point(color = "steelblue", size = 3) +
       ggplot2::labs(
         title = "Scree Plot - Variance (Eigenvalues)",
@@ -243,7 +274,14 @@ tidy_pca_screeplot <- function(pca_obj, type = "proportion", add_line = TRUE) {
 #' @param label_obs Logical; label observations? (default: FALSE)
 #' @param label_vars Logical; label variables? (default: TRUE)
 #'
-#' @return A ggplot object
+#' @return A \code{\link[ggplot2]{ggplot}} object.
+#'
+#' @examples
+#' \donttest{
+#' pca <- tidy_pca(USArrests)
+#' tidy_pca_biplot(pca)
+#' }
+#'
 #' @export
 tidy_pca_biplot <- function(pca_obj, pc_x = 1, pc_y = 2,
                             color_by = NULL,
@@ -361,7 +399,14 @@ tidy_pca_biplot <- function(pca_obj, pc_x = 1, pc_y = 2,
 #' @param x A tidy_pca object
 #' @param ... Additional arguments (ignored)
 #'
-#' @return Invisibly returns the input object x
+#' @return The input object \code{x}, returned invisibly.
+#'
+#' @examples
+#' \donttest{
+#' pca <- tidy_pca(USArrests)
+#' print(pca)
+#' }
+#'
 #' @export
 print.tidy_pca <- function(x, ...) {
   cat("Tidy PCA Analysis\n")
