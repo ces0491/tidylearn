@@ -48,8 +48,15 @@ jobs:
         with:
           extra-packages: any::rcmdcheck
           needs: check
+        env:
+          # Skip heavyweight Suggests that need compilation or external
+          # runtimes. R CMD check with _R_CHECK_FORCE_SUGGESTS_=false
+          # handles missing Suggests gracefully.
+          _R_CHECK_FORCE_SUGGESTS_: false
 
       - uses: r-lib/actions/check-r-package@v2
         with:
           upload-snapshots: true
           build_args: 'c("--no-manual","--compact-vignettes=gs+qpdf")'
+        env:
+          _R_CHECK_FORCE_SUGGESTS_: false
