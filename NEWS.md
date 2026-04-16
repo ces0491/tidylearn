@@ -18,11 +18,10 @@
 
 ## Tests
 
-* Added 11 tests for `tidy_gower()` / `tidy_dist(..., method = "gower")`
+* Added 10 tests for `tidy_gower()` / `tidy_dist(..., method = "gower")`
   covering: return type and metadata, symmetry and self-distance, identical
   rows, hand-verified numeric / categorical / ordered / mixed-type distances,
-  NA skipping, custom weights, constant-column denominator behaviour, and
-  numerical equivalence against the pre-optimisation implementation.
+  NA skipping, custom weights and constant-column denominator behaviour.
 
 
 # tidylearn 0.3.0
