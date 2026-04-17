@@ -1,6 +1,6 @@
 Package: tidylearn
 Title: A Unified Tidy Interface to R's Machine Learning Ecosystem
-Version: 0.3.0
+Version: 0.3.1
 Authors@R:
     person("Cesaire", "Tobias", email = "cesaire@sheetsolved.com", role = c("aut", "cre"))
 Description: Provides a unified tidyverse-compatible interface to R's machine
