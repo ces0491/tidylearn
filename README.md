@@ -292,9 +292,7 @@ tidylearn is built on these principles:
 ## Contributing
 
 Contributions are welcome. Before opening a PR, please read
-[CONTRIBUTING.md](CONTRIBUTING.md) — it covers the couple of conventions
-that trip people up most often (notably: don't bump `Version:` in
-`DESCRIPTION`; the maintainer handles that at release time).
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
