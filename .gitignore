@@ -6,3 +6,11 @@
 *.tar.gz
 /doc/
 /Meta/
+
+# R check / run artifacts
+Rplots.pdf
+**/Rplots.pdf
+url_check_result.rds
+
+# Editor / tooling caches
+.claude/
