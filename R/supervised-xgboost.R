@@ -498,6 +498,7 @@ tl_tune_xgboost <- function(data, formula, is_classification = FALSE,
   model <- structure(
     list(
       spec = list(
+        paradigm = "supervised",
         formula = formula,
         method = "xgboost",
         is_classification = is_classification,
@@ -506,7 +507,7 @@ tl_tune_xgboost <- function(data, formula, is_classification = FALSE,
       fit = final_model,
       data = data
     ),
-    class = c("tidylearn_xgboost", "tidylearn_model")
+    class = c("tidylearn_xgboost", "tidylearn_supervised", "tidylearn_model")
   )
 
   # Add tuning results to model

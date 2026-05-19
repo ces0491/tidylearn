@@ -17,7 +17,8 @@ visualize_rules(rules_obj, method = "scatter", top_n = 50, ...)
 \item{...}{Additional arguments passed to plot() for rules visualization}
 }
 \value{
-A \code{\link[ggplot2]{ggplot}} object when \code{method = "scatter"}.
+A \code{\link[ggplot2]{ggplot}} object when
+\code{method = "scatter"}.
 For other methods, the plot is produced as a side effect via
 \pkg{arulesViz}.
 }

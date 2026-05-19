@@ -103,7 +103,7 @@ tidy_gower <- function(data, weights = NULL) {
   col_vecs   <- as.list(data)           # plain-vector views, no copy
   col_ranges <- vector("numeric",   p)
   col_ranks  <- vector("list",      p)
-  col_type   <- vector("character", p)  # "numeric" | "ordered" | "categorical"
+  col_type   <- vector("character", p)  # numeric, ordered, or categorical
 
   for (k in seq_len(p)) {
     v <- col_vecs[[k]]
@@ -123,8 +123,9 @@ tidy_gower <- function(data, weights = NULL) {
   # Initialize distance matrix
   dist_matrix <- matrix(0, nrow = n, ncol = n)
 
-  # Compute pairwise distances
-  for (i in 1:(n - 1)) {
+  # Compute pairwise distances. seq_len() yields an empty sequence when
+  # n < 2, so single-row input returns an empty dist instead of erroring.
+  for (i in seq_len(n - 1)) {
     for (j in (i + 1):n) {
 
       total_dist <- 0
@@ -229,7 +230,9 @@ standardize_data <- function(data, center = TRUE, scale = TRUE) {
 #'
 #' @examples
 #' \donttest{
-#' dists <- compare_distances(iris[, 1:4], methods = c("euclidean", "manhattan"))
+#' dists <- compare_distances(
+#'   iris[, 1:4], methods = c("euclidean", "manhattan")
+#' )
 #' }
 #'
 #' @export
@@ -239,7 +242,9 @@ compare_distances <- function(
 
   data_numeric <- data %>% dplyr::select(where(is.numeric))
 
-  dist_list <- purrr::map(methods, ~tidy_dist(data_numeric, method = .x))
+  dist_list <- purrr::map(methods, function(method) {
+    tidy_dist(data = data_numeric, method = method)
+  })
   names(dist_list) <- methods
 
   dist_list

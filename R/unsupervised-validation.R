@@ -220,8 +220,8 @@ plot_silhouette <- function(sil_obj) {
 #' }
 #'
 #' @export
-tidy_gap_stat <- function(data, FUN_cluster = NULL,
-                          max_k = 10, B = 50,
+tidy_gap_stat <- function(data, FUN_cluster = NULL,  # nolint
+                          max_k = 10, B = 50,  # nolint
                           nstart = 25) {
 
   data_numeric <- data %>% dplyr::select(where(is.numeric))
@@ -249,7 +249,7 @@ tidy_gap_stat <- function(data, FUN_cluster = NULL,
     dplyr::mutate(k = 1:max_k, .before = 1)
 
   # Determine optimal k using different methods
-  k_firstSEmax <- cluster::maxSE(gap_result$Tab[, "gap"],
+  k_firstSEmax <- cluster::maxSE(gap_result$Tab[, "gap"],  # nolint
                                  gap_result$Tab[, "SE.sim"],
                                  method = "firstSEmax")
 

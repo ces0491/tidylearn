@@ -336,7 +336,8 @@ summarize_rules <- function(rules_obj) {
 #' @param top_n Number of top rules to visualize (default: 50)
 #' @param ... Additional arguments passed to plot() for rules visualization
 #'
-#' @return A \code{\link[ggplot2]{ggplot}} object when \code{method = "scatter"}.
+#' @return A \code{\link[ggplot2]{ggplot}} object when
+#'   \code{method = "scatter"}.
 #'   For other methods, the plot is produced as a side effect via
 #'   \pkg{arulesViz}.
 #'

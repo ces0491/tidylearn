@@ -314,7 +314,7 @@ augment_dbscan <- function(dbscan_obj, data) {
 #' }
 #'
 #' @export
-explore_dbscan_params <- function(data, eps_values, minPts_values) {
+explore_dbscan_params <- function(data, eps_values, minPts_values) {  # nolint
 
   data_numeric <- data %>% dplyr::select(where(is.numeric))
 

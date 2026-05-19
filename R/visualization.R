@@ -46,7 +46,7 @@ tl_plot_importance_comparison <- function(..., top_n = 10, names = NULL) {
       imp_data
     } else if (model$spec$method %in% c("ridge", "lasso", "elastic_net")) {
       # Regularized regression
-      imp_data <- tl_extract_importance_regularized(model)
+      imp_data <- tl_get_importance_regularized(model)
 
       # Add model name
       imp_data$model <- name
@@ -177,7 +177,7 @@ tl_extract_importance <- function(model) {
 #' @param lambda Which lambda to use ("1se" or "min", default: "1se")
 #' @return A data frame with feature importance values
 #' @keywords internal
-tl_extract_importance_regularized <- function(model, lambda = "1se") {
+tl_get_importance_regularized <- function(model, lambda = "1se") {
   # Extract the glmnet model
   fit <- model$fit
 
@@ -1219,8 +1219,8 @@ plot_dendrogram <- function(hclust_obj,
 #' @param cluster_col Cluster column name
 #' @param validation_metrics Optional tibble of validation metrics
 #'
-#' @return Invisibly returns a list of \code{\link[ggplot2]{ggplot}} objects. The
-#'   combined plot grid is drawn as a side effect via
+#' @return Invisibly returns a list of \code{\link[ggplot2]{ggplot}} objects.
+#'   The combined plot grid is drawn as a side effect via
 #'   \code{\link[gridExtra]{grid.arrange}}.
 #' @examples
 #' \donttest{

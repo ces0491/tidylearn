@@ -8,7 +8,9 @@
 ^pkgdown$
 ^\.claude$
 ^PACKAGE_ARCHITECTURE\.md$
+^CONTRIBUTING\.md$
 ^cran-comments\.md$
+^check_output\.log$
 ^doc$
 ^Meta$
 ^CRAN-SUBMISSION$

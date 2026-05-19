@@ -64,7 +64,7 @@ tl_reduce_dimensions <- function(data,
     if (!is.null(n_components)) {
       pc_cols <- paste0("PC", seq_len(n_components))
       transformed <- transformed %>%
-        dplyr::select(.obs_id, dplyr::all_of(pc_cols))
+        dplyr::select(dplyr::all_of(pc_cols))
     }
 
     # Add response back
@@ -79,13 +79,21 @@ tl_reduce_dimensions <- function(data,
     if (!is.null(n_components)) {
       dim_cols <- paste0("Dim", seq_len(n_components))
       transformed <- transformed %>%
-        dplyr::select(.obs_id, dplyr::all_of(dim_cols))
+        dplyr::select(dplyr::all_of(dim_cols))
     }
 
     # Add response back
     if (!is.null(response)) {
       transformed[[response]] <- response_data
     }
+  }
+
+  # Drop the .obs_id row identifier -- it is internal bookkeeping, not a
+  # feature. Leaving it in place lets it reach downstream supervised models
+  # as a high-cardinality predictor, which makes tree-based fits intractable.
+  if (".obs_id" %in% names(transformed)) {
+    transformed <- transformed[, names(transformed) != ".obs_id",
+                               drop = FALSE]
   }
 
   list(

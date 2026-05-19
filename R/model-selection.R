@@ -75,6 +75,7 @@ tl_step_selection <- function(data, formula, direction = "backward",
   model <- structure(
     list(
       spec = list(
+        paradigm = "supervised",
         formula = formula(selected_model),
         method = "linear",
         is_classification = is_classification,
@@ -87,7 +88,7 @@ tl_step_selection <- function(data, formula, direction = "backward",
       fit = selected_model,
       data = data
     ),
-    class = c("tidylearn_linear", "tidylearn_model")
+    class = c("tidylearn_linear", "tidylearn_supervised", "tidylearn_model")
   )
 
   model

@@ -1,3 +1,6 @@
 linters: linters_with_defaults(
-    pipe_consistency_linter = pipe_consistency_linter(pipe = "%>%")
+    pipe_consistency_linter = pipe_consistency_linter(pipe = "%>%"),
+    object_name_linter = object_name_linter(
+      styles = c("snake_case", "symbols", "dotted.case", "camelCase")
+    )
   )

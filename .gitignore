@@ -11,6 +11,7 @@
 Rplots.pdf
 **/Rplots.pdf
 url_check_result.rds
+check_output.log
 
 # Editor / tooling caches
 .claude/

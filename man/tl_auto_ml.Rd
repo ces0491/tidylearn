@@ -34,7 +34,8 @@ interrupt C-level code (e.g. randomForest, xgboost, e1071).
 
 How the budget shapes the workflow:
 \itemize{
-\item \strong{Under 30s}: Only fast models are attempted (tree, logistic/linear).
+\item \strong{Under 30s}: Only fast models are attempted
+(tree, logistic/linear).
 Cross-validation is skipped; models are ranked on training-set metrics
 only. Expect 2 models in the leaderboard. Use this for quick sanity
 checks or interactive exploration.

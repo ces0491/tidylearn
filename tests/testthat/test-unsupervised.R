@@ -149,6 +149,14 @@ test_that("tidy_gower returns a dist object with correct metadata", {
   expect_equal(attr(d, "method"), "gower")
 })
 
+test_that("tidy_gower handles single-row input without erroring", {
+  d <- tidy_gower(iris[1, 1:4])
+
+  expect_s3_class(d, "dist")
+  expect_equal(length(d), 0L)          # no pairs to compute
+  expect_equal(attr(d, "method"), "gower")
+})
+
 test_that("tidy_gower distances are non-negative and symmetric", {
   d <- tidy_gower(iris[1:20, 1:4])
   m <- as.matrix(d)
@@ -208,7 +216,8 @@ test_that("tidy_gower ordered distances are correct", {
 })
 
 test_that("tidy_gower handles mixed numeric and categorical columns", {
-  # x in {0, 1, 0.5}, color in {red, red, blue}; equal weights → average of two d_k
+  # x in {0, 1, 0.5}, color in {red, red, blue}; equal weights, so each
+  # pairwise distance is the average of the two d_k.
   # d(1,2): d_x = 1, d_color = 0  → 0.5
   # d(1,3): d_x = 0.5, d_color = 1  → 0.75
   # d(2,3): d_x = 0.5, d_color = 1  → 0.75
@@ -259,7 +268,7 @@ test_that("tidy_gower respects custom weights", {
   expect_gt(d_wt2[1, 2], d_eq2[1, 2])  # heavy color weight → larger distance
 })
 
-test_that("tidy_gower constant columns contribute zero to numerator but not denominator", {
+test_that("tidy_gower constant column adds to denominator not numerator", {
   # A constant column (range = 0) has d_k = 0 for every pair, so it adds
   # nothing to the numerator.  However, both observations are non-NA, so the
   # column IS counted in valid_vars (the denominator).  The net effect is that

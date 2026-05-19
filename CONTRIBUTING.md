@@ -41,9 +41,19 @@ Internal refactors and pure perf optimizations don't strictly need a NEWS entry,
 
 Follow the surrounding code. The package leans on tidyverse conventions:
 
-- `snake_case` for function and variable names.
+- `snake_case` for function and variable names. The exception is a name that
+  mirrors an argument of a wrapped package — e.g. `n.trees` (`gbm`), `minPts`
+  (`dbscan`), `B` (`cluster::clusGap`) — which keeps that package's spelling
+  so the interface stays familiar. `.lintr` allows `dotted.case` and
+  `camelCase` for this reason; `.lintr` is parsed as strict DCF and cannot
+  carry a comment, hence this note.
 - `<-` (not `=`) for assignment.
 - Exported functions need roxygen documentation with `@param`, `@return`, `@examples`, and `@export`.
+
+`lintr::lint_package()` should report no issues. Install the package first
+(`R CMD INSTALL .` or `devtools::install()`) so `object_usage_linter` can
+resolve the namespace — otherwise it reports spurious "no visible global
+function definition" lints for the package's own internal functions.
 
 ## Opening the PR
 

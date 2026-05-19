@@ -1,6 +1,6 @@
 Package: tidylearn
 Title: A Unified Tidy Interface to R's Machine Learning Ecosystem
-Version: 0.3.0.9000
+Version: 0.3.1
 Authors@R:
     person("Cesaire", "Tobias", email = "cesaire@sheetsolved.com", role = c("aut", "cre"))
 Description: Provides a unified tidyverse-compatible interface to R's machine
@@ -53,7 +53,6 @@ Suggests:
     arulesViz,
     bigrquery,
     car,
-    caret,
     DBI,
     DT,
     GGally,
@@ -64,17 +63,12 @@ Suggests:
     keras,
     knitr,
     lmtest,
-    mclust,
     moments,
     nanoparquet,
     NeuralNetTools,
-    onnx,
-    parsnip,
     paws.storage,
     readr,
     readxl,
-    recipes,
-    reticulate,
     RMariaDB,
     rmarkdown,
     RPostgres,
@@ -85,7 +79,6 @@ Suggests:
     shinydashboard,
     tensorflow,
     testthat (>= 3.0.0),
-    workflows,
     xgboost
 Config/testthat/edition: 3
 URL: https://github.com/ces0491/tidylearn

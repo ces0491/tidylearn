@@ -3,6 +3,7 @@
 Machine Learning for Tidynauts
 
 [![CRAN status](https://www.r-pkg.org/badges/version/tidylearn)](https://cran.r-project.org/package=tidylearn)
+[![R-CMD-check](https://github.com/ces0491/tidylearn/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/ces0491/tidylearn/actions/workflows/R-CMD-check.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 ## Overview
@@ -33,12 +34,12 @@ implementations with the convenience of a consistent, tidy API.
 Each ML package in R has its own API, output format, and conventions. tidylearn
 provides a translation layer so you can:
 
-| Without tidylearn                     | With tidylearn          |
-| ------------------------------------- | ----------------------- |
-| Learn different APIs for each package | One API for everything  |
+| Without tidylearn                     | With tidylearn           |
+| ------------------------------------- | -----------------------  |
+| Learn different APIs for each package | One API for everything   |
 | Write custom code to extract results  | Consistent tibble output |
-| Create different plots for each model | Unified visualization   |
-| Manage package-specific quirks        | Focus on your analysis  |
+| Create different plots for each model | Unified visualization    |
+| Manage package-specific quirks        | Focus on your analysis   |
 
 The underlying algorithms are unchanged - tidylearn simply makes them easier to
 use together.
@@ -161,7 +162,7 @@ tidylearn provides a unified interface to these established R packages:
 ### Unsupervised Learning
 
 | Method | Underlying Package | Function Called |
-|--------|-------------------|-----------------|
+| ------ | ------------------ | --------------- |
 | `"pca"` | stats | `prcomp()` |
 | `"mds"` | stats, MASS, smacof | `cmdscale()`, `isoMDS()`, etc. |
 | `"kmeans"` | stats | `kmeans()` |
@@ -292,7 +293,7 @@ tidylearn is built on these principles:
 ## Contributing
 
 Contributions are welcome. Before opening a PR, please read
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](https://github.com/ces0491/tidylearn/blob/main/CONTRIBUTING.md).
 
 ## License
 
