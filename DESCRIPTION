@@ -109,6 +109,8 @@ Collate:
     'integration.R'
     'pipeline.R'
     'model-selection.R'
+    'compute-detection.R'
+    'compute-advisor.R'
     'tuning.R'
     'interactions.R'
     'diagnostics.R'

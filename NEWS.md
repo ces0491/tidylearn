@@ -1,6 +1,22 @@
 # tidylearn 0.3.1.9000
 
-(Development version.)
+## New Features
+
+### Compute backends (foundation)
+
+* `tl_check_gpu()` — detects local NVIDIA CUDA support and reports which
+  GPU-capable backends (xgboost, keras, tensorflow, torch) are
+  installed. Cheap detection: parses `nvidia-smi` output and checks
+  installed packages without loading Python or fitting a model. Returns
+  a `tidylearn_gpu_check` object with a `print()` method.
+
+* `tl_compute_advisor()` — S3 generic that estimates runtime, peak RAM,
+  and cost across local CPU, local GPU, and cloud GPU tiers for a given
+  tidylearn method and dataset. Dispatches on either a method name
+  (`character`) or a fitted `tidylearn_supervised` model. Returns a
+  structured recommendation with a `print()` method. Cloud-tier
+  estimates are reported but not yet executable; Modal integration will
+  follow in a later iteration.
 
 # tidylearn 0.3.1
 

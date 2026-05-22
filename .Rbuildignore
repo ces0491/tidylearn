@@ -20,3 +20,4 @@
 ^tidylearn\.Rcheck$
 ^Rplots\.pdf$
 ^url_check_result\.rds$
+^SCOPE\.md$

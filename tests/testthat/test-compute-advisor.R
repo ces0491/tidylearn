@@ -1,0 +1,269 @@
+# ---- Compute advisor (tl_compute_advisor and helpers) ----
+
+# Shared fixtures: synthetic gpu_check objects so tests don't depend on
+# the host machine having (or not having) a real GPU.
+fake_gpu_off <- structure(
+  list(
+    any_gpu = FALSE,
+    cuda = list(
+      driver_present = FALSE,
+      device_count   = 0L,
+      device_names   = character(0),
+      driver_version = NA_character_
+    ),
+    backends = list(
+      xgboost    = list(installed = FALSE, gpu_likely_works = FALSE),
+      tensorflow = list(installed = FALSE, gpu_likely_works = FALSE),
+      keras      = list(installed = FALSE, gpu_likely_works = FALSE),
+      torch      = list(installed = FALSE, gpu_likely_works = FALSE)
+    ),
+    messages = character(0)
+  ),
+  class = "tidylearn_gpu_check"
+)
+
+fake_gpu_xgb <- structure(
+  list(
+    any_gpu = TRUE,
+    cuda = list(
+      driver_present = TRUE,
+      device_count   = 1L,
+      device_names   = "Tesla T4",
+      driver_version = "525.85.12"
+    ),
+    backends = list(
+      xgboost    = list(installed = TRUE,  gpu_likely_works = TRUE),
+      tensorflow = list(installed = FALSE, gpu_likely_works = FALSE),
+      keras      = list(installed = FALSE, gpu_likely_works = FALSE),
+      torch      = list(installed = FALSE, gpu_likely_works = FALSE)
+    ),
+    messages = character(0)
+  ),
+  class = "tidylearn_gpu_check"
+)
+
+test_that(".character dispatch returns expected structure", {
+  result <- tl_compute_advisor(
+    "linear", iris, Species ~ .,
+    gpu_check = fake_gpu_off
+  )
+  expect_s3_class(result, "tidylearn_compute_advice")
+  expect_named(
+    result,
+    c("problem", "local_cpu", "local_gpu", "cloud",
+      "recommendation", "reasoning")
+  )
+  expect_equal(result$problem$method, "linear")
+  expect_equal(result$problem$rows, nrow(iris))
+})
+
+test_that(".character dispatch validates method name", {
+  expect_error(
+    tl_compute_advisor("nonexistent_method", iris, Species ~ .,
+                       gpu_check = fake_gpu_off),
+    "not supported by the advisor"
+  )
+})
+
+test_that(".character dispatch rejects empty method name", {
+  expect_error(
+    tl_compute_advisor("", iris, Species ~ ., gpu_check = fake_gpu_off),
+    "single non-empty method name"
+  )
+})
+
+test_that(".character dispatch validates data type", {
+  expect_error(
+    tl_compute_advisor("linear", "not_a_df", Species ~ .,
+                       gpu_check = fake_gpu_off),
+    "'data' must be a data frame"
+  )
+})
+
+test_that(".character dispatch validates hyperparams type", {
+  expect_error(
+    tl_compute_advisor("linear", iris, Species ~ .,
+                       hyperparams = "bad",
+                       gpu_check = fake_gpu_off),
+    "must be a list"
+  )
+})
+
+test_that(".character dispatch validates gpu_check class", {
+  expect_error(
+    tl_compute_advisor("linear", iris, Species ~ .,
+                       gpu_check = list()),
+    "tidylearn_gpu_check object"
+  )
+})
+
+test_that(".tidylearn_supervised dispatch introspects method + formula", {
+  fake_model <- structure(
+    list(
+      spec = list(
+        method  = "linear",
+        formula = Sepal.Length ~ Sepal.Width
+      ),
+      fit  = NULL,
+      data = iris
+    ),
+    class = c("tidylearn_linear", "tidylearn_supervised", "tidylearn_model")
+  )
+  result <- tl_compute_advisor(fake_model, gpu_check = fake_gpu_off)
+  expect_s3_class(result, "tidylearn_compute_advice")
+  expect_equal(result$problem$method, "linear")
+  expect_equal(result$problem$cols, 1L)
+})
+
+test_that(".tidylearn_supervised dispatch accepts new data argument", {
+  fake_model <- structure(
+    list(
+      spec = list(
+        method  = "linear",
+        formula = Sepal.Length ~ Sepal.Width
+      ),
+      fit  = NULL,
+      data = iris
+    ),
+    class = c("tidylearn_linear", "tidylearn_supervised", "tidylearn_model")
+  )
+  new_data <- iris[1:50, ]
+  result <- tl_compute_advisor(
+    fake_model, data = new_data, gpu_check = fake_gpu_off
+  )
+  expect_equal(result$problem$rows, 50L)
+})
+
+test_that(".default dispatch errors helpfully", {
+  expect_error(
+    tl_compute_advisor(42),
+    "expects either a method name"
+  )
+  expect_error(
+    tl_compute_advisor(list()),
+    "expects either a method name"
+  )
+})
+
+test_that("small problem recommends CPU", {
+  result <- tl_compute_advisor(
+    "linear", iris, Species ~ .,
+    gpu_check = fake_gpu_xgb
+  )
+  expect_equal(result$recommendation, "cpu")
+  expect_match(result$reasoning, "Cloud cold-start|run it locally")
+})
+
+test_that("non-GPU method reports local_gpu as not applicable", {
+  result <- tl_compute_advisor(
+    "linear", iris, Species ~ .,
+    gpu_check = fake_gpu_xgb
+  )
+  expect_false(result$local_gpu$available)
+  expect_match(result$local_gpu$notes, "no upstream GPU path")
+})
+
+test_that("xgboost with GPU detected reports GPU available", {
+  result <- tl_compute_advisor(
+    "xgboost", iris, Species ~ .,
+    gpu_check = fake_gpu_xgb
+  )
+  expect_true(result$local_gpu$available)
+})
+
+test_that("xgboost without GPU reports GPU not available", {
+  result <- tl_compute_advisor(
+    "xgboost", iris, Species ~ .,
+    gpu_check = fake_gpu_off
+  )
+  expect_false(result$local_gpu$available)
+  expect_match(result$local_gpu$notes, "no GPU-capable backend")
+})
+
+test_that("cloud tier is reported as not configured in this slice", {
+  result <- tl_compute_advisor(
+    "xgboost", iris, Species ~ .,
+    gpu_check = fake_gpu_xgb
+  )
+  expect_false(result$cloud$configured)
+  expect_match(result$cloud$notes, "not yet configured")
+})
+
+test_that("large xgboost problem with GPU recommends gpu", {
+  big <- as.data.frame(matrix(rnorm(2e5 * 50), ncol = 50))
+  names(big) <- paste0("v", seq_len(50))
+  big$y <- rnorm(nrow(big))
+  result <- tl_compute_advisor(
+    "xgboost", big, y ~ .,
+    hyperparams = list(nrounds = 5000),
+    gpu_check = fake_gpu_xgb
+  )
+  expect_equal(result$recommendation, "gpu")
+})
+
+test_that("xgboost long-running but no GPU recommends cpu", {
+  big <- as.data.frame(matrix(rnorm(2e5 * 50), ncol = 50))
+  names(big) <- paste0("v", seq_len(50))
+  big$y <- rnorm(nrow(big))
+  result <- tl_compute_advisor(
+    "xgboost", big, y ~ .,
+    hyperparams = list(nrounds = 5000),
+    gpu_check = fake_gpu_off
+  )
+  expect_equal(result$recommendation, "cpu")
+})
+
+test_that("tl_effective_p_internal handles NULL formula", {
+  expect_equal(tl_effective_p_internal(iris, NULL), 4L)
+})
+
+test_that("tl_effective_p_internal handles dot formula", {
+  expect_equal(tl_effective_p_internal(iris, Species ~ .), 4L)
+})
+
+test_that("tl_effective_p_internal counts explicit predictors", {
+  expect_equal(
+    tl_effective_p_internal(iris, Species ~ Sepal.Length + Sepal.Width),
+    2L
+  )
+})
+
+test_that("tl_method_complexity_internal respects hyperparams", {
+  base <- tl_method_complexity_internal("xgboost", 1000, 10, list())
+  more <- tl_method_complexity_internal(
+    "xgboost", 1000, 10, list(nrounds = 1000)
+  )
+  expect_gt(more, base)
+})
+
+test_that("tl_method_complexity_internal scales with rows and cols", {
+  small <- tl_method_complexity_internal("linear", 100,  5, list())
+  big   <- tl_method_complexity_internal("linear", 1000, 5, list())
+  expect_gt(big, small)
+})
+
+test_that("tl_method_complexity_internal has a sane fallback", {
+  result <- tl_method_complexity_internal(
+    "nonexistent", 100, 5, list()
+  )
+  expect_equal(result, 500)
+})
+
+test_that("print.tidylearn_compute_advice runs without error", {
+  result <- tl_compute_advisor(
+    "linear", iris, Species ~ .,
+    gpu_check = fake_gpu_off
+  )
+  expect_output(print(result), "tidylearn compute advice")
+  expect_output(print(result), "Recommendation:")
+})
+
+test_that("print.tidylearn_compute_advice renders cloud cost when available", {
+  result <- tl_compute_advisor(
+    "xgboost", iris, Species ~ .,
+    gpu_check = fake_gpu_xgb
+  )
+  output <- capture.output(print(result))
+  expect_true(any(grepl("Cloud GPU:", output)))
+  expect_true(any(grepl("not configured", output)))
+})
