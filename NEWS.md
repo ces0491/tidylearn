@@ -40,6 +40,33 @@
   on supervised and unsupervised methods. The resolved tier is recorded
   on `model$spec$compute` for both paradigms.
 
+### Compute backends (cloud reframed as memory-headroom tier)
+
+* `tl_compute_advisor()` now treats cloud as a "doesn't fit on my
+  machine" tier rather than a GPU-acceleration-only tier. Cloud
+  estimates are produced for every method (not just GPU-eligible
+  ones), and the recommendation flips to `"cloud"` whenever the local
+  job is RAM-infeasible — even for CPU-only methods like PCA, kmeans,
+  or linear regression on very large data.
+
+* New internal Modal instance tier table (`.tl_modal_tiers`) listing
+  CPU-RAM tiers (`cpu-small`, `cpu-large`, `cpu-xlarge`) alongside GPU
+  tiers (`t4`, `a10g`, `a100-40gb`, `a100-80gb`). The advisor picks the
+  cheapest viable tier for the workload based on RAM headroom and
+  whether the method has an upstream GPU path. Pricing is approximate
+  as of early 2026 and may drift; revise if Modal pricing changes.
+
+* The advisor's recommendation is no longer gated on
+  `cloud$configured`. The advisor advises optimally; the caller
+  (`tl_resolve_compute()`) decides whether it can act on a cloud
+  recommendation. When `compute = "auto"` and the advisor recommends
+  cloud, `tl_resolve_compute()` emits a clear message that cloud isn't
+  yet wired up and falls back to local CPU.
+
+* Print method updated: the cloud line now shows the chosen tier label
+  (e.g., `T4 (16 GB VRAM / 16 GB RAM)`) alongside the time and cost
+  estimate.
+
 # tidylearn 0.3.1
 
 ## Performance

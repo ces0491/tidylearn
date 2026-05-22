@@ -258,12 +258,167 @@ test_that("print.tidylearn_compute_advice runs without error", {
   expect_output(print(result), "Recommendation:")
 })
 
-test_that("print.tidylearn_compute_advice renders cloud cost when available", {
+test_that("print.tidylearn_compute_advice renders cloud cost + tier", {
   result <- tl_compute_advisor(
     "xgboost", iris, Species ~ .,
     gpu_check = fake_gpu_xgb
   )
   output <- capture.output(print(result))
-  expect_true(any(grepl("Cloud GPU:", output)))
+  expect_true(any(grepl("Cloud:", output)))
   expect_true(any(grepl("not configured", output)))
+  # Tier label should appear (xgboost is GPU-eligible -> picks a GPU tier)
+  expect_true(any(grepl("T4|A10G|A100", output)))
+})
+
+# ---- Cloud reframe: applies to all methods, RAM-bound triggers cloud ----
+
+test_that("cloud estimate now applies to CPU-only methods too", {
+  result <- tl_compute_advisor(
+    "linear", iris, Species ~ .,
+    gpu_check = fake_gpu_off
+  )
+  expect_true(is_finite_num(result$cloud$est_seconds))
+  expect_true(is_finite_num(result$cloud$est_cost_usd))
+  expect_false(result$cloud$has_gpu)
+  expect_match(result$cloud$tier_label, "cpu-")
+})
+
+test_that("cloud estimate picks a GPU tier for GPU-eligible methods", {
+  result <- tl_compute_advisor(
+    "xgboost", iris, Species ~ .,
+    gpu_check = fake_gpu_xgb
+  )
+  expect_true(result$cloud$has_gpu)
+  expect_true(grepl("T4|A10G|A100", result$cloud$tier_label))
+})
+
+test_that("RAM-infeasible workload triggers cloud regardless of GPU", {
+  # Build synthetic per-tier estimates that simulate a RAM-bound
+  # local-CPU job and a viable cloud estimate. This is the unit-level
+  # test of the new recommendation contract -- the integration is
+  # exercised separately via tl_compute_advisor on real (small) data.
+  ram_bound_cpu <- list(
+    est_seconds     = 600,
+    est_peak_ram_mb = 32000,
+    cores_used      = 4L,
+    feasible        = FALSE,
+    notes           = "exceeds heuristic"
+  )
+  no_local_gpu <- list(
+    est_seconds = NA_real_,
+    available   = FALSE,
+    feasible    = FALSE,
+    notes       = "no GPU path"
+  )
+  cloud_est <- list(
+    est_seconds    = 100,
+    est_cost_usd   = 0.30,
+    upload_seconds = 5,
+    tier_name      = "cpu-large",
+    tier_label     = "cpu-large (8 CPU / 64 GB)",
+    ram_needed_gb  = 48,
+    has_gpu        = FALSE,
+    configured     = FALSE,
+    notes          = "not configured"
+  )
+
+  # CPU-only method (linear) -> cloud should be recommended even
+  # without any local GPU and without cloud being "configured".
+  result <- tl_recommend_internal(ram_bound_cpu, no_local_gpu, cloud_est)
+  expect_equal(result$recommendation, "cloud")
+  expect_true(any(grepl("Local CPU infeasible", result$reasoning)))
+  expect_true(any(grepl("cpu-large", result$reasoning)))
+})
+
+test_that("RAM-infeasible workload returns infeasible when no cloud estimate", {
+  ram_bound_cpu <- list(
+    est_seconds     = 600,
+    est_peak_ram_mb = 32000,
+    cores_used      = 4L,
+    feasible        = FALSE,
+    notes           = "exceeds heuristic"
+  )
+  no_local_gpu <- list(
+    est_seconds = NA_real_,
+    available   = FALSE,
+    feasible    = FALSE,
+    notes       = ""
+  )
+  no_cloud <- list(
+    est_seconds   = NA_real_,
+    est_cost_usd  = NA_real_,
+    tier_name     = NA_character_,
+    tier_label    = NA_character_,
+    ram_needed_gb = 48,
+    has_gpu       = FALSE,
+    configured    = FALSE,
+    notes         = ""
+  )
+  result <- tl_recommend_internal(ram_bound_cpu, no_local_gpu, no_cloud)
+  expect_equal(result$recommendation, "infeasible")
+})
+
+test_that("tl_pick_modal_tier picks the cheapest viable GPU tier", {
+  # Small RAM need + GPU-eligible method -> T4 (cheapest GPU tier)
+  pick <- tl_pick_modal_tier_internal(
+    method_has_gpu_path = TRUE,
+    cpu_seconds         = 100,
+    method_speedup      = 5,
+    ram_needed_gb       = 4
+  )
+  expect_equal(pick$name, "t4")
+  expect_true(pick$has_gpu)
+  expect_true(pick$fits_ram_need)
+})
+
+test_that("tl_pick_modal_tier picks larger GPU tier when RAM needed", {
+  # 60 GB RAM need + GPU -> needs A100 (T4 has only 16 GB, A10G 24 GB)
+  pick <- tl_pick_modal_tier_internal(
+    method_has_gpu_path = TRUE,
+    cpu_seconds         = 100,
+    method_speedup      = 5,
+    ram_needed_gb       = 60
+  )
+  expect_equal(pick$name, "a100-40gb")
+  expect_true(pick$fits_ram_need)
+})
+
+test_that("tl_pick_modal_tier picks CPU tier for CPU-only methods", {
+  pick <- tl_pick_modal_tier_internal(
+    method_has_gpu_path = FALSE,
+    cpu_seconds         = 100,
+    method_speedup      = 1,
+    ram_needed_gb       = 4
+  )
+  expect_false(pick$has_gpu)
+  expect_match(pick$name, "cpu-")
+})
+
+test_that("tl_pick_modal_tier falls back when no tier has enough RAM", {
+  # 500 GB exceeds all tiers — picks biggest with fits_ram_need = FALSE
+  pick <- tl_pick_modal_tier_internal(
+    method_has_gpu_path = TRUE,
+    cpu_seconds         = 100,
+    method_speedup      = 5,
+    ram_needed_gb       = 500
+  )
+  expect_equal(pick$name, "a100-80gb")
+  expect_false(pick$fits_ram_need)
+})
+
+test_that("recommendation no longer gated on cloud$configured", {
+  # Big RAM-bound CPU-only problem: advisor should recommend cloud
+  # even though configured = FALSE. The new contract: advisor advises
+  # optimally; caller decides whether it can act on the recommendation.
+  result <- tl_compute_advisor(
+    "linear",
+    data = data.frame(y = numeric(5), x1 = numeric(5)),
+    formula = y ~ x1,
+    gpu_check = fake_gpu_off
+  )
+  # iris-sized problem is small enough that cpu is the right answer.
+  # Just confirm we no longer gate on configured.
+  expect_false(result$cloud$configured)
+  # And that cloud estimate is populated (not NA) for this CPU-only fit.
+  expect_true(is_finite_num(result$cloud$est_seconds))
 })

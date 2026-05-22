@@ -95,6 +95,31 @@ tl_resolve_compute <- function(method, data, formula, compute = "cpu",
     return("gpu")
   }
 
+  # The advisor can recommend "cloud" when local resources are
+  # insufficient (RAM-bound or compute-bound + cloud meaningfully
+  # faster), even for methods without an upstream GPU path. Cloud is
+  # not yet wired up, so we surface the recommendation as a message and
+  # fall back to local CPU.
+  if (advice$recommendation == "cloud") {
+    message(
+      "compute = 'auto' advisor recommended 'cloud' for method '",
+      method, "', but cloud is not yet wired up in tidylearn. ",
+      "Falling back to CPU (may be slow or RAM-bound). See ",
+      "?tl_compute_advisor for the full advice."
+    )
+    return("cpu")
+  }
+
+  if (advice$recommendation == "infeasible") {
+    warning(
+      "compute = 'auto' advisor reported the workload as infeasible ",
+      "locally and no viable cloud tier was found. Proceeding on CPU; ",
+      "the fit may fail. See ?tl_compute_advisor.",
+      call. = FALSE
+    )
+    return("cpu")
+  }
+
   message(
     "compute = 'auto' chose 'cpu' for method '", method, "'."
   )
