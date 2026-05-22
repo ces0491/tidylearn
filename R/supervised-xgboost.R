@@ -25,6 +25,10 @@ NULL
 #' @param nthread Number of threads (default: max available)
 #' @param verbose Verbose output (default: 0)
 #' @param ... Additional arguments to pass to xgb.train()
+#' @param compute Compute tier. Either \code{"cpu"} (default) or
+#'   \code{"gpu"}; when \code{"gpu"}, the function passes
+#'   \code{device = "cuda"} to \code{xgb.train()}. Requires an
+#'   xgboost build with CUDA support.
 #' @return A fitted XGBoost model
 #' @keywords internal
 tl_fit_xgboost <- function(data, formula, is_classification = FALSE,
@@ -33,7 +37,8 @@ tl_fit_xgboost <- function(data, formula, is_classification = FALSE,
                            min_child_weight = 1, gamma = 0,
                            alpha = 0, lambda = 1,
                            early_stopping_rounds = NULL,
-                           nthread = NULL, verbose = 0, ...) {
+                           nthread = NULL, verbose = 0, ...,
+                           compute = "cpu") {
   # Check if xgboost is installed
   tl_check_packages("xgboost")
 
@@ -97,6 +102,12 @@ tl_fit_xgboost <- function(data, formula, is_classification = FALSE,
   # Add nthread parameter if specified
   if (!is.null(nthread)) {
     params$nthread <- nthread
+  }
+
+  # Route to local CUDA when caller resolved compute to GPU. Requires
+  # an xgboost build with CUDA support; otherwise xgb.train will error.
+  if (identical(compute, "gpu")) {
+    params$device <- "cuda"
   }
 
   # Train XGBoost model

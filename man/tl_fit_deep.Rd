@@ -15,7 +15,8 @@ tl_fit_deep(
   batch_size = 32,
   validation_split = 0.2,
   verbose = 0,
-  ...
+  ...,
+  compute = "cpu"
 )
 }
 \arguments{
@@ -45,6 +46,14 @@ classification problem}
 2 = one line per epoch) (default: 0)}
 
 \item{...}{Additional arguments}
+
+\item{compute}{Compute tier. Either \code{"cpu"} (default) or
+\code{"gpu"}. GPU usage is handled automatically by the underlying
+tensorflow runtime when CUDA is configured; this argument is
+accepted for API consistency with the rest of \pkg{tidylearn} but
+does not itself change the keras model setup. The expectation is
+that the caller has already resolved the compute tier via
+\code{\link{tl_compute_advisor}} / \code{tl_resolve_compute}.}
 }
 \value{
 A fitted deep learning model

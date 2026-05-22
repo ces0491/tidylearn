@@ -111,6 +111,7 @@ Collate:
     'model-selection.R'
     'compute-detection.R'
     'compute-advisor.R'
+    'compute-routing.R'
     'tuning.R'
     'interactions.R'
     'diagnostics.R'

@@ -18,6 +18,28 @@
   estimates are reported but not yet executable; Modal integration will
   follow in a later iteration.
 
+### Compute backends (local GPU routing)
+
+* `tl_model()` now accepts a `compute` argument on both supervised and
+  unsupervised paths: `"cpu"` (default — existing behaviour), `"gpu"`
+  (route to local CUDA when the method supports it), `"auto"` (consult
+  `tl_compute_advisor()` and pick per call), or `"cloud"` (reserved;
+  errors with a clear message until the Modal integration lands).
+
+* `tl_fit_xgboost(compute = "gpu")` passes `device = "cuda"` to
+  `xgb.train()`. Requires xgboost compiled with CUDA support.
+
+* `tl_fit_deep(compute = "gpu")` defers to TensorFlow's automatic CUDA
+  detection — the argument is accepted for API consistency but does not
+  itself change the keras model setup.
+
+* All compute validation flows through `tl_resolve_compute()` so the
+  behaviour is uniform across paradigms: methods without an upstream
+  GPU path (linear, glm, randomForest, pca, kmeans, etc.) warn and fall
+  back to CPU when `"gpu"` is requested; `"cloud"` errors the same way
+  on supervised and unsupervised methods. The resolved tier is recorded
+  on `model$spec$compute` for both paradigms.
+
 # tidylearn 0.3.1
 
 ## Performance

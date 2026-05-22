@@ -61,6 +61,14 @@ NULL
 #'   "mds" (stats/MASS/smacof), "kmeans" (stats::kmeans),
 #'   "pam"/"clara" (cluster), "hclust" (stats::hclust),
 #'   "dbscan" (dbscan).
+#' @param compute Compute tier for the fit. One of \code{"cpu"} (default,
+#'   existing behaviour), \code{"gpu"} (route to local CUDA when the
+#'   method has an upstream GPU path -- xgboost and deep learning today),
+#'   \code{"auto"} (consult \code{\link{tl_compute_advisor}} and pick per
+#'   call), or \code{"cloud"} (reserved -- not yet wired up). When
+#'   \code{"gpu"} is requested for a method without an upstream GPU path
+#'   or on a machine without a detected GPU, the call falls back to CPU
+#'   with a warning.
 #' @param ... Additional arguments passed to the underlying model function
 #' @return A \code{tidylearn_model} object (S3) containing the fitted model
 #'   (\code{$fit}), model specification (\code{$spec}), and training data
@@ -86,7 +94,8 @@ NULL
 #' model <- tl_model(iris, method = "kmeans", k = 3)
 #' model$fit  # Access the raw kmeans object
 #' }
-tl_model <- function(data, formula = NULL, method = "linear", ...) {
+tl_model <- function(data, formula = NULL, method = "linear", ...,
+                     compute = "cpu") {
   # Validate inputs
   if (!is.data.frame(data)) {
     stop("'data' must be a data frame", call. = FALSE)
@@ -118,11 +127,14 @@ tl_model <- function(data, formula = NULL, method = "linear", ...) {
     )
   }
 
-  # Route to appropriate function
+  # Route to appropriate function. Both paths thread `compute` through
+  # tl_resolve_compute(), which applies the documented fallback rules
+  # uniformly — including "cloud" -> error for all methods until Modal
+  # lands.
   if (is_supervised) {
-    tl_model_supervised(data, formula, method, ...)
+    tl_model_supervised(data, formula, method, compute = compute, ...)
   } else {
-    tl_model_unsupervised(data, formula, method, ...)
+    tl_model_unsupervised(data, formula, method, compute = compute, ...)
   }
 }
 
@@ -131,7 +143,7 @@ tl_model <- function(data, formula = NULL, method = "linear", ...) {
 #' Internal function for creating supervised models
 #' @keywords internal
 #' @noRd
-tl_model_supervised <- function(data, formula, method, ...) {
+tl_model_supervised <- function(data, formula, method, ..., compute = "cpu") {
   if (!inherits(formula, "formula")) {
     formula <- as.formula(formula)
   }
@@ -153,16 +165,25 @@ tl_model_supervised <- function(data, formula, method, ...) {
     )
   }
 
+  # Resolve the effective compute tier (handles auto/gpu fallbacks).
+  # CPU-only methods short-circuit so they don't trigger advisor / GPU
+  # detection unnecessarily.
+  effective_compute <- tl_resolve_compute(
+    method, data, formula, compute = compute
+  )
+
   # Create model specification
   model_spec <- list(
     paradigm = "supervised",
     formula = formula,
     method = method,
     is_classification = is_classification,
-    response_var = response_var
+    response_var = response_var,
+    compute = effective_compute
   )
 
-  # Fit the model based on method
+  # Fit the model based on method. Methods with an upstream GPU path
+  # receive the resolved compute tier; others ignore it.
   fitted_model <- switch(
     method,
     "linear" = tl_fit_linear(data, formula, ...),
@@ -176,8 +197,14 @@ tl_model_supervised <- function(data, formula, method, ...) {
     "elastic_net" = tl_fit_elastic_net(data, formula, is_classification, ...),
     "svm" = tl_fit_svm(data, formula, is_classification, ...),
     "nn" = tl_fit_nn(data, formula, is_classification, ...),
-    "deep" = tl_fit_deep(data, formula, is_classification, ...),
-    "xgboost" = tl_fit_xgboost(data, formula, is_classification, ...),
+    "deep" = tl_fit_deep(
+      data, formula, is_classification,
+      compute = effective_compute, ...
+    ),
+    "xgboost" = tl_fit_xgboost(
+      data, formula, is_classification,
+      compute = effective_compute, ...
+    ),
     stop("Unsupported supervised method: ", method, call. = FALSE)
   )
 
@@ -202,14 +229,23 @@ tl_model_supervised <- function(data, formula, method, ...) {
 #' Internal function for creating unsupervised models
 #' @keywords internal
 #' @noRd
-tl_model_unsupervised <- function(data, formula = NULL, method, ...) {
+tl_model_unsupervised <- function(data, formula = NULL, method, ...,
+                                  compute = "cpu") {
   # For unsupervised learning, formula can be NULL or ~ vars
+
+  # Resolve the effective compute tier. None of tidylearn's current
+  # unsupervised methods have an upstream GPU path, so "gpu" warns and
+  # falls back to CPU; "cloud" errors uniformly until Modal lands.
+  effective_compute <- tl_resolve_compute(
+    method, data, formula, compute = compute
+  )
 
   # Create model specification
   model_spec <- list(
     paradigm = "unsupervised",
     formula = formula,
-    method = method
+    method = method,
+    compute = effective_compute
   )
 
   # Fit the model based on method

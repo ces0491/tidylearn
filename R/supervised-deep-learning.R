@@ -24,6 +24,13 @@ NULL
 #' @param verbose Verbosity mode (0 = silent, 1 = progress bar,
 #'   2 = one line per epoch) (default: 0)
 #' @param ... Additional arguments
+#' @param compute Compute tier. Either \code{"cpu"} (default) or
+#'   \code{"gpu"}. GPU usage is handled automatically by the underlying
+#'   tensorflow runtime when CUDA is configured; this argument is
+#'   accepted for API consistency with the rest of \pkg{tidylearn} but
+#'   does not itself change the keras model setup. The expectation is
+#'   that the caller has already resolved the compute tier via
+#'   \code{\link{tl_compute_advisor}} / \code{tl_resolve_compute}.
 #' @return A fitted deep learning model
 #' @keywords internal
 tl_fit_deep <- function(data, formula,
@@ -33,7 +40,8 @@ tl_fit_deep <- function(data, formula,
                         dropout = 0.2,
                         epochs = 30, batch_size = 32,
                         validation_split = 0.2,
-                        verbose = 0, ...) {
+                        verbose = 0, ...,
+                        compute = "cpu") {
   # Check if keras is installed
   tl_check_packages(c("keras", "tensorflow"))
 

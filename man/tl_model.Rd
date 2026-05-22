@@ -4,7 +4,7 @@
 \alias{tl_model}
 \title{Create a tidylearn model}
 \usage{
-tl_model(data, formula = NULL, method = "linear", ...)
+tl_model(data, formula = NULL, method = "linear", ..., compute = "cpu")
 }
 \arguments{
 \item{data}{A data frame containing the training data}
@@ -23,6 +23,15 @@ Unsupervised: "pca" (stats::prcomp),
 "dbscan" (dbscan).}
 
 \item{...}{Additional arguments passed to the underlying model function}
+
+\item{compute}{Compute tier for the fit. One of \code{"cpu"} (default,
+existing behaviour), \code{"gpu"} (route to local CUDA when the
+method has an upstream GPU path -- xgboost and deep learning today),
+\code{"auto"} (consult \code{\link{tl_compute_advisor}} and pick per
+call), or \code{"cloud"} (reserved -- not yet wired up). When
+\code{"gpu"} is requested for a method without an upstream GPU path
+or on a machine without a detected GPU, the call falls back to CPU
+with a warning.}
 }
 \value{
 A \code{tidylearn_model} object (S3) containing the fitted model
