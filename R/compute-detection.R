@@ -21,12 +21,14 @@
 #'   and `messages` (character vector). A `print()` method is provided.
 #'
 #' @examples
-#' \dontrun{
+#' # Safe to call anywhere: probes for nvidia-smi on the PATH and checks
+#' # which backend packages are installed. Reports no GPU rather than
+#' # failing when there isn't one.
 #' gpu <- tl_check_gpu()
-#' print(gpu)
+#' gpu$any_gpu
+#'
 #' if (gpu$any_gpu && gpu$backends$xgboost$gpu_likely_works) {
 #'   # xgboost with GPU is worth trying for this workload
-#' }
 #' }
 #' @export
 tl_check_gpu <- function(verbose = FALSE) {
@@ -118,6 +120,21 @@ tl_detect_cuda_internal <- function() {
     return(na_result)
   }
 
+  # system2() attaches a "status" attribute on a non-zero exit. A machine
+  # with the binary installed but the driver unloaded prints its error to
+  # stdout and exits non-zero -- without this check that error text would
+  # be parsed as a device name and reported as a working GPU.
+  exit_status <- attr(out, "status")
+  if (!is.null(exit_status) && !identical(as.integer(exit_status), 0L)) {
+    return(na_result)
+  }
+
+  # Defensive: a successful query returns "name, driver_version" per GPU
+  out <- out[nzchar(trimws(out))]
+  if (length(out) == 0L || !any(grepl(",", out, fixed = TRUE))) {
+    return(na_result)
+  }
+
   parsed <- strsplit(out, ",\\s*")
   device_names <- vapply(parsed, function(p) p[1], character(1))
   driver_v <- if (length(parsed[[1]]) >= 2) parsed[[1]][2] else NA_character_
@@ -154,6 +171,25 @@ tl_check_backend_gpu <- function(pkg, cuda) {
       gpu_likely_works = FALSE,
       notes            = "Installed, but no CUDA driver detected."
     ))
+  }
+
+  # xgboost gained the `device = "cuda"` parameter in 2.0.0. Older
+  # versions silently ignore it and train on CPU, so treat them as having
+  # no GPU path rather than reporting a GPU fit that never happened.
+  min_version <- c("xgboost" = "2.0.0")
+  if (pkg %in% names(min_version)) {
+    installed_version <- utils::packageVersion(pkg)
+    if (installed_version < min_version[[pkg]]) {
+      return(list(
+        installed        = TRUE,
+        gpu_likely_works = FALSE,
+        notes            = paste0(
+          "Installed version ", as.character(installed_version),
+          " predates GPU support; ", pkg, " >= ", min_version[[pkg]],
+          " is required."
+        )
+      ))
+    }
   }
 
   config_note <- switch(

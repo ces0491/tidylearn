@@ -78,14 +78,23 @@ toggle parameters `use_reduction` and `use_clustering`.
 
 | Phase | What it does | Models added (classification) | Models added (regression) |
 |-------|-------------|-------------------------------|---------------------------|
-| 1. Baselines | Trains standard models | tree, logistic, forest | tree, linear, forest |
-| 2. PCA variants | PCA preprocessing + baseline methods | pca\_tree, pca\_logistic, pca\_forest | pca\_tree, pca\_linear, pca\_forest |
-| 3. Cluster variants | Adds cluster assignments as features | clustered\_tree, clustered\_logistic, clustered\_forest | clustered\_tree, clustered\_linear, clustered\_forest |
+| 1. Baselines | Trains standard models | tree, logistic\*, forest | tree, linear, forest |
+| 2. PCA variants | PCA preprocessing + baseline methods | pca\_tree, pca\_logistic\*, pca\_forest | pca\_tree, pca\_linear, pca\_forest |
+| 3. Cluster variants | Adds cluster assignments as features | clustered\_tree, clustered\_logistic\*, clustered\_forest | clustered\_tree, clustered\_linear, clustered\_forest |
 | 4. Advanced | Tries heavier methods | svm, xgboost | ridge, lasso |
+
+\* Logistic regression is binary only, so it is included only when the
+response has exactly two classes. On a multiclass problem such as `iris`
+the baselines are tree and forest, and the `_logistic` variants are absent.
 
 Each model is first fit on the full training data, then (if budget allows)
 evaluated with k-fold cross-validation. When time is tight, models fall back
 to training-set metrics instead of CV.
+
+The `evaluation` column on the leaderboard records which of the two produced
+each score — `"cv"` or `"train"`. Training metrics are optimistically biased,
+so a leaderboard mixing the two is not ranking like with like. If you see
+both, raise the budget.
 
 ## Understanding the Time Budget
 
@@ -101,9 +110,12 @@ last model that started before the budget expired.
 
 | Budget | Baselines | CV | PCA/Cluster variants | Advanced models | Typical models | Use case |
 |--------|-----------|-----|----------------------|-----------------|----------------|----------|
-| < 30 s | tree + logistic/linear only | No (training metrics) | No | No | 2 | Quick sanity check, interactive use |
+| < 30 s | tree + logistic/linear only | No (training metrics) | No | No | 1--2 | Quick sanity check, interactive use |
 | 30--120 s | tree + logistic/linear + forest | When time remains | If enabled and > 10 % budget left | If > 40 % budget left | 3--7 | Development iteration, notebook exploration |
-| 120 s+ | All | Yes | Yes (if enabled) | Yes | 9--11 | Thorough comparison, final model selection |
+| 120 s+ | All | Yes | Yes (if enabled) | Yes | 8--11 | Thorough comparison, final model selection |
+
+Model counts are for a binary response. A multiclass problem drops the
+logistic variants, so expect one fewer per phase.
 
 The "forest" baseline and all advanced models (SVM, XGBoost, ridge, lasso)
 involve C-level code that typically takes 3--15 seconds per fit depending on
@@ -128,21 +140,23 @@ quick <- tl_auto_ml(iris, Species ~ .,
                     use_reduction = FALSE,
                     use_clustering = FALSE)
 quick$leaderboard
-#> baseline_tree, baseline_logistic
+#> baseline_tree only -- iris is multiclass, so logistic is skipped.
+#> On a two-class response this would be baseline_tree, baseline_logistic.
 
 # Development iteration -- baselines + forest, some CV
 medium <- tl_auto_ml(iris, Species ~ .,
                      time_budget = 60,
                      cv_folds = 3)
 medium$leaderboard
-#> 5--7 models depending on data size
+#> 4--7 models depending on data size and number of classes
 
 # Thorough search -- all phases, full CV
 thorough <- tl_auto_ml(iris, Species ~ .,
                        time_budget = 300,
                        cv_folds = 5)
 thorough$leaderboard
-#> 9--11 models with cross-validated scores
+#> 8--11 models with cross-validated scores (iris is multiclass,
+#> so the logistic variants are skipped)
 ```
 
 ## Task Type Detection
@@ -214,10 +228,12 @@ pca_forest <- result$models$pca_forest
 ### Leaderboard
 
 ```{r, eval=FALSE}
-# View performance comparison
+# View performance comparison. Columns are model, score and evaluation
+# ("cv" or "train" -- see "How AutoML Works" above).
 leaderboard <- result$leaderboard
 
-# Sort by score (higher is better for accuracy, lower for RMSE)
+# Already sorted best-first, but to re-sort explicitly:
+# higher is better for accuracy, lower for RMSE
 leaderboard <- leaderboard %>%
   arrange(desc(score))
 
@@ -455,18 +471,19 @@ baseline_result <- tl_auto_ml(data, formula,
 quick_result <- tl_auto_ml(data, formula, time_budget = 10)
 ```
 
-### Leaderboard scores are all NA
+### A model is missing, or its score is NA
 
-This happens when the evaluation metric isn't found in the results.
-The most common cause is using training-set evaluation (short budget)
-where the metric names differ from CV output. Try increasing the budget
-so that CV runs, or specify the metric explicitly:
+A model that fails to fit, or that errors during evaluation, is dropped
+with a message explaining why — it never reaches the leaderboard. Run with
+messages enabled to see which ones and why.
 
-```{r, eval=FALSE}
-result <- tl_auto_ml(data, formula,
-                     metric = "accuracy",  # or "rmse" for regression
-                     time_budget = 60)
-```
+A model that evaluates successfully but produces no value for the chosen
+metric appears with an `NA` score. That usually means the metric name is
+not one `tl_evaluate()` recognises for the task: classification supports
+`accuracy`, `precision`, `recall`, `sensitivity`, `specificity`, `f1`,
+`auc` and `pr_auc`; regression supports `rmse`, `mse`, `mae`, `mape` and
+`rsq`. If every score is `NA`, `tl_auto_ml()` warns and returns the first
+model trained rather than pretending to have ranked them.
 
 ### Not enough models tried
 

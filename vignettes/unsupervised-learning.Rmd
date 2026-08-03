@@ -164,7 +164,7 @@ print(centers)
 
 PAM is more robust to outliers than k-means:
 
-```{r, eval=FALSE}
+```{r}
 # Perform PAM clustering
 model_pam <- tl_model(iris[, 1:4], method = "pam", k = 3)
 print(model_pam)
@@ -183,7 +183,13 @@ print(model_hclust)
 ```
 
 ```{r}
-# Plot dendrogram
+# plot() dispatches on the model type -- a dendrogram for hclust,
+# a variance plot for PCA, a cluster scatter plot for k-means and friends
+plot(model_hclust)
+```
+
+```{r}
+# Or work with the underlying hclust object directly
 plot(model_hclust$fit$model,
      labels = FALSE,
      main = "Hierarchical Clustering of Iris")
@@ -214,7 +220,7 @@ ggplot(hc_viz, aes(x = PC1, y = PC2, color = Cluster)) +
 
 DBSCAN can find arbitrarily shaped clusters and identify outliers:
 
-```{r, eval=FALSE}
+```{r}
 # Perform DBSCAN
 model_dbscan <- tl_model(iris[, 1:4], method = "dbscan", eps = 0.5, minPts = 5)
 print(model_dbscan)
@@ -231,7 +237,7 @@ table(Cluster = clusters_dbscan$cluster, Species = iris$Species)
 
 CLARA is efficient for large datasets:
 
-```{r, eval=FALSE}
+```{r}
 # Create larger dataset
 large_data <- iris[rep(seq_len(nrow(iris)), 10), 1:4]
 

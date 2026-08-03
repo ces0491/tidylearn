@@ -209,14 +209,22 @@ tl_fit_boost <- function(
     # Get response variable
     response_var <- all.vars(formula)[1]
     y <- data[[response_var]]
+    if (!is.factor(y)) {
+      y <- factor(y)
+    }
+    class_levels <- levels(y)
 
     # Check if binary or multiclass
-    if (is.factor(y) && length(levels(y)) == 2) {
-      # Binary classification
+    if (length(class_levels) == 2) {
+      # Binary classification. gbm's bernoulli requires a numeric 0/1
+      # response, so encode the second level as the positive class --
+      # the same orientation tl_predict_boost assumes
       distribution <- "bernoulli"
+      data[[response_var]] <- as.integer(y == class_levels[2])
     } else {
       # Multiclass classification
       distribution <- "multinomial"
+      data[[response_var]] <- y
     }
   } else {
     # Regression

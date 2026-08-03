@@ -104,8 +104,11 @@ tl_pipeline <- function(data, formula,
 #' @param verbose Logical; whether to print progress
 #' @return The input \code{tidylearn_pipeline} object with its
 #'   \code{$results} component populated. Results include
-#'   \code{$processed_data}, \code{$model_results} (a named list of
-#'   per-model fits and metrics), \code{$best_model_name},
+#'   \code{$processed_data} (the training data after preprocessing),
+#'   \code{$preprocessing_stats} (the medians, modes, centres and scales
+#'   learned from the training data, replayed by
+#'   \code{\link{tl_predict_pipeline}}), \code{$model_results} (a named
+#'   list of per-model fits and metrics), \code{$best_model_name},
 #'   \code{$best_model} (the winning \code{tidylearn_model}), and
 #'   \code{$metric_values}.
 #' @examples
@@ -130,12 +133,33 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
   models <- pipeline$models
   evaluation <- pipeline$evaluation
 
+  # Without names the training loop below silently does nothing, leaving
+  # an empty leaderboard and an unhelpful downstream error
+  if (length(models) == 0 || is.null(names(models)) ||
+        any(!nzchar(names(models)))) {
+    stop(
+      "`models` must be a named list of model configurations, e.g. ",
+      "list(linear = list(method = \"linear\")).",
+      call. = FALSE
+    )
+  }
+
   # Apply preprocessing
   if (verbose) {
     message("Applying preprocessing steps...")
   }
 
   processed_data <- data
+
+  # Preprocessing statistics learned from the training data. These are
+  # recorded on the scale each step sees, so tl_predict_pipeline() can
+  # replay the same transformation on raw new data.
+  preprocessing_stats <- list(
+    medians = list(),
+    modes = list(),
+    center = list(),
+    scale = list()
+  )
 
   if (preprocessing$impute_missing) {
     if (verbose) {
@@ -145,24 +169,32 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
     # Simple imputation for numeric and categorical variables
     for (col in names(processed_data)) {
       if (is.numeric(processed_data[[col]])) {
-        # Impute with median for numeric
+        # Record the median even when this column is complete -- new data
+        # may still have gaps here
+        med <- median(processed_data[[col]], na.rm = TRUE)
+        preprocessing_stats$medians[[col]] <- med
+
         na_idx <- is.na(processed_data[[col]])
         if (any(na_idx)) {
-          med <- median(processed_data[[col]], na.rm = TRUE)
           processed_data[[col]][na_idx] <- med
         }
       } else if (is.factor(processed_data[[col]]) ||
                    is.character(processed_data[[col]])) {
-        # Impute with mode for categorical
+        # Calculate mode
+        if (is.factor(processed_data[[col]])) {
+          tab <- table(processed_data[[col]])
+        } else {
+          tab <- table(processed_data[[col]], useNA = "no")
+        }
+        mode_val <- if (length(tab) > 0) {
+          names(tab)[which.max(tab)]
+        } else {
+          NA_character_
+        }
+        preprocessing_stats$modes[[col]] <- mode_val
+
         na_idx <- is.na(processed_data[[col]])
-        if (any(na_idx)) {
-          # Calculate mode
-          if (is.factor(processed_data[[col]])) {
-            tab <- table(processed_data[[col]])
-          } else {
-            tab <- table(processed_data[[col]], useNA = "no")
-          }
-          mode_val <- names(tab)[which.max(tab)]
+        if (any(na_idx) && !is.na(mode_val)) {
           processed_data[[col]][na_idx] <- mode_val
         }
       }
@@ -179,9 +211,20 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
     numeric_cols <- sapply(processed_data, is.numeric)
     numeric_cols[response_var] <- FALSE  # Don't standardize response
 
-    # Standardize each numeric column (as.vector avoids matrix-column)
+    # Standardize each numeric column, recording the centre and scale
     for (col in names(processed_data)[numeric_cols]) {
-      processed_data[[col]] <- as.vector(scale(processed_data[[col]]))
+      col_mean <- mean(processed_data[[col]], na.rm = TRUE)
+      col_sd <- stats::sd(processed_data[[col]], na.rm = TRUE)
+
+      # A constant column would divide by zero; centre it only
+      if (is.na(col_sd) || col_sd == 0) {
+        col_sd <- 1
+      }
+
+      preprocessing_stats$center[[col]] <- col_mean
+      preprocessing_stats$scale[[col]] <- col_sd
+
+      processed_data[[col]] <- (processed_data[[col]] - col_mean) / col_sd
     }
   }
 
@@ -420,6 +463,7 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
   # Update pipeline with results
   pipeline$results <- list(
     processed_data = processed_data,
+    preprocessing_stats = preprocessing_stats,
     model_results = model_results,
     best_model_name = best_model_name,
     best_model = best_model,
@@ -613,75 +657,50 @@ tl_predict_pipeline <- function(pipeline,
   processed_new_data <- new_data
 
   if (!is.null(pipeline$preprocessing)) {
-    if (pipeline$preprocessing$impute_missing) {
-      # Simple imputation for numeric and categorical variables
+    stats_learned <- pipeline$results$preprocessing_stats
+
+    needs_stats <- isTRUE(pipeline$preprocessing$impute_missing) ||
+      isTRUE(pipeline$preprocessing$standardize)
+
+    if (needs_stats && is.null(stats_learned)) {
+      stop(
+        "This pipeline was run by an older version of tidylearn that did ",
+        "not record preprocessing statistics, so new data cannot be ",
+        "transformed consistently. Re-run it with tl_run_pipeline().",
+        call. = FALSE
+      )
+    }
+
+    if (isTRUE(pipeline$preprocessing$impute_missing)) {
+      # Impute with the statistics learned from the raw training data
       for (col in names(processed_new_data)) {
+        na_idx <- is.na(processed_new_data[[col]])
+        if (!any(na_idx)) next
+
         if (is.numeric(processed_new_data[[col]])) {
-          # Impute with median for numeric
-          na_idx <- is.na(processed_new_data[[col]])
-          if (any(na_idx)) {
-            # Use median from original processed data if available
-            if (col %in% names(pipeline$results$processed_data)) {
-              med <- median(
-                pipeline$results$processed_data[[col]],
-                na.rm = TRUE
-              )
-            } else {
-              med <- median(processed_new_data[[col]], na.rm = TRUE)
-            }
-            processed_new_data[[col]][na_idx] <- med
+          med <- stats_learned$medians[[col]]
+          if (is.null(med)) {
+            med <- median(processed_new_data[[col]], na.rm = TRUE)
           }
+          processed_new_data[[col]][na_idx] <- med
         } else if (is.factor(processed_new_data[[col]]) ||
                      is.character(processed_new_data[[col]])) {
-          # Impute with mode for categorical
-          na_idx <- is.na(processed_new_data[[col]])
-          if (any(na_idx)) {
-            # Use mode from original processed data if available
-            if (col %in% names(pipeline$results$processed_data)) {
-              if (is.factor(pipeline$results$processed_data[[col]])) {
-                tab <- table(pipeline$results$processed_data[[col]])
-              } else {
-                tab <- table(
-                  pipeline$results$processed_data[[col]],
-                  useNA = "no"
-                )
-              }
-            } else {
-              if (is.factor(processed_new_data[[col]])) {
-                tab <- table(processed_new_data[[col]])
-              } else {
-                tab <- table(processed_new_data[[col]], useNA = "no")
-              }
-            }
-            mode_val <- names(tab)[which.max(tab)]
-            processed_new_data[[col]][na_idx] <- mode_val
-          }
+          mode_val <- stats_learned$modes[[col]]
+          if (is.null(mode_val) || is.na(mode_val)) next
+          processed_new_data[[col]][na_idx] <- mode_val
         }
       }
     }
 
-    if (pipeline$preprocessing$standardize) {
-      # Identify numeric columns (excluding response)
-      response_var <- all.vars(pipeline$formula)[1]
-      numeric_cols <- sapply(processed_new_data, is.numeric)
-      if (response_var %in% names(numeric_cols)) {
-        numeric_cols[response_var] <- FALSE  # Don't standardize response
-      }
+    if (isTRUE(pipeline$preprocessing$standardize)) {
+      # Standardize exactly the columns that were standardized during
+      # training, using the training centre and scale
+      for (col in names(stats_learned$center)) {
+        if (!col %in% names(processed_new_data)) next
 
-      # Standardize using means and sds from training data
-      for (col in names(processed_new_data)[numeric_cols]) {
-        if (col %in% names(pipeline$results$processed_data)) {
-          # Use mean and sd from training data
-          col_mean <- mean(pipeline$results$processed_data[[col]], na.rm = TRUE)
-          col_sd <- sd(pipeline$results$processed_data[[col]], na.rm = TRUE)
-
-          processed_new_data[[col]] <-
-            (processed_new_data[[col]] - col_mean) /
-            col_sd
-        } else {
-          # Just standardize with its own mean and sd
-          processed_new_data[[col]] <- scale(processed_new_data[[col]])
-        }
+        processed_new_data[[col]] <-
+          (processed_new_data[[col]] - stats_learned$center[[col]]) /
+          stats_learned$scale[[col]]
       }
     }
   }

@@ -68,7 +68,13 @@ A list with class \code{"tidylearn_automl"} containing:
 \describe{
 \item{best_model}{The best tidylearn model object}
 \item{models}{Named list of all successfully trained models}
-\item{leaderboard}{Tibble ranking models by the chosen metric}
+\item{leaderboard}{Tibble ranking models by the chosen metric, with
+columns \code{model}, \code{score} and \code{evaluation}. The
+\code{evaluation} column records how each score was obtained --
+\code{"cv"} for cross-validated, \code{"train"} for training-set
+metrics, which are optimistic. Scores of different kinds are not
+directly comparable; a mixed leaderboard means the budget ran
+short of cross-validating every model.}
 \item{task}{Detected or specified task type}
 \item{metric}{Metric used for ranking}
 \item{runtime}{Total elapsed time as a difftime object}

@@ -18,7 +18,14 @@ tl_compute_advisor(x, ...)
   ...
 )
 
-\method{tl_compute_advisor}{tidylearn_supervised}(x, data = NULL, hyperparams = list(), gpu_check = NULL, ...)
+\method{tl_compute_advisor}{tidylearn_supervised}(
+  x,
+  data = NULL,
+  formula = NULL,
+  hyperparams = list(),
+  gpu_check = NULL,
+  ...
+)
 
 \method{tl_compute_advisor}{default}(x, ...)
 }
@@ -64,12 +71,18 @@ and will be off by 2-3x in either direction for any individual job.
 Treat the recommendation as a starting point, not gospel.
 }
 \examples{
-\dontrun{
+# Estimating from a method name needs neither a GPU nor the backend
+# package -- it is arithmetic over the problem dimensions
 advice <- tl_compute_advisor("xgboost", iris, Species ~ .,
                              hyperparams = list(nrounds = 1000))
+advice$recommendation
 print(advice)
 
-model <- tl_model(iris, Species ~ ., method = "xgboost")
-tl_compute_advisor(model)
+\donttest{
+# Dispatching on a fitted model requires the backend to be installed
+if (requireNamespace("xgboost", quietly = TRUE)) {
+  model <- tl_model(iris, Species ~ ., method = "xgboost")
+  tl_compute_advisor(model)
+}
 }
 }

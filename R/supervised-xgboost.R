@@ -106,6 +106,8 @@ tl_fit_xgboost <- function(data, formula, is_classification = FALSE,
 
   # Route to local CUDA when caller resolved compute to GPU. Requires
   # an xgboost build with CUDA support; otherwise xgb.train will error.
+  # `device` requires xgboost >= 2.0.0; tl_check_backend_gpu() screens
+  # older versions out before compute ever resolves to "gpu"
   if (identical(compute, "gpu")) {
     params$device <- "cuda"
   }

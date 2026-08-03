@@ -145,17 +145,27 @@ test_that("tl_resolve_compute('auto') consults advisor for GPU-capable", {
   expect_equal(result, "cpu")
 })
 
-test_that("tl_resolve_compute('auto') picks gpu for large GPU-capable job", {
+test_that("tl_resolve_compute('auto') picks gpu for long GPU-capable job", {
+  # Pin the CPU estimate rather than allocating a large matrix: the real
+  # estimate divides by detectCores(), so the expectation would flip on a
+  # machine with enough cores
   testthat::local_mocked_bindings(
     tl_check_gpu = function(...) fake_gpu_xgb,
+    tl_estimate_local_cpu_internal = function(method, n_rows, n_cols, hyp) {
+      list(
+        est_seconds     = 1200,
+        est_peak_ram_mb = 400,
+        cores_used      = 4L,
+        feasible        = TRUE,
+        notes           = character(0)
+      )
+    },
     .package = "tidylearn"
   )
-  big <- as.data.frame(matrix(rnorm(2e5 * 50), ncol = 50))
-  names(big) <- paste0("v", seq_len(50))
-  big$y <- rnorm(nrow(big))
+
   expect_message(
     result <- tl_resolve_compute(
-      "xgboost", big, y ~ ., compute = "auto",
+      "xgboost", iris, Species ~ ., compute = "auto",
       hyperparams = list(nrounds = 5000)
     ),
     "chose 'gpu'"
@@ -168,6 +178,27 @@ test_that("tl_resolve_compute('auto') picks gpu for large GPU-capable job", {
 test_that("tl_model() defaults to compute = 'cpu' (no behaviour change)", {
   model <- tl_model(iris, Species ~ ., method = "tree")
   expect_equal(model$spec$compute, "cpu")
+})
+
+test_that("tl_model() forwards hyperparameters to the compute advisor", {
+  # Without forwarding, "auto" sizes a default job (nrounds = 100) and can
+  # be out by the ratio of requested to default
+  seen <- NULL
+  testthat::local_mocked_bindings(
+    tl_resolve_compute = function(method, data, formula, compute = "cpu",
+                                  hyperparams = list()) {
+      seen <<- hyperparams
+      "cpu"
+    },
+    .package = "tidylearn"
+  )
+
+  invisible(tl_model(
+    iris, Species ~ ., method = "tree",
+    compute = "auto", cp = 0.05
+  ))
+
+  expect_equal(seen$cp, 0.05)
 })
 
 test_that("tl_model(compute = 'cpu') sets spec$compute and proceeds", {

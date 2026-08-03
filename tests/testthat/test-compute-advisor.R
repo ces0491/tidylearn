@@ -189,28 +189,94 @@ test_that("cloud tier is reported as not configured in this slice", {
   expect_match(result$cloud$notes, "not yet configured")
 })
 
-test_that("large xgboost problem with GPU recommends gpu", {
-  big <- as.data.frame(matrix(rnorm(2e5 * 50), ncol = 50))
-  names(big) <- paste0("v", seq_len(50))
-  big$y <- rnorm(nrow(big))
+# The real CPU estimate divides by parallel::detectCores(), so on a
+# many-core machine a "long job" drops under the 60s threshold and the
+# recommendation flips. Pin it instead of allocating a large matrix and
+# hoping the host has few enough cores. Every estimator (GPU, cloud)
+# derives from this one, so mocking it makes the whole advisor
+# deterministic.
+local_pinned_cpu <- function(seconds = 1200, peak_ram_mb = 400,
+                             env = parent.frame()) {
+  testthat::local_mocked_bindings(
+    tl_estimate_local_cpu_internal = function(method, n_rows, n_cols, hyp) {
+      list(
+        est_seconds     = seconds,
+        est_peak_ram_mb = peak_ram_mb,
+        cores_used      = 4L,
+        feasible        = peak_ram_mb < 16384,
+        notes           = character(0)
+      )
+    },
+    .env = env
+  )
+}
+
+test_that("long xgboost problem with GPU recommends gpu", {
+  local_pinned_cpu()
+
   result <- tl_compute_advisor(
-    "xgboost", big, y ~ .,
+    "xgboost", iris, Species ~ .,
     hyperparams = list(nrounds = 5000),
     gpu_check = fake_gpu_xgb
   )
+
   expect_equal(result$recommendation, "gpu")
+  expect_match(result$reasoning, "faster than CPU")
 })
 
-test_that("xgboost long-running but no GPU recommends cpu", {
-  big <- as.data.frame(matrix(rnorm(2e5 * 50), ncol = 50))
-  names(big) <- paste0("v", seq_len(50))
-  big$y <- rnorm(nrow(big))
+test_that("xgboost long-running but no GPU does not recommend gpu", {
+  local_pinned_cpu()
+
   result <- tl_compute_advisor(
-    "xgboost", big, y ~ .,
+    "xgboost", iris, Species ~ .,
     hyperparams = list(nrounds = 5000),
     gpu_check = fake_gpu_off
   )
-  expect_equal(result$recommendation, "cpu")
+
+  expect_false(result$recommendation == "gpu")
+  expect_false(result$local_gpu$available)
+})
+
+test_that("a fast GPU is not disqualified for finishing quickly", {
+  # A GPU estimate under 5s used to fall through to "no meaningfully
+  # faster tier available" even at a 15x speedup
+  cpu <- list(est_seconds = 70, est_peak_ram_mb = 100, feasible = TRUE)
+  gpu <- list(est_seconds = 4.7, available = TRUE, feasible = TRUE)
+  cloud <- list(
+    est_seconds = 200, est_cost_usd = 0.05, tier_label = "T4",
+    ram_needed_gb = 1, configured = FALSE
+  )
+
+  rec <- tl_recommend_internal(cpu, gpu, cloud)
+
+  expect_equal(rec$recommendation, "gpu")
+})
+
+test_that("sub-60s jobs still stay local even with a GPU available", {
+  cpu <- list(est_seconds = 30, est_peak_ram_mb = 100, feasible = TRUE)
+  gpu <- list(est_seconds = 2, available = TRUE, feasible = TRUE)
+  cloud <- list(
+    est_seconds = 60, est_cost_usd = 0.05, tier_label = "T4",
+    ram_needed_gb = 1, configured = FALSE
+  )
+
+  rec <- tl_recommend_internal(cpu, gpu, cloud)
+
+  expect_equal(rec$recommendation, "cpu")
+  expect_match(rec$reasoning, "Cloud cold-start")
+})
+
+test_that("a GPU that is barely faster does not win", {
+  cpu <- list(est_seconds = 120, est_peak_ram_mb = 100, feasible = TRUE)
+  gpu <- list(est_seconds = 60, available = TRUE, feasible = TRUE)
+  cloud <- list(
+    est_seconds = 300, est_cost_usd = 0.05, tier_label = "T4",
+    ram_needed_gb = 1, configured = FALSE
+  )
+
+  rec <- tl_recommend_internal(cpu, gpu, cloud)
+
+  expect_false(rec$recommendation == "gpu")
 })
 
 test_that("tl_effective_p_internal handles NULL formula", {

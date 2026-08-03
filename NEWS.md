@@ -1,4 +1,4 @@
-# tidylearn 0.3.1.9000
+# tidylearn 0.4.0
 
 ## New Features
 
@@ -44,10 +44,21 @@
 
 * `tl_compute_advisor()` now treats cloud as a "doesn't fit on my
   machine" tier rather than a GPU-acceleration-only tier. Cloud
-  estimates are produced for every method (not just GPU-eligible
-  ones), and the recommendation flips to `"cloud"` whenever the local
-  job is RAM-infeasible — even for CPU-only methods like PCA, kmeans,
-  or linear regression on very large data.
+  estimates are produced for every method the advisor supports (not
+  just GPU-eligible ones), and the recommendation flips to `"cloud"`
+  whenever the local job is RAM-infeasible — including CPU-only
+  methods like linear regression, SVM or random forest on very large
+  data.
+
+  Scope: the advisor covers the 13 supervised methods in
+  `.tl_method_profiles`. Unsupervised methods (PCA, k-means, MDS,
+  clustering) are not modelled and calling the advisor on one errors.
+  Reaching the cloud recommendation through `tl_model(compute =
+  "auto")` additionally requires a method with an upstream GPU path
+  (`xgboost`, `deep`), since `tl_resolve_compute()` short-circuits
+  CPU-only methods to `"cpu"` before consulting the advisor. Call
+  `tl_compute_advisor()` directly to get memory-headroom advice for the
+  other supervised methods.
 
 * New internal Modal instance tier table (`.tl_modal_tiers`) listing
   CPU-RAM tiers (`cpu-small`, `cpu-large`, `cpu-xlarge`) alongside GPU
@@ -66,6 +77,237 @@
 * Print method updated: the cloud line now shows the chosen tier label
   (e.g., `T4 (16 GB VRAM / 16 GB RAM)`) alongside the time and cost
   estimate.
+
+### Compute backends (security threat model)
+
+* Added `inst/security/threat-model.md` — the contract for what
+  cloud compute in tidylearn will and will not do once the Modal
+  integration lands. Covers token handling (never read in R), data
+  egress consent (per-call `confirm_upload = TRUE` plus session-level
+  `tl_cloud_consent()`), ephemeral compute (no persistent Modal
+  volumes by default), no telemetry, and an audit checklist that
+  reviewers can grep / verify against the Modal-integration PR. The
+  doc is shipped with the package so users (and CRAN reviewers) can
+  find it via `system.file("security/threat-model.md", package =
+  "tidylearn")`.
+
+## Bug Fixes
+
+These four defects produced plausible but wrong numbers rather than
+errors, so results computed with earlier versions should be rechecked.
+
+* `tl_evaluate()` scored classification models against raw prediction
+  output rather than class labels. Because the default `predict()` type
+  returns probabilities for logistic regression, comparing them to
+  factor labels gave an accuracy of exactly 0 for every logistic model.
+  Evaluation now requests `type = "class"` explicitly. Everything built
+  on `tl_evaluate()` was affected — `tl_cv()`, `tl_tune_grid()`,
+  `tl_tune_random()`, `tl_run_pipeline()`, `tl_auto_ml()` and
+  `tl_compare_cv()` all ranked logistic models last regardless of how
+  they actually performed.
+
+* `tl_evaluate()` had no `metrics` argument, so a requested metric
+  silently landed in `...` and was forwarded to `predict()`. Only
+  accuracy (classification) or rmse/mae/rsq (regression) were ever
+  returned. `tl_evaluate()` now takes `metrics` and computes the
+  requested set, delegating to `tl_calc_classification_metrics()` for
+  classification. Classification supports accuracy, precision, recall,
+  sensitivity, specificity, f1, auc and pr_auc; regression supports
+  rmse, mse, mae, mape and rsq. `tl_cv()` gains a matching `metrics`
+  argument. This removes the "Could not determine best model ... all
+  values NA" warning from default pipeline runs and the
+  `replacement has length zero` error from
+  `tl_tune_grid(metric = "f1")`.
+
+  Regression `rsq` is now `1 - SS_res/SS_tot` rather than the squared
+  correlation. The two agree for in-sample OLS; the squared correlation
+  was optimistic on held-out data.
+
+* `tl_predict_pipeline()` derived its centre and scale from
+  `results$processed_data`, which is stored *after* standardization —
+  so new data was rescaled against a mean of ~0 and an sd of ~1 and
+  reached the model in raw units. On `mtcars` with `mpg ~ wt + hp` this
+  returned predictions near -230 for rows whose actual mpg was 21. The
+  same defect made imputation substitute a standardized median (~0) for
+  missing values instead of the raw-scale one. `tl_run_pipeline()` now
+  records the medians, modes, centres and scales it learned in
+  `results$preprocessing_stats`, and `tl_predict_pipeline()` applies
+  those. Pipelines run by an earlier version carry no such statistics
+  and now raise a clear error asking for a re-run rather than silently
+  producing wrong predictions. Constant columns are centred without
+  dividing by zero.
+
+* `tl_auto_ml()`'s leaderboard scores were always `NA`.
+  `create_leaderboard()` expected a result shape that neither
+  `tl_cv()` nor `tl_evaluate()` produces, so every model scored `NA`
+  and the reported "best model" was whichever trained first. Score
+  extraction now handles both shapes, and the target metric is passed
+  through to every evaluation.
+
+* `predict()` on unsupervised models used `nrow(new_data) ==
+  nrow(object$data)` to decide whether new data had been supplied. Any
+  new data with the same number of rows as the training set silently
+  got the training result back — verified with a PCA projection of an
+  all-999 frame returning the training scores. `predict()` now tracks
+  whether the caller supplied `new_data` rather than inferring it from
+  row count. This also affected `predict.tidylearn_transfer()` and
+  `predict.tidylearn_stratified()`, which delegate to it.
+
+  Methods with no out-of-sample projection (PAM, CLARA, MDS, DBSCAN,
+  hierarchical clustering) now error when handed new data instead of
+  returning training assignments that look like predictions. PAM and
+  CLARA gained the training-data branch they previously lacked, and
+  hierarchical clustering — whose fit holds a tree, not assignments —
+  points at `tidy_cutree()` rather than returning `NULL`.
+
+* Prediction for `ridge`, `lasso` and `elastic_net` built its design
+  matrix from a `~ predictors - 1` formula while the fit used
+  `model.matrix()` with the intercept dropped. The two disagree
+  whenever a factor predictor is present: the fit uses treatment
+  contrasts (k-1 columns), prediction one-hot encodes (k columns), so
+  any such model failed with `The number of variables in newx must be
+  N`. The fit now records its terms and factor levels, and prediction
+  rebuilds an identically-coded design matrix from them.
+
+* Regularized classification ignored the `type` argument and always
+  returned class labels, so `type = "prob"` gave labels and ROC,
+  calibration, lift and gain plots could not work for these models.
+  `type = "prob"` now returns one probability column per class (binary
+  and multinomial), and `type = "class"`/`"response"` returns a factor
+  carrying the training levels rather than a character vector. An
+  unrecognised type errors instead of silently returning labels.
+
+* `method = "boost"` could not fit a classification model at all:
+  `gbm()` was handed a factor response with `distribution =
+  "bernoulli"`, which requires a numeric 0/1 response. The response is
+  now encoded with the second factor level as the positive class,
+  matching the orientation `tl_predict_boost()` already assumed.
+
+* `plot()` failed for every unsupervised method. The `tl_fit_*`
+  wrappers unpack the `tidy_*` objects into plain lists, but the plot
+  helpers were handed the unpacked list: k-means, PAM, CLARA and
+  DBSCAN partial-matched `$cluster` to the `$clusters` tibble and built
+  a nested column; PCA and MDS hit `tidy_pca`/`tidy_mds` class checks
+  that a plain list cannot satisfy; hclust passed a list where an
+  `hclust` object was expected. Each method now supplies the structure
+  its plot helper expects.
+
+### Compute backends (corrections)
+
+* `parallel` is now declared in Imports. `tl_estimate_local_cpu_internal()`
+  calls `parallel::detectCores()`, which without the declaration produces
+  an "'::' call not declared from" NOTE under `R CMD check`.
+
+* `testthat` minimum raised to 3.1.7. The compute tests use
+  `local_mocked_bindings()` (3.1.7) and `expect_no_warning()` (3.1.5);
+  on an older testthat the suite errored rather than skipped.
+
+* `tl_detect_cuda_internal()` now checks the exit status of `nvidia-smi`.
+  A machine with the binary installed but the driver unloaded prints its
+  error message to stdout and exits non-zero — that text was being parsed
+  as a device name, so `tl_check_gpu()` reported a working GPU and
+  `compute = "gpu"` routed `device = "cuda"` into a fit that then failed.
+
+* GPU routing for xgboost now requires xgboost >= 2.0.0, checked during
+  backend detection. The `device` parameter arrived in 2.0.0; older
+  versions ignore unknown parameters, so the fit ran on CPU while
+  `spec$compute` recorded `"gpu"`. Older versions are now reported as
+  having no GPU path, so `compute = "gpu"` warns and falls back honestly.
+
+* `tl_model(compute = "auto")` now forwards the caller's runtime-relevant
+  hyperparameters to the advisor. Previously the advisor always estimated
+  a default-sized job, so `tl_model(..., method = "xgboost", nrounds =
+  5000, compute = "auto")` was costed as `nrounds = 100` and could choose
+  CPU when GPU was the right call.
+
+* `tl_compute_advisor()` no longer skips a local GPU that finishes
+  quickly. The guard required an estimated GPU runtime of at least 5
+  seconds on top of a 3x speedup, so a job estimated at 70s on CPU and
+  4.7s on GPU — a 15x speedup — was reported as "No meaningfully faster
+  tier available". The sub-60s check earlier in the same function
+  already covers jobs too small to bother offloading.
+
+* `tl_compute_advisor(fitted_model, formula = ...)` no longer errors with
+  "formal argument 'formula' matched by multiple actual arguments". The
+  documentation says `formula` is ignored for a fitted model; now it
+  actually is.
+
+## Other Changes
+
+* `tl_auto_ml()` now cross-validates the PCA-augmented and
+  cluster-augmented variants when the budget allows. Previously these
+  were scored on training data while baselines were cross-validated, so
+  once scoring worked at all, overfit variants would have outranked
+  honestly-scored models. The leaderboard gains an `evaluation` column
+  recording `"cv"` or `"train"` per model, since mixed scores are not
+  directly comparable.
+
+* `tl_auto_ml()` no longer fits logistic regression to a multiclass
+  response — the implementation is binary-only, and the resulting model
+  was meaningless. It errors early when the response has fewer than two
+  observed classes.
+
+* `tl_run_pipeline()` rejects an unnamed `models` argument. Passing a
+  character vector previously trained nothing and failed later with an
+  indexing error.
+
+* `tl_evaluate()` errors when the response column is absent from
+  `new_data` instead of computing metrics against `NULL`.
+
+## Tests
+
+* New `test-metrics.R` and `test-pipeline.R` cover the four fixes
+  above; `tl_evaluate()` and the whole pipeline family previously had
+  no test coverage, which is why the defects survived. Added
+  leaderboard scoring and ranking tests to `test-workflows.R`.
+
+* `tl_auto_ml handles small datasets` used `iris[1:30, ]`, which is
+  entirely setosa. It passed only because a degenerate single-class
+  logistic model was counted as a trained model. It now samples across
+  all three species, and a separate test covers the single-class
+  rejection.
+
+* New `test-supervised-predict.R` and `test-unsupervised-predict.R`
+  cover the prediction fixes above, and `tests/testthat/setup.R` draws
+  base-graphics test plots to a null device so they no longer leave an
+  `Rplots.pdf` behind.
+
+## Documentation
+
+* Corrected vignette examples that printed wrong results. The
+  integration-workflows vignette reported 0% accuracy in five places —
+  it compared logistic regression's probability output against factor
+  labels, on a three-class response that logistic regression cannot
+  represent. The supervised-learning vignette reported 33.3% (chance)
+  for its complete-workflow example, which fitted on standardized
+  features and then predicted on raw test data. Both now use
+  multiclass-capable methods, score through `tl_evaluate()`, and apply
+  the training preprocessing to the test set.
+
+* The getting-started and supervised-learning vignettes now explain
+  that `predict()`'s default `type = "response"` returns probabilities
+  for logistic regression but class labels for trees and forests, and
+  show `type = "class"` and `type = "prob"` alongside `tl_evaluate()`.
+
+* Re-enabled seven vignette chunks that were disabled while the
+  underlying bugs were present: ridge, lasso, elastic net and SVM in
+  the supervised-learning vignette, and PAM, DBSCAN and CLARA in the
+  unsupervised-learning vignette.
+
+* Added package-level documentation, so `?tidylearn` now resolves.
+
+* README: fixed a `predict()` example that referenced columns which do
+  not exist, replaced a `plot_clusters()` call that passed a model
+  where a data frame is required, and added a section on the compute
+  backends.
+
+* `tl_run_pipeline()` documents the `$preprocessing_stats` component,
+  and `predict()` no longer advertises unsupervised `type` values that
+  it ignores — its `@return` now describes the shape unsupervised
+  models actually produce, and which of them accept `new_data`.
+
+* `tl_check_gpu()` and `tl_compute_advisor()` examples now run rather
+  than sitting in `\dontrun{}`; neither requires a GPU.
 
 # tidylearn 0.3.1
 

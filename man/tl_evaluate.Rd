@@ -4,7 +4,7 @@
 \alias{tl_evaluate}
 \title{Evaluate a tidylearn model}
 \usage{
-tl_evaluate(object, new_data = NULL, ...)
+tl_evaluate(object, new_data = NULL, metrics = NULL, ...)
 }
 \arguments{
 \item{object}{A tidylearn model object}
@@ -12,13 +12,20 @@ tl_evaluate(object, new_data = NULL, ...)
 \item{new_data}{Optional new data for evaluation
 (if NULL, uses training data)}
 
-\item{...}{Additional arguments}
+\item{metrics}{Character vector of metrics to compute. If \code{NULL}
+(the default), \code{"accuracy"} is used for classification models
+and \code{c("rmse", "mae", "rsq")} for regression models.
+Classification supports \code{"accuracy"}, \code{"precision"},
+\code{"recall"}, \code{"sensitivity"}, \code{"specificity"},
+\code{"f1"}, \code{"auc"} and \code{"pr_auc"}; regression supports
+\code{"rmse"}, \code{"mse"}, \code{"mae"}, \code{"mape"} and
+\code{"rsq"}.}
+
+\item{...}{Additional arguments passed to \code{predict()}}
 }
 \value{
 A \link[tibble]{tibble} with columns \code{metric} (character)
-and \code{value} (numeric). For regression models, includes
-\code{rmse}, \code{mae}, and \code{rsq}. For classification models,
-includes \code{accuracy}.
+and \code{value} (numeric), containing one row per requested metric.
 }
 \description{
 Evaluate a tidylearn model
@@ -27,5 +34,6 @@ Evaluate a tidylearn model
 \donttest{
 model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
 tl_evaluate(model)
+tl_evaluate(model, metrics = c("rmse", "mape"))
 }
 }

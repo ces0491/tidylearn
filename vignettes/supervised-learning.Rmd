@@ -63,10 +63,31 @@ model_logistic <- tl_model(split$train, Species ~ ., method = "logistic")
 print(model_logistic)
 ```
 
+The `type` argument controls what `.pred` holds. This matters: the default
+`"response"` returns **probabilities** for logistic regression but **class
+labels** for trees, forests and SVMs. Ask for `type = "class"` when you want
+labels regardless of method.
+
 ```{r}
-# Predictions
-preds_logistic <- predict(model_logistic, new_data = split$test)
+# Predicted labels
+preds_logistic <- predict(model_logistic, new_data = split$test, type = "class")
 head(preds_logistic)
+```
+
+```{r}
+# Class probabilities
+head(predict(model_logistic, new_data = split$test, type = "prob"))
+```
+
+`tl_evaluate()` resolves this for you — it always scores against class
+labels, and computes whichever metrics you ask for:
+
+```{r}
+tl_evaluate(
+  model_logistic,
+  new_data = split$test,
+  metrics = c("accuracy", "precision", "recall", "f1", "auc")
+)
 ```
 
 #### Decision Trees
@@ -108,7 +129,7 @@ mean(preds_forest$.pred == split_multi$test$Species)
 
 #### Support Vector Machines
 
-```{r, eval=FALSE}
+```{r}
 # Train SVM
 model_svm <- tl_model(split_multi$train, Species ~ ., method = "svm")
 print(model_svm)
@@ -185,7 +206,7 @@ Regularization helps prevent overfitting by adding penalties to model complexity
 
 ### Ridge Regression
 
-```{r, eval=FALSE}
+```{r}
 # Ridge regression (L2 regularization)
 model_ridge <- tl_model(split_reg$train, mpg ~ ., method = "ridge")
 print(model_ridge)
@@ -196,7 +217,7 @@ preds_ridge <- predict(model_ridge, new_data = split_reg$test)
 
 ### LASSO
 
-```{r, eval=FALSE}
+```{r}
 # LASSO (L1 regularization) - performs feature selection
 model_lasso <- tl_model(split_reg$train, mpg ~ ., method = "lasso")
 print(model_lasso)
@@ -207,7 +228,7 @@ preds_lasso <- predict(model_lasso, new_data = split_reg$test)
 
 ### Elastic Net
 
-```{r, eval=FALSE}
+```{r}
 # Elastic Net - combines L1 and L2 regularization
 model_enet <- tl_model(
   split_reg$train, mpg ~ .,
@@ -352,14 +373,34 @@ tidylearn provides a unified interface for supervised learning:
 ```{r}
 # Complete workflow example
 final_split <- tl_split(iris, prop = 0.7, stratify = "Species", seed = 42)
+
 final_prep <- tl_prepare_data(
   final_split$train, Species ~ .,
   scale_method = "standardize"
 )
 final_model <- tl_model(final_prep$data, Species ~ ., method = "forest")
-final_preds <- predict(final_model, new_data = final_split$test)
+```
 
-# Evaluate
+A model trained on scaled features expects scaled inputs at prediction time.
+`tl_prepare_data()` keeps the parameters it learned, so the same
+transformation can be replayed on the test set — applying the *training*
+centre and scale, never recomputing them from the test data:
+
+```{r}
+scaling <- final_prep$preprocessing_steps$scaling$scaling_params
+
+final_test <- final_split$test
+for (col in names(scaling)) {
+  final_test[[col]] <-
+    (final_test[[col]] - scaling[[col]]$mean) / scaling[[col]]$sd
+}
+
+final_preds <- predict(final_model, new_data = final_test)
 accuracy <- mean(final_preds$.pred == final_split$test$Species)
 cat("Test Accuracy:", round(accuracy * 100, 1), "%\n")
 ```
+
+Skipping that step and predicting on raw test data is a common and quiet
+mistake — the model still returns predictions, they are just wrong. For
+multi-step preprocessing, `tl_pipeline()` handles this bookkeeping for you:
+`tl_predict_pipeline()` replays the training preprocessing automatically.

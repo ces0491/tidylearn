@@ -12,17 +12,29 @@
 \item{new_data}{A data frame containing the new data.
 If NULL, uses training data.}
 
-\item{type}{Type of prediction. For supervised:
-"response" (default), "prob", "class". For
-unsupervised: "scores", "clusters", "transform"
-depending on method.}
+\item{type}{Type of prediction, for supervised models only:
+\code{"response"} (default), \code{"prob"} or \code{"class"}. Note
+that \code{"response"} is method-dependent -- logistic regression
+returns probabilities, trees and forests return class labels -- so
+pass \code{"class"} explicitly when you want labels. Ignored by
+unsupervised models, whose output is determined by the method.}
 
 \item{...}{Additional arguments}
 }
 \value{
-A \link[tibble]{tibble} with a \code{.pred} column containing
-predictions. For classification with \code{type = "prob"}, returns
-columns for each class probability.
+For supervised models, a \link[tibble]{tibble} with a
+\code{.pred} column; with \code{type = "prob"}, one column per class
+instead. For unsupervised models, the method's natural output: an
+\code{.obs_id} column plus component scores for \code{"pca"} and
+\code{"mds"}, or plus a \code{cluster} column for the clustering
+methods.
+
+Unsupervised models differ in whether they can handle new data.
+\code{"pca"} projects it and \code{"kmeans"} assigns it to the
+nearest centre; \code{"pam"}, \code{"clara"}, \code{"dbscan"},
+\code{"mds"} and \code{"hclust"} have no out-of-sample projection
+and error if \code{new_data} is supplied. For hierarchical
+clustering, cut the tree with \code{tidy_cutree()} instead.
 }
 \description{
 Unified prediction interface for both supervised and unsupervised models

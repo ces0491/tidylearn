@@ -53,7 +53,13 @@ NULL
 #'   \describe{
 #'     \item{best_model}{The best tidylearn model object}
 #'     \item{models}{Named list of all successfully trained models}
-#'     \item{leaderboard}{Tibble ranking models by the chosen metric}
+#'     \item{leaderboard}{Tibble ranking models by the chosen metric, with
+#'       columns \code{model}, \code{score} and \code{evaluation}. The
+#'       \code{evaluation} column records how each score was obtained --
+#'       \code{"cv"} for cross-validated, \code{"train"} for training-set
+#'       metrics, which are optimistic. Scores of different kinds are not
+#'       directly comparable; a mixed leaderboard means the budget ran
+#'       short of cross-validating every model.}
 #'     \item{task}{Detected or specified task type}
 #'     \item{metric}{Metric used for ranking}
 #'     \item{runtime}{Total elapsed time as a difftime object}
@@ -97,15 +103,59 @@ tl_auto_ml <- function(data, formula, task = "auto",
     )
   }
 
+  # Helper: score a fitted model. Cross-validation when the budget allows,
+  # otherwise training-set metrics. Training metrics are optimistic, so the
+  # kind is recorded and reported on the leaderboard -- without it, models
+  # scored in-sample would outrank cross-validated ones by overfitting.
+  evaluate_model <- function(model, eval_data, eval_formula, method, label) {
+    if (budget_left() > time_budget * 0.3) {
+      cv <- safe_train(function() {
+        tl_cv(eval_data, eval_formula, method = method,
+              folds = cv_folds, metrics = metric)
+      }, paste0(label, " CV"))
+
+      if (!is.null(cv)) {
+        return(list(result = cv, kind = "cv"))
+      }
+    }
+
+    # Not routed through safe_train: a model that fitted should not be
+    # discarded just because the budget expired before scoring it
+    train_result <- tryCatch(
+      tl_evaluate(model, metrics = metric),
+      error = function(e) {
+        message("    ", label, ": evaluation failed - ", e$message)
+        NULL
+      }
+    )
+
+    if (is.null(train_result)) {
+      return(NULL)
+    }
+
+    list(result = train_result, kind = "train")
+  }
+
   # Determine task type
+  response_var <- all.vars(formula)[1]
+  y <- data[[response_var]]
+
   if (task == "auto") {
-    response_var <- all.vars(formula)[1]
-    y <- data[[response_var]]
     task <- if (is.factor(y) || is.character(y)) {
       "classification"
     } else {
       "regression"
     }
+  }
+
+  n_classes <- length(unique(stats::na.omit(y)))
+
+  if (task == "classification" && n_classes < 2) {
+    stop(
+      "Classification requires at least two observed classes in '",
+      response_var, "'; found ", n_classes, ".",
+      call. = FALSE
+    )
   }
 
   # Set default metric
@@ -119,6 +169,7 @@ tl_auto_ml <- function(data, formula, task = "auto",
   # Prepare candidate models
   models <- list()
   results <- list()
+  eval_kinds <- character()
 
   # 1. Baseline models (ordered fast to slow)
   # Slow methods (forest, svm, xgboost) involve C code that cannot be
@@ -126,7 +177,9 @@ tl_auto_ml <- function(data, formula, task = "auto",
   # interrupted, so we only attempt them when the budget is generous.
   message("\n[1/4] Training baseline models...")
   fast_methods <- if (task == "classification") {
-    c("tree", "logistic")
+    # Logistic regression is binary-only here, so it is skipped rather
+    # than fitted to a multiclass response it cannot represent
+    if (n_classes == 2) c("tree", "logistic") else "tree"
   } else {
     c("tree", "linear")
   }
@@ -149,18 +202,12 @@ tl_auto_ml <- function(data, formula, task = "auto",
     }, model_name)
     if (is.null(model)) next
 
-    # CV only when enough budget remains
-    eval_result <- if (budget_left() > time_budget * 0.3) {
-      safe_train(function() {
-        tl_cv(data, formula, method = method, folds = cv_folds)
-      }, paste0(model_name, " CV"))
-    } else {
-      NULL
-    }
-    if (is.null(eval_result)) eval_result <- tl_evaluate(model)
+    scored <- evaluate_model(model, data, formula, method, model_name)
+    if (is.null(scored)) next
 
     models[[model_name]] <- model
-    results[[model_name]] <- eval_result
+    results[[model_name]] <- scored$result
+    eval_kinds[[model_name]] <- scored$kind
   }
 
   # 2. Models with dimensionality reduction
@@ -206,13 +253,16 @@ tl_auto_ml <- function(data, formula, task = "auto",
             reduction_model = reduced$reduction_model,
             n_components = n_components
           )
-          eval_result <- tl_evaluate(model)
-          list(model = model, eval_result = eval_result)
+          scored <- evaluate_model(
+            model, reduced_data, formula_reduced, method, model_name
+          )
+          list(model = model, scored = scored)
         }, model_name)
 
-        if (!is.null(result)) {
+        if (!is.null(result) && !is.null(result$scored)) {
           models[[model_name]] <- result$model
-          results[[model_name]] <- result$eval_result
+          results[[model_name]] <- result$scored$result
+          eval_kinds[[model_name]] <- result$scored$kind
         }
       }
     }, error = function(e) {
@@ -245,13 +295,16 @@ tl_auto_ml <- function(data, formula, task = "auto",
 
         result <- safe_train(function() {
           model <- tl_model(data_clustered, formula, method = method)
-          eval_result <- tl_evaluate(model)
-          list(model = model, eval_result = eval_result)
+          scored <- evaluate_model(
+            model, data_clustered, formula, method, model_name
+          )
+          list(model = model, scored = scored)
         }, model_name)
 
-        if (!is.null(result)) {
+        if (!is.null(result) && !is.null(result$scored)) {
           models[[model_name]] <- result$model
-          results[[model_name]] <- result$eval_result
+          results[[model_name]] <- result$scored$result
+          eval_kinds[[model_name]] <- result$scored$kind
         }
       }
     }, error = function(e) {
@@ -279,23 +332,18 @@ tl_auto_ml <- function(data, formula, task = "auto",
       }, model_name)
       if (is.null(model)) next
 
-      eval_result <- if (budget_left() > time_budget * 0.3) {
-        safe_train(function() {
-          tl_cv(data, formula, method = method, folds = cv_folds)
-        }, paste0(model_name, " CV"))
-      } else {
-        NULL
-      }
-      if (is.null(eval_result)) eval_result <- tl_evaluate(model)
+      scored <- evaluate_model(model, data, formula, method, model_name)
+      if (is.null(scored)) next
 
       models[[model_name]] <- model
-      results[[model_name]] <- eval_result
+      results[[model_name]] <- scored$result
+      eval_kinds[[model_name]] <- scored$kind
     }
   }
 
   # Create leaderboard
   message("\n[*] Creating leaderboard...")
-  leaderboard <- create_leaderboard(results, metric, task)
+  leaderboard <- create_leaderboard(results, metric, task, eval_kinds)
 
   # Get best model
   if (nrow(leaderboard) == 0 || length(models) == 0) {
@@ -303,6 +351,14 @@ tl_auto_ml <- function(data, formula, task = "auto",
             call. = FALSE)
     best_model_name <- NA_character_
     best_model <- NULL
+  } else if (all(is.na(leaderboard$score))) {
+    warning(
+      "Metric '", metric, "' could not be computed for any model, so the ",
+      "leaderboard is unranked. Returning the first model trained.",
+      call. = FALSE
+    )
+    best_model_name <- leaderboard$model[1]
+    best_model <- models[[best_model_name]]
   } else {
     best_model_name <- leaderboard$model[1]
     best_model <- models[[best_model_name]]
@@ -327,28 +383,90 @@ tl_auto_ml <- function(data, formula, task = "auto",
   )
 }
 
+#' Pull a single metric value out of an evaluation result
+#'
+#' Auto ML collects results from two sources with different shapes:
+#' \code{\link{tl_cv}} returns \code{list(folds, summary)} where
+#' \code{summary} has \code{metric}/\code{mean}/\code{sd} columns, while
+#' \code{\link{tl_evaluate}} returns a tibble with \code{metric}/
+#' \code{value} columns.
+#'
+#' @param result An evaluation result
+#' @param metric Name of the metric to extract
+#' @return The metric value, or \code{NA_real_} if it is not present
+#' @keywords internal
+#' @noRd
+extract_metric_score <- function(result, metric) {
+  if (is.null(result)) {
+    return(NA_real_)
+  }
+
+  pick <- function(df, value_col) {
+    hit <- which(df$metric == metric)
+    if (length(hit) == 0) NA_real_ else as.numeric(df[[value_col]][hit[1]])
+  }
+
+  # tl_evaluate() output -- checked before the list branches below because
+  # a tibble is also a list
+  if (is.data.frame(result) &&
+        all(c("metric", "value") %in% names(result))) {
+    return(pick(result, "value"))
+  }
+
+  if (is.list(result) && !is.data.frame(result)) {
+    # tl_cv() output
+    if ("summary" %in% names(result)) {
+      summary_df <- result$summary
+      if (is.data.frame(summary_df) &&
+            all(c("metric", "mean") %in% names(summary_df))) {
+        return(pick(summary_df, "mean"))
+      }
+      return(NA_real_)
+    }
+
+    # Plain named-list shapes
+    if (metric %in% names(result)) {
+      return(as.numeric(result[[metric]])[1])
+    }
+    if ("metrics" %in% names(result)) {
+      nested <- result$metrics
+      if (is.data.frame(nested) &&
+            all(c("metric", "value") %in% names(nested))) {
+        return(pick(nested, "value"))
+      }
+      val <- nested[[metric]]
+      return(if (is.null(val)) NA_real_ else as.numeric(val)[1])
+    }
+  }
+
+  NA_real_
+}
+
 #' Create leaderboard from results
 #' @keywords internal
 #' @noRd
-create_leaderboard <- function(results, metric, task) {
+create_leaderboard <- function(results, metric, task, eval_kinds = NULL) {
   if (length(results) == 0) {
-    return(tibble::tibble(model = character(0), score = numeric(0)))
+    return(tibble::tibble(
+      model = character(0), score = numeric(0), evaluation = character(0)
+    ))
   }
 
   scores <- vapply(results, function(r) {
-    if (is.list(r) && metric %in% names(r)) {
-      as.numeric(r[[metric]])
-    } else if (is.list(r) && "metrics" %in% names(r)) {
-      val <- r$metrics[[metric]]
-      if (is.null(val)) NA_real_ else as.numeric(val)
-    } else {
-      NA_real_
-    }
+    val <- extract_metric_score(r, metric)
+    if (is.nan(val)) NA_real_ else val
   }, numeric(1))
+
+  kinds <- if (is.null(eval_kinds)) {
+    rep(NA_character_, length(scores))
+  } else {
+    unname(eval_kinds[names(scores)])
+  }
 
   leaderboard <- tibble::tibble(
     model = names(scores),
-    score = scores
+    score = scores,
+    evaluation = kinds
   )
 
   # Sort: ascending for error metrics, descending for accuracy metrics

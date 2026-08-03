@@ -31,11 +31,13 @@ Apple MPS (Metal Performance Shaders) is intentionally not detected
 in this iteration; see the issue tracker for the MPS feature request.
 }
 \examples{
-\dontrun{
+# Safe to call anywhere: probes for nvidia-smi on the PATH and checks
+# which backend packages are installed. Reports no GPU rather than
+# failing when there isn't one.
 gpu <- tl_check_gpu()
-print(gpu)
+gpu$any_gpu
+
 if (gpu$any_gpu && gpu$backends$xgboost$gpu_likely_works) {
   # xgboost with GPU is worth trying for this workload
-}
 }
 }

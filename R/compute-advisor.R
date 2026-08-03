@@ -34,13 +34,19 @@
 #'   and `reasoning`. A `print()` method is provided.
 #'
 #' @examples
-#' \dontrun{
+#' # Estimating from a method name needs neither a GPU nor the backend
+#' # package -- it is arithmetic over the problem dimensions
 #' advice <- tl_compute_advisor("xgboost", iris, Species ~ .,
 #'                              hyperparams = list(nrounds = 1000))
+#' advice$recommendation
 #' print(advice)
 #'
-#' model <- tl_model(iris, Species ~ ., method = "xgboost")
-#' tl_compute_advisor(model)
+#' \donttest{
+#' # Dispatching on a fitted model requires the backend to be installed
+#' if (requireNamespace("xgboost", quietly = TRUE)) {
+#'   model <- tl_model(iris, Species ~ ., method = "xgboost")
+#'   tl_compute_advisor(model)
+#' }
 #' }
 #' @export
 tl_compute_advisor <- function(x, ...) {
@@ -122,12 +128,17 @@ tl_compute_advisor.character <- function(x,
 #' @export
 tl_compute_advisor.tidylearn_supervised <- function(x,
                                                     data = NULL,
+                                                    formula = NULL,
                                                     hyperparams = list(),
                                                     gpu_check = NULL,
                                                     ...) {
   if (is.null(data)) {
     data <- x$data
   }
+
+  # `formula` is a formal purely so a caller-supplied one is absorbed and
+  # ignored, as documented, rather than colliding with the fitted
+  # model's own formula in the call below
   tl_compute_advisor(
     x           = x$spec$method,
     data        = data,
@@ -531,10 +542,12 @@ tl_recommend_internal <- function(cpu, gpu, cloud) {
     ))
   }
 
-  # Case 3: Local GPU clearly faster — use it.
+  # Case 3: Local GPU clearly faster — use it. No floor on the GPU
+  # estimate: Case 2 has already sent every sub-60s job to the CPU, so a
+  # GPU that finishes in seconds is the point, not a reason to skip it.
   if (isTRUE(gpu$available) && is_finite_num(gpu$est_seconds)) {
     speedup <- cpu_seconds / gpu$est_seconds
-    if (speedup >= 3 && gpu$est_seconds >= 5) {
+    if (speedup >= 3) {
       return(list(
         recommendation = "gpu",
         reasoning = paste0(

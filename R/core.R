@@ -168,8 +168,21 @@ tl_model_supervised <- function(data, formula, method, ..., compute = "cpu") {
   # Resolve the effective compute tier (handles auto/gpu fallbacks).
   # CPU-only methods short-circuit so they don't trigger advisor / GPU
   # detection unnecessarily.
+  #
+  # Forward the caller's runtime-relevant hyperparameters (nrounds,
+  # ntree, epochs, ...) so "auto" estimates the job actually being run.
+  # Without this the advisor sizes a default job and can be out by the
+  # ratio of requested to default.
+  dots <- list(...)
+  hyperparams <- dots[vapply(
+    dots,
+    function(value) is.numeric(value) && length(value) == 1L,
+    logical(1)
+  )]
+
   effective_compute <- tl_resolve_compute(
-    method, data, formula, compute = compute
+    method, data, formula,
+    compute = compute, hyperparams = hyperparams
   )
 
   # Create model specification
@@ -284,14 +297,26 @@ tl_model_unsupervised <- function(data, formula = NULL, method, ...,
 #' @param object A tidylearn model object
 #' @param new_data A data frame containing the new data.
 #'   If NULL, uses training data.
-#' @param type Type of prediction. For supervised:
-#'   "response" (default), "prob", "class". For
-#'   unsupervised: "scores", "clusters", "transform"
-#'   depending on method.
+#' @param type Type of prediction, for supervised models only:
+#'   \code{"response"} (default), \code{"prob"} or \code{"class"}. Note
+#'   that \code{"response"} is method-dependent -- logistic regression
+#'   returns probabilities, trees and forests return class labels -- so
+#'   pass \code{"class"} explicitly when you want labels. Ignored by
+#'   unsupervised models, whose output is determined by the method.
 #' @param ... Additional arguments
-#' @return A \link[tibble]{tibble} with a \code{.pred} column containing
-#'   predictions. For classification with \code{type = "prob"}, returns
-#'   columns for each class probability.
+#' @return For supervised models, a \link[tibble]{tibble} with a
+#'   \code{.pred} column; with \code{type = "prob"}, one column per class
+#'   instead. For unsupervised models, the method's natural output: an
+#'   \code{.obs_id} column plus component scores for \code{"pca"} and
+#'   \code{"mds"}, or plus a \code{cluster} column for the clustering
+#'   methods.
+#'
+#'   Unsupervised models differ in whether they can handle new data.
+#'   \code{"pca"} projects it and \code{"kmeans"} assigns it to the
+#'   nearest centre; \code{"pam"}, \code{"clara"}, \code{"dbscan"},
+#'   \code{"mds"} and \code{"hclust"} have no out-of-sample projection
+#'   and error if \code{new_data} is supplied. For hierarchical
+#'   clustering, cut the tree with \code{tidy_cutree()} instead.
 #' @examples
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
@@ -303,7 +328,12 @@ predict.tidylearn_model <- function(object,
                                     new_data = NULL,
                                     type = "response",
                                     ...) {
-  if (is.null(new_data)) {
+  # Track whether the caller supplied data. Unsupervised methods behave
+  # differently for training data than for new observations, and row
+  # count is not a reliable way to tell the two apart.
+  training <- is.null(new_data)
+
+  if (training) {
     new_data <- object$data
   }
 
@@ -311,7 +341,7 @@ predict.tidylearn_model <- function(object,
   if (inherits(object, "tidylearn_supervised")) {
     predict_supervised(object, new_data, type, ...)
   } else if (inherits(object, "tidylearn_unsupervised")) {
-    predict_unsupervised(object, new_data, type, ...)
+    predict_unsupervised(object, new_data, type, training = training, ...)
   } else {
     stop("Unknown model type", call. = FALSE)
   }
@@ -356,14 +386,27 @@ predict_supervised <- function(object, new_data, type = "response", ...) {
 #' Predict using unsupervised models
 #' @keywords internal
 #' @noRd
-predict_unsupervised <- function(object, new_data, type = "response", ...) {
+predict_unsupervised <- function(object, new_data, type = "response",
+                                 training = FALSE, ...) {
   method <- object$spec$method
+
+  # Methods with no out-of-sample projection: returning the training
+  # result for new data would look like a prediction but is not one
+  no_out_of_sample <- function(label, hint = NULL) {
+    if (!training) {
+      stop(
+        label, " does not support out-of-sample prediction.",
+        if (!is.null(hint)) paste0(" ", hint) else "",
+        call. = FALSE
+      )
+    }
+  }
 
   result <- switch(
     method,
     "pca" = {
       # For PCA, transform the new data
-      if (is.null(new_data) || nrow(new_data) == nrow(object$data)) {
+      if (training) {
         object$fit$scores
       } else {
         # Transform new data using the PCA rotation
@@ -396,7 +439,7 @@ predict_unsupervised <- function(object, new_data, type = "response", ...) {
       }
     },
     "kmeans" = {
-      if (is.null(new_data) || nrow(new_data) == nrow(object$data)) {
+      if (training) {
         object$fit$clusters
       } else {
         # Assign to nearest center
@@ -411,21 +454,28 @@ predict_unsupervised <- function(object, new_data, type = "response", ...) {
         tibble::tibble(cluster = as.integer(clusters))
       }
     },
+    "pam" = ,
+    "clara" = {
+      no_out_of_sample(toupper(method))
+      object$fit$clusters
+    },
     "mds" = {
-      # MDS doesn't naturally support new data prediction
+      no_out_of_sample("Multidimensional scaling")
       object$fit$points
     },
     "hclust" = {
-      # Hierarchical clustering doesn't support standard prediction
-      warning(
-        "Hierarchical clustering does not support ",
-        "standard out-of-sample prediction."
+      no_out_of_sample("Hierarchical clustering")
+      # The fit holds the tree, not cluster assignments -- those require
+      # choosing a cut height or number of clusters
+      stop(
+        "Hierarchical clustering models carry a tree, not cluster ",
+        "assignments. Use tidy_cutree(model$fit$model, k = ...) to cut ",
+        "the tree.",
+        call. = FALSE
       )
-      object$fit$clusters
     },
     "dbscan" = {
-      # DBSCAN doesn't support standard prediction
-      warning("DBSCAN does not support standard out-of-sample prediction.")
+      no_out_of_sample("DBSCAN")
       object$fit$clusters
     },
     stop(
@@ -569,17 +619,44 @@ tl_plot_model <- function(model, type = "auto", ...) {
 tl_plot_unsupervised <- function(model, type = "auto", ...) {
   method <- model$spec$method
 
+  # The tl_fit_* wrappers unpack the tidy_* objects into plain lists, so
+  # the plot helpers have to be handed the pieces they expect rather than
+  # the fit itself
+  cluster_data <- function() {
+    clusters <- model$fit$clusters
+    if (is.null(clusters) || !"cluster" %in% names(clusters)) {
+      stop(
+        "No cluster assignments found in the fitted ", method, " model.",
+        call. = FALSE
+      )
+    }
+
+    data <- model$data
+    # As a factor so plot_clusters does not pick it as an axis
+    data$cluster <- as.factor(clusters$cluster)
+    data
+  }
+
   switch(
     method,
-    "pca"    = plot_variance_explained(get_pca_variance(model$fit), ...),
+    "pca"    = plot_variance_explained(model$fit$variance_explained, ...),
     "kmeans" = ,
     "pam"    = ,
     "clara"  = ,
-    "dbscan" = plot_clusters(
-      cbind(model$data, cluster = model$fit$cluster), ...
+    "dbscan" = plot_clusters(cluster_data(), ...),
+    "hclust" = plot_dendrogram(model$fit$model, ...),
+    "mds"    = plot_mds(
+      structure(
+        list(
+          config = model$fit$points,
+          method = model$fit$method,
+          stress = model$fit$stress,
+          gof = model$fit$gof
+        ),
+        class = "tidy_mds"
+      ),
+      ...
     ),
-    "hclust" = plot_dendrogram(model$fit, ...),
-    "mds"    = plot_mds(model$fit, ...),
     stop(
       "Plotting not implemented for unsupervised method: ", method,
       call. = FALSE
