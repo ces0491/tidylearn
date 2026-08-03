@@ -254,6 +254,33 @@ errors, so results computed with earlier versions should be rechecked.
 * `tl_evaluate()` errors when the response column is absent from
   `new_data` instead of computing metrics against `NULL`.
 
+* `tl_tune_grid()` and `tl_tune_random()` failed with "argument is of
+  length zero" whenever a `metric` was named without also naming
+  `maximize`. The optimisation direction was only assigned inside the
+  branch that supplies a default metric, so an explicit metric left
+  `maximize` at `NULL` and the later `if (maximize)` errored. Direction
+  now follows the metric itself: `rmse`, `mse`, `mae` and `mape` are
+  minimised, everything else maximised. An explicitly supplied
+  `maximize` is still respected.
+
+* Tuning a single hyperparameter dropped its name. Indexing one column
+  of the results without `drop = FALSE` collapsed the row to a bare
+  value, so the winning setting was passed to `tl_model()` positionally
+  and never reached the underlying fit — a tuned `cp` or `lambda` was
+  silently discarded. Affected both `tl_tune_grid()` and
+  `tl_tune_random()`.
+
+* `tl_plot_tuning_results(plot_type = "importance")` errored on
+  categorical parameters with "Can't subset `.data` outside of a data
+  mask context". The ANOVA branch built its formula with the tidy-eval
+  `.data` pronoun, which `aov()` cannot evaluate; it now uses
+  `stats::reformulate()`.
+
+* `tl_plot_tuning_results(plot_type = "grid")` errored with "object 'p'
+  not found" when a parameter had more than 20 unique values. The
+  fallback to a scatter plot called the function recursively but
+  discarded the result.
+
 ## Tests
 
 * New `test-metrics.R` and `test-pipeline.R` cover the four fixes
