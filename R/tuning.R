@@ -7,6 +7,21 @@
 #' @importFrom tidyr crossing
 NULL
 
+#' Should a metric be maximised?
+#'
+#' Error metrics are minimised; scores are maximised. Unknown metric names
+#' are treated as scores, which matches every metric tidylearn currently
+#' computes apart from the error family listed here.
+#'
+#' @param metric Metric name
+#' @return \code{TRUE} to maximise, \code{FALSE} to minimise
+#' @keywords internal
+#' @noRd
+tl_metric_maximize <- function(metric) {
+  error_metrics <- c("rmse", "mse", "mae", "mape")
+  !(metric %in% error_metrics)
+}
+
 #' Tune hyperparameters for a model using grid search
 #'
 #' @param data A data frame containing the training data
@@ -49,13 +64,15 @@ tl_tune_grid <- function(data, formula, method,
 
   # Default metric based on problem type
   if (is.null(metric)) {
-    if (is_classification) {
-      metric <- "accuracy"
-      if (is.null(maximize)) maximize <- TRUE
-    } else {
-      metric <- "rmse"
-      if (is.null(maximize)) maximize <- FALSE
-    }
+    metric <- if (is_classification) "accuracy" else "rmse"
+  }
+
+  # Optimisation direction. Derived from the metric itself, not from
+  # whether the caller supplied one -- naming a metric while leaving
+  # `maximize` at its NULL default previously left it NULL, and the
+  # `if (maximize)` below then failed with "argument is of length zero".
+  if (is.null(maximize)) {
+    maximize <- tl_metric_maximize(metric)
   }
 
   # Create parameter grid
@@ -199,9 +216,11 @@ tl_tune_grid <- function(data, formula, method,
     best_idx <- which.min(results_df$mean_metric)
   }
 
-  # Extract best parameters
+  # Extract best parameters. drop = FALSE keeps this a one-row data frame:
+  # with a single tuned parameter it would otherwise collapse to a bare
+  # value, and the unnamed list would reach tl_model() positionally.
   best_params <- as.list(
-    results_df[best_idx, names(param_grid)]
+    results_df[best_idx, names(param_grid), drop = FALSE]
   )
 
   if (verbose) {
@@ -301,13 +320,13 @@ tl_tune_random <- function(data, formula, method,
 
   # Default metric based on problem type
   if (is.null(metric)) {
-    if (is_classification) {
-      metric <- "accuracy"
-      if (is.null(maximize)) maximize <- TRUE
-    } else {
-      metric <- "rmse"
-      if (is.null(maximize)) maximize <- FALSE
-    }
+    metric <- if (is_classification) "accuracy" else "rmse"
+  }
+
+  # See tl_tune_grid(): the direction follows the metric, not whether one
+  # was supplied
+  if (is.null(maximize)) {
+    maximize <- tl_metric_maximize(metric)
   }
 
   if (verbose) {
@@ -509,9 +528,10 @@ tl_tune_random <- function(data, formula, method,
     best_idx <- which.min(results_df$mean_metric)
   }
 
-  # Extract best parameters
+  # Extract best parameters (drop = FALSE preserves names -- see
+  # tl_tune_grid())
   best_params <- as.list(
-    results_df[best_idx, names(param_space)]
+    results_df[best_idx, names(param_space), drop = FALSE]
   )
 
   if (verbose) {
@@ -714,8 +734,9 @@ tl_plot_tuning_results <- function(model,
         "for a grid plot. ",
         "Using scatter plot instead."
       )
-      plot_type <- "scatter"
-      tl_plot_tuning_results(
+      # The result has to be assigned: the function returns `p`, so
+      # discarding this call left `p` undefined on the fallback path
+      p <- tl_plot_tuning_results(
         model, top_n, param1, param2, "scatter"
       )
     }
@@ -847,9 +868,11 @@ tl_plot_tuning_results <- function(model,
             results_df[[param]]
           )
 
-          # Run ANOVA
-          anova_result <- summary(aov(
-            mean_metric ~ .data[[param]],
+          # Run ANOVA. The formula is built with stats::reformulate --
+          # the .data pronoun is a tidy-eval construct and is not
+          # understood by aov(), which evaluates in a plain data frame.
+          anova_result <- summary(stats::aov(
+            stats::reformulate(param, response = "mean_metric"),
             data = results_df
           ))
 

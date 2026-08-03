@@ -59,6 +59,15 @@ failed for every unsupervised method; and unsupervised `predict()` used row
 count to decide whether new data had been supplied, silently returning
 training results for same-sized input.
 
+In the tuning functions, `tl_tune_grid()` and `tl_tune_random()` errored
+with "argument is of length zero" whenever a metric was named without also
+naming `maximize`, because the optimisation direction was only assigned in
+the branch that supplies a default metric. Separately, tuning a single
+hyperparameter dropped its name, so the winning value was passed
+positionally and never reached the underlying fit. Two errors in
+`tl_plot_tuning_results()` — on categorical parameters, and on grids with
+more than 20 unique values — are fixed as well.
+
 ### Documentation
 
 Vignette examples that printed incorrect results have been corrected — one
@@ -69,8 +78,8 @@ for its complete-workflow example. Added package-level documentation, so
 ## Test environments
 
 * local: Windows 11 x64, R 4.5.2
-* win-builder: R-devel (2026-07-30 r90327 ucrt) -- Status: OK
 * win-builder: R-release (4.6.1, 2026-06-24 ucrt) -- Status: OK
+* win-builder: R-devel (2026-07-30 r90327 ucrt) -- Status: OK
 
 ## Downstream dependencies
 
