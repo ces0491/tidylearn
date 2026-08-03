@@ -16,6 +16,11 @@ knitr::opts_chunk$set(
   message = FALSE,
   warning = FALSE
 )
+
+# Each backend demo is guarded on its reader package, which lives in
+# Suggests -- the vignette has to build without them
+has_sqlite <- requireNamespace("DBI", quietly = TRUE) &&
+  requireNamespace("RSQLite", quietly = TRUE)
 ```
 
 ## Overview
@@ -97,7 +102,7 @@ unlink(c(tmp_csv, tmp_tsv))
 Reads `.xls`, `.xlsx`, and `.xlsm` files via
 [readxl](https://readxl.tidyverse.org/). Select sheets by name or position:
 
-```{r excel-demo}
+```{r excel-demo, eval = requireNamespace("readxl", quietly = TRUE)}
 library(readxl)
 
 path <- readxl_example("datasets.xlsx")
@@ -111,7 +116,7 @@ Lightweight, columnar storage for large datasets. Uses
 [nanoparquet](https://cran.r-project.org/package=nanoparquet) — a fast,
 dependency-free reader:
 
-```{r parquet-demo}
+```{r parquet-demo, eval = requireNamespace("nanoparquet", quietly = TRUE)}
 library(nanoparquet)
 
 tmp_pq <- tempfile(fileext = ".parquet")
@@ -121,7 +126,7 @@ pq_data <- tl_read_parquet(tmp_pq)
 nrow(pq_data)
 ```
 
-```{r cleanup-pq, include = FALSE}
+```{r cleanup-pq, include = FALSE, eval = requireNamespace("nanoparquet", quietly = TRUE)}
 unlink(tmp_pq)
 ```
 
@@ -131,7 +136,7 @@ Reads tabular JSON (array of objects) via
 [jsonlite](https://cran.r-project.org/package=jsonlite). Nested structures
 are automatically flattened:
 
-```{r json-demo}
+```{r json-demo, eval = requireNamespace("jsonlite", quietly = TRUE)}
 library(jsonlite)
 
 tmp_json <- tempfile(fileext = ".json")
@@ -141,7 +146,7 @@ json_data <- tl_read_json(tmp_json)
 json_data
 ```
 
-```{r cleanup-json, include = FALSE}
+```{r cleanup-json, include = FALSE, eval = requireNamespace("jsonlite", quietly = TRUE)}
 unlink(tmp_json)
 ```
 
@@ -184,7 +189,7 @@ query.
 
 The simplest database backend — no server required:
 
-```{r sqlite-demo}
+```{r sqlite-demo, eval = has_sqlite}
 library(DBI)
 library(RSQLite)
 
@@ -202,7 +207,7 @@ db_data <- tl_read_sqlite(
 nrow(db_data)
 ```
 
-```{r cleanup-sqlite, include = FALSE}
+```{r cleanup-sqlite, include = FALSE, eval = has_sqlite}
 unlink(tmp_db)
 ```
 
@@ -211,7 +216,7 @@ unlink(tmp_db)
 If you already have a DBI connection, use `tl_read_db()` directly — it will
 not close your connection:
 
-```{r db-demo}
+```{r db-demo, eval = has_sqlite}
 conn <- dbConnect(SQLite(), ":memory:")
 dbWriteTable(conn, "mtcars_tbl", mtcars)
 
@@ -359,10 +364,8 @@ dir <- tempfile(pattern = "tl_zip_src_")
 dir.create(dir)
 write.csv(iris, file.path(dir, "iris.csv"), row.names = FALSE)
 zip_path <- tempfile(fileext = ".zip")
-old_wd <- getwd()
-setwd(dir)
-utils::zip(zip_path, "iris.csv")
-setwd(old_wd)
+# -j stores the file without its directory path, so no setwd() is needed
+utils::zip(zip_path, file.path(dir, "iris.csv"), flags = "-j9X")
 
 zip_data <- tl_read_zip(zip_path, .quiet = TRUE)
 nrow(zip_data)

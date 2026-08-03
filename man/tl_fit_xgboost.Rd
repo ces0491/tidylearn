@@ -20,7 +20,8 @@ tl_fit_xgboost(
   early_stopping_rounds = NULL,
   nthread = NULL,
   verbose = 0,
-  ...
+  ...,
+  compute = "cpu"
 )
 }
 \arguments{
@@ -57,6 +58,11 @@ needed in a child (default: 1)}
 \item{verbose}{Verbose output (default: 0)}
 
 \item{...}{Additional arguments to pass to xgb.train()}
+
+\item{compute}{Compute tier. Either \code{"cpu"} (default) or
+\code{"gpu"}; when \code{"gpu"}, the function passes
+\code{device = "cuda"} to \code{xgb.train()}. Requires an
+xgboost build with CUDA support.}
 }
 \value{
 A fitted XGBoost model

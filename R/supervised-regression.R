@@ -18,44 +18,6 @@ tl_fit_linear <- function(data, formula, ...) {
   lm_model
 }
 
-#' Predict using a linear regression model
-#'
-#' @param model A tidylearn linear model object
-#' @param new_data A data frame containing the new data
-#' @param type Type of prediction: "response" (default),
-#'   "confidence", "prediction"
-#' @param level Confidence level for intervals (default: 0.95)
-#' @param ... Additional arguments
-#' @return Predictions
-#' @keywords internal
-tl_predict_linear <- function(model, new_data,
-                              type = "response",
-                              level = 0.95, ...) {
-  if (type == "response") {
-    preds <- stats::predict(
-      model$fit, newdata = new_data, ...
-    )
-    preds
-  } else if (type == "confidence") {
-    pred_obj <- stats::predict(
-      model$fit, newdata = new_data,
-      interval = "confidence", level = level, ...
-    )
-    as.data.frame(pred_obj)
-  } else if (type == "prediction") {
-    pred_obj <- stats::predict(
-      model$fit, newdata = new_data,
-      interval = "prediction", level = level, ...
-    )
-    as.data.frame(pred_obj)
-  } else {
-    stop(
-      "Invalid prediction type. ",
-      "Use 'response', 'confidence', or 'prediction'.",
-      call. = FALSE
-    )
-  }
-}
 
 #' Fit a polynomial regression model
 #'
@@ -109,49 +71,6 @@ tl_fit_polynomial <- function(data, formula, degree = 2, ...) {
   poly_model
 }
 
-#' Predict using a polynomial regression model
-#'
-#' @param model A tidylearn polynomial model object
-#' @param new_data A data frame containing the new data
-#' @param type Type of prediction: "response" (default),
-#'   "confidence", "prediction"
-#' @param level Confidence level for intervals (default: 0.95)
-#' @param ... Additional arguments
-#' @return Predictions
-#' @keywords internal
-tl_predict_polynomial <- function(model, new_data,
-                                  type = "response",
-                                  level = 0.95, ...) {
-  # Extract polynomial degree
-  degree <- attr(model$fit, "poly_degree")
-  if (is.null(degree)) degree <- 2  # Default if not stored
-
-  # Call the underlying prediction function
-  if (type == "response") {
-    preds <- stats::predict(
-      model$fit, newdata = new_data, ...
-    )
-    preds
-  } else if (type == "confidence") {
-    pred_obj <- stats::predict(
-      model$fit, newdata = new_data,
-      interval = "confidence", level = level, ...
-    )
-    as.data.frame(pred_obj)
-  } else if (type == "prediction") {
-    pred_obj <- stats::predict(
-      model$fit, newdata = new_data,
-      interval = "prediction", level = level, ...
-    )
-    as.data.frame(pred_obj)
-  } else {
-    stop(
-      "Invalid prediction type. ",
-      "Use 'response', 'confidence', or 'prediction'.",
-      call. = FALSE
-    )
-  }
-}
 
 #' Plot diagnostics for a regression model
 #'

@@ -50,19 +50,16 @@ head(reduced$data)
 ```
 
 ```{r}
-# Train classifier on reduced features.
-# PCA output includes a .obs_id row-identifier column — drop it before
-# modeling so it isn't treated as a predictor in the formula.
-reduced_data <- reduced$data %>% select(-starts_with(".obs"))
-model_reduced <- tl_model(reduced_data, Species ~ ., method = "logistic")
+# Train classifier on the reduced features. iris has three species, so this
+# needs a multiclass-capable method -- logistic regression is binary only.
+model_reduced <- tl_model(reduced$data, Species ~ ., method = "forest")
 print(model_reduced)
 ```
 
 ```{r}
-# Make predictions
-preds <- predict(model_reduced)
-accuracy <- mean(preds$.pred == iris$Species)
-cat("Accuracy with PCA features:", round(accuracy * 100, 1), "%\n")
+# Training-set accuracy. Use tl_evaluate() rather than comparing $.pred by
+# hand: what $.pred holds depends on the method and prediction type.
+tl_evaluate(model_reduced)
 ```
 
 ### Comparison: Original vs Reduced Features
@@ -72,9 +69,8 @@ cat("Accuracy with PCA features:", round(accuracy * 100, 1), "%\n")
 split <- tl_split(iris, prop = 0.7, stratify = "Species", seed = 123)
 
 # Model with original features
-model_original <- tl_model(split$train, Species ~ ., method = "logistic")
-preds_original <- predict(model_original, new_data = split$test)
-acc_original <- mean(preds_original$.pred == split$test$Species)
+model_original <- tl_model(split$train, Species ~ ., method = "forest")
+eval_original <- tl_evaluate(model_original, new_data = split$test)
 
 # Model with PCA features
 reduced_train <- tl_reduce_dimensions(split$train,
@@ -82,25 +78,22 @@ reduced_train <- tl_reduce_dimensions(split$train,
                                       method = "pca",
                                       n_components = 3)
 
-# Remove .obs_id column before modeling (it's just an identifier)
-reduced_train_data <- reduced_train$data %>% select(-starts_with(".obs"))
-model_pca <- tl_model(reduced_train_data, Species ~ ., method = "logistic")
+model_pca <- tl_model(reduced_train$data, Species ~ ., method = "forest")
 
-# Need to transform test data using same PCA
-test_predictors <- split$test %>% select(-Species)
+# The test set must be projected through the PCA fitted on the training
+# data -- refitting PCA on the test set would leak information
 test_transformed <- predict(
   reduced_train$reduction_model,
-  new_data = test_predictors
+  new_data = split$test %>% select(-Species)
 )
 test_transformed$Species <- split$test$Species
-test_transformed <- test_transformed %>% select(-starts_with(".obs"))
 
-preds_pca <- predict(model_pca, new_data = test_transformed)
-acc_pca <- mean(preds_pca$.pred == split$test$Species)
+eval_pca <- tl_evaluate(model_pca, new_data = test_transformed)
 
 # Compare results
-cat("Original features (4):", round(acc_original * 100, 1), "%\n")
-cat("PCA features (3):", round(acc_pca * 100, 1), "%\n")
+acc <- function(x) round(x$value[x$metric == "accuracy"] * 100, 1)
+cat("Original features (4):", acc(eval_original), "%\n")
+cat("PCA features (3):", acc(eval_pca), "%\n")
 cat("Feature reduction:", round((1 - 3 / 4) * 100, 1), "%\n")
 ```
 
@@ -169,11 +162,13 @@ Train models with limited labels using cluster-based label propagation.
 set.seed(123)
 labeled_indices <- sample(nrow(iris), size = 15)  # Only 15 out of 150 labeled!
 
-# Train semi-supervised model
+# Train semi-supervised model. supervised_method defaults to "logistic",
+# which is binary only -- iris has three species, so name a multiclass
+# method explicitly.
 model_semi <- tl_semisupervised(iris, Species ~ .,
                                 labeled_indices = labeled_indices,
                                 cluster_method = "kmeans",
-                                supervised_method = "logistic")
+                                supervised_method = "forest")
 
 print(model_semi)
 ```
@@ -185,8 +180,8 @@ print(label_mapping)
 ```
 
 ```{r}
-# Evaluate performance
-preds_semi <- predict(model_semi)
+# Evaluate against the true labels
+preds_semi <- predict(model_semi, new_data = iris, type = "class")
 accuracy_semi <- mean(preds_semi$.pred == iris$Species)
 
 cat("Accuracy with only", length(labeled_indices), "labels:",
@@ -202,8 +197,8 @@ cat("Proportion of data labeled:", labeled_pct, "%\n")
 ```{r}
 # Fully supervised with same amount of data
 labeled_data <- iris[labeled_indices, ]
-model_full <- tl_model(labeled_data, Species ~ ., method = "logistic")
-preds_full <- predict(model_full, new_data = iris)
+model_full <- tl_model(labeled_data, Species ~ ., method = "forest")
+preds_full <- predict(model_full, new_data = iris, type = "class")
 accuracy_full <- mean(preds_full$.pred == iris$Species)
 
 cat("Fully supervised (15 samples):", round(accuracy_full * 100, 1), "%\n")
@@ -223,7 +218,7 @@ model_anomaly_flag <- tl_anomaly_aware(iris, Species ~ .,
                                        response = "Species",
                                        anomaly_method = "dbscan",
                                        action = "flag",
-                                       supervised_method = "logistic")
+                                       supervised_method = "forest")
 
 # Check anomaly info
 cat("Anomalies detected:", model_anomaly_flag$anomaly_info$n_anomalies, "\n")
@@ -237,7 +232,7 @@ model_anomaly_remove <- tl_anomaly_aware(iris, Species ~ .,
                                          response = "Species",
                                          anomaly_method = "dbscan",
                                          action = "remove",
-                                         supervised_method = "logistic")
+                                         supervised_method = "forest")
 
 cat("Anomalies removed:", model_anomaly_remove$anomalies_removed, "\n")
 ```
@@ -292,9 +287,8 @@ workflow_reduced <- tl_reduce_dimensions(workflow_split$train,
                                          method = "pca",
                                          n_components = 3)
 
-# Step 3: Add cluster features to reduced data (remove .obs_id first)
-workflow_reduced_clean <- workflow_reduced$data %>% select(-starts_with(".obs"))
-workflow_clustered <- tl_add_cluster_features(workflow_reduced_clean,
+# Step 3: Add cluster features to reduced data
+workflow_clustered <- tl_add_cluster_features(workflow_reduced$data,
                                               response = "Species",
                                               method = "kmeans",
                                               k = 3)
@@ -416,13 +410,11 @@ final_reduced <- tl_reduce_dimensions(final_split$train,
                                       response = "Species",
                                       method = "pca",
                                       n_components = 3)
-# Remove .obs_id column before clustering
-final_reduced_clean <- final_reduced$data %>% select(-starts_with(".obs"))
-final_clustered <- tl_add_cluster_features(final_reduced_clean,
+final_clustered <- tl_add_cluster_features(final_reduced$data,
                                            response = "Species",
                                            method = "kmeans",
                                            k = 3)
-final_model <- tl_model(final_clustered, Species ~ ., method = "logistic")
+final_model <- tl_model(final_clustered, Species ~ ., method = "forest")
 
 cat("Final integrated model created successfully!\n")
 print(final_model)

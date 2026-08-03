@@ -15,3 +15,6 @@ check_output.log
 
 # Editor / tooling caches
 .claude/
+
+# Local-only planning docs (feature-scoped, not package-wide)
+SCOPE.md

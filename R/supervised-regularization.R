@@ -115,9 +115,15 @@ tl_fit_regularized <- function(data, formula,
 
   # Create model matrix for predictors
   # Remove intercept as glmnet adds it by default
+  model_frame <- stats::model.frame(formula, data = data)
+  design_terms <- stats::terms(model_frame)
   x_mat <- stats::model.matrix(
-    formula, data = data
+    design_terms, model_frame
   )[, -1, drop = FALSE]
+
+  # Retain the terms and factor levels so prediction can rebuild an
+  # identically-coded design matrix on new data
+  design_xlevels <- stats::.getXlevels(design_terms, model_frame)
 
   # Determine the appropriate family based on problem type
   if (is_classification) {
@@ -190,208 +196,15 @@ tl_fit_regularized <- function(data, formula,
   attr(model, "alpha") <- alpha
   attr(model, "is_classification") <- is_classification
 
-  model
-}
-
-#' Predict using a regularized regression model
-#'
-#' @param model A tidylearn regularized model object
-#' @param new_data A data frame containing the new data
-#' @param type Type of prediction: "response" (default),
-#'   "class" or "prob" (for classification)
-#' @param lambda Which lambda to use for prediction
-#'   ("1se" or "min", default: "1se")
-#' @param ... Additional arguments
-#' @return Predictions
-#' @keywords internal
-tl_predict_regularized <- function(model, new_data,
-                                   type = "response",
-                                   lambda = "1se",
-                                   ...) {
-  fit <- model$fit
-  is_classification <- model$spec$is_classification
-  formula <- model$spec$formula
-  response_var <- model$spec$response_var
-
-  # Extract lambda value to use
-  if (lambda == "1se") {
-    lambda_val <- attr(fit, "lambda_1se")
-  } else if (lambda == "min") {
-    lambda_val <- attr(fit, "lambda_min")
-  } else if (is.numeric(lambda)) {
-    lambda_val <- lambda
-  } else {
-    stop(
-      "Invalid lambda specification. ",
-      "Use '1se', 'min', or a numeric value.",
-      call. = FALSE
-    )
-  }
-
-  # Create model matrix for new data (excluding intercept)
-  x_new <- stats::model.matrix(
-    formula, data = new_data
-  )[, -1, drop = FALSE]
-
-  # Make predictions
+  # Design specification used at fit time
+  attr(model, "tl_terms") <- design_terms
+  attr(model, "tl_xlevels") <- design_xlevels
+  attr(model, "tl_colnames") <- colnames(x_mat)
   if (is_classification) {
-    # Classification predictions
-    if (type == "response" || type == "link") {
-      # Linear predictor
-      preds <- glmnet::predict.glmnet(
-        fit,
-        newx = x_new,
-        s = lambda_val,
-        type = "link",
-        ...
-      )
-      as.vector(preds)
-    } else if (type == "class") {
-      # Predicted classes
-      if ("family" %in% names(fit) &&
-            fit$family == "binomial") {
-        # Binary classification
-        probs <- glmnet::predict.glmnet(
-          fit,
-          newx = x_new,
-          s = lambda_val,
-          type = "response",
-          ...
-        )
-
-        # Get class levels from training data
-        class_levels <- levels(
-          factor(model$data[[response_var]])
-        )
-
-        # Classify based on probability > 0.5
-        pred_classes <- ifelse(
-          as.vector(probs) > 0.5,
-          class_levels[2],
-          class_levels[1]
-        )
-        pred_classes <- factor(
-          pred_classes, levels = class_levels
-        )
-
-        pred_classes
-      } else {
-        # Multiclass classification
-        preds <- glmnet::predict.glmnet(
-          fit,
-          newx = x_new,
-          s = lambda_val,
-          type = "class",
-          ...
-        )
-        as.vector(preds)
-      }
-    } else if (type == "prob") {
-      # Predicted probabilities
-      if ("family" %in% names(fit) &&
-            fit$family == "binomial") {
-        # Binary classification
-        pos_probs <- as.vector(
-          glmnet::predict.glmnet(
-            fit,
-            newx = x_new,
-            s = lambda_val,
-            type = "response",
-            ...
-          )
-        )
-        neg_probs <- 1 - pos_probs
-
-        # Get class levels from training data
-        class_levels <- levels(
-          factor(model$data[[response_var]])
-        )
-
-        # Create a data frame with probs for each class
-        prob_df <- tibble::tibble(
-          !!class_levels[1] := neg_probs,
-          !!class_levels[2] := pos_probs
-        )
-
-        prob_df
-      } else {
-        # Multiclass classification
-        probs <- glmnet::predict.glmnet(
-          fit,
-          newx = x_new,
-          s = lambda_val,
-          type = "response",
-          ...
-        )
-
-        # Reshape to data frame
-        prob_df <- as.data.frame(probs)
-        names(prob_df) <- levels(
-          factor(model$data[[response_var]])
-        )
-
-        tibble::as_tibble(prob_df)
-      }
-    } else {
-      stop(
-        "Invalid prediction type for classification. ",
-        "Use 'response', 'class', or 'prob'.",
-        call. = FALSE
-      )
-    }
-  } else {
-    # Regression predictions
-    preds <- glmnet::predict.glmnet(
-      fit,
-      newx = x_new,
-      s = lambda_val,
-      type = "response",
-      ...
-    )
-    as.vector(preds)
+    attr(model, "response_levels") <- levels(y)
   }
-}
 
-#' Predict using a Ridge regression model
-#'
-#' @param model A tidylearn Ridge model object
-#' @param new_data A data frame containing the new data
-#' @param type Type of prediction
-#' @param ... Additional arguments
-#' @return Predictions
-#' @keywords internal
-tl_predict_ridge <- function(model, new_data,
-                             type = "response",
-                             ...) {
-  tl_predict_regularized(model, new_data, type, ...)
-}
-
-#' Predict using a Lasso regression model
-#'
-#' @param model A tidylearn Lasso model object
-#' @param new_data A data frame containing the new data
-#' @param type Type of prediction
-#' @param ... Additional arguments
-#' @return Predictions
-#' @keywords internal
-tl_predict_lasso <- function(model, new_data,
-                             type = "response",
-                             ...) {
-  tl_predict_regularized(model, new_data, type, ...)
-}
-
-#' Predict using an Elastic Net regression model
-#'
-#' @param model A tidylearn Elastic Net model object
-#' @param new_data A data frame containing the new data
-#' @param type Type of prediction
-#' @param ... Additional arguments
-#' @return Predictions
-#' @keywords internal
-tl_predict_elastic_net <- function(model, new_data,
-                                   type = "response",
-                                   ...) {
-  tl_predict_regularized(model, new_data, type, ...)
+  model
 }
 
 #' Plot regularization path for a regularized model
@@ -707,39 +520,32 @@ tl_predict_glmnet <- function(model, new_data,
   fit <- model$fit
   is_classification <- model$spec$is_classification
 
-  # Create model matrix for new data
   formula <- model$spec$formula
-  response_var <- all.vars(formula)[1]
+  response_var <- model$spec$response_var
 
-  # Get predictor variables from original formula
-  all_vars <- all.vars(formula)
-  predictor_vars <- all_vars[-1]  # Remove response
+  # Rebuild the design matrix exactly as the fit did. Deriving it from a
+  # "~ predictors - 1" formula instead would one-hot encode the first
+  # factor, giving one more column than the model was trained on.
+  design_terms <- attr(fit, "tl_terms")
+  design_xlevels <- attr(fit, "tl_xlevels")
 
-  # Create formula manually without using update()
-  if (length(predictor_vars) == 0 ||
-        (length(predictor_vars) == 1 &&
-           predictor_vars[1] == ".")) {
-    # Use all predictors except response
-    predictor_names <- setdiff(
-      names(new_data), response_var
-    )
-    predictor_formula <- as.formula(paste(
-      "~",
-      paste(predictor_names, collapse = " + "),
-      "- 1"
-    ))
-  } else {
-    predictor_formula <- as.formula(paste(
-      "~",
-      paste(predictor_vars, collapse = " + "),
-      "- 1"
-    ))
+  if (is.null(design_terms)) {
+    # Model fitted by an earlier version: recover the design from the
+    # training data, which the model object carries
+    training_frame <- stats::model.frame(formula, data = model$data)
+    design_terms <- stats::terms(training_frame)
+    design_xlevels <- stats::.getXlevels(design_terms, training_frame)
   }
 
-  # Create model matrix
-  x_new <- stats::model.matrix(
-    predictor_formula, data = new_data
+  predictor_terms <- stats::delete.response(design_terms)
+  new_frame <- stats::model.frame(
+    predictor_terms, new_data,
+    xlev = design_xlevels,
+    na.action = stats::na.pass
   )
+  x_new <- stats::model.matrix(
+    predictor_terms, new_frame
+  )[, -1, drop = FALSE]
 
   # Get optimal lambda value from model
   lambda_val <- attr(fit, "lambda_min")
@@ -748,22 +554,45 @@ tl_predict_glmnet <- function(model, new_data,
     lambda_val <- fit$lambda[1]
   }
 
-  # Make predictions
-  if (is_classification) {
-    preds <- predict(
-      fit,
-      newx = x_new,
-      type = "class",
-      s = lambda_val
+  if (!is_classification) {
+    return(as.vector(stats::predict(
+      fit, newx = x_new, type = "response", s = lambda_val
+    )))
+  }
+
+  class_levels <- attr(fit, "response_levels")
+  if (is.null(class_levels)) {
+    class_levels <- levels(factor(model$data[[response_var]]))
+  }
+
+  if (type == "prob") {
+    probs <- stats::predict(
+      fit, newx = x_new, type = "response", s = lambda_val
     )
-    as.vector(preds)
+
+    if (length(class_levels) == 2) {
+      # glmnet returns the probability of the second level
+      positive <- as.vector(probs)
+      tibble::tibble(
+        !!class_levels[1] := 1 - positive,
+        !!class_levels[2] := positive
+      )
+    } else {
+      # Multinomial: an [observation, class, lambda] array
+      prob_mat <- probs[, , 1, drop = TRUE]
+      colnames(prob_mat) <- class_levels
+      tibble::as_tibble(as.data.frame(prob_mat))
+    }
+  } else if (type == "class" || type == "response") {
+    preds <- stats::predict(
+      fit, newx = x_new, type = "class", s = lambda_val
+    )
+    factor(as.vector(preds), levels = class_levels)
   } else {
-    preds <- predict(
-      fit,
-      newx = x_new,
-      type = "response",
-      s = lambda_val
+    stop(
+      "Invalid prediction type for regularized classification. ",
+      "Use 'prob', 'class', or 'response'.",
+      call. = FALSE
     )
-    as.vector(preds)
   }
 }

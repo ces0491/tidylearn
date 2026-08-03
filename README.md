@@ -17,7 +17,7 @@ implementations with the convenience of a consistent, tidy API.
 
 - Reads data from diverse sources (`tl_read()`) — CSV, Excel, Parquet,
   JSON, databases, S3, Kaggle, and more
-- Provides one consistent interface (`tl_model()`) to 20+ ML algorithms
+- Provides one consistent interface (`tl_model()`) to 20 ML algorithms
 - Returns tidy tibbles instead of varied output formats
 - Offers unified ggplot2-based visualization and formatted `gt` tables
 - Enables pipe-friendly workflows with `%>%`
@@ -111,19 +111,26 @@ model <- tl_model(iris[,1:4], method = "pca")
 All results come back as tibbles, ready for dplyr and ggplot2:
 
 ```r
-# Predictions as tibbles
+# Predictions come back as a tibble with a .pred column
 predictions <- predict(model, new_data = test_data)
 
-# Metrics as tibbles
+# Metrics as tibbles - pick the metrics you want
 metrics <- tl_evaluate(model, test_data)
+metrics <- tl_evaluate(model, test_data, metrics = c("rmse", "rsq"))
 
 # Easy to pipe
 model %>%
-  predict(test_data) %>%
+  predict(new_data = test_data) %>%
   bind_cols(test_data) %>%
-  ggplot(aes(x = actual, y = prediction)) +
-  geom_point()
+  ggplot(aes(x = mpg, y = .pred)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0)
 ```
+
+For classification, what `.pred` holds depends on `type`: `"class"` gives
+labels, `"prob"` gives one column per class. The default `"response"` varies
+by method - probabilities for logistic regression, labels for trees and
+forests - so pass `type` explicitly, or let `tl_evaluate()` handle it.
 
 ### Access the Underlying Model
 
@@ -182,7 +189,7 @@ that combine multiple techniques:
 # Reduce dimensions before classification
 reduced <- tl_reduce_dimensions(iris, response = "Species",
                                 method = "pca", n_components = 3)
-model <- tl_model(reduced$data, Species ~ ., method = "logistic")
+model <- tl_model(reduced$data, Species ~ ., method = "forest")
 ```
 
 ### Cluster-Based Feature Engineering
@@ -212,6 +219,34 @@ result <- tl_auto_ml(data, target ~ .,
 result$leaderboard
 ```
 
+## Compute Backends
+
+Most methods run on the CPU and need no thought. For the two with an
+upstream GPU path (`"xgboost"` and `"deep"`), `tl_model()` takes a
+`compute` argument:
+
+```r
+# Check what this machine can actually do
+tl_check_gpu()
+
+# Route a fit to the local GPU (falls back to CPU with a warning if
+# no CUDA-capable backend is detected)
+model <- tl_model(data, y ~ ., method = "xgboost", compute = "gpu")
+
+# Let tidylearn decide per call
+model <- tl_model(data, y ~ ., method = "xgboost", compute = "auto")
+```
+
+`tl_compute_advisor()` estimates runtime, peak memory and cost across
+local CPU, local GPU and cloud tiers before you commit to a long fit:
+
+```r
+tl_compute_advisor("xgboost", data, y ~ ., hyperparams = list(nrounds = 5000))
+```
+
+Estimates are order-of-magnitude, not quotes. The cloud tier is reported
+for planning only - it is not yet executable.
+
 ## Unified Visualization
 
 Consistent ggplot2-based plotting regardless of model type:
@@ -220,11 +255,13 @@ Consistent ggplot2-based plotting regardless of model type:
 # Generic plot method works for all model types
 plot(forest_model)       # Automatic visualization based on model type
 plot(linear_model)       # Diagnostic plots for regression
-plot(pca_result)         # Variance explained for PCA
+plot(pca_model)          # Variance explained for PCA
+plot(kmeans_model)       # Cluster scatter plot
+plot(hclust_model)       # Dendrogram
 
-# Specialized plotting functions for unsupervised learning
-plot_clusters(clustering_result, cluster_col = "cluster")
-plot_variance_explained(pca_result$fit$variance_explained)
+# The lower-level helpers take data frames rather than models
+plot_clusters(cluster_data, cluster_col = "cluster")
+plot_variance_explained(pca_model$fit$variance_explained)
 
 # Interactive dashboard for detailed exploration
 tl_dashboard(model, test_data)

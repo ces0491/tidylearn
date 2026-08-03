@@ -73,8 +73,9 @@ test_that("tl_auto_ml can disable reduction and clustering", {
 test_that("tl_auto_ml handles small datasets", {
   skip_on_cran()
 
-  # Small dataset
-  small_data <- iris[1:30, ]
+  # Small dataset -- sampled across all three classes, since a
+  # single-class response is not a classification problem
+  small_data <- iris[c(1:10, 51:60, 101:110), ]
 
   result <- tl_auto_ml(small_data, Species ~ .,
                        time_budget = 5,
@@ -82,6 +83,85 @@ test_that("tl_auto_ml handles small datasets", {
 
   expect_type(result, "list")
   expect_gte(length(result$models), 1)
+})
+
+test_that("tl_auto_ml rejects a single-class response", {
+  skip_on_cran()
+
+  expect_error(
+    tl_auto_ml(iris[1:30, ], Species ~ ., time_budget = 5),
+    "at least two observed classes"
+  )
+})
+
+test_that("extract_metric_score reads both evaluation result shapes", {
+  # tl_evaluate() shape
+  evaluated <- tibble::tibble(
+    metric = c("accuracy", "f1"), value = c(0.9, 0.8)
+  )
+  expect_equal(extract_metric_score(evaluated, "accuracy"), 0.9)
+  expect_equal(extract_metric_score(evaluated, "f1"), 0.8)
+  expect_true(is.na(extract_metric_score(evaluated, "auc")))
+
+  # tl_cv() shape
+  cross_validated <- list(
+    folds = list(),
+    summary = tibble::tibble(
+      metric = c("accuracy", "f1"),
+      mean = c(0.7, 0.6),
+      sd = c(0.1, 0.1)
+    )
+  )
+  expect_equal(extract_metric_score(cross_validated, "accuracy"), 0.7)
+  expect_true(is.na(extract_metric_score(cross_validated, "auc")))
+
+  expect_true(is.na(extract_metric_score(NULL, "accuracy")))
+})
+
+test_that("tl_auto_ml leaderboard is scored and ranked", {
+  skip_on_cran()
+
+  binary_iris <- droplevels(subset(iris, Species != "virginica"))
+
+  set.seed(301)
+  result <- suppressWarnings(
+    tl_auto_ml(binary_iris, Species ~ .,
+               use_reduction = FALSE,
+               use_clustering = FALSE,
+               time_budget = 20,
+               cv_folds = 3)
+  )
+
+  expect_true(all(c("model", "score", "evaluation") %in%
+                    names(result$leaderboard)))
+  expect_false(all(is.na(result$leaderboard$score)))
+  expect_true(all(result$leaderboard$evaluation %in% c("cv", "train")))
+
+  # Accuracy ranks highest-first, and the reported best model is the winner
+  scored <- result$leaderboard$score[!is.na(result$leaderboard$score)]
+  expect_false(is.unsorted(rev(scored)))
+  expect_equal(
+    result$leaderboard$model[1],
+    result$leaderboard$model[which.max(result$leaderboard$score)]
+  )
+})
+
+test_that("tl_auto_ml ranks regression models by ascending rmse", {
+  skip_on_cran()
+
+  set.seed(302)
+  result <- suppressWarnings(
+    tl_auto_ml(mtcars, mpg ~ wt + hp,
+               use_reduction = FALSE,
+               use_clustering = FALSE,
+               time_budget = 20,
+               cv_folds = 3)
+  )
+
+  expect_equal(result$metric, "rmse")
+  scored <- result$leaderboard$score[!is.na(result$leaderboard$score)]
+  expect_gt(length(scored), 0)
+  expect_false(is.unsorted(scored))
 })
 
 test_that("tl_auto_ml returns best model", {

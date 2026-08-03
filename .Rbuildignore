@@ -18,5 +18,6 @@
 ^CRAN_SUBMISSION_GUIDE\.md$
 ^\.lintr$
 ^tidylearn\.Rcheck$
-^Rplots\.pdf$
+(^|/)Rplots\.pdf$
 ^url_check_result\.rds$
+^SCOPE\.md$

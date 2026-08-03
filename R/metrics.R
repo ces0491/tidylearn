@@ -235,61 +235,152 @@ tl_evaluate_thresholds <- function(actuals, probs, thresholds, pos_class) {
 }
 
 
+#' Calculate regression metrics
+#'
+#' @param actuals Actual values (ground truth)
+#' @param predicted Predicted values
+#' @param metrics Character vector of metrics to compute
+#' @return A \link[tibble]{tibble} with columns \code{metric} and
+#'   \code{value}
+#' @keywords internal
+#' @noRd
+tl_calc_regression_metrics <- function(actuals, predicted,
+                                       metrics = c("rmse", "mae", "rsq")) {
+  actuals <- as.numeric(actuals)
+  predicted <- as.numeric(predicted)
+
+  # Drop pairs where either side is missing so every metric is computed
+  # over the same observations
+  complete <- !is.na(actuals) & !is.na(predicted)
+  actuals <- actuals[complete]
+  predicted <- predicted[complete]
+
+  residuals <- predicted - actuals
+
+  results <- tibble::tibble(metric = character(), value = numeric())
+
+  if ("mse" %in% metrics) {
+    results <- dplyr::add_row(
+      results, metric = "mse", value = mean(residuals^2)
+    )
+  }
+
+  if ("rmse" %in% metrics) {
+    results <- dplyr::add_row(
+      results, metric = "rmse", value = sqrt(mean(residuals^2))
+    )
+  }
+
+  if ("mae" %in% metrics) {
+    results <- dplyr::add_row(
+      results, metric = "mae", value = mean(abs(residuals))
+    )
+  }
+
+  if ("mape" %in% metrics) {
+    nonzero <- actuals != 0
+    mape <- if (any(nonzero)) {
+      mean(abs(residuals[nonzero] / actuals[nonzero])) * 100
+    } else {
+      NA_real_
+    }
+    results <- dplyr::add_row(results, metric = "mape", value = mape)
+  }
+
+  if ("rsq" %in% metrics) {
+    ss_res <- sum(residuals^2)
+    ss_tot <- sum((actuals - mean(actuals))^2)
+    rsq <- if (ss_tot > 0) 1 - ss_res / ss_tot else NA_real_
+    results <- dplyr::add_row(results, metric = "rsq", value = rsq)
+  }
+
+  results
+}
+
 #' Evaluate a tidylearn model
 #' @param object A tidylearn model object
 #' @param new_data Optional new data for evaluation
 #'   (if NULL, uses training data)
-#' @param ... Additional arguments
+#' @param metrics Character vector of metrics to compute. If \code{NULL}
+#'   (the default), \code{"accuracy"} is used for classification models
+#'   and \code{c("rmse", "mae", "rsq")} for regression models.
+#'   Classification supports \code{"accuracy"}, \code{"precision"},
+#'   \code{"recall"}, \code{"sensitivity"}, \code{"specificity"},
+#'   \code{"f1"}, \code{"auc"} and \code{"pr_auc"}; regression supports
+#'   \code{"rmse"}, \code{"mse"}, \code{"mae"}, \code{"mape"} and
+#'   \code{"rsq"}.
+#' @param ... Additional arguments passed to \code{predict()}
 #' @return A \link[tibble]{tibble} with columns \code{metric} (character)
-#'   and \code{value} (numeric). For regression models, includes
-#'   \code{rmse}, \code{mae}, and \code{rsq}. For classification models,
-#'   includes \code{accuracy}.
+#'   and \code{value} (numeric), containing one row per requested metric.
 #' @examples
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
 #' tl_evaluate(model)
+#' tl_evaluate(model, metrics = c("rmse", "mape"))
 #' }
 #' @export
-tl_evaluate <- function(object, new_data = NULL, ...) {
+tl_evaluate <- function(object, new_data = NULL, metrics = NULL, ...) {
   if (is.null(new_data)) {
     new_data <- object$data
   }
 
-  # Get predictions
-  preds <- predict(object, new_data = new_data, ...)
+  if (!inherits(object, "tidylearn_supervised")) {
+    # Unsupervised evaluation (placeholder)
+    return(tibble::tibble(metric = "completed", value = 1))
+  }
 
-  # Get actual values
-  if (inherits(object, "tidylearn_supervised")) {
-    response_var <- object$spec$response_var
-    actuals <- new_data[[response_var]]
+  response_var <- object$spec$response_var
+  if (!response_var %in% names(new_data)) {
+    stop(
+      "Response variable '", response_var,
+      "' not found in the evaluation data.",
+      call. = FALSE
+    )
+  }
+  actuals <- new_data[[response_var]]
 
-    # Calculate appropriate metrics
-    if (object$spec$is_classification) {
-      # Classification metrics
-      predicted_classes <- preds$.pred
-      acc <- mean(predicted_classes == actuals, na.rm = TRUE)
-
-      tibble::tibble(
-        metric = "accuracy",
-        value = acc
-      )
-    } else {
-      # Regression metrics
-      predicted_values <- preds$.pred
-      rmse <- sqrt(mean((predicted_values - actuals)^2, na.rm = TRUE))
-      mae <- mean(abs(predicted_values - actuals), na.rm = TRUE)
-      rsq <- cor(predicted_values, actuals, use = "complete.obs")^2
-
-      tibble::tibble(
-        metric = c("rmse", "mae", "rsq"),
-        value = c(rmse, mae, rsq)
+  # Ask for the prediction type each metric family needs. The default
+  # predict type is method-dependent -- logistic returns probabilities
+  # for type = "response" -- so classification must request "class".
+  extract_pred <- function(type) {
+    preds <- predict(object, new_data = new_data, type = type, ...)
+    if (!".pred" %in% names(preds)) {
+      stop(
+        "predict() for method '", object$spec$method, "' did not return a ",
+        "'.pred' column for type = '", type, "'.",
+        call. = FALSE
       )
     }
+    preds$.pred
+  }
+
+  if (object$spec$is_classification) {
+    if (is.null(metrics)) metrics <- "accuracy"
+
+    predicted <- extract_pred("class")
+
+    predicted_probs <- NULL
+    if (any(c("auc", "pr_auc") %in% metrics)) {
+      predicted_probs <- predict(
+        object, new_data = new_data, type = "prob", ...
+      )
+    }
+
+    tl_calc_classification_metrics(
+      actuals = actuals,
+      predicted = predicted,
+      predicted_probs = predicted_probs,
+      metrics = metrics
+    )
   } else {
-    # Unsupervised evaluation (placeholder)
-    tibble::tibble(
-      metric = "completed",
-      value = 1
+    if (is.null(metrics)) metrics <- c("rmse", "mae", "rsq")
+
+    predicted <- extract_pred("response")
+
+    tl_calc_regression_metrics(
+      actuals = actuals,
+      predicted = predicted,
+      metrics = metrics
     )
   }
 }
@@ -299,7 +390,10 @@ tl_evaluate <- function(object, new_data = NULL, ...) {
 #' @param formula Model formula
 #' @param method Modeling method
 #' @param folds Number of cross-validation folds
-#' @param ... Additional arguments
+#' @param metrics Character vector of metrics to compute on each fold,
+#'   passed to \code{\link{tl_evaluate}}. If \code{NULL} (the default),
+#'   \code{tl_evaluate}'s per-task defaults are used.
+#' @param ... Additional arguments passed to \code{\link{tl_model}}
 #' @return A list with two elements:
 #'   \describe{
 #'     \item{\code{$folds}}{A list of per-fold evaluation
@@ -315,7 +409,7 @@ tl_evaluate <- function(object, new_data = NULL, ...) {
 #' cv$summary
 #' }
 #' @export
-tl_cv <- function(data, formula, method, folds = 5, ...) {
+tl_cv <- function(data, formula, method, folds = 5, metrics = NULL, ...) {
   n <- nrow(data)
   fold_size <- floor(n / folds)
   indices <- sample(1:n)
@@ -337,7 +431,7 @@ tl_cv <- function(data, formula, method, folds = 5, ...) {
     model <- tl_model(train_data, formula, method = method, ...)
 
     # Evaluate
-    eval_result <- tl_evaluate(model, new_data = test_data)
+    eval_result <- tl_evaluate(model, new_data = test_data, metrics = metrics)
 
     cv_results[[i]] <- eval_result
   }

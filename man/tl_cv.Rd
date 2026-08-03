@@ -4,7 +4,7 @@
 \alias{tl_cv}
 \title{Cross-validation for tidylearn models}
 \usage{
-tl_cv(data, formula, method, folds = 5, ...)
+tl_cv(data, formula, method, folds = 5, metrics = NULL, ...)
 }
 \arguments{
 \item{data}{Data frame}
@@ -15,7 +15,11 @@ tl_cv(data, formula, method, folds = 5, ...)
 
 \item{folds}{Number of cross-validation folds}
 
-\item{...}{Additional arguments}
+\item{metrics}{Character vector of metrics to compute on each fold,
+passed to \code{\link{tl_evaluate}}. If \code{NULL} (the default),
+\code{tl_evaluate}'s per-task defaults are used.}
+
+\item{...}{Additional arguments passed to \code{\link{tl_model}}}
 }
 \value{
 A list with two elements:
