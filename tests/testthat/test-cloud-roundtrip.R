@@ -95,6 +95,63 @@ for (method_name in names(roundtrip_methods)) {
   })
 }
 
+# 'deep' is the one supervised method that does NOT round-trip through
+# base serialize(). A keras model is a reference to a Python object --
+# ?serialize_model puts it plainly: "Model objects are external references
+# to Keras objects which cannot be saved and restored across R sessions."
+# keras supplies serialize_model()/unserialize_model() for exactly this, so
+# the cloud path has to special-case the keras slot rather than serialise
+# the tidylearn object wholesale.
+#
+# These tests need a working TensorFlow backend, which CI does not provide.
+# They run wherever one is installed and skip everywhere else.
+skip_if_no_tensorflow <- function() {
+  skip_if_not_installed("keras")
+  skip_if_not_installed("tensorflow")
+  ok <- tryCatch(
+    !is.null(tensorflow::tf_version()),
+    error = function(e) FALSE
+  )
+  if (!isTRUE(ok)) {
+    skip("No TensorFlow backend available")
+  }
+}
+
+test_that("'deep' does not survive a plain serialise round trip", {
+  skip_if_no_tensorflow()
+
+  model <- tl_model(big_train, reg_formula, method = "deep",
+                    epochs = 5, verbose = 0)
+
+  restored <- unserialize(serialize(model, connection = NULL))
+
+  # The R-level structure comes back; the network behind it does not.
+  expect_s3_class(restored, class(model)[1])
+  expect_error(predict(restored, new_data = big_test))
+})
+
+test_that("'deep' round-trips via keras's own serialiser", {
+  skip_if_no_tensorflow()
+
+  model <- tl_model(big_train, reg_formula, method = "deep",
+                    epochs = 5, verbose = 0)
+  reference <- predict(model, new_data = big_test)
+
+  # The keras object lives at model$fit$model, surrounded by plain R
+  # metadata. Swap just that slot.
+  keras_payload <- keras::serialize_model(model$fit$model)
+  shell <- model
+  shell$fit$model <- NULL
+
+  restored <- unserialize(serialize(shell, connection = NULL))
+  restored$fit$model <- keras::unserialize_model(keras_payload)
+
+  expect_equal(
+    as.data.frame(predict(restored, new_data = big_test)),
+    as.data.frame(reference)
+  )
+})
+
 test_that("xgboost serialises its booster into the byte stream", {
   skip_if_not_installed("xgboost")
 
