@@ -1,0 +1,254 @@
+---
+title: "Compute Backends: CPU, GPU and Cloud"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Compute Backends: CPU, GPU and Cloud}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup, message = FALSE}
+library(tidylearn)
+```
+
+## Where a fit runs
+
+Most of the time, nowhere interesting: `tl_model()` runs on the CPU and
+you never think about it. This vignette is about the cases where you
+should — a fit that would take hours, or one that will not fit in memory
+at all.
+
+tidylearn separates two questions that are easy to conflate:
+
+- **Can this method go faster on a GPU?** Only two can.
+- **Will this job fit on this machine?** Any of them might not.
+
+## What this machine can do
+
+```{r check-gpu, eval = FALSE}
+tl_check_gpu()
+```
+
+`tl_check_gpu()` parses `nvidia-smi` and checks which GPU-capable
+backends are installed. It is deliberately cheap: it does not load
+Python, import TensorFlow, or fit anything. It returns an object with a
+`print()` method describing the CUDA driver, the devices found, and
+which of xgboost, keras, tensorflow and torch are installed.
+
+## Only two methods have a GPU path
+
+This surprises people, so it is worth being blunt about it. Of the
+thirteen supervised methods, only `"xgboost"` and `"deep"` have an
+upstream GPU implementation. The other eleven — linear and logistic
+regression, ridge, LASSO, elastic net, decision trees, random forests,
+gradient boosting, SVM, neural networks — wrap packages that have no
+CUDA path at all. Asking for a GPU gets you a warning and a CPU fit:
+
+```{r gpu-routing, eval = FALSE}
+# Routed to CUDA when a capable backend is present
+model <- tl_model(data, y ~ ., method = "xgboost", compute = "gpu")
+
+# Warns and falls back to CPU: randomForest has no GPU implementation
+model <- tl_model(data, y ~ ., method = "forest", compute = "gpu")
+
+# Let tidylearn decide per call
+model <- tl_model(data, y ~ ., method = "xgboost", compute = "auto")
+```
+
+For those eleven methods the useful question is not "GPU or CPU" but
+"does this fit in memory, and how many cores can I throw at it".
+
+## Estimating before you commit
+
+`tl_compute_advisor()` answers that. It is arithmetic over the problem
+dimensions, so it needs neither a GPU nor the backend package installed:
+
+```{r advisor}
+advice <- tl_compute_advisor(
+  "xgboost", iris, Species ~ .,
+  hyperparams = list(nrounds = 1000)
+)
+
+advice$recommendation
+```
+
+```{r advisor-print}
+advice
+```
+
+The advisor covers all thirteen supervised methods and treats cloud as a
+*memory headroom* tier rather than a GPU tier. That matters: it will
+recommend cloud for a CPU-only method such as random forest or SVM when
+the job is RAM-infeasible locally, which is the common case for large
+data. On a small dataset like `iris` it will tell you to stay local,
+because you should.
+
+Estimates are order-of-magnitude, not quotes. Runtime constants are
+calibrated per method, and Modal pricing is approximate as of early 2026.
+Treat the output as a decision aid, not a bill.
+
+Unsupervised methods are not modelled. Calling the advisor on one is an
+error rather than a guess.
+
+## Cloud compute
+
+**Cloud execution is not available yet.** `compute = "cloud"` errors with
+a message saying so, and the advisor's cloud tier is reported for
+planning only. What follows describes what is already in place, so that
+you can see the safety model before the feature that uses it.
+
+A cloud fit uploads your training data to your own Modal account. That is
+a third party, and it may be something your organisation's data-handling
+rules forbid. tidylearn treats that transfer as the consequential step it
+is.
+
+### Consent is explicit
+
+Nothing is uploaded without you saying so, either per call or for the
+session:
+
+```{r consent}
+# For the session
+tl_cloud_consent()
+
+# Revoke early
+tl_cloud_consent(FALSE)
+```
+
+The session lock is held in memory only. It is never written to disk and
+does not survive an R restart. There is also no interactive prompt
+anywhere in the cloud path, so `Rscript`, CI and knitted documents behave
+exactly like an interactive session — a prompt that cannot be answered in
+batch is worse than useless.
+
+Per call, the equivalent is `confirm_upload = TRUE`.
+
+### Destinations are checked, not trusted
+
+The endpoint is read from an environment variable:
+
+```{r endpoint, eval = FALSE}
+Sys.setenv(
+  TIDYLEARN_MODAL_ENDPOINT = "https://you--tidylearn-fit.modal.run"
+)
+```
+
+An environment variable rather than an R option, deliberately: a shared
+`.Rprofile` can set an option without you noticing, and the whole point
+of this check is that a destination should not appear silently.
+
+Before anything is sent, the URL must parse, use `https`, and resolve to
+a host on the allowlist. Anything else is an error rather than a warning.
+The default allowlist is Modal's own domains:
+
+```{r hosts}
+tl_cloud_allowed_hosts()
+```
+
+Modal customers serving Web Functions from a custom domain can add it,
+for the session:
+
+```{r allow-host}
+tl_cloud_allow_host("fits.example.com")
+tl_cloud_allowed_hosts()
+```
+
+```{r allow-host-reset, include = FALSE}
+tl_cloud_allow_host(NULL)
+```
+
+Matching is anchored, so allowing a host allows exactly it and its
+subdomains. `fits.example.com` does not admit `example.com`,
+`evil-fits.example.com`, or `fits.example.com.evil.test`. Single-label
+names such as `"com"` are refused outright, since they would open an
+entire top-level domain.
+
+### Cost is bounded, not just estimated
+
+This is the part worth reading carefully, because the obvious mental
+model is wrong.
+
+A job submitted to Modal runs there to completion whatever your R session
+does next. Pressing Ctrl-C, closing the IDE, a crashed session, a closed
+laptop — none of them stop it. The session was polling for a result; it
+was never what kept the work alive. A job you thought you had abandoned
+keeps billing until it finishes or something kills it.
+
+That has an awkward consequence: no amount of care in the R client can
+guarantee anything, because a killed session runs no cleanup handlers. So
+the controls are layered by what survives:
+
+**What holds even if your session dies.** Every submission sets an
+explicit timeout — never Modal's inherited default, never none — derived
+from the estimate with headroom and capped well below Modal's 24-hour
+maximum. The worker runs with retries disabled, because Modal applies
+timeouts per attempt and three retries would bill four full timeouts for
+one hung job. And you should set a spend budget on your Modal workspace,
+which is the only true hard cap and is not tidylearn's to set.
+
+**What is best-effort.** The pre-flight gates, the job registry, cancel
+on interrupt. These catch the ordinary cases and are worth having, but
+they are the second line, not the first.
+
+Before a fit, the figure you are asked to accept is the **worst case** —
+the timeout at the tier's rate — rather than the estimate:
+
+```{r cost, eval = FALSE}
+model <- tl_model(data, y ~ ., method = "xgboost", compute = "cloud",
+                  confirm_upload = TRUE, max_cost = 5)
+```
+
+That refuses before anything is uploaded if the worst case exceeds
+`max_cost`. It also refuses a fit whose estimate is so large that the job
+would be killed by its own timeout before finishing — submitting that
+would bill the full timeout and return nothing.
+
+Nothing in flight is invisible:
+
+```{r jobs}
+tl_cloud_jobs()
+```
+
+A job leaves that list when its result is collected or it is cancelled.
+The list cannot outlive the session — but the timeout can, which is
+precisely why the timeout is the control that matters.
+
+### The contract is written down
+
+What cloud compute will and will not do is documented as a threat model
+that ships with the package, including an audit checklist a reviewer can
+run against the source:
+
+```{r threat-model, eval = FALSE}
+file.show(
+  system.file("security/threat-model.md", package = "tidylearn")
+)
+```
+
+It covers token handling, egress consent, ephemeral compute, the absence
+of telemetry, and destination validation.
+
+## What is coming
+
+The remaining work is the submission path itself — building the
+authenticated request, uploading, polling for the result, and restoring
+the fitted model in your session. Models cross that boundary as bytes;
+twelve of the thirteen methods serialise natively, and `"deep"` carries
+its keras weights separately because a keras model is a reference to a
+Python object rather than an R one.
+
+Until that lands, use `tl_compute_advisor()` to size the problem and run
+locally.
+
+## See also
+
+- `vignette("getting-started", package = "tidylearn")`
+- `vignette("supervised-learning", package = "tidylearn")`
+- `?tl_check_gpu`, `?tl_compute_advisor`, `?tl_cloud_consent`

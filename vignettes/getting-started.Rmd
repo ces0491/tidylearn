@@ -254,6 +254,8 @@ Now that you understand the basics, explore:
 2. **Unsupervised Learning** - Explore clustering and dimensionality reduction
 3. **Integration Workflows** - Combine supervised and unsupervised learning
 4. **AutoML** - Automated machine learning with `tl_auto_ml()`
+5. **Compute Backends** - When a fit is too slow or too large for this
+   machine: GPU routing, cost estimates, and the cloud safety model
 
 ## Summary
 

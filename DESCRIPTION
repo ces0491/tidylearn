@@ -81,6 +81,7 @@ Suggests:
     shinydashboard,
     tensorflow,
     testthat (>= 3.1.7),
+    withr,
     xgboost
 Config/testthat/edition: 3
 URL: https://github.com/ces0491/tidylearn
@@ -117,6 +118,7 @@ Collate:
     'compute-routing.R'
     'cloud-consent.R'
     'cloud-endpoint.R'
+    'cloud-cost.R'
     'cloud-serialize.R'
     'tuning.R'
     'interactions.R'

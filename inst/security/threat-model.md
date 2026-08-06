@@ -433,6 +433,73 @@ the destination.
 - Code review confirms redirect-following is disabled on data-carrying
   requests.
 
+### T10: Runaway spend and orphaned jobs
+
+**Scenario.** A user submits a cloud fit and is billed far more than they
+expected. The ways this happens are mostly not adversarial:
+
+- The R session goes away — Ctrl-C, a closed IDE, a crash, a closed
+  laptop — and the job keeps running on Modal, because the session was
+  only polling for a result and was never what kept the work alive.
+- The job hangs or diverges and runs to whatever timeout it inherited.
+- A retry policy silently multiplies the bill: Modal's timeouts are per
+  execution attempt, so `n` retries can cost `n + 1` full timeouts.
+- A submission is retried over a flaky network and runs twice.
+- The advisor's estimate is optimistic and the real fit costs more.
+
+**Risk.** High, and the consequence is financial rather than
+informational. It was previously listed as out of scope on the grounds
+that quota exhaustion is a usability concern; that was wrong. A library
+that spends a user's money on their behalf owns this.
+
+**Mitigation.**
+
+The controls split into two groups, and the distinction matters more
+than any individual control:
+
+*Survives the client dying* — the only real guarantees:
+
+- Every submission sets an explicit timeout, derived from the advisor's
+  estimate with headroom and capped well below Modal's 24-hour maximum.
+  tidylearn MUST NOT inherit Modal's default timeout, and MUST NOT
+  submit a job with no timeout.
+- Retries are off by default on the tidylearn worker function. A failed
+  fit is the user's decision to repeat, not a silent cost multiplier.
+- `tl_cloud_setup()` directs the user to set a spend budget on their
+  Modal workspace. That budget is the only true hard cap, and it is not
+  tidylearn's to set.
+
+*Best-effort, lost if the session is killed:*
+
+- A fit whose own estimate exceeds the timeout cap is refused before
+  submission. Such a job would bill the full timeout and then be killed
+  before producing anything.
+- The user is shown, and gated on, the **worst-case** cost — timeout
+  multiplied by the tier rate — not the expected cost. The estimate is
+  order-of-magnitude; the timeout is the actual bound.
+- A worst-case cost above `max_cost` is refused. Raising it is explicit.
+- The submitted call id is recorded and printed, and in-flight jobs are
+  listable, so a job is never invisible.
+- Interrupt and error handlers cancel the remote call rather than
+  orphaning it, and an explicit cancel is available.
+- The submit POST is never automatically retried; only the idempotent
+  result poll is.
+
+**Verification.**
+
+- A test asserts that a fit estimated beyond the timeout cap is refused
+  rather than submitted.
+- A test asserts the gate uses worst case, not the estimate, and that
+  the refusal message says so.
+- Tests assert the derived timeout has headroom over the estimate, a
+  floor, and a cap.
+- `grep -rn 'req_retry' R/` shows retry configured only on polling
+  requests, never on submission.
+- The Modal app definition sets an explicit timeout and `retries = 0`.
+- Code review confirms in-flight jobs are registered before the request
+  is performed, not after, so a response that never arrives still leaves
+  a record.
+
 ## 4. Data egress consent UX
 
 The egress contract has two layers:
@@ -452,17 +519,26 @@ prints:
 
 ```text
 Uploading to Modal:
-  Method:        xgboost
-  Destination:   my-workspace--tidylearn-fit.modal.run
-  Rows × cols:   1,500,000 × 47
-  Estimated MB:  564
-  Modal tier:    A10G (24 GB VRAM / 24 GB RAM)
-  Estimated:     14 min, $0.43
+  Method:           xgboost
+  Destination:      my-workspace--tidylearn-fit.modal.run
+  Rows x cols:      1,500,000 x 47
+  Estimated MB:     564
+  Modal tier:       A10G (24 GB VRAM / 24 GB RAM)
+  Estimated:        14 min, $0.43
+  Timeout:          42 min (job is killed at this point)
+  Most it can bill: $0.77
 ```
 
 The destination line is part of the mitigation for
 [T9](#t9-egress-to-a-non-modal-host): the host the data will actually reach
-is shown before consent is acted on.
+is shown before consent is acted on, and is marked when it is a host the
+user added this session rather than one of Modal's own.
+
+The last two lines are the mitigation for
+[T10](#t10-runaway-spend-and-orphaned-jobs). The estimate is
+order-of-magnitude and could be wrong; the timeout is what actually
+bounds the bill, so the figure the user is asked to accept is the worst
+case rather than the expectation.
 
 The summary is generated from metadata only — no row values.
 
@@ -508,6 +584,18 @@ Before the Modal-integration PR is merged, reviewers must confirm:
       validated as bare host names with no single-label entries.
 - [ ] Redirect-following is disabled on requests carrying user data.
 - [ ] No TLS downgrades (`ssl_verifypeer`, `ssl_verifyhost`, custom CA).
+- [ ] Every submission sets an explicit timeout; none inherits Modal's
+      default or omits one.
+- [ ] The Modal app definition sets `retries = 0`, so a hung job cannot
+      bill several full timeouts.
+- [ ] The submit request is never auto-retried; `req_retry()` appears
+      only on result polling.
+- [ ] The pre-upload summary states the worst-case cost and the timeout,
+      and the budget gate refuses on worst case rather than estimate.
+- [ ] A fit whose estimate exceeds the timeout cap is refused before
+      submission.
+- [ ] In-flight jobs are registered before the request is performed and
+      are listable with `tl_cloud_jobs()`.
 - [ ] `httr2` is the only HTTP client in cloud paths; no `curl::`,
       `download.file()`, or `url()`.
 
@@ -522,9 +610,10 @@ The following are intentionally not addressed by this threat model:
   from `/tmp` or memory).
 - Threats requiring physical access to the user's machine.
 - Cryptanalysis of TLS.
-- Adversarial inputs designed to exhaust Modal quotas (denial of
-  service against the user's own Modal account by tidylearn callers
-  — this is a usability issue, not a security one for this scope).
+- Modal's own billing accuracy, and the spend budget the user sets on
+  their Modal workspace. tidylearn bounds what it submits (see
+  [T10](#t10-runaway-spend-and-orphaned-jobs)) but cannot enforce a cap
+  on the account itself.
 
 ## 7. Open questions
 
@@ -551,6 +640,14 @@ via `tl_cloud_allow_host()` under the constraints in
 
 ## 8. Revision history
 
+- **2026-08-06** — added [T10](#t10-runaway-spend-and-orphaned-jobs),
+  runaway spend and orphaned jobs, and removed the out-of-scope line that
+  dismissed quota exhaustion as a usability concern. A submitted Modal
+  job runs to completion regardless of what the R session does, so a
+  closed session leaves a job billing invisibly; the mandatory
+  submission timeout, not any client-side handler, is what bounds that.
+  Section 4's summary now shows the timeout and the worst-case cost, and
+  the gate refuses on worst case rather than on the estimate.
 - **2026-08-06** — revised for the HTTPS + R-worker architecture. Modal has
   no R SDK and no general REST API for invoking Functions, so tidylearn
   calls a user-deployed Web Function over HTTPS with `httr2` instead of

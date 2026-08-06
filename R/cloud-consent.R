@@ -14,6 +14,12 @@ NULL
 # same reason as the consent lock: session-scoped, never persisted.
 .tl_cloud_state$extra_hosts <- character(0)
 
+# In-flight cloud jobs, keyed by Modal call id, so that a submitted job
+# is never invisible. See tl_cloud_jobs(). Session-scoped like the rest:
+# a job outlives this registry, which is exactly why the timeout set at
+# submission is the control that matters.
+.tl_cloud_state$jobs <- list()
+
 #' Grant or revoke cloud upload consent for this R session
 #'
 #' Fitting with `compute = "cloud"` uploads your training data to your
