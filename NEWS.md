@@ -1,6 +1,29 @@
 # tidylearn 0.4.0.9000
 
-(Development version.)
+## New Features
+
+### Cloud compute (security guards)
+
+* `tl_cloud_consent()` — grants or revokes permission for the rest of the
+  R session to upload training data to your Modal account. Cloud fits
+  otherwise require `confirm_upload = TRUE` on every call. The lock is
+  never written to disk and does not survive an R restart, and tidylearn
+  never prompts interactively, so scripts and CI behave the same as an
+  interactive session.
+
+* Cloud endpoints are read from the `TIDYLEARN_MODAL_ENDPOINT`
+  environment variable and validated before any request is built: the
+  scheme must be `https` and the host must belong to Modal. Lookalikes
+  such as `modal.run.example.com` or `evil-modal.run` are rejected. The
+  endpoint is user-supplied configuration, so this check is what stops a
+  typo or a modified variable sending training data somewhere other than
+  Modal. An environment variable is used rather than an R option because
+  an option can be set silently by a shared `.Rprofile`.
+
+  These implement T2 and T9 of
+  `system.file("security/threat-model.md", package = "tidylearn")`.
+  Submission itself is still not wired up — `compute = "cloud"` continues
+  to error.
 
 # tidylearn 0.4.0
 

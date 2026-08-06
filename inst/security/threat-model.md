@@ -245,8 +245,10 @@ rather than delegating it.
 - `grep -rn 'request(' R/` — every request base URL traces back to the
   validated endpoint from [T9](#t9-egress-to-a-non-modal-host), not to a
   literal or an unchecked user string.
-- `grep -rn 'curl::\|download\.file\|url(' R/` returns nothing in cloud
-  paths; `httr2` is the only client.
+- `grep -rnE 'curl::|download\.file|\burl\(' R/` returns nothing in cloud
+  paths; `httr2` is the only client. (The `\b` matters — without it the
+  pattern also matches identifiers ending in `url`, such as
+  `tl_validate_modal_url(`.)
 
 ### T5: Telemetry / phone-home from tidylearn
 

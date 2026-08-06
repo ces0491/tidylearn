@@ -60,6 +60,7 @@ Suggests:
     ggforce,
     gridExtra,
     gt,
+    httr2 (>= 1.0.0),
     jsonlite,
     keras,
     knitr,
@@ -114,6 +115,8 @@ Collate:
     'compute-detection.R'
     'compute-advisor.R'
     'compute-routing.R'
+    'cloud-endpoint.R'
+    'cloud-consent.R'
     'tuning.R'
     'interactions.R'
     'diagnostics.R'
