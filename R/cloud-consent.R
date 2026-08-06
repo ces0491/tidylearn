@@ -10,6 +10,10 @@ NULL
 .tl_cloud_state <- new.env(parent = emptyenv())
 .tl_cloud_state$consent <- FALSE
 
+# Hosts added this session with tl_cloud_allow_host(). Kept here for the
+# same reason as the consent lock: session-scoped, never persisted.
+.tl_cloud_state$extra_hosts <- character(0)
+
 #' Grant or revoke cloud upload consent for this R session
 #'
 #' Fitting with `compute = "cloud"` uploads your training data to your

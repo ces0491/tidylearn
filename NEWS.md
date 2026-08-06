@@ -13,17 +13,43 @@
 
 * Cloud endpoints are read from the `TIDYLEARN_MODAL_ENDPOINT`
   environment variable and validated before any request is built: the
-  scheme must be `https` and the host must belong to Modal. Lookalikes
-  such as `modal.run.example.com` or `evil-modal.run` are rejected. The
-  endpoint is user-supplied configuration, so this check is what stops a
-  typo or a modified variable sending training data somewhere other than
-  Modal. An environment variable is used rather than an R option because
-  an option can be set silently by a shared `.Rprofile`.
+  scheme must be `https` and the host must be on the allowlist.
+  Lookalikes such as `modal.run.example.com` or `evil-modal.run` are
+  rejected. The endpoint is user-supplied configuration, so this check is
+  what stops a typo or a modified variable sending training data
+  somewhere other than Modal. An environment variable is used rather than
+  an R option because an option can be set silently by a shared
+  `.Rprofile`.
+
+* `tl_cloud_allow_host()` and `tl_cloud_allowed_hosts()` — the allowlist
+  defaults to Modal's own domains, and Modal customers serving Web
+  Functions from a custom domain can extend it. Extension is a
+  per-session call rather than an option or environment variable, for the
+  same reason: nothing inherited from the environment should be able to
+  add an upload destination. Added hosts must be bare host names, and a
+  single label such as `"com"` is refused because it would open an entire
+  top-level domain.
 
   These implement T2 and T9 of
   `system.file("security/threat-model.md", package = "tidylearn")`.
   Submission itself is still not wired up — `compute = "cloud"` continues
   to error.
+
+### Cloud compute (model serialisation)
+
+* Internal helpers now convert a fitted model to bytes and back for
+  transport from a remote worker. Twelve of the thirteen supervised
+  methods survive base R serialisation unchanged, xgboost included — its
+  booster is embedded in the byte stream rather than left as a dangling
+  pointer.
+
+  `method = "deep"` is the exception and is handled separately: a keras
+  model is a reference to a Python object and cannot cross a process
+  boundary that way, so its weights travel as their own hdf5 payload via
+  `keras::serialize_model()`. Detection is by the presence of a Python
+  object rather than by method name or keras class, because keras renamed
+  its classes between versions and matching those would silently stop
+  detecting models on one side of the change.
 
 # tidylearn 0.4.0
 

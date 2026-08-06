@@ -7,27 +7,116 @@
 # ---- T9: host allowlist ----
 
 test_that("Modal hosts and their subdomains are accepted", {
-  expect_true(tl_is_modal_host("modal.run"))
-  expect_true(tl_is_modal_host("modal.com"))
-  expect_true(tl_is_modal_host("my-workspace--tidylearn-fit.modal.run"))
-  expect_true(tl_is_modal_host("api.modal.com"))
+  expect_true(tl_is_allowed_host("modal.run"))
+  expect_true(tl_is_allowed_host("modal.com"))
+  expect_true(tl_is_allowed_host("my-workspace--tidylearn-fit.modal.run"))
+  expect_true(tl_is_allowed_host("api.modal.com"))
 })
 
 test_that("lookalike hosts are rejected", {
   # Suffix-shaped attacks: the allowlisted domain appears in the name but
   # the request would not reach Modal.
-  expect_false(tl_is_modal_host("modal.run.example.com"))
-  expect_false(tl_is_modal_host("evil-modal.run"))
-  expect_false(tl_is_modal_host("notmodal.com"))
-  expect_false(tl_is_modal_host("modal.run.evil.test"))
-  expect_false(tl_is_modal_host("example.com"))
+  expect_false(tl_is_allowed_host("modal.run.example.com"))
+  expect_false(tl_is_allowed_host("evil-modal.run"))
+  expect_false(tl_is_allowed_host("notmodal.com"))
+  expect_false(tl_is_allowed_host("modal.run.evil.test"))
+  expect_false(tl_is_allowed_host("example.com"))
 })
 
 test_that("degenerate hosts are rejected", {
-  expect_false(tl_is_modal_host(""))
-  expect_false(tl_is_modal_host(NA_character_))
-  expect_false(tl_is_modal_host(character(0)))
-  expect_false(tl_is_modal_host(c("modal.run", "modal.run")))
+  expect_false(tl_is_allowed_host(""))
+  expect_false(tl_is_allowed_host(NA_character_))
+  expect_false(tl_is_allowed_host(character(0)))
+  expect_false(tl_is_allowed_host(c("modal.run", "modal.run")))
+})
+
+# ---- T9: extending the allowlist ----
+
+test_that("the default allowlist is Modal's hosts only", {
+  suppressMessages(tl_cloud_allow_host(NULL))
+  on.exit(suppressMessages(tl_cloud_allow_host(NULL)))
+
+  expect_setequal(tl_cloud_allowed_hosts(), c("modal.run", "modal.com"))
+})
+
+test_that("an added host and its subdomains become allowed", {
+  suppressMessages(tl_cloud_allow_host(NULL))
+  on.exit(suppressMessages(tl_cloud_allow_host(NULL)))
+
+  expect_false(tl_is_allowed_host("fits.example.com"))
+
+  expect_message(
+    tl_cloud_allow_host("fits.example.com"),
+    "may now also go to"
+  )
+
+  expect_true(tl_is_allowed_host("fits.example.com"))
+  expect_true(tl_is_allowed_host("a.fits.example.com"))
+
+  # Adding a host must not widen anything above it.
+  expect_false(tl_is_allowed_host("example.com"))
+  expect_false(tl_is_allowed_host("evil-fits.example.com"))
+  expect_false(tl_is_allowed_host("fits.example.com.evil.test"))
+})
+
+test_that("added hosts are still distinguishable from Modal's own", {
+  suppressMessages(tl_cloud_allow_host(NULL))
+  on.exit(suppressMessages(tl_cloud_allow_host(NULL)))
+
+  suppressMessages(tl_cloud_allow_host("fits.example.com"))
+
+  # Allowed, but the pre-upload summary must be able to say it is not
+  # a Modal host.
+  expect_true(tl_is_allowed_host("fits.example.com"))
+  expect_false(tl_is_modal_host("fits.example.com"))
+  expect_true(tl_is_modal_host("ws.modal.run"))
+})
+
+test_that("clearing removes session additions but keeps Modal's hosts", {
+  suppressMessages(tl_cloud_allow_host("fits.example.com"))
+  expect_true(tl_is_allowed_host("fits.example.com"))
+
+  expect_message(tl_cloud_allow_host(NULL), "Cleared all additional")
+
+  expect_false(tl_is_allowed_host("fits.example.com"))
+  expect_setequal(tl_cloud_allowed_hosts(), c("modal.run", "modal.com"))
+})
+
+test_that("only bare host names may be added", {
+  on.exit(suppressMessages(tl_cloud_allow_host(NULL)))
+
+  # A single label would open an entire TLD.
+  expect_error(tl_cloud_allow_host("com"), "single label")
+  expect_error(tl_cloud_allow_host("localhost"), "single label")
+
+  # URLs, ports, paths and wildcards are not host names.
+  expect_error(tl_cloud_allow_host("https://x.example.com"), "bare host")
+  expect_error(tl_cloud_allow_host("x.example.com/fit"), "bare host")
+  expect_error(tl_cloud_allow_host("x.example.com:8443"), "bare host")
+  expect_error(tl_cloud_allow_host("*.example.com"), "bare host")
+  expect_error(tl_cloud_allow_host("a b.example.com"), "bare host")
+
+  expect_error(tl_cloud_allow_host(""), "non-empty host names")
+  expect_error(tl_cloud_allow_host(NA_character_), "non-empty host names")
+  expect_error(tl_cloud_allow_host(character(0)), "non-empty host names")
+  expect_error(tl_cloud_allow_host(42), "non-empty host names")
+})
+
+test_that("a configured endpoint on an added host validates", {
+  skip_if_not_installed("httr2")
+  on.exit(suppressMessages(tl_cloud_allow_host(NULL)))
+
+  url <- "https://fits.example.com/fit"
+  expect_error(tl_validate_modal_url(url), "not an allowed upload")
+
+  suppressMessages(tl_cloud_allow_host("fits.example.com"))
+  expect_equal(tl_validate_modal_url(url), url)
+
+  # http is still refused on an added host.
+  expect_error(
+    tl_validate_modal_url("http://fits.example.com/fit"),
+    "must use https"
+  )
 })
 
 # ---- T9: URL validation ----
@@ -54,11 +143,11 @@ test_that("non-Modal hosts are refused", {
 
   expect_error(
     tl_validate_modal_url("https://example.com/fit"),
-    "not a Modal host"
+    "not an allowed upload"
   )
   expect_error(
     tl_validate_modal_url("https://modal.run.evil.test/fit"),
-    "not a Modal host"
+    "not an allowed upload"
   )
 })
 
@@ -106,7 +195,7 @@ test_that("a configured endpoint is validated, not trusted", {
   # A hostile or mistyped value must not slip through just because it
   # was configured.
   Sys.setenv(TIDYLEARN_MODAL_ENDPOINT = "https://evil.test/fit")
-  expect_error(tl_cloud_endpoint(), "not a Modal host")
+  expect_error(tl_cloud_endpoint(), "not an allowed upload")
 })
 
 # ---- T2: consent ----

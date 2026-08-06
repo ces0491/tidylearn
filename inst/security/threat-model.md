@@ -92,7 +92,7 @@ Boundaries:
 | Modal account API token | High | `~/.modal.toml` (user OS), used only by the Python CLI at deploy time | Until revoked |
 | Modal proxy token (`wk-` / `ws-`) | High — endpoint-scoped | User environment; read into the R process per request, never persisted | Until revoked |
 | Training data (rows × cols) | User-determined; may contain PII | In-memory in R, transmitted to Modal during fit | Ephemeral on Modal — destroyed with container |
-| Fitted model artifacts | Medium — may memorize training data | Returned to R session; not persisted on Modal | Lives in user's R session |
+| Fitted model artifacts | Medium — may memorize training data | Returned to R session as raw bytes; not persisted on Modal. Keras models travel as a separate hdf5 payload, since they cannot cross a process boundary through base R serialisation | Lives in user's R session |
 | Hyperparameters / model spec | Low | In-memory in R, transmitted to Modal | Ephemeral |
 | Job stdout / logs | Low — should contain no row-level data | Modal log retention (per Modal's policy) | Per Modal |
 
@@ -319,11 +319,20 @@ user's session.
 - The worker image pins its **R** dependencies — a fixed `rocker/r-ver`
   base tag plus a package snapshot (a repository snapshot date or a
   committed `renv.lock`). Reproducible image builds, lock file committed
-  to the repo. The previous commitment to pin *Python* dependencies no
-  longer describes the worker; the only Python involved is Modal's own
-  entrypoint shim, which shells out to `Rscript`.
+  to the repo.
+- Because `method = "deep"` ships in the first cloud release, the worker
+  image also carries a Python runtime with TensorFlow and keras, and
+  **those are pinned too**. The R `keras` package and the Python keras it
+  binds to must be a matched pair; an unpinned image would drift into the
+  Keras 2 / Keras 3 split and fail at deserialisation rather than at
+  build time. This is the cost of shipping `deep`: the other twelve
+  methods need only R and CRAN packages.
 - R-side cloud deps live in `Suggests:` so the install footprint is
-  minimal. `httr2` is the only addition.
+  minimal. `httr2` is the only addition for the twelve pure-R methods.
+  The `deep` path additionally calls `keras`, which tidylearn already
+  suggests for local deep fits — it adds no new dependency, but it does
+  mean reticulate and a Python runtime are present on the client for
+  that one method.
 - Direct dep tree is reviewed before each tidylearn release.
 - This is an industry-wide problem; tidylearn does not solve it
   unilaterally but commits to good hygiene.
@@ -331,10 +340,16 @@ user's session.
 **Verification.**
 
 - The worker image's pinned R dependency manifest is part of the
-  cloud-integration PR and is reviewed.
+  cloud-integration PR and is reviewed, as is the pinned Python/TF
+  manifest for the `deep` variant.
 - The image build is reproducible from the committed manifest.
-- `R/` source for cloud paths adds only `httr2` — no other R-side cloud
-  deps, and no `reticulate`.
+- `grep -rn 'reticulate::\|library(reticulate)\|require(reticulate)' R/`
+  returns nothing — tidylearn never drives reticulate directly, even on
+  the `deep` path, where it calls `keras::serialize_model()` and lets
+  keras own the Python boundary. (Match on calls, not on the word: the
+  source explains in comments why `python.builtin.object` is the right
+  class to detect.)
+- Cloud paths import only `httr2` and, for `deep`, `keras`.
 
 ### T8: Multi-tenant data leakage on Modal
 
@@ -377,9 +392,23 @@ the destination.
 **Mitigation.**
 
 - The endpoint URL is validated before any request carrying user data.
-  It MUST parse, use scheme `https`, and have a host under Modal's
-  domains (`*.modal.run`, and `modal.com` for API hosts). Anything else
-  is a hard error, not a warning.
+  It MUST parse, use scheme `https`, and have a host on the allowlist.
+  Anything else is a hard error, not a warning.
+- The allowlist defaults to Modal's own domains (`*.modal.run`, and
+  `modal.com` for API hosts). Modal customers serving Web Functions from
+  a custom domain extend it with `tl_cloud_allow_host()`.
+- Extension is a **per-session function call**, never an option or an
+  environment variable. A shared `.Rprofile` or an inherited environment
+  must not be able to add an upload destination without the user having
+  written the call. Additions are not persisted and die with the session.
+- Added hosts are validated as bare host names. URLs, ports, paths and
+  wildcards are refused, as is any single-label name — `"com"` would
+  otherwise open an entire TLD and defeat this control completely.
+- Host matching is anchored on a leading dot, for default and added
+  hosts alike, so a host is matched only by itself and its subdomains.
+- The pre-upload summary distinguishes a Modal host from a host added
+  this session, so an extended allowlist is visible at the moment
+  consent is acted on.
 - Validation happens at the single choke point that builds the request,
   so no call site can bypass it.
 - The pre-upload summary in [Section 4](#4-data-egress-consent-ux)
@@ -395,6 +424,10 @@ the destination.
 - A test supplies `http://` , a non-Modal host, and a Modal-lookalike host
   (e.g. `modal.run.evil.test`) and expects an error in each case before any
   request is made.
+- Tests confirm that adding a host does not widen anything above it: with
+  `fits.example.com` allowed, `example.com`, `evil-fits.example.com` and
+  `fits.example.com.evil.test` all remain refused.
+- Tests confirm `https` is still required on an added host.
 - `grep -rn 'request(' R/` confirms every request is constructed through
   the validating helper.
 - Code review confirms redirect-following is disabled on data-carrying
@@ -465,9 +498,14 @@ Before the Modal-integration PR is merged, reviewers must confirm:
       `modal.NetworkFileSystem`, or persistent-storage references.
 - [ ] No telemetry / analytics / pingback calls in cloud paths.
 - [ ] The worker image's R dependency manifest is pinned and committed,
-      and the build is reproducible from it.
+      and the build is reproducible from it. For the `deep` variant, the
+      Python/TensorFlow/keras stack is pinned as a matched pair with the
+      R `keras` package.
 - [ ] Every request is built through the URL-validating helper; scheme is
-      `https` and host is a Modal host, enforced as an error.
+      `https` and host is on the allowlist, enforced as an error.
+- [ ] The allowlist is extensible only by an explicit per-session call,
+      not by an option or environment variable, and added hosts are
+      validated as bare host names with no single-label entries.
 - [ ] Redirect-following is disabled on requests carrying user data.
 - [ ] No TLS downgrades (`ssl_verifypeer`, `ssl_verifyhost`, custom CA).
 - [ ] `httr2` is the only HTTP client in cloud paths; no `curl::`,
@@ -498,19 +536,18 @@ These are commitments deferred to the Modal-integration PR:
   also short-circuit the network-time portion of the cloud estimate?
 - Behaviour when a user revokes consent mid-session while a fit is
   in-flight (likely: complete the in-flight fit, refuse new ones).
-- Where the endpoint URL is configured — environment variable, R option,
-  or an argument to `tl_cloud_setup()`. An R option is the weakest of the
-  three against [T9](#t9-egress-to-a-non-modal-host), since a shared
-  `.Rprofile` can set it silently.
-- Whether the Modal host allowlist is a fixed constant or user-extensible
-  for Modal customers on custom domains. Fixed is safer; extensible needs
-  its own opt-in.
 - Poll-loop behaviour on `404` from the result endpoint: Modal expires
   results after 7 days, which is indistinguishable at the HTTP level from
   a call ID that never existed.
 - Logging cadence: at what verbosity level (`verbose = 0/1/2`) does
   the upload-summary print, and at what level (if any) is it
   suppressed?
+
+Two questions listed here previously are now settled and described above:
+the endpoint is read from the `TIDYLEARN_MODAL_ENDPOINT` environment
+variable rather than an R option, and the host allowlist is extensible
+via `tl_cloud_allow_host()` under the constraints in
+[T9](#t9-egress-to-a-non-modal-host).
 
 ## 8. Revision history
 
