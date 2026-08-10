@@ -56,7 +56,14 @@ tidy_kmeans <- function(data, k, cols = NULL, nstart = 25, iter_max = 100,
     betweenss = km_model$betweenss,
     tot_ss = km_model$totss,
     iter = km_model$iter,
-    converged = km_model$ifault == 0
+    # kmeans() only sets ifault for Hartigan-Wong; Lloyd, Forgy and
+    # MacQueen leave it NULL, and a logical(0) here recycles the whole
+    # tibble down to zero rows, silently losing every metric
+    converged = if (is.null(km_model$ifault)) {
+      NA
+    } else {
+      km_model$ifault == 0
+    }
   )
 
   # Return tidy object

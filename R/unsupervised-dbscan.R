@@ -1,3 +1,20 @@
+#' Identify DBSCAN core points
+#'
+#' @param data_matrix Either a coordinate matrix or a \code{dist} object,
+#'   whichever was clustered
+#' @param eps The neighbourhood radius
+#' @param minPts Minimum points in a neighbourhood, the point included
+#' @return A logical vector, TRUE for core points
+#' @keywords internal
+#' @noRd
+tl_dbscan_core_points <- function(data_matrix, eps, minPts) {
+  neighbours <- dbscan::frNN(data_matrix, eps = eps)
+
+  # frNN excludes the point itself, so a core point needs minPts - 1
+  # neighbours within eps
+  lengths(neighbours$id) >= (minPts - 1)
+}
+
 #' Tidy DBSCAN Clustering
 #'
 #' Performs density-based clustering with tidy output
@@ -33,9 +50,15 @@ tidy_dbscan <- function(data, eps, minPts = 5,
                         cols = NULL,
                         distance = "euclidean") {
 
-  # Handle distance matrix
-  if (inherits(data, "dist")) {
-    data_matrix <- as.matrix(data)
+  # Handle distance matrix. dbscan::dbscan() accepts a dist object
+  # directly and uses it as a dissimilarity; converting to a matrix
+  # instead turns every observation into an n-dimensional coordinate row
+  # of its own distances, which silently clusters something else.
+  input_is_dist <- inherits(data, "dist")
+
+  if (input_is_dist) {
+    data_matrix <- data
+    n_obs <- attr(data, "Size")
   } else {
     # Select columns
     if (!is.null(cols)) {
@@ -46,6 +69,7 @@ tidy_dbscan <- function(data, eps, minPts = 5,
     }
 
     data_matrix <- as.matrix(data_selected)
+    n_obs <- nrow(data_matrix)
   }
 
   # Perform DBSCAN
@@ -56,17 +80,24 @@ tidy_dbscan <- function(data, eps, minPts = 5,
   n_noise <- sum(db_model$cluster == 0)
 
   # Create clusters tibble
-  if (!is.null(rownames(data))) {
+  if (!input_is_dist && !is.null(rownames(data))) {
     obs_ids <- rownames(data)
+  } else if (input_is_dist && !is.null(attr(data, "Labels"))) {
+    obs_ids <- attr(data, "Labels")
   } else {
-    obs_ids <- paste0("obs_", seq_len(nrow(data_matrix)))
+    obs_ids <- paste0("obs_", seq_len(n_obs))
   }
+
+  # A point is core when it has at least minPts neighbours (itself
+  # included) within eps. The result carries no "core" attribute, so
+  # reading one back gave every point is_core = FALSE.
+  core_flags <- tl_dbscan_core_points(data_matrix, eps, minPts)
 
   clusters_tbl <- tibble::tibble(
     .obs_id = obs_ids,
     cluster = as.integer(db_model$cluster),
     is_noise = cluster == 0,
-    is_core = seq_along(cluster) %in% attr(db_model, "core")
+    is_core = core_flags
   )
 
   # Create summary statistics
@@ -144,7 +175,7 @@ tidy_knn_dist <- function(data, k = 4, cols = NULL) {
 #'
 #' @param data A data frame or matrix
 #' @param minPts Minimum points parameter (used as k for k-NN)
-#' @param method Method to suggest eps: "knee" (default), "percentile"
+#' @param method Method to suggest eps: "percentile" (default), "knee"
 #' @param percentile If method="percentile", which
 #'   percentile to use (default: 0.95)
 #'

@@ -26,8 +26,20 @@ data}
 
 \item{method}{The modeling method to tune}
 
-\item{param_space}{A named list of parameter spaces
-to sample from}
+\item{param_space}{A named list of parameter spaces to sample from.
+Each element is read by its type and length:
+\describe{
+\item{a function}{called with no arguments to draw one value}
+\item{\code{c(min, max, "log")}}{log-uniform draw between
+\code{min} and \code{max}}
+\item{two whole numbers}{integer range, e.g.
+\code{c(10, 20)} draws from 10:20}
+\item{three or more whole numbers}{a discrete set, sampled from
+as given}
+\item{two other numbers}{uniform draw between them, e.g.
+\code{c(0.01, 0.1)}}
+\item{character or factor}{categorical, sampled from as given}
+}}
 
 \item{n_iter}{Number of random parameter
 combinations to try}

@@ -31,12 +31,29 @@ NULL
 tl_influence_measures <- function(model, threshold_cook = NULL,
                                   threshold_leverage = NULL,
                                   threshold_dffits = NULL) {
-  # Check if model is supported
-  supported_methods <- c(
-    "linear", "logistic", "polynomial", "ridge", "lasso", "elastic_net"
-  )
-  if (!inherits(model, "tidylearn_model") ||
-        !model$spec$method %in% supported_methods) {
+  # cooks.distance(), hatvalues(), dffits() and rstandard() have no
+  # glmnet methods, so the penalised fits cannot be supported here even
+  # though they are linear-based
+  supported_methods <- c("linear", "logistic", "polynomial")
+
+  if (!inherits(model, "tidylearn_model")) {
+    stop(
+      "Influence measures are only available for linear-based models",
+      call. = FALSE
+    )
+  }
+
+  if (model$spec$method %in% c("ridge", "lasso", "elastic_net")) {
+    stop(
+      "Influence measures are not available for penalised regression ",
+      "('", model$spec$method, "'): glmnet provides no hat values or ",
+      "leave-one-out diagnostics. Refit with method = \"linear\" or ",
+      "\"logistic\" to diagnose the unpenalised specification.",
+      call. = FALSE
+    )
+  }
+
+  if (!model$spec$method %in% supported_methods) {
     stop(
       "Influence measures are only available for linear-based models",
       call. = FALSE
@@ -185,7 +202,10 @@ tl_plot_influence <- function(model,
         vjust = 0.5,
         size = label_size
       ) +
-      ggplot2::scale_color_manual(values = c("blue", "red")) +
+      ggplot2::scale_color_manual(
+        values = c("FALSE" = "blue", "TRUE" = "red"),
+        drop = FALSE
+      ) +
       ggplot2::labs(
         title = "Cook's Distance Plot",
         subtitle = subtitle_text,
@@ -235,7 +255,10 @@ tl_plot_influence <- function(model,
         vjust = 0.5,
         size = label_size
       ) +
-      ggplot2::scale_color_manual(values = c("blue", "red")) +
+      ggplot2::scale_color_manual(
+        values = c("FALSE" = "blue", "TRUE" = "red"),
+        drop = FALSE
+      ) +
       ggplot2::labs(
         title = "Leverage-Residual Plot",
         subtitle = paste(
@@ -283,7 +306,10 @@ tl_plot_influence <- function(model,
         vjust = 0.5,
         size = label_size
       ) +
-      ggplot2::scale_color_manual(values = c("blue", "red")) +
+      ggplot2::scale_color_manual(
+        values = c("FALSE" = "blue", "TRUE" = "red"),
+        drop = FALSE
+      ) +
       ggplot2::labs(
         title = "Index Plot of Standardized Residuals",
         subtitle = "Points outside +/-3 are considered outliers",
@@ -300,6 +326,85 @@ tl_plot_influence <- function(model,
   }
 
   p
+}
+
+#' Test the linearity assumption
+#'
+#' A RESET-style specification test: regress the residuals on powers of
+#' the fitted values and test whether they explain anything. If the
+#' relationship is really linear, no function of the fitted values should
+#' predict what the model left over.
+#'
+#' This replaces a check on \code{cor(fitted, residuals)}, which cannot
+#' detect anything: for OLS with an intercept, residuals are orthogonal
+#' to fitted values by construction, so that correlation is identically
+#' zero however curved the data is.
+#'
+#' @param fitted_values Fitted values from the model
+#' @param residuals Residuals from the model
+#' @return A list with \code{assumption}, \code{check}, \code{details}
+#'   and \code{recommendation}
+#' @keywords internal
+#' @noRd
+tl_check_linearity <- function(fitted_values, residuals) {
+  result <- function(check, details, recommendation) {
+    list(
+      assumption = "Linearity", check = check,
+      details = details, recommendation = recommendation
+    )
+  }
+
+  # Cubing raw fitted values overflows for large responses, so work on a
+  # standardised scale
+  scaled_fit <- as.vector(scale(fitted_values))
+
+  if (length(unique(scaled_fit)) < 4 || anyNA(scaled_fit)) {
+    return(result(
+      NA,
+      "Not enough distinct fitted values to test linearity",
+      "Inspect a residuals-versus-fitted plot directly"
+    ))
+  }
+
+  aux_data <- data.frame(
+    .tl_resid = as.vector(residuals),
+    .tl_fit2 = scaled_fit^2,
+    .tl_fit3 = scaled_fit^3
+  )
+
+  aux <- try(
+    stats::lm(.tl_resid ~ .tl_fit2 + .tl_fit3, data = aux_data),
+    silent = TRUE
+  )
+
+  f_stat <- if (inherits(aux, "try-error")) NULL else summary(aux)$fstatistic
+
+  if (is.null(f_stat)) {
+    return(result(
+      NA,
+      "Linearity test could not be computed",
+      "Inspect a residuals-versus-fitted plot directly"
+    ))
+  }
+
+  p_value <- stats::pf(
+    f_stat[1], f_stat[2], f_stat[3], lower.tail = FALSE
+  )
+
+  details <- paste(
+    "RESET-style test on powers of the fitted values: p-value =",
+    format.pval(p_value, digits = 4)
+  )
+
+  result(
+    unname(p_value >= 0.05),
+    details,
+    if (p_value < 0.05) {
+      "Consider non-linear transformations or polynomial terms"
+    } else {
+      "Linearity assumption appears satisfied"
+    }
+  )
 }
 
 #' Check model assumptions
@@ -321,12 +426,31 @@ tl_plot_influence <- function(model,
 #' }
 #' @export
 tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
-  # Check if model is supported
-  supported <- c(
-    "linear", "logistic", "polynomial", "ridge", "lasso", "elastic_net"
-  )
-  if (!inherits(model, "tidylearn_model") ||
-        !model$spec$method %in% supported) {
+  # These checks all run off residuals(), fitted() and the influence
+  # measures, none of which glmnet provides -- listing ridge/lasso/
+  # elastic_net as supported produced a "no applicable method" error
+  # partway through rather than an answer.
+  supported <- c("linear", "logistic", "polynomial")
+  penalised <- c("ridge", "lasso", "elastic_net")
+
+  if (!inherits(model, "tidylearn_model")) {
+    stop(
+      "Assumption checking is only available for linear-based models",
+      call. = FALSE
+    )
+  }
+
+  if (model$spec$method %in% penalised) {
+    stop(
+      "Assumption checking is not available for penalised regression ",
+      "('", model$spec$method, "'): glmnet provides no residuals, ",
+      "hat values or influence measures. Refit with method = \"linear\" ",
+      "or \"logistic\" to diagnose the unpenalised specification.",
+      call. = FALSE
+    )
+  }
+
+  if (!model$spec$method %in% supported) {
     stop(
       "Assumption checking is only available for linear-based models",
       call. = FALSE
@@ -345,22 +469,7 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
   assumptions <- list()
 
   # 1. Linearity
-  # Check correlation between fitted values and residuals
-  linearity_cor <- cor(fitted_values, residuals)
-  linearity_details <- paste(
-    "Correlation between fitted values and residuals:",
-    round(linearity_cor, 4)
-  )
-  assumptions$linearity <- list(
-    assumption = "Linearity",
-    check = abs(linearity_cor) < 0.1,
-    details = linearity_details,
-    recommendation = if (abs(linearity_cor) >= 0.1) {
-      "Consider non-linear transformations or polynomial terms"
-    } else {
-      "Linearity assumption appears satisfied"
-    }
-  )
+  assumptions$linearity <- tl_check_linearity(fitted_values, residuals)
 
   # 2. Independence
   # Durbin-Watson test for autocorrelation
@@ -1023,7 +1132,10 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
           aes(color = is_outlier),
           progress = FALSE
         ) +
-          ggplot2::scale_color_manual(values = c("blue", "red")) +
+          ggplot2::scale_color_manual(
+        values = c("FALSE" = "blue", "TRUE" = "red"),
+        drop = FALSE
+      ) +
           ggplot2::labs(
             title = paste("Outlier Detection using", method_name),
             subtitle = threshold_label
@@ -1039,7 +1151,10 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
           )
         ) +
           ggplot2::geom_point() +
-          ggplot2::scale_color_manual(values = c("blue", "red")) +
+          ggplot2::scale_color_manual(
+        values = c("FALSE" = "blue", "TRUE" = "red"),
+        drop = FALSE
+      ) +
           ggplot2::labs(
             title = paste("Outlier Detection using", method_name),
             subtitle = threshold_label,
@@ -1071,7 +1186,10 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
           linetype = "dashed",
           color = "red"
         ) +
-        ggplot2::scale_color_manual(values = c("blue", "red")) +
+        ggplot2::scale_color_manual(
+        values = c("FALSE" = "blue", "TRUE" = "red"),
+        drop = FALSE
+      ) +
         ggplot2::labs(
           title = paste("Outlier Detection using", method_name),
           subtitle = threshold_label,
@@ -1090,13 +1208,21 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
         values_to = "value"
       )
 
-      # Add outlier flag
-      plot_data$is_outlier <- FALSE
-      for (i in seq_len(nrow(plot_data))) {
-        var_idx <- match(plot_data$variable[i], variables)
-        obs_idx <- (i - 1) %% nrow(data) + 1
-        plot_data$is_outlier[i] <- outlier_flags[obs_idx, var_idx]
-      }
+      # Add outlier flag.
+      #
+      # pivot_longer() emits row-major output: each observation's
+      # variables appear consecutively. Deriving the observation as
+      # (i - 1) %% nrow(data) + 1 assumes column-major and is correct
+      # only when there is exactly one variable -- with more, the flags
+      # get attached to the wrong points and the plot colours genuine
+      # outliers as normal.
+      n_vars <- length(variables)
+      obs_idx <- ((seq_len(nrow(plot_data)) - 1L) %/% n_vars) + 1L
+      var_idx <- match(plot_data$variable, variables)
+
+      plot_data$is_outlier <- outlier_flags[
+        cbind(obs_idx, var_idx)
+      ]
 
       outlier_plot <- ggplot2::ggplot(
         plot_data,
@@ -1113,7 +1239,10 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
           alpha = 0.7
         ) +
         ggplot2::scale_fill_manual(values = c("lightblue", "lightpink")) +
-        ggplot2::scale_color_manual(values = c("blue", "red")) +
+        ggplot2::scale_color_manual(
+        values = c("FALSE" = "blue", "TRUE" = "red"),
+        drop = FALSE
+      ) +
         ggplot2::labs(
           title = paste("Outlier Detection using", method_name),
           subtitle = threshold_label,

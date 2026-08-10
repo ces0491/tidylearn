@@ -82,10 +82,29 @@ tidy_gower <- function(data, weights = NULL) {
   n <- nrow(data)
   p <- ncol(data)
 
-  # Set up weights
+  # Set up weights. The loop below indexes them positionally, so a named
+  # vector has to be reordered to match the columns first -- otherwise
+  # weights = c(color = 100, x = 1) for data.frame(x, color) silently
+  # applies the 100 to x.
   if (is.null(weights)) {
     weights <- rep(1, p)
     names(weights) <- colnames(data)
+  } else if (!is.null(names(weights)) && all(nzchar(names(weights)))) {
+    missing_weights <- setdiff(colnames(data), names(weights))
+    if (length(missing_weights) > 0) {
+      stop(
+        "'weights' is named but has no entry for: ",
+        paste(missing_weights, collapse = ", "),
+        call. = FALSE
+      )
+    }
+    weights <- weights[colnames(data)]
+  } else if (length(weights) != p) {
+    stop(
+      "'weights' must have one entry per column (", p, "). Got: ",
+      length(weights), ".",
+      call. = FALSE
+    )
   }
 
   # Pre-computation pass

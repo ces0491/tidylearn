@@ -326,8 +326,31 @@ tl_plot_model_comparison <- function(
 #' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @export
 tl_plot_cv_results <- function(cv_results, metrics = NULL) {
-  # Extract fold metrics
+  # tl_cv() returns $folds (a list of per-fold tibbles, with no fold
+  # column) and a $summary keyed on `mean`. Reading $fold_metrics and
+  # `mean_value` produced a ggplot that only failed when it was drawn.
   fold_metrics <- cv_results$fold_metrics
+
+  if (is.null(fold_metrics)) {
+    if (is.null(cv_results$folds)) {
+      stop(
+        "'cv_results' does not look like tl_cv() output: expected a ",
+        "$folds component.",
+        call. = FALSE
+      )
+    }
+
+    fold_metrics <- dplyr::bind_rows(
+      cv_results$folds, .id = "fold"
+    )
+    fold_metrics$fold <- as.integer(fold_metrics$fold)
+  }
+
+  summary_data <- cv_results$summary
+  if (!is.null(summary_data) && "mean" %in% names(summary_data) &&
+        !"mean_value" %in% names(summary_data)) {
+    summary_data$mean_value <- summary_data$mean
+  }
 
   # Filter metrics if specified
   if (!is.null(metrics)) {
@@ -349,7 +372,7 @@ tl_plot_cv_results <- function(cv_results, metrics = NULL) {
     ggplot2::geom_point() +
     ggplot2::facet_wrap(~ metric, scales = "free_y") +
     ggplot2::geom_hline(
-      data = cv_results$summary,
+      data = summary_data,
       ggplot2::aes(yintercept = mean_value, color = metric),
       linetype = "dashed"
     ) +
@@ -719,9 +742,14 @@ tl_plot_lift <- function(model, new_data = NULL, bins = 10, ...) {
     cumulative_total <- 0
 
     for (i in 1:bins) {
-      # Get current decile indices
+      # Get current decile indices. ceiling() can size the deciles so
+      # that the last few start past the end of the data, which turns
+      # start:end into a descending range that re-counts earlier rows
+      # and pulls NA.
       start_idx <- (i - 1) * decile_size + 1
       end_idx <- min(i * decile_size, nrow(ordered_data))
+
+      if (start_idx > nrow(ordered_data)) next
 
       # Update cumulative counts
       current_responders <- sum(ordered_data$actual[start_idx:end_idx])
@@ -838,9 +866,14 @@ tl_plot_gain <- function(model, new_data = NULL, bins = 10, ...) {
     cumulative_responders <- 0
 
     for (i in 1:bins) {
-      # Get current decile indices
+      # Get current decile indices. ceiling() can size the deciles so
+      # that the last few start past the end of the data, which turns
+      # start:end into a descending range that re-counts earlier rows
+      # and pulls NA.
       start_idx <- (i - 1) * decile_size + 1
       end_idx <- min(i * decile_size, nrow(ordered_data))
+
+      if (start_idx > nrow(ordered_data)) next
 
       # Update cumulative counts
       current_responders <- sum(ordered_data$actual[start_idx:end_idx])
@@ -1071,6 +1104,14 @@ plot_cluster_comparison <- function(data, cluster_cols, x_col, y_col) {
   })
 
   # Combine plots
+  if (!requireNamespace("gridExtra", quietly = TRUE)) {
+    stop(
+      "Package 'gridExtra' is required to combine these panels. ",
+      "Install it with: install.packages(\"gridExtra\")",
+      call. = FALSE
+    )
+  }
+
   gridExtra::grid.arrange(
     grobs = plots,
     ncol = ceiling(sqrt(length(plots)))
@@ -1275,6 +1316,13 @@ create_cluster_dashboard <- function(data,
 
   # Combine plots
   if (length(plots) > 0) {
+  if (!requireNamespace("gridExtra", quietly = TRUE)) {
+      stop(
+        "Package 'gridExtra' is required to combine these panels. ",
+        "Install it with: install.packages(\"gridExtra\")",
+        call. = FALSE
+      )
+    }
     gridExtra::grid.arrange(grobs = plots, ncol = 2)
   }
 
@@ -1314,6 +1362,15 @@ plot_distance_heatmap <- function(dist_mat,
   dist_long <- dist_matrix %>%
     tibble::as_tibble(rownames = "id1") %>%
     tidyr::pivot_longer(-id1, names_to = "id2", values_to = "distance")
+
+  # Pin the axis order to the matrix. Character IDs on a discrete scale
+  # otherwise sort alphabetically -- "1", "10", "11", ..., "2" -- which
+  # moves the diagonal off the diagonal and undoes any cluster_order
+  # reordering applied above, fabricating the block structure the plot
+  # exists to show.
+  axis_levels <- rownames(dist_matrix)
+  dist_long$id1 <- factor(dist_long$id1, levels = axis_levels)
+  dist_long$id2 <- factor(dist_long$id2, levels = rev(axis_levels))
 
   # Create heatmap
   ggplot2::ggplot(dist_long, ggplot2::aes(x = id1, y = id2, fill = distance)) +

@@ -1,5 +1,152 @@
 # tidylearn 0.4.0.9000
 
+## Bug Fixes
+
+Several of these changed reported numbers. Results produced by 0.4.0 and
+earlier should be recomputed.
+
+### Metrics and evaluation
+
+* `tl_calc_classification_metrics()` computed precision, recall,
+  sensitivity, specificity and F1 for the **wrong class**. The
+  `yardstick` calls omitted `event_level`, so they defaulted to the first
+  factor level while the rest of the package — AUC, class prediction,
+  lift and gain — treats the second level as positive. A binary model
+  predicting only positives reported specificity 1.0 where the true value
+  is 0.0. Threshold metrics from `tl_evaluate_thresholds()` were affected
+  the same way, so reported precision fell as the threshold rose.
+  Multiclass metrics were never affected.
+
+* `tl_cv()` never evaluated the last `n %% folds` observations: folds
+  were sized with `floor(n / folds)` and sliced forward, leaving the
+  remainder in every training set and no test set. On `mtcars` with
+  `folds = 5`, 30 of 32 rows were scored. Rows are now assigned to folds
+  so that the folds partition the data and differ in size by at most one.
+  `tl_cv()` also rejects fold counts below 2 or above `nrow(data)`.
+
+* `tl_check_assumptions()` tested linearity with
+  `cor(fitted, residuals)`, which is identically zero for any OLS fit
+  with an intercept — the check could only ever report SATISFIED. It is
+  now a RESET-style test on powers of the fitted values.
+
+### Prediction
+
+* `predict()` failed or returned wrong output for six method-and-task
+  combinations, all now fixed and covered by a contract test that runs
+  every method through the same grid:
+
+  * Multiclass `"boost"` returned a **single** prediction for the whole
+    input, because `predict.gbm` hands back a 3-D array that
+    `is.matrix()` does not recognise. `type = "prob"` errored for any
+    input with more than one row.
+  * `"svm"` with `type = "prob"` always errored: the fitted object
+    records the flag as `$compprob`, not `$probability`.
+  * Binary classification with `method = "nn"` could not fit at all —
+    `entropy` was passed explicitly and collided with the value
+    `nnet.formula()` supplies itself.
+  * `"xgboost"` built its design matrix from the full two-sided formula,
+    so scoring data without the response column was impossible.
+  * `"svm"` and `"xgboost"` silently dropped rows with missing
+    predictors, returning a shorter vector so that predictions no longer
+    lined up with the input rows.
+  * Multinomial `"ridge"`/`"lasso"`/`"elastic_net"` with `type = "prob"`
+    errored on single-row input.
+
+* `"xgboost"` prediction now pins the training factor levels, so new data
+  missing a level no longer changes the contrast coding, and uses
+  `iterationrange` instead of the removed `ntreelimit`/`reshape`
+  arguments.
+
+* Out-of-sample PCA scores and k-means assignments matched columns by
+  position. Passing the same columns in a different order produced
+  silently wrong results; they are now matched by name, and a missing
+  variable errors.
+
+### Data leakage
+
+* `tl_pipeline()` learned imputation medians and standardisation centres
+  and scales from the **whole** dataset and only then split, so every
+  assessment row helped define the transformation it was scored under.
+  Each fold, and each side of a train/test split, now learns its own
+  statistics. The final model still uses the full-data statistics, which
+  `tl_predict_pipeline()` continues to replay.
+
+* `tl_pipeline()` also imputed the **response**, replacing missing
+  outcomes with the median and turning them into both training targets
+  and evaluation ground truth. Imputation now skips the response.
+
+* `tl_auto_ml()` fitted PCA rotations and cluster centroids on all rows
+  before cross-validating on the transformed data, so the `pca_*` and
+  `clustered_*` candidates competed against honestly scored baselines.
+  Both are now refitted inside each fold, via a new `transform` argument
+  to `tl_cv()`.
+
+* A winning `pca_*` or `clustered_*` model could not predict on raw data
+  at all. The transform now travels with the model and `predict()`
+  replays it.
+
+### Ranking, splitting and tuning
+
+* `tl_auto_ml(metric = "mape")` returned the model with the **highest**
+  error as the best one — `mape` was missing from the ascending-sort
+  list. Unrecognised metrics now error rather than assume a direction.
+  `tl_auto_ml()` also returns `best_model_name`.
+
+* `tl_split()` could return an empty training set *and* an empty test
+  set: `floor(n * prop)` can be zero, and `data[-integer(0), ]` selects
+  nothing. Every group now keeps at least one row on each side.
+
+* `tl_tune_random()` ignored two documented parameter forms. Any
+  two-element numeric was caught by the continuous branch first, so an
+  integer range like `c(100, 500)` was sampled with `runif()`; and the
+  log-uniform form `c(min, max, "log")` is a character vector, so its
+  branch was unreachable and the literal `"log"` could be sampled as a
+  value. `param_space` is now fully documented.
+
+### Clustering, distance and plots
+
+* `tidy_dbscan()` converted a `dist` input with `as.matrix()` and passed
+  it as coordinates, clustering each observation's vector of distances
+  rather than the dissimilarity. It also read a non-existent `"core"`
+  attribute, so every point was reported as a non-core point.
+
+* `tidy_kmeans()` lost its entire metrics tibble for the Lloyd, Forgy and
+  MacQueen algorithms, which leave `ifault` NULL.
+
+* `tidy_gower()` documented `weights` as a named vector but indexed it
+  positionally, applying weights to the wrong variables. Named weights
+  are now matched by name, and a mismatched length errors.
+
+* `tl_plot_cv_results()` could not plot `tl_cv()` output — it read
+  `$fold_metrics` and `mean_value`, which are named `$folds` and `mean`.
+
+* Lift and gain charts indexed past the end of the data in their final
+  deciles, corrupting the cumulative curve.
+
+* The outlier plot from `tl_detect_outliers()` attached flags to the
+  wrong observations whenever more than one variable was plotted.
+
+* `plot_distance_heatmap()` sorted its axes alphabetically, moving the
+  diagonal off the diagonal and discarding any `cluster_order`.
+
+* Influence plots used unnamed colour vectors, so when every point was
+  influential they all rendered in the "not influential" colour.
+
+### Errors instead of misleading results
+
+* `tl_check_assumptions()` and `tl_influence_measures()` advertised
+  support for `"ridge"`, `"lasso"` and `"elastic_net"`, but glmnet
+  provides no residuals, hat values or influence measures. They now
+  explain this instead of failing partway through.
+
+* `plot_cluster_comparison()` and `create_cluster_dashboard()` called
+  `gridExtra` without a `requireNamespace()` guard.
+
+* Database connection strings carried the password into the returned
+  object's `tl_source` attribute — printed on every `print()` and
+  persisted by `saveRDS()` — into the progress message, and into the
+  URL parse error. All are now redacted.
+
 ## New Features
 
 ### Cloud compute (security guards)

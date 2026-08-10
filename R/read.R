@@ -237,7 +237,11 @@ tl_read <- function(source, ..., format = NULL, .quiet = FALSE) {
          call. = FALSE)
   }
 
-  if (!.quiet) message("Reading ", format, " data from: ", source)
+  # A database source is a DSN carrying a password in the clear, so the
+  # progress line reports the redacted form
+  if (!.quiet) {
+    message("Reading ", format, " data from: ", tl_redact_db_url(source))
+  }
 
   result <- switch(format,
     "csv"      = tl_read_csv(source, ...),
