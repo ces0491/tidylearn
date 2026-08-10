@@ -46,6 +46,12 @@ tl_calc_classification_metrics <- function(
   # Create a results data frame
   results <- tibble::tibble(metric = character(), value = numeric())
 
+  # tidylearn treats the second factor level as the positive class -- see
+  # the AUC branch below, tl_predict_classification(), and the lift/gain
+  # plots. yardstick defaults to the first level, so binary metrics have
+  # to say so explicitly or they describe the negative class.
+  ev <- tl_event_level_args(actuals)
+
   # Calculate basic classification metrics
   if ("accuracy" %in% metrics) {
     acc <- yardstick::accuracy_vec(actuals, predicted)
@@ -53,12 +59,14 @@ tl_calc_classification_metrics <- function(
   }
 
   if ("precision" %in% metrics) {
-    prec <- yardstick::precision_vec(actuals, predicted)
+    prec <- do.call(
+      yardstick::precision_vec, c(list(actuals, predicted), ev)
+    )
     results <- results %>% dplyr::add_row(metric = "precision", value = prec)
   }
 
   if ("recall" %in% metrics || "sensitivity" %in% metrics) {
-    rec <- yardstick::recall_vec(actuals, predicted)
+    rec <- do.call(yardstick::recall_vec, c(list(actuals, predicted), ev))
     results <- results %>% dplyr::add_row(metric = "recall", value = rec)
     if ("sensitivity" %in% metrics) {
       results <- results %>% dplyr::add_row(metric = "sensitivity", value = rec)
@@ -66,12 +74,16 @@ tl_calc_classification_metrics <- function(
   }
 
   if ("specificity" %in% metrics) {
-    spec <- yardstick::specificity_vec(actuals, predicted)
+    spec <- do.call(
+      yardstick::specificity_vec, c(list(actuals, predicted), ev)
+    )
     results <- results %>% dplyr::add_row(metric = "specificity", value = spec)
   }
 
   if ("f1" %in% metrics) {
-    f1 <- yardstick::f_meas_vec(actuals, predicted, beta = 1)
+    f1 <- do.call(
+      yardstick::f_meas_vec, c(list(actuals, predicted, beta = 1), ev)
+    )
     results <- results %>% dplyr::add_row(metric = "f1", value = f1)
   }
 
@@ -154,6 +166,20 @@ tl_calc_classification_metrics <- function(
   results
 }
 
+#' Positive-class argument for yardstick binary metrics
+#'
+#' tidylearn's positive class is the second factor level. yardstick's
+#' default is the first, and its \code{event_level} argument only applies
+#' to the binary case -- passing it for a multiclass problem warns.
+#'
+#' @param actuals A factor of ground-truth values
+#' @return A list to splice into a yardstick call: \code{event_level =
+#'   "second"} for a two-level factor, empty otherwise
+#' @keywords internal
+tl_event_level_args <- function(actuals) {
+  if (nlevels(actuals) == 2L) list(event_level = "second") else list()
+}
+
 #' Calculate the area under the precision-recall curve
 #'
 #' @param perf A ROCR performance object
@@ -206,15 +232,27 @@ tl_evaluate_thresholds <- function(actuals, probs, thresholds, pos_class) {
       pred_vals, levels = levels(actuals)
     )
 
+    # Score against the same positive class the threshold assigns above,
+    # not yardstick's default first level
+    ev <- tl_event_level_args(actuals)
+
     # Calculate metrics
     acc <- yardstick::accuracy_vec(actuals, pred_class)
-    prec <- yardstick::precision_vec(actuals, pred_class)
-    rec <- yardstick::recall_vec(actuals, pred_class)
-    f1 <- yardstick::f_meas_vec(actuals, pred_class, beta = 1)
+    prec <- do.call(
+      yardstick::precision_vec, c(list(actuals, pred_class), ev)
+    )
+    rec <- do.call(yardstick::recall_vec, c(list(actuals, pred_class), ev))
+    f1 <- do.call(
+      yardstick::f_meas_vec, c(list(actuals, pred_class, beta = 1), ev)
+    )
 
     # Calculate F2 and F0.5 scores
-    f2 <- yardstick::f_meas_vec(actuals, pred_class, beta = 2)
-    f0_5 <- yardstick::f_meas_vec(actuals, pred_class, beta = 0.5)
+    f2 <- do.call(
+      yardstick::f_meas_vec, c(list(actuals, pred_class, beta = 2), ev)
+    )
+    f0_5 <- do.call(
+      yardstick::f_meas_vec, c(list(actuals, pred_class, beta = 0.5), ev)
+    )
 
     # Return results for this threshold
     tibble::tibble(
@@ -393,6 +431,14 @@ tl_evaluate <- function(object, new_data = NULL, metrics = NULL, ...) {
 #' @param metrics Character vector of metrics to compute on each fold,
 #'   passed to \code{\link{tl_evaluate}}. If \code{NULL} (the default),
 #'   \code{tl_evaluate}'s per-task defaults are used.
+#' @param transform Optional function for feature engineering that has to
+#'   be refitted per fold. It is called with the training rows of each
+#'   fold and must return a list with an \code{apply} function (applied
+#'   to both the training and assessment rows) and, optionally, a
+#'   \code{formula} to fit under. Use this for anything that learns
+#'   parameters from the data -- PCA rotations, cluster centroids,
+#'   target encodings -- since fitting those before the split inflates
+#'   every fold's score.
 #' @param ... Additional arguments passed to \code{\link{tl_model}}
 #' @return A list with two elements:
 #'   \describe{
@@ -409,26 +455,46 @@ tl_evaluate <- function(object, new_data = NULL, metrics = NULL, ...) {
 #' cv$summary
 #' }
 #' @export
-tl_cv <- function(data, formula, method, folds = 5, metrics = NULL, ...) {
+tl_cv <- function(data, formula, method, folds = 5, metrics = NULL,
+                  transform = NULL, ...) {
   n <- nrow(data)
-  fold_size <- floor(n / folds)
+  if (folds < 2 || folds > n) {
+    stop("'folds' must be between 2 and nrow(data) (", n, "). Got: ", folds,
+         call. = FALSE)
+  }
   indices <- sample(1:n)
+
+  # Assign every row to exactly one fold. Sizing the folds by
+  # floor(n / folds) and slicing forward leaves the final n %% folds rows
+  # in no test set at all, so spread the remainder instead.
+  fold_id <- rep(seq_len(folds), length.out = n)
 
   cv_results <- list()
 
   for (i in 1:folds) {
     # Create fold indices
-    test_indices <- indices[
-      ((i - 1) * fold_size + 1):min(i * fold_size, n)
-    ]
+    test_indices <- indices[fold_id == i]
     train_indices <- setdiff(1:n, test_indices)
 
     # Split data
     train_data <- data[train_indices, ]
     test_data <- data[test_indices, ]
 
+    fold_formula <- formula
+
+    # Feature engineering that learns from data -- PCA rotations, cluster
+    # centroids -- has to be refitted inside the fold. Fitting it once on
+    # everything beforehand lets each assessment row shape the features
+    # it is then scored on.
+    if (!is.null(transform)) {
+      fitted_transform <- transform(train_data)
+      train_data <- fitted_transform$apply(train_data)
+      test_data <- fitted_transform$apply(test_data)
+      fold_formula <- fitted_transform$formula %||% formula
+    }
+
     # Train model
-    model <- tl_model(train_data, formula, method = method, ...)
+    model <- tl_model(train_data, fold_formula, method = method, ...)
 
     # Evaluate
     eval_result <- tl_evaluate(model, new_data = test_data, metrics = metrics)
