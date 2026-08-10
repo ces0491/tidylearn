@@ -185,6 +185,17 @@ tl_model_supervised <- function(data, formula, method, ..., compute = "cpu") {
     compute = compute, hyperparams = hyperparams
   )
 
+  # Record the training-time factor levels. Predict methods that build
+  # their own design matrix need these to keep contrast coding identical
+  # to the fit; without them, new data missing a level silently changes
+  # the encoding.
+  predictor_vars <- intersect(get_formula_vars(formula, data), names(data))
+  xlev <- lapply(
+    Filter(function(v) is.factor(data[[v]]), predictor_vars),
+    function(v) levels(data[[v]])
+  )
+  names(xlev) <- Filter(function(v) is.factor(data[[v]]), predictor_vars)
+
   # Create model specification
   model_spec <- list(
     paradigm = "supervised",
@@ -192,6 +203,8 @@ tl_model_supervised <- function(data, formula, method, ..., compute = "cpu") {
     method = method,
     is_classification = is_classification,
     response_var = response_var,
+    response_levels = if (is_classification) levels(as.factor(y)) else NULL,
+    xlev = xlev,
     compute = effective_compute
   )
 
@@ -335,6 +348,11 @@ predict.tidylearn_model <- function(object,
 
   if (training) {
     new_data <- object$data
+  } else if (!is.null(object$feature_transform)) {
+    # Candidates from tl_auto_ml() may have been fitted on engineered
+    # features (principal components, cluster assignments). Rebuild them
+    # from the raw columns so the caller does not have to.
+    new_data <- object$feature_transform(new_data)
   }
 
   # Route to appropriate predict method
@@ -409,10 +427,14 @@ predict_unsupervised <- function(object, new_data, type = "response",
       if (training) {
         object$fit$scores
       } else {
-        # Transform new data using the PCA rotation
-        x_mat <- new_data %>%
-          dplyr::select(where(is.numeric)) %>%
-          as.matrix()
+        # Transform new data using the PCA rotation. Select by the
+        # training variable names, not by position -- the rotation,
+        # centre and scale are all indexed by variable, so a caller
+        # passing the same columns in a different order would otherwise
+        # get silently wrong scores.
+        x_mat <- tl_align_training_columns(
+          new_data, rownames(object$fit$model$rotation)
+        )
         if (object$fit$settings$center) {
           x_mat <- scale(
             x_mat,
@@ -442,11 +464,10 @@ predict_unsupervised <- function(object, new_data, type = "response",
       if (training) {
         object$fit$clusters
       } else {
-        # Assign to nearest center
-        x_mat <- new_data %>%
-          dplyr::select(where(is.numeric)) %>%
-          as.matrix()
+        # Assign to nearest center, matching columns by the training
+        # variable names rather than by position
         centers <- object$fit$model$centers
+        x_mat <- tl_align_training_columns(new_data, colnames(centers))
         dists <- apply(x_mat, 1, function(x) {
           apply(centers, 1, function(c) sum((x - c)^2))
         })

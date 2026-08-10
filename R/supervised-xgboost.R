@@ -134,6 +134,54 @@ tl_fit_xgboost <- function(data, formula, is_classification = FALSE,
   xgb_model
 }
 
+#' Predict from an xgboost booster over an optional tree range
+#'
+#' \code{ntreelimit} was renamed to \code{iterationrange} in xgboost 2.0
+#' and now warns on every call; it is scheduled to become an error.
+#' Translate here, and omit the argument entirely when no limit is asked
+#' for.
+#'
+#' @param xgb_model A fitted booster
+#' @param dtest An \code{xgb.DMatrix}
+#' @param ntreelimit Number of trees to use, or NULL for all
+#' @param ... Passed to \code{predict}
+#' @return The booster's predictions
+#' @keywords internal
+#' @noRd
+tl_xgb_predict <- function(xgb_model, dtest, ntreelimit = NULL, ...) {
+  args <- list(xgb_model, newdata = dtest, ...)
+  if (!is.null(ntreelimit)) {
+    args$iterationrange <- c(1L, as.integer(ntreelimit) + 1L)
+  }
+  do.call(stats::predict, args)
+}
+
+#' Multiclass xgboost probabilities as an n x k matrix
+#'
+#' xgboost 3.x returns a matrix directly and has dropped the
+#' \code{reshape} argument; earlier versions returned a flat row-major
+#' vector unless \code{reshape = TRUE} was passed. Normalise both.
+#'
+#' @param raw The value returned by \code{tl_xgb_predict}
+#' @param n_obs Number of observations predicted
+#' @param class_levels The response levels recorded at fit time
+#' @return A numeric matrix with one named column per class
+#' @keywords internal
+#' @noRd
+tl_xgb_prob_matrix <- function(raw, n_obs, class_levels) {
+  k <- length(class_levels)
+
+  out <- if (is.matrix(raw)) {
+    raw
+  } else {
+    # Flat vector is row-major: obs 1's k probabilities, then obs 2's
+    matrix(raw, nrow = n_obs, ncol = k, byrow = TRUE)
+  }
+
+  colnames(out) <- class_levels
+  out
+}
+
 #' Predict using an XGBoost model
 #'
 #' @param model A tidylearn XGBoost model object
@@ -155,18 +203,31 @@ tl_predict_xgboost <- function(model, new_data,
   feature_names <- attr(xgb_model, "feature_names")
   is_classification <- model$spec$is_classification
 
-  # Create model matrix for new data (exclude intercept)
+  # Build the design matrix from the predictors only, pinned to the
+  # training factor levels. Using the full two-sided formula would demand
+  # the response column, which unlabelled data does not have, and letting
+  # new data supply its own levels would change the contrast coding.
   formula <- model$spec$formula
-  x_new <- stats::model.matrix(formula, data = new_data)[, -1, drop = FALSE]
+  x_new <- tl_predictor_matrix(formula, new_data, xlev = model$spec$xlev)
 
   # Check column names match
   if (!all(colnames(x_new) %in% feature_names)) {
-    missing_cols <- setdiff(colnames(x_new), feature_names)
+    extra_cols <- setdiff(colnames(x_new), feature_names)
     warning("New data contains columns not in the training data: ",
-            paste(missing_cols, collapse = ", "))
+            paste(extra_cols, collapse = ", "))
+  }
+  missing_cols <- setdiff(feature_names, colnames(x_new))
+  if (length(missing_cols) > 0) {
+    stop(
+      "New data is missing predictors used at fit time: ",
+      paste(missing_cols, collapse = ", "),
+      call. = FALSE
+    )
   }
 
-  # Create DMatrix for prediction
+  # Create DMatrix for prediction. NAs are passed through rather than
+  # dropped -- xgboost routes missing values itself, so predictions stay
+  # aligned with the rows of new_data.
   x_subset <- x_new[, feature_names, drop = FALSE]
   dtest <- xgboost::xgb.DMatrix(
     data = as.matrix(x_subset)
@@ -181,10 +242,7 @@ tl_predict_xgboost <- function(model, new_data,
 
       if (n_classes == 2) {
         # Binary classification
-        prob <- predict(
-          xgb_model, newdata = dtest,
-          ntreelimit = ntreelimit
-        )
+        prob <- tl_xgb_predict(xgb_model, dtest, ntreelimit)
 
         # Create data frame with probabilities for both classes
         prob_df <- data.frame(
@@ -196,12 +254,10 @@ tl_predict_xgboost <- function(model, new_data,
         prob_df
       } else {
         # Multiclass classification
-        probs <- predict(
-          xgb_model, newdata = dtest,
-          ntreelimit = ntreelimit,
-          reshape = TRUE
+        probs <- tl_xgb_prob_matrix(
+          tl_xgb_predict(xgb_model, dtest, ntreelimit),
+          n_obs = nrow(x_subset), class_levels = response_levels
         )
-        colnames(probs) <- response_levels
 
         as.data.frame(probs)
       }
@@ -212,10 +268,7 @@ tl_predict_xgboost <- function(model, new_data,
 
       if (n_classes == 2) {
         # Binary classification
-        prob <- predict(
-          xgb_model, newdata = dtest,
-          ntreelimit = ntreelimit
-        )
+        prob <- tl_xgb_predict(xgb_model, dtest, ntreelimit)
         pred_classes <- ifelse(
           prob > 0.5,
           response_levels[2],
@@ -223,12 +276,11 @@ tl_predict_xgboost <- function(model, new_data,
         )
       } else {
         # Multiclass classification
-        probs <- predict(
-          xgb_model, newdata = dtest,
-          ntreelimit = ntreelimit,
-          reshape = TRUE
+        probs <- tl_xgb_prob_matrix(
+          tl_xgb_predict(xgb_model, dtest, ntreelimit),
+          n_obs = nrow(x_subset), class_levels = response_levels
         )
-        pred_idx <- max.col(probs)
+        pred_idx <- max.col(probs, ties.method = "first")
         pred_classes <- response_levels[pred_idx]
       }
 
@@ -244,10 +296,7 @@ tl_predict_xgboost <- function(model, new_data,
     }
   } else {
     # Regression predictions
-    predict(
-      xgb_model, newdata = dtest,
-      ntreelimit = ntreelimit
-    )
+    tl_xgb_predict(xgb_model, dtest, ntreelimit)
   }
 }
 

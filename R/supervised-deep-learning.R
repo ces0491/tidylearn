@@ -107,8 +107,11 @@ tl_fit_deep <- function(data, formula,
     model %>% keras::layer_dropout(rate = dropout)
   }
 
-  # Add hidden layers
-  for (i in 2:length(hidden_layers)) {
+  # Add the remaining hidden layers. seq_len() rather than 2:length():
+  # with a single hidden layer, 2:1 counts backwards and adds a layer
+  # with units = hidden_layers[1] followed by units = NA. The default
+  # tuning grid includes single-layer candidates, so this was reachable.
+  for (i in seq_len(length(hidden_layers) - 1L) + 1L) {
     model %>% keras::layer_dense(
       units = hidden_layers[i],
       activation = activation

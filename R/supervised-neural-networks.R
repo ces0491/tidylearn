@@ -35,7 +35,13 @@ tl_fit_nn <- function(data, formula, is_classification = FALSE,
       data[[response_var]] <- factor(data[[response_var]])
     }
 
-    # Fit classification neural network
+    # Fit classification neural network.
+    #
+    # Don't set entropy/softmax here: nnet.formula already picks the right
+    # one from the response -- entropy for a two-level factor, softmax for
+    # more. Passing entropy = TRUE duplicates the argument in the binary
+    # case and contradicts softmax in the multiclass case, so either way
+    # the fit fails.
     nn_model <- nnet::nnet(
       formula = formula,
       data = data,
@@ -43,8 +49,6 @@ tl_fit_nn <- function(data, formula, is_classification = FALSE,
       decay = decay,
       maxit = maxit,
       trace = trace,
-      # For classification
-      entropy = TRUE,  # Use cross-entropy error function
       ...
     )
   } else {
