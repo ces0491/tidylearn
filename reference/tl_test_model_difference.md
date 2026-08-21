@@ -46,6 +46,6 @@ m2 <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
 cv <- tl_compare_cv(mtcars, list(simple = m1, full = m2), folds = 3)
 tl_test_model_difference(cv, baseline_model = "simple", metric = "rmse")
 #>   metric model baseline  mean_diff   p_value     p_adj
-#> 1   rmse  full   simple -0.3511811 0.4258791 0.4258791
+#> 1   rmse  full   simple -0.4229862 0.0656034 0.0656034
 # }
 ```

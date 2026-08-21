@@ -32,10 +32,10 @@ print(gap)
 #> Tidy Gap Statistic
 #> ==================
 #> 
-#> Recommended k: 5 (firstSEmax method)
+#> Recommended k: 4 (firstSEmax method)
 #> 
 #> Alternative methods:
-#>   firstSEmax: k = 5 (most conservative)
+#>   firstSEmax: k = 4 (most conservative)
 #>   globalmax:  k = 6 (middle ground)
 #>   firstmax:   k = 6 (most liberal)
 #> 
@@ -43,11 +43,11 @@ print(gap)
 #> # A tibble: 6 × 5
 #>       k  logW E.logW    gap SE.sim
 #>   <int> <dbl>  <dbl>  <dbl>  <dbl>
-#> 1     1  4.55   4.64 0.0861 0.0373
-#> 2     2  3.81   4.18 0.374  0.0339
-#> 3     3  3.52   4.00 0.481  0.0242
-#> 4     4  3.37   3.90 0.533  0.0218
-#> 5     5  3.28   3.82 0.545  0.0209
-#> 6     6  3.18   3.74 0.560  0.0167
+#> 1     1  4.55   4.62 0.0689 0.0242
+#> 2     2  3.81   4.21 0.397  0.0196
+#> 3     3  3.52   4.01 0.493  0.0182
+#> 4     4  3.37   3.92 0.548  0.0192
+#> 5     5  3.28   3.83 0.553  0.0162
+#> 6     6  3.18   3.75 0.563  0.0217
 # }
 ```

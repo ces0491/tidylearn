@@ -307,6 +307,44 @@ earlier should be recomputed.
 
 #### Errors instead of misleading results
 
+- `tl_model(method = "logistic")` now errors when the response does not
+  have exactly two levels. `glm(family = binomial)` accepts a
+  three-level factor without complaint and fits the first level against
+  the other two, so `tl_model(iris, Species ~ ., method = "logistic")`
+  returned a model that looked fine and meant nothing. The failure
+  surfaced three calls later, at `predict(type = "class")` and
+  [`tl_evaluate()`](https://tidylearn.sheetsolved.com/reference/tl_evaluate.md),
+  both of which reported only that multiclass logistic was “not
+  implemented” — by which point the caller had no reason to suspect the
+  method choice. The error is now raised at fit time and names the
+  methods that do handle more than two classes. A single-level response
+  is reported separately.
+
+  [`tl_pipeline()`](https://tidylearn.sheetsolved.com/reference/tl_pipeline.md)
+  offered `logistic` as a default candidate for any classification task,
+  so without a matching guard a three-level response would now fail the
+  whole pipeline rather than one model. It offers `logistic` only for a
+  two-level response, as
+  [`tl_auto_ml()`](https://tidylearn.sheetsolved.com/reference/tl_auto_ml.md)
+  already did.
+
+- [`tl_semisupervised()`](https://tidylearn.sheetsolved.com/reference/tl_semisupervised.md),
+  [`tl_anomaly_aware()`](https://tidylearn.sheetsolved.com/reference/tl_anomaly_aware.md),
+  [`tl_transfer_learning()`](https://tidylearn.sheetsolved.com/reference/tl_transfer_learning.md)
+  and
+  [`tl_stratified_models()`](https://tidylearn.sheetsolved.com/reference/tl_stratified_models.md)
+  default to `supervised_method = "tree"`. The first three defaulted to
+  `"logistic"`, which cannot fit a response with more than two levels or
+  a numeric one, and the fourth to `"linear"`, which fits
+  [`lm()`](https://rdrr.io/r/stats/lm.html) to a factor response and
+  returns numbers rather than refusing.
+  `tl_anomaly_aware(iris, Species ~ ., response = "Species")` — the
+  function’s own documented example — was in the first group. `"tree"`
+  handles regression and classification, at any number of classes.
+
+  This changes the model a call produces when `supervised_method` is not
+  given. Pass it explicitly to keep the previous behaviour.
+
 - [`tl_check_assumptions()`](https://tidylearn.sheetsolved.com/reference/tl_check_assumptions.md)
   and
   [`tl_influence_measures()`](https://tidylearn.sheetsolved.com/reference/tl_influence_measures.md)

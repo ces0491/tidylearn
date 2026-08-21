@@ -10,7 +10,7 @@ tl_stratified_models(
   formula,
   cluster_method = "kmeans",
   k = 3,
-  supervised_method = "linear",
+  supervised_method = "tree",
   ...
 )
 ```
@@ -35,7 +35,10 @@ tl_stratified_models(
 
 - supervised_method:
 
-  Supervised learning method
+  Supervised learning method (default: `"tree"`, which handles both
+  regression and classification). `"linear"` silently fits
+  [`lm()`](https://rdrr.io/r/stats/lm.html) to a factor response rather
+  than refusing it, so it is not a safe default here.
 
 - ...:
 
@@ -67,7 +70,7 @@ A list with class `"tidylearn_stratified"` containing:
 # \donttest{
 models <- tl_stratified_models(mtcars, mpg ~ ., cluster_method = "kmeans",
                                 k = 3, supervised_method = "linear")
-#> Note: Response 'mpg' has 8 unique numeric values. Treating as regression. Convert to factor for classification.
 #> Note: Response 'mpg' has 6 unique numeric values. Treating as regression. Convert to factor for classification.
+#> Note: Response 'mpg' has 8 unique numeric values. Treating as regression. Convert to factor for classification.
 # }
 ```

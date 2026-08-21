@@ -70,10 +70,10 @@ A list with two elements:
 cv <- tl_cv(mtcars, mpg ~ wt + hp, method = "linear", folds = 3)
 cv$summary
 #> # A tibble: 3 × 3
-#>   metric  mean     sd
-#>   <chr>  <dbl>  <dbl>
-#> 1 mae    2.16  0.766 
-#> 2 rmse   2.70  0.959 
-#> 3 rsq    0.758 0.0981
+#>   metric  mean    sd
+#>   <chr>  <dbl> <dbl>
+#> 1 mae    2.09  0.779
+#> 2 rmse   2.63  0.927
+#> 3 rsq    0.737 0.214
 # }
 ```

@@ -33,13 +33,11 @@ A [tibble](https://tibble.tidyverse.org/reference/tibble.html) with a
 ``` r
 # \donttest{
 model <- tl_transfer_learning(iris, Species ~ .,
-  pretrain_method = "pca", supervised_method = "logistic")
+  pretrain_method = "pca", supervised_method = "tree")
 #> Transfer Learning Workflow
 #> ==========================
 #> [Phase 1] Unsupervised pre-training with pca...
-#> [Phase 2] Supervised learning with logistic...
-#> Warning: glm.fit: algorithm did not converge
-#> Warning: glm.fit: fitted probabilities numerically 0 or 1 occurred
+#> [Phase 2] Supervised learning with tree...
 preds <- predict(model, iris[1:5, ])
 # }
 ```

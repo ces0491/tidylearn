@@ -187,6 +187,9 @@ tidylearn provides a unified interface to these established R packages:
 | `"nn"` | nnet | `nnet()` |
 | `"deep"` | keras | `keras_model_sequential()` |
 
+`"logistic"` requires a two-level response and errors on anything else.
+Every other classification method here handles more than two classes.
+
 ### Unsupervised Learning
 
 | Method | Underlying Package | Function Called |

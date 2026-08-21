@@ -11,7 +11,7 @@ tl_semisupervised(
   formula,
   labeled_indices,
   cluster_method = "kmeans",
-  supervised_method = "logistic",
+  supervised_method = "tree",
   ...
 )
 ```
@@ -36,7 +36,10 @@ tl_semisupervised(
 
 - supervised_method:
 
-  Supervised learning method for final model
+  Supervised learning method for the final model (default: `"tree"`,
+  which handles both regression and classification with any number of
+  classes). `"logistic"` is binary-only and errors on a response with
+  more than two levels.
 
 - ...:
 

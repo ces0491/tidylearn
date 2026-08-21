@@ -35,7 +35,7 @@ summary(pipe)
 #> Formula: Species ~ . 
 #> Data: 150 observations, 5 variables
 #> Preprocessing: impute_missing, standardize, dummy_encode 
-#> Models: logistic, tree, forest 
+#> Models: tree, forest 
 #> Evaluation:  cv (5 folds)
 #> Metrics: accuracy, precision, recall, f1, auc 
 #> Best metric: f1 

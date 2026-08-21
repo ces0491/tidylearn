@@ -89,7 +89,7 @@ statistical comparisons against the baseline model.</p>
 <span class="r-in"><span><span class="va">cv</span> <span class="op">&lt;-</span> <span class="fu"><a href="tl_compare_cv.html">tl_compare_cv</a></span><span class="op">(</span><span class="va">mtcars</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>simple <span class="op">=</span> <span class="va">m1</span>, full <span class="op">=</span> <span class="va">m2</span><span class="op">)</span>, folds <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">tl_test_model_difference</span><span class="op">(</span><span class="va">cv</span>, baseline_model <span class="op">=</span> <span class="st">"simple"</span>, metric <span class="op">=</span> <span class="st">"rmse"</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   metric model baseline  mean_diff   p_value     p_adj</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1   rmse  full   simple -0.3511811 0.4258791 0.4258791</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1   rmse  full   simple -0.4229862 0.0656034 0.0656034</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

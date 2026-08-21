@@ -10,7 +10,7 @@ tl_transfer_learning(
   data,
   formula,
   pretrain_method = "pca",
-  supervised_method = "logistic",
+  supervised_method = "tree",
   ...
 )
 ```
@@ -31,7 +31,10 @@ tl_transfer_learning(
 
 - supervised_method:
 
-  Supervised learning method
+  Supervised learning method (default: `"tree"`, which handles both
+  regression and classification with any number of classes).
+  `"logistic"` is binary-only and errors on a response with more than
+  two levels.
 
 - ...:
 
@@ -62,12 +65,10 @@ A list with class `"tidylearn_transfer"` containing:
 ``` r
 # \donttest{
 model <- tl_transfer_learning(iris, Species ~ .,
-  pretrain_method = "pca", supervised_method = "logistic")
+  pretrain_method = "pca", supervised_method = "tree")
 #> Transfer Learning Workflow
 #> ==========================
 #> [Phase 1] Unsupervised pre-training with pca...
-#> [Phase 2] Supervised learning with logistic...
-#> Warning: glm.fit: algorithm did not converge
-#> Warning: glm.fit: fitted probabilities numerically 0 or 1 occurred
+#> [Phase 2] Supervised learning with tree...
 # }
 ```

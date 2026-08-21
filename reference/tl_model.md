@@ -26,7 +26,9 @@ tl_model(data, formula = NULL, method = "linear", ..., compute = "cpu")
   The modeling method. Supervised: "linear" (stats::lm), "logistic"
   (stats::glm), "tree" (rpart), "forest" (randomForest), "boost" (gbm),
   "ridge"/"lasso"/"elastic_net" (glmnet), "svm" (e1071), "nn" (nnet),
-  "deep" (keras), "xgboost" (xgboost). Unsupervised: "pca"
+  "deep" (keras), "xgboost" (xgboost). `"logistic"` requires a two-level
+  response and errors on anything else; every other classification
+  method handles more than two classes. Unsupervised: "pca"
   (stats::prcomp), "mds" (stats/MASS/smacof), "kmeans" (stats::kmeans),
   "pam"/"clara" (cluster), "hclust" (stats::hclust), "dbscan" (dbscan).
 
@@ -77,12 +79,12 @@ model$fit  # Access the raw randomForest object
 #>                      Number of trees: 500
 #> No. of variables tried at each split: 2
 #> 
-#>         OOB estimate of  error rate: 4%
+#>         OOB estimate of  error rate: 4.67%
 #> Confusion matrix:
 #>            setosa versicolor virginica class.error
 #> setosa         50          0         0        0.00
 #> versicolor      0         47         3        0.06
-#> virginica       0          3        47        0.06
+#> virginica       0          4        46        0.08
 
 # Regression -> wraps stats::lm()
 model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
@@ -163,50 +165,50 @@ model$fit  # Access the raw kmeans object
 #> # A tibble: 150 × 2
 #>    .obs_id cluster
 #>    <chr>     <int>
-#>  1 1             1
-#>  2 2             1
-#>  3 3             1
-#>  4 4             1
-#>  5 5             1
-#>  6 6             1
-#>  7 7             1
-#>  8 8             1
-#>  9 9             1
-#> 10 10            1
+#>  1 1             2
+#>  2 2             2
+#>  3 3             2
+#>  4 4             2
+#>  5 5             2
+#>  6 6             2
+#>  7 7             2
+#>  8 8             2
+#>  9 9             2
+#> 10 10            2
 #> # ℹ 140 more rows
 #> 
 #> $centers
 #> # A tibble: 3 × 5
 #>   cluster Sepal.Length Sepal.Width Petal.Length Petal.Width
 #>     <int>        <dbl>       <dbl>        <dbl>       <dbl>
-#> 1       1         5.01        3.43         1.46       0.246
-#> 2       2         5.90        2.75         4.39       1.43 
+#> 1       1         5.90        2.75         4.39       1.43 
+#> 2       2         5.01        3.43         1.46       0.246
 #> 3       3         6.85        3.07         5.74       2.07 
 #> 
 #> $metrics
 #> # A tibble: 1 × 6
 #>       k tot_withinss betweenss tot_ss  iter converged
 #>   <dbl>        <dbl>     <dbl>  <dbl> <int> <lgl>    
-#> 1     3         78.9      603.   681.     3 TRUE     
+#> 1     3         78.9      603.   681.     2 TRUE     
 #> 
 #> $model
-#> K-means clustering with 3 clusters of sizes 50, 62, 38
+#> K-means clustering with 3 clusters of sizes 62, 50, 38
 #> 
 #> Cluster means:
 #>   Sepal.Length Sepal.Width Petal.Length Petal.Width
-#> 1     5.006000    3.428000     1.462000    0.246000
-#> 2     5.901613    2.748387     4.393548    1.433871
+#> 1     5.901613    2.748387     4.393548    1.433871
+#> 2     5.006000    3.428000     1.462000    0.246000
 #> 3     6.850000    3.073684     5.742105    2.071053
 #> 
 #> Clustering vector:
-#>   [1] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-#>  [38] 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 3 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-#>  [75] 2 2 2 3 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 3 2 3 3 3 3 2 3 3 3 3
-#> [112] 3 3 2 2 3 3 3 3 2 3 2 3 2 3 3 2 2 3 3 3 3 3 2 3 3 3 3 2 3 3 3 2 3 3 3 2 3
-#> [149] 3 2
+#>   [1] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+#>  [38] 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 3 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+#>  [75] 1 1 1 3 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 3 1 3 3 3 3 1 3 3 3 3
+#> [112] 3 3 1 1 3 3 3 3 1 3 1 3 1 3 3 1 1 3 3 3 3 3 1 3 3 3 3 1 3 3 3 1 3 3 3 1 3
+#> [149] 3 1
 #> 
 #> Within cluster sum of squares by cluster:
-#> [1] 15.15100 39.82097 23.87947
+#> [1] 39.82097 15.15100 23.87947
 #>  (between_SS / total_SS =  88.4 %)
 #> 
 #> Available components:

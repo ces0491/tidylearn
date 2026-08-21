@@ -53,7 +53,7 @@ and propagating labels within clusters.</p>
 <span>  <span class="va">formula</span>,</span>
 <span>  <span class="va">labeled_indices</span>,</span>
 <span>  cluster_method <span class="op">=</span> <span class="st">"kmeans"</span>,</span>
-<span>  supervised_method <span class="op">=</span> <span class="st">"logistic"</span>,</span>
+<span>  supervised_method <span class="op">=</span> <span class="st">"tree"</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -79,7 +79,10 @@ and propagating labels within clusters.</p>
 
 
 <dt id="arg-supervised-method">supervised_method<a class="anchor" aria-label="anchor" href="#arg-supervised-method"></a></dt>
-<dd><p>Supervised learning method for final model</p></dd>
+<dd><p>Supervised learning method for the final
+model (default: <code>"tree"</code>, which handles both regression and
+classification with any number of classes). <code>"logistic"</code> is
+binary-only and errors on a response with more than two levels.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>

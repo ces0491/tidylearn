@@ -55,13 +55,13 @@ cv$summary
 #> # A tibble: 8 × 6
 #>   model  metric mean_value sd_value min_value max_value
 #>   <chr>  <chr>       <dbl>    <dbl>     <dbl>     <dbl>
-#> 1 full   mae         2.11    0.579      1.48      2.61 
-#> 2 full   mape       11.0     2.93       8.61     14.3  
-#> 3 full   rmse        2.68    0.563      2.05      3.13 
-#> 4 full   rsq         0.786   0.0713     0.705     0.839
-#> 5 simple mae         2.57    0.353      2.17      2.84 
-#> 6 simple mape       14.0     2.21      12.5      16.5  
-#> 7 simple rmse        3.23    0.478      2.68      3.59 
-#> 8 simple rsq         0.690   0.0666     0.613     0.734
+#> 1 full   mae         2.01    0.0456     1.98      2.07 
+#> 2 full   mape       10.6     2.53       9.12     13.5  
+#> 3 full   rmse        2.65    0.123      2.54      2.78 
+#> 4 full   rsq         0.781   0.0669     0.705     0.831
+#> 5 simple mae         2.45    0.174      2.34      2.65 
+#> 6 simple mape       13.3     1.82      11.9      15.4  
+#> 7 simple rmse        3.17    0.0705     3.13      3.25 
+#> 8 simple rsq         0.691   0.0584     0.627     0.742
 # }
 ```

@@ -12,7 +12,7 @@ tl_anomaly_aware(
   response,
   anomaly_method = "dbscan",
   action = "flag",
-  supervised_method = "logistic",
+  supervised_method = "tree",
   ...
 )
 ```
@@ -41,7 +41,10 @@ tl_anomaly_aware(
 
 - supervised_method:
 
-  Supervised learning method
+  Supervised learning method (default: `"tree"`, which handles both
+  regression and classification with any number of classes).
+  `"logistic"` is binary-only and errors on a response with more than
+  two levels.
 
 - ...:
 
@@ -60,7 +63,5 @@ element with `anomaly_model`, `is_anomaly` (logical vector),
 # \donttest{
 model <- tl_anomaly_aware(iris, Species ~ ., response = "Species",
                            anomaly_method = "dbscan", action = "flag")
-#> Warning: glm.fit: algorithm did not converge
-#> Warning: glm.fit: fitted probabilities numerically 0 or 1 occurred
 # }
 ```
