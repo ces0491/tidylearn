@@ -1,0 +1,936 @@
+# tidylearn
+
+Machine Learning for Tidynauts
+
+[![CRAN
+status](https://www.r-pkg.org/badges/version/tidylearn)](https://cran.r-project.org/package=tidylearn)
+[![R-CMD-check](https://github.com/ces0491/tidylearn/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/ces0491/tidylearn/actions/workflows/R-CMD-check.yaml)
+[![License:
+MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![pkgdown](https://github.com/ces0491/tidylearn/actions/workflows/pkgdown.yaml/badge.svg)](https://tidylearn.sheetsolved.com)
+
+Full documentation, including every function reference page and all ten
+articles: **<https://tidylearn.sheetsolved.com>**
+
+## Overview
+
+`tidylearn` provides a **unified tidyverse-compatible interface** to R’s
+machine learning ecosystem. It wraps proven packages like glmnet,
+randomForest, xgboost, e1071, cluster, and dbscan - you get the
+reliability of established implementations with the convenience of a
+consistent, tidy API.
+
+**What tidylearn does:**
+
+- Reads data from diverse sources
+  ([`tl_read()`](https://tidylearn.sheetsolved.com/reference/tl_read.md))
+  — CSV, Excel, Parquet, JSON, databases, S3, Kaggle, and more
+- Provides one consistent interface
+  ([`tl_model()`](https://tidylearn.sheetsolved.com/reference/tl_model.md))
+  to 20 ML algorithms (13 supervised, 7 unsupervised)
+- Returns tidy tibbles instead of varied output formats
+- Offers unified ggplot2-based visualization and formatted `gt` tables
+- Enables pipe-friendly workflows with `%>%`
+- Orchestrates complex workflows combining multiple techniques
+
+**What tidylearn is NOT:**
+
+- A reimplementation of ML algorithms (uses established packages under
+  the hood)
+- A replacement for the underlying packages (you can access the raw
+  model via `model$fit`)
+
+## Why tidylearn?
+
+Each ML package in R has its own API, output format, and conventions.
+tidylearn provides a translation layer so you can:
+
+| Without tidylearn                     | With tidylearn           |
+|---------------------------------------|--------------------------|
+| Learn different APIs for each package | One API for everything   |
+| Write custom code to extract results  | Consistent tibble output |
+| Create different plots for each model | Unified visualization    |
+| Manage package-specific quirks        | Focus on your analysis   |
+
+The underlying algorithms are unchanged - tidylearn simply makes them
+easier to use together.
+
+## Installation
+
+``` r
+
+# Install from CRAN
+install.packages("tidylearn")
+
+# Or install development version from GitHub
+# devtools::install_github("ces0491/tidylearn")
+```
+
+## Quick Start
+
+### Data Ingestion
+
+[`tl_read()`](https://tidylearn.sheetsolved.com/reference/tl_read.md)
+auto-detects the format and returns a tidy `tidylearn_data` object:
+
+``` r
+
+library(tidylearn)
+
+# Single files — format auto-detected from extension
+data <- tl_read("sales.csv")
+data <- tl_read("results.xlsx", sheet = "Q1")
+data <- tl_read("experiment.parquet")
+
+# Databases
+data <- tl_read_sqlite("warehouse.sqlite", "SELECT * FROM sales")
+data <- tl_read_postgres("localhost", query = "SELECT * FROM customers",
+                         dbname = "analytics", user = "me")
+
+# Cloud and API sources
+data <- tl_read_s3("s3://my-bucket/data.csv")
+data <- tl_read_kaggle("zillow/zecon", file = "Zip_time_series.csv")
+
+# Multi-file reading
+data <- tl_read(c("jan.csv", "feb.csv", "mar.csv"))
+data <- tl_read_dir("data/monthly/", format = "csv")
+data <- tl_read_zip("download.zip")
+```
+
+### Unified Interface
+
+A single
+[`tl_model()`](https://tidylearn.sheetsolved.com/reference/tl_model.md)
+function dispatches to the appropriate underlying package:
+
+``` r
+
+library(tidylearn)
+
+# Classification -> uses randomForest::randomForest()
+model <- tl_model(iris, Species ~ ., method = "forest")
+
+# Regression -> uses stats::lm()
+model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+
+# Regularization -> uses glmnet::glmnet()
+model <- tl_model(mtcars, mpg ~ ., method = "lasso")
+
+# Clustering -> uses stats::kmeans()
+model <- tl_model(iris[,1:4], method = "kmeans", k = 3)
+
+# PCA -> uses stats::prcomp()
+model <- tl_model(iris[,1:4], method = "pca")
+```
+
+### Tidy Output
+
+All results come back as tibbles, ready for dplyr and ggplot2:
+
+``` r
+
+# Predictions come back as a tibble with a .pred column
+predictions <- predict(model, new_data = test_data)
+
+# Metrics as tibbles - pick the metrics you want
+metrics <- tl_evaluate(model, test_data)
+metrics <- tl_evaluate(model, test_data, metrics = c("rmse", "rsq"))
+
+# Easy to pipe
+model %>%
+  predict(new_data = test_data) %>%
+  bind_cols(test_data) %>%
+  ggplot(aes(x = mpg, y = .pred)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0)
+```
+
+For classification, what `.pred` holds depends on `type`: `"class"`
+gives labels, `"prob"` gives one column per class. The default
+`"response"` varies by method - probabilities for logistic regression,
+labels for trees and forests - so pass `type` explicitly, or let
+[`tl_evaluate()`](https://tidylearn.sheetsolved.com/reference/tl_evaluate.md)
+handle it.
+
+### Access the Underlying Model
+
+You always have access to the raw model from the underlying package:
+
+``` r
+
+model <- tl_model(iris, Species ~ ., method = "forest")
+
+# Access the randomForest object directly
+model$fit  # This is the randomForest::randomForest() result
+
+# Use package-specific functions if needed
+randomForest::varImpPlot(model$fit)
+```
+
+## Wrapped Packages
+
+tidylearn provides a unified interface to these established R packages:
+
+### Supervised Learning
+
+| Method | Underlying Package | Function Called |
+|----|----|----|
+| `"linear"` | stats | [`lm()`](https://rdrr.io/r/stats/lm.html) |
+| `"polynomial"` | stats | [`lm()`](https://rdrr.io/r/stats/lm.html) with [`poly()`](https://rdrr.io/r/stats/poly.html) |
+| `"logistic"` | stats | `glm(..., family = binomial)` |
+| `"ridge"`, `"lasso"`, `"elastic_net"` | glmnet | `glmnet()` |
+| `"tree"` | rpart | `rpart()` |
+| `"forest"` | randomForest | `randomForest()` |
+| `"boost"` | gbm | `gbm()` |
+| `"xgboost"` | xgboost | `xgb.train()` |
+| `"svm"` | e1071 | `svm()` |
+| `"nn"` | nnet | `nnet()` |
+| `"deep"` | keras | `keras_model_sequential()` |
+
+### Unsupervised Learning
+
+| Method | Underlying Package | Function Called |
+|----|----|----|
+| `"pca"` | stats | [`prcomp()`](https://rdrr.io/r/stats/prcomp.html) |
+| `"mds"` | stats, MASS, smacof | [`cmdscale()`](https://rdrr.io/r/stats/cmdscale.html), `isoMDS()`, etc. |
+| `"kmeans"` | stats | [`kmeans()`](https://rdrr.io/r/stats/kmeans.html) |
+| `"pam"` | cluster | `pam()` |
+| `"clara"` | cluster | `clara()` |
+| `"hclust"` | stats | [`hclust()`](https://rdrr.io/r/stats/hclust.html) |
+| `"dbscan"` | dbscan | `dbscan()` |
+
+## Integration Workflows
+
+Beyond wrapping individual packages, tidylearn provides orchestration
+functions that combine multiple techniques:
+
+### Dimensionality Reduction + Supervised Learning
+
+``` r
+
+# Reduce dimensions before classification
+reduced <- tl_reduce_dimensions(iris, response = "Species",
+                                method = "pca", n_components = 3)
+model <- tl_model(reduced$data, Species ~ ., method = "forest")
+```
+
+### Cluster-Based Feature Engineering
+
+``` r
+
+# Add cluster membership as a feature
+enriched <- tl_add_cluster_features(data, response = "target",
+                                    method = "kmeans", k = 3)
+model <- tl_model(enriched, target ~ ., method = "forest")
+```
+
+### Semi-Supervised Learning
+
+``` r
+
+# Use clustering to propagate labels to unlabeled data
+model <- tl_semisupervised(data, target ~ .,
+                          labeled_indices = labeled_idx,
+                          cluster_method = "kmeans")
+```
+
+### AutoML
+
+``` r
+
+# Automatically try multiple approaches
+result <- tl_auto_ml(data, target ~ .,
+                    time_budget = 300)
+result$leaderboard
+```
+
+## Compute Backends
+
+Most methods run on the CPU and need no thought. For the two with an
+upstream GPU path (`"xgboost"` and `"deep"`),
+[`tl_model()`](https://tidylearn.sheetsolved.com/reference/tl_model.md)
+takes a `compute` argument:
+
+``` r
+
+# Check what this machine can actually do
+tl_check_gpu()
+
+# Route a fit to the local GPU (falls back to CPU with a warning if
+# no CUDA-capable backend is detected)
+model <- tl_model(data, y ~ ., method = "xgboost", compute = "gpu")
+
+# Let tidylearn decide per call
+model <- tl_model(data, y ~ ., method = "xgboost", compute = "auto")
+```
+
+[`tl_compute_advisor()`](https://tidylearn.sheetsolved.com/reference/tl_compute_advisor.md)
+estimates runtime, peak memory and cost across local CPU, local GPU and
+cloud tiers before you commit to a long fit:
+
+``` r
+
+tl_compute_advisor("xgboost", data, y ~ ., hyperparams = list(nrounds = 5000))
+```
+
+Estimates are order-of-magnitude, not quotes. The cloud tier is reported
+for planning only - it is not yet executable.
+
+## Unified Visualization
+
+Consistent ggplot2-based plotting regardless of model type:
+
+``` r
+
+# Generic plot method works for all model types
+plot(forest_model)       # Automatic visualization based on model type
+plot(linear_model)       # Diagnostic plots for regression
+plot(pca_model)          # Variance explained for PCA
+plot(kmeans_model)       # Cluster scatter plot
+plot(hclust_model)       # Dendrogram
+
+# The lower-level helpers take data frames rather than models
+plot_clusters(cluster_data, cluster_col = "cluster")
+plot_variance_explained(pca_model$fit$variance_explained)
+
+# Interactive dashboard for detailed exploration
+tl_dashboard(model, test_data)
+```
+
+## Formatted Tables
+
+The
+[`tl_table()`](https://tidylearn.sheetsolved.com/reference/tl_table.md)
+family produces formatted `gt` tables for reporting:
+
+``` r
+
+# Auto-selects the best table type
+tl_table(model)
+
+# Specific table types
+tl_table_metrics(model, new_data = test_data)
+tl_table_coefficients(model)
+tl_table_confusion(model, new_data = test_data)
+tl_table_importance(model)
+
+# Compare models side-by-side
+tl_table_comparison(model1, model2, model3,
+                    new_data = test_data,
+                    names = c("Linear", "Forest", "XGBoost"))
+```
+
+## Philosophy
+
+tidylearn is built on these principles:
+
+1.  **Transparency**: The underlying packages do the real work.
+    tidylearn makes them easier to use together without hiding what’s
+    happening.
+
+2.  **Consistency**: One interface, tidy output, unified visualization -
+    across all methods.
+
+3.  **Accessibility**: Focus on your analysis, not on learning different
+    package APIs.
+
+4.  **Interoperability**: Results are tibbles and ggplot2 objects, so
+    they work with dplyr and the rest of the tidyverse without
+    conversion.
+
+## Documentation
+
+The full site is at **<https://tidylearn.sheetsolved.com>** — every
+function reference page and every article, browsable without installing
+anything.
+
+From an R session:
+
+``` r
+
+# Package overview
+?tidylearn
+
+# Main entry points
+?tl_read
+?tl_model
+?tl_evaluate
+?tl_table
+?tl_auto_ml
+
+# List the articles
+browseVignettes("tidylearn")
+```
+
+### Articles
+
+| Article | Covers |
+|----|----|
+| [Getting Started](https://tidylearn.sheetsolved.com/articles/getting-started.html) | The shape of a tidylearn workflow |
+| [Data Ingestion](https://tidylearn.sheetsolved.com/articles/data-ingestion.html) | [`tl_read()`](https://tidylearn.sheetsolved.com/reference/tl_read.md) over files, databases and cloud sources |
+| [Supervised Learning](https://tidylearn.sheetsolved.com/articles/supervised-learning.html) | Classification and regression, and replaying preprocessing |
+| [Unsupervised Learning](https://tidylearn.sheetsolved.com/articles/unsupervised-learning.html) | PCA, MDS, clustering, and choosing *k* |
+| [Market Basket Analysis](https://tidylearn.sheetsolved.com/articles/market-basket.html) | Association rules with [`tidy_apriori()`](https://tidylearn.sheetsolved.com/reference/tidy_apriori.md) |
+| [Tuning and Pipelines](https://tidylearn.sheetsolved.com/articles/tuning-and-pipelines.html) | Hyperparameter search, then freezing the recipe |
+| [AutoML](https://tidylearn.sheetsolved.com/articles/automl.html) | Searching across methods under a time budget |
+| [Diagnostics](https://tidylearn.sheetsolved.com/articles/diagnostics.html) | Assumptions, influence, and comparing models |
+| [Reporting](https://tidylearn.sheetsolved.com/articles/reporting.html) | Plots and formatted `gt` tables |
+| [Integration Workflows](https://tidylearn.sheetsolved.com/articles/integration-workflows.html) | Combining supervised and unsupervised steps |
+
+## Contributing
+
+Contributions are welcome. Before opening a PR, please read
+[CONTRIBUTING.md](https://github.com/ces0491/tidylearn/blob/main/CONTRIBUTING.md).
+
+## License
+
+MIT License - see
+[LICENSE](https://github.com/ces0491/tidylearn/blob/main/LICENSE) for
+details.
+
+## Author
+
+Cesaire Tobias (<cesaire@sheetsolved.com>)
+
+## Acknowledgments
+
+tidylearn is a wrapper. The algorithms are implemented in:
+
+- **stats** (base R): lm, glm, prcomp, kmeans, hclust, cmdscale
+- **glmnet**: Ridge, LASSO, and elastic net regularization
+- **randomForest**: Random forest implementation
+- **xgboost**: Gradient boosting
+- **gbm**: Gradient boosting machines
+- **e1071**: Support vector machines
+- **nnet**: Neural networks
+- **rpart**: Decision trees
+- **cluster**: PAM, CLARA clustering
+- **dbscan**: Density-based clustering
+- **MASS**: Sammon mapping, isoMDS
+- **smacof**: SMACOF MDS algorithm
+- **keras/tensorflow**: Deep learning (optional)
+
+Thanks to their maintainers.
+
+------------------------------------------------------------------------
+
+# Package index
+
+## Reading data
+
+One interface over files, databases and cloud sources. Every reader
+returns a tibble.
+
+- [`tl_read()`](https://tidylearn.sheetsolved.com/reference/tl_read.md)
+  : Read data from diverse sources
+- [`tl_read_bigquery()`](https://tidylearn.sheetsolved.com/reference/tl_read_bigquery.md)
+  : Read from Google BigQuery
+- [`tl_read_csv()`](https://tidylearn.sheetsolved.com/reference/tl_read_csv.md)
+  : Read a CSV file
+- [`tl_read_db()`](https://tidylearn.sheetsolved.com/reference/tl_read_db.md)
+  : Read from a DBI database connection
+- [`tl_read_dir()`](https://tidylearn.sheetsolved.com/reference/tl_read_dir.md)
+  : Read all matching files from a directory
+- [`tl_read_excel()`](https://tidylearn.sheetsolved.com/reference/tl_read_excel.md)
+  : Read an Excel file
+- [`tl_read_github()`](https://tidylearn.sheetsolved.com/reference/tl_read_github.md)
+  : Read from GitHub
+- [`tl_read_json()`](https://tidylearn.sheetsolved.com/reference/tl_read_json.md)
+  : Read a JSON file
+- [`tl_read_kaggle()`](https://tidylearn.sheetsolved.com/reference/tl_read_kaggle.md)
+  : Read from Kaggle
+- [`tl_read_mysql()`](https://tidylearn.sheetsolved.com/reference/tl_read_mysql.md)
+  : Read from a MySQL/MariaDB database
+- [`tl_read_parquet()`](https://tidylearn.sheetsolved.com/reference/tl_read_parquet.md)
+  : Read a Parquet file
+- [`tl_read_postgres()`](https://tidylearn.sheetsolved.com/reference/tl_read_postgres.md)
+  : Read from a PostgreSQL database
+- [`tl_read_rdata()`](https://tidylearn.sheetsolved.com/reference/tl_read_rdata.md)
+  : Read an RData file
+- [`tl_read_rds()`](https://tidylearn.sheetsolved.com/reference/tl_read_rds.md)
+  : Read an RDS file
+- [`tl_read_s3()`](https://tidylearn.sheetsolved.com/reference/tl_read_s3.md)
+  : Read from Amazon S3
+- [`tl_read_sqlite()`](https://tidylearn.sheetsolved.com/reference/tl_read_sqlite.md)
+  : Read from a SQLite database
+- [`tl_read_tsv()`](https://tidylearn.sheetsolved.com/reference/tl_read_tsv.md)
+  : Read a TSV file
+- [`tl_read_zip()`](https://tidylearn.sheetsolved.com/reference/tl_read_zip.md)
+  : Read data from a zip archive
+
+## Modelling
+
+Fit, split, evaluate and cross-validate. Reach the underlying model
+object through the `$fit` slot.
+
+- [`tl_model()`](https://tidylearn.sheetsolved.com/reference/tl_model.md)
+  : Create a tidylearn model
+- [`tl_split()`](https://tidylearn.sheetsolved.com/reference/tl_split.md)
+  : Split data into train and test sets
+- [`tl_prepare_data()`](https://tidylearn.sheetsolved.com/reference/tl_prepare_data.md)
+  : Data Preprocessing for tidylearn
+- [`tl_evaluate()`](https://tidylearn.sheetsolved.com/reference/tl_evaluate.md)
+  : Evaluate a tidylearn model
+- [`tl_cv()`](https://tidylearn.sheetsolved.com/reference/tl_cv.md) :
+  Cross-validation for tidylearn models
+- [`tl_compare_cv()`](https://tidylearn.sheetsolved.com/reference/tl_compare_cv.md)
+  : Compare models using cross-validation
+- [`tl_calc_classification_metrics()`](https://tidylearn.sheetsolved.com/reference/tl_calc_classification_metrics.md)
+  : Calculate classification metrics
+- [`tl_get_best_model()`](https://tidylearn.sheetsolved.com/reference/tl_get_best_model.md)
+  : Get the best model from a pipeline
+- [`tl_stratified_models()`](https://tidylearn.sheetsolved.com/reference/tl_stratified_models.md)
+  : Stratified Features via Clustering
+- [`tl_semisupervised()`](https://tidylearn.sheetsolved.com/reference/tl_semisupervised.md)
+  : Semi-Supervised Learning via Clustering
+- [`tl_anomaly_aware()`](https://tidylearn.sheetsolved.com/reference/tl_anomaly_aware.md)
+  : Anomaly-Aware Supervised Learning
+- [`tl_step_selection()`](https://tidylearn.sheetsolved.com/reference/tl_step_selection.md)
+  : Perform stepwise selection on a linear model
+- [`tl_reduce_dimensions()`](https://tidylearn.sheetsolved.com/reference/tl_reduce_dimensions.md)
+  : Integration Functions: Combining Supervised and Unsupervised
+  Learning
+- [`tl_add_cluster_features()`](https://tidylearn.sheetsolved.com/reference/tl_add_cluster_features.md)
+  : Cluster-Based Features
+
+## Pipelines
+
+Compose the steps above into something you can save and re-run.
+
+- [`tl_pipeline()`](https://tidylearn.sheetsolved.com/reference/tl_pipeline.md)
+  : Create a modeling pipeline
+- [`tl_run_pipeline()`](https://tidylearn.sheetsolved.com/reference/tl_run_pipeline.md)
+  : Run a tidylearn pipeline
+- [`tl_save_pipeline()`](https://tidylearn.sheetsolved.com/reference/tl_save_pipeline.md)
+  : Save a pipeline to disk
+- [`tl_load_pipeline()`](https://tidylearn.sheetsolved.com/reference/tl_load_pipeline.md)
+  : Load a pipeline from disk
+- [`tl_predict_pipeline()`](https://tidylearn.sheetsolved.com/reference/tl_predict_pipeline.md)
+  : Make predictions using a pipeline
+- [`tl_compare_pipeline_models()`](https://tidylearn.sheetsolved.com/reference/tl_compare_pipeline_models.md)
+  : Compare models from a pipeline
+
+## Tuning and AutoML
+
+- [`tl_tune_deep()`](https://tidylearn.sheetsolved.com/reference/tl_tune_deep.md)
+  : Tune a deep learning model
+- [`tl_tune_grid()`](https://tidylearn.sheetsolved.com/reference/tl_tune_grid.md)
+  : Tune hyperparameters for a model using grid search
+- [`tl_tune_nn()`](https://tidylearn.sheetsolved.com/reference/tl_tune_nn.md)
+  : Tune a neural network model
+- [`tl_tune_random()`](https://tidylearn.sheetsolved.com/reference/tl_tune_random.md)
+  : Tune hyperparameters using random search
+- [`tl_tune_xgboost()`](https://tidylearn.sheetsolved.com/reference/tl_tune_xgboost.md)
+  : Tune XGBoost hyperparameters
+- [`tl_auto_ml()`](https://tidylearn.sheetsolved.com/reference/tl_auto_ml.md)
+  : Auto ML: Automated Machine Learning Workflow
+- [`tl_auto_interactions()`](https://tidylearn.sheetsolved.com/reference/tl_auto_interactions.md)
+  : Find important interactions automatically
+- [`tl_default_param_grid()`](https://tidylearn.sheetsolved.com/reference/tl_default_param_grid.md)
+  : Create pre-defined parameter grids for common models
+
+## Diagnostics
+
+What the model got wrong, and which observations drove it.
+
+- [`tl_check_assumptions()`](https://tidylearn.sheetsolved.com/reference/tl_check_assumptions.md)
+  : Check model assumptions
+- [`tl_diagnostic_dashboard()`](https://tidylearn.sheetsolved.com/reference/tl_diagnostic_dashboard.md)
+  : Create a comprehensive diagnostic dashboard
+- [`tl_influence_measures()`](https://tidylearn.sheetsolved.com/reference/tl_influence_measures.md)
+  : Calculate influence measures for a linear model
+- [`tl_detect_outliers()`](https://tidylearn.sheetsolved.com/reference/tl_detect_outliers.md)
+  : Detect outliers in the data
+- [`tl_interaction_effects()`](https://tidylearn.sheetsolved.com/reference/tl_interaction_effects.md)
+  : Calculate partial effects based on a model with interactions
+- [`tl_test_interactions()`](https://tidylearn.sheetsolved.com/reference/tl_test_interactions.md)
+  : Test for significant interactions between variables
+- [`tl_test_model_difference()`](https://tidylearn.sheetsolved.com/reference/tl_test_model_difference.md)
+  : Perform statistical comparison of models using cross-validation
+- [`tl_explore()`](https://tidylearn.sheetsolved.com/reference/tl_explore.md)
+  : Exploratory Data Analysis Workflow
+- [`tl_dashboard()`](https://tidylearn.sheetsolved.com/reference/tl_dashboard.md)
+  : Create interactive visualization dashboard for a model
+
+## Unsupervised learning
+
+Clustering, ordination and dimension reduction, each returning a tibble
+rather than a fitted object you have to take apart.
+
+- [`tidy_apriori()`](https://tidylearn.sheetsolved.com/reference/tidy_apriori.md)
+  : Tidy Apriori Algorithm
+- [`tidy_clara()`](https://tidylearn.sheetsolved.com/reference/tidy_clara.md)
+  : Tidy CLARA (Clustering Large Applications)
+- [`tidy_cutree()`](https://tidylearn.sheetsolved.com/reference/tidy_cutree.md)
+  : Cut Hierarchical Clustering Tree
+- [`tidy_dbscan()`](https://tidylearn.sheetsolved.com/reference/tidy_dbscan.md)
+  : Tidy DBSCAN Clustering
+- [`tidy_dendrogram()`](https://tidylearn.sheetsolved.com/reference/tidy_dendrogram.md)
+  : Plot Dendrogram
+- [`tidy_dist()`](https://tidylearn.sheetsolved.com/reference/tidy_dist.md)
+  : Tidy Distance Matrix Computation
+- [`tidy_gap_stat()`](https://tidylearn.sheetsolved.com/reference/tidy_gap_stat.md)
+  : Tidy Gap Statistic
+- [`tidy_gower()`](https://tidylearn.sheetsolved.com/reference/tidy_gower.md)
+  : Gower Distance Calculation
+- [`tidy_hclust()`](https://tidylearn.sheetsolved.com/reference/tidy_hclust.md)
+  : Tidy Hierarchical Clustering
+- [`tidy_kmeans()`](https://tidylearn.sheetsolved.com/reference/tidy_kmeans.md)
+  : Tidy K-Means Clustering
+- [`tidy_knn_dist()`](https://tidylearn.sheetsolved.com/reference/tidy_knn_dist.md)
+  : Compute k-NN Distances
+- [`tidy_mds()`](https://tidylearn.sheetsolved.com/reference/tidy_mds.md)
+  : Tidy Multidimensional Scaling
+- [`tidy_mds_classical()`](https://tidylearn.sheetsolved.com/reference/tidy_mds_classical.md)
+  : Classical (Metric) MDS
+- [`tidy_mds_kruskal()`](https://tidylearn.sheetsolved.com/reference/tidy_mds_kruskal.md)
+  : Kruskal's Non-metric MDS
+- [`tidy_mds_sammon()`](https://tidylearn.sheetsolved.com/reference/tidy_mds_sammon.md)
+  : Sammon Mapping
+- [`tidy_mds_smacof()`](https://tidylearn.sheetsolved.com/reference/tidy_mds_smacof.md)
+  : SMACOF MDS (Metric or Non-metric)
+- [`tidy_pam()`](https://tidylearn.sheetsolved.com/reference/tidy_pam.md)
+  : Tidy PAM (Partitioning Around Medoids)
+- [`tidy_pca()`](https://tidylearn.sheetsolved.com/reference/tidy_pca.md)
+  : Tidy Principal Component Analysis
+- [`tidy_pca_biplot()`](https://tidylearn.sheetsolved.com/reference/tidy_pca_biplot.md)
+  : Create PCA Biplot
+- [`tidy_pca_screeplot()`](https://tidylearn.sheetsolved.com/reference/tidy_pca_screeplot.md)
+  : Create PCA Scree Plot
+- [`tidy_rules()`](https://tidylearn.sheetsolved.com/reference/tidy_rules.md)
+  : Convert Association Rules to Tidy Tibble
+- [`tidy_silhouette()`](https://tidylearn.sheetsolved.com/reference/tidy_silhouette.md)
+  : Tidy Silhouette Analysis
+- [`tidy_silhouette_analysis()`](https://tidylearn.sheetsolved.com/reference/tidy_silhouette_analysis.md)
+  : Silhouette Analysis Across Multiple k Values
+- [`augment_dbscan()`](https://tidylearn.sheetsolved.com/reference/augment_dbscan.md)
+  : Augment Data with DBSCAN Cluster Assignments
+- [`augment_hclust()`](https://tidylearn.sheetsolved.com/reference/augment_hclust.md)
+  : Augment Data with Hierarchical Cluster Assignments
+- [`augment_kmeans()`](https://tidylearn.sheetsolved.com/reference/augment_kmeans.md)
+  : Augment Data with K-Means Cluster Assignments
+- [`augment_pam()`](https://tidylearn.sheetsolved.com/reference/augment_pam.md)
+  : Augment Data with PAM Cluster Assignments
+- [`augment_pca()`](https://tidylearn.sheetsolved.com/reference/augment_pca.md)
+  : Augment Original Data with PCA Scores
+- [`optimal_clusters()`](https://tidylearn.sheetsolved.com/reference/optimal_clusters.md)
+  : Find Optimal Number of Clusters
+- [`optimal_hclust_k()`](https://tidylearn.sheetsolved.com/reference/optimal_hclust_k.md)
+  : Determine Optimal Number of Clusters for Hierarchical Clustering
+- [`compare_clusterings()`](https://tidylearn.sheetsolved.com/reference/compare_clusterings.md)
+  : Compare Multiple Clustering Results
+- [`compare_distances()`](https://tidylearn.sheetsolved.com/reference/compare_distances.md)
+  : Compare Distance Methods
+- [`calc_validation_metrics()`](https://tidylearn.sheetsolved.com/reference/calc_validation_metrics.md)
+  : Calculate Cluster Validation Metrics
+- [`calc_wss()`](https://tidylearn.sheetsolved.com/reference/calc_wss.md)
+  : Calculate Within-Cluster Sum of Squares for Different k
+- [`explore_dbscan_params()`](https://tidylearn.sheetsolved.com/reference/explore_dbscan_params.md)
+  : Explore DBSCAN Parameters
+- [`get_pca_loadings()`](https://tidylearn.sheetsolved.com/reference/get_pca_loadings.md)
+  : Get PCA Loadings in Wide Format
+- [`get_pca_variance()`](https://tidylearn.sheetsolved.com/reference/get_pca_variance.md)
+  : Get Variance Explained Summary
+- [`suggest_eps()`](https://tidylearn.sheetsolved.com/reference/suggest_eps.md)
+  : Suggest eps Parameter for DBSCAN
+- [`standardize_data()`](https://tidylearn.sheetsolved.com/reference/standardize_data.md)
+  : Standardize Data
+- [`create_cluster_dashboard()`](https://tidylearn.sheetsolved.com/reference/create_cluster_dashboard.md)
+  : Create Summary Dashboard
+
+## Association rules
+
+- [`inspect_rules()`](https://tidylearn.sheetsolved.com/reference/inspect_rules.md)
+  : Inspect Association Rules
+- [`filter_rules_by_item()`](https://tidylearn.sheetsolved.com/reference/filter_rules_by_item.md)
+  : Filter Rules by Item
+- [`find_related_items()`](https://tidylearn.sheetsolved.com/reference/find_related_items.md)
+  : Find Related Items
+- [`recommend_products()`](https://tidylearn.sheetsolved.com/reference/recommend_products.md)
+  : Generate Product Recommendations
+- [`summarize_rules()`](https://tidylearn.sheetsolved.com/reference/summarize_rules.md)
+  : Summarize Association Rules
+- [`visualize_rules()`](https://tidylearn.sheetsolved.com/reference/visualize_rules.md)
+  : Visualize Association Rules
+
+## Plots
+
+ggplot2 objects, returned rather than printed, so you can keep editing
+them.
+
+- [`tl_plot_cv_comparison()`](https://tidylearn.sheetsolved.com/reference/tl_plot_cv_comparison.md)
+  : Plot comparison of cross-validation results
+- [`tl_plot_cv_results()`](https://tidylearn.sheetsolved.com/reference/tl_plot_cv_results.md)
+  : Plot cross-validation results
+- [`tl_plot_deep_architecture()`](https://tidylearn.sheetsolved.com/reference/tl_plot_deep_architecture.md)
+  : Plot deep learning model architecture
+- [`tl_plot_deep_history()`](https://tidylearn.sheetsolved.com/reference/tl_plot_deep_history.md)
+  : Plot deep learning model training history
+- [`tl_plot_gain()`](https://tidylearn.sheetsolved.com/reference/tl_plot_gain.md)
+  : Plot gain chart for a classification model
+- [`tl_plot_importance_comparison()`](https://tidylearn.sheetsolved.com/reference/tl_plot_importance_comparison.md)
+  : Plot feature importance across multiple models
+- [`tl_plot_importance_regularized()`](https://tidylearn.sheetsolved.com/reference/tl_plot_importance_regularized.md)
+  : Plot variable importance for a regularized model
+- [`tl_plot_influence()`](https://tidylearn.sheetsolved.com/reference/tl_plot_influence.md)
+  : Plot influence diagnostics
+- [`tl_plot_interaction()`](https://tidylearn.sheetsolved.com/reference/tl_plot_interaction.md)
+  : Plot interaction effects
+- [`tl_plot_intervals()`](https://tidylearn.sheetsolved.com/reference/tl_plot_intervals.md)
+  : Create confidence and prediction interval plots
+- [`tl_plot_lift()`](https://tidylearn.sheetsolved.com/reference/tl_plot_lift.md)
+  : Plot lift chart for a classification model
+- [`tl_plot_model_comparison()`](https://tidylearn.sheetsolved.com/reference/tl_plot_model_comparison.md)
+  : Plot model comparison
+- [`tl_plot_nn_architecture()`](https://tidylearn.sheetsolved.com/reference/tl_plot_nn_architecture.md)
+  : Plot neural network architecture
+- [`tl_plot_nn_tuning()`](https://tidylearn.sheetsolved.com/reference/tl_plot_nn_tuning.md)
+  : Plot neural network training history
+- [`tl_plot_partial_dependence()`](https://tidylearn.sheetsolved.com/reference/tl_plot_partial_dependence.md)
+  : Plot partial dependence for tree-based models
+- [`tl_plot_regularization_cv()`](https://tidylearn.sheetsolved.com/reference/tl_plot_regularization_cv.md)
+  : Plot cross-validation results for a regularized model
+- [`tl_plot_regularization_path()`](https://tidylearn.sheetsolved.com/reference/tl_plot_regularization_path.md)
+  : Plot regularization path for a regularized model
+- [`tl_plot_svm_boundary()`](https://tidylearn.sheetsolved.com/reference/tl_plot_svm_boundary.md)
+  : Plot SVM decision boundary
+- [`tl_plot_svm_tuning()`](https://tidylearn.sheetsolved.com/reference/tl_plot_svm_tuning.md)
+  : Plot SVM tuning results
+- [`tl_plot_tree()`](https://tidylearn.sheetsolved.com/reference/tl_plot_tree.md)
+  : Plot a decision tree
+- [`tl_plot_tuning_results()`](https://tidylearn.sheetsolved.com/reference/tl_plot_tuning_results.md)
+  : Plot hyperparameter tuning results
+- [`tl_plot_xgboost_importance()`](https://tidylearn.sheetsolved.com/reference/tl_plot_xgboost_importance.md)
+  : Plot feature importance for an XGBoost model
+- [`tl_plot_xgboost_shap_dependence()`](https://tidylearn.sheetsolved.com/reference/tl_plot_xgboost_shap_dependence.md)
+  : Plot SHAP dependence for a specific feature
+- [`tl_plot_xgboost_shap_summary()`](https://tidylearn.sheetsolved.com/reference/tl_plot_xgboost_shap_summary.md)
+  : Plot SHAP summary for XGBoost model
+- [`tl_plot_xgboost_tree()`](https://tidylearn.sheetsolved.com/reference/tl_plot_xgboost_tree.md)
+  : Plot XGBoost tree visualization
+- [`plot_cluster_comparison()`](https://tidylearn.sheetsolved.com/reference/plot_cluster_comparison.md)
+  : Create Cluster Comparison Plot
+- [`plot_cluster_sizes()`](https://tidylearn.sheetsolved.com/reference/plot_cluster_sizes.md)
+  : Plot Cluster Size Distribution
+- [`plot_clusters()`](https://tidylearn.sheetsolved.com/reference/plot_clusters.md)
+  : Plot Clusters in 2D Space
+- [`plot_dendrogram()`](https://tidylearn.sheetsolved.com/reference/plot_dendrogram.md)
+  : Plot Dendrogram with Cluster Highlights
+- [`plot_distance_heatmap()`](https://tidylearn.sheetsolved.com/reference/plot_distance_heatmap.md)
+  : Create Distance Heatmap
+- [`plot_elbow()`](https://tidylearn.sheetsolved.com/reference/plot_elbow.md)
+  : Create Elbow Plot for K-Means
+- [`plot_gap_stat()`](https://tidylearn.sheetsolved.com/reference/plot_gap_stat.md)
+  : Plot Gap Statistic
+- [`plot_knn_dist()`](https://tidylearn.sheetsolved.com/reference/plot_knn_dist.md)
+  : Plot k-NN Distance Plot
+- [`plot_mds()`](https://tidylearn.sheetsolved.com/reference/plot_mds.md)
+  : Plot MDS Configuration
+- [`plot_silhouette()`](https://tidylearn.sheetsolved.com/reference/plot_silhouette.md)
+  : Plot Silhouette Analysis
+- [`plot_variance_explained()`](https://tidylearn.sheetsolved.com/reference/plot_variance_explained.md)
+  : Plot Variance Explained (PCA)
+- [`tl_xgboost_shap()`](https://tidylearn.sheetsolved.com/reference/tl_xgboost_shap.md)
+  : Generate SHAP values for XGBoost model interpretation
+
+## Tables
+
+Formatted gt tables for reporting.
+
+- [`tl_table()`](https://tidylearn.sheetsolved.com/reference/tl_table.md)
+  : Create formatted tables for tidylearn models
+- [`tl_table_clusters()`](https://tidylearn.sheetsolved.com/reference/tl_table_clusters.md)
+  : Formatted cluster summary table
+- [`tl_table_coefficients()`](https://tidylearn.sheetsolved.com/reference/tl_table_coefficients.md)
+  : Formatted model coefficients table
+- [`tl_table_comparison()`](https://tidylearn.sheetsolved.com/reference/tl_table_comparison.md)
+  : Compare multiple models in a formatted table
+- [`tl_table_confusion()`](https://tidylearn.sheetsolved.com/reference/tl_table_confusion.md)
+  : Formatted confusion matrix table
+- [`tl_table_importance()`](https://tidylearn.sheetsolved.com/reference/tl_table_importance.md)
+  : Formatted feature importance table
+- [`tl_table_loadings()`](https://tidylearn.sheetsolved.com/reference/tl_table_loadings.md)
+  : Formatted PCA loadings table
+- [`tl_table_metrics()`](https://tidylearn.sheetsolved.com/reference/tl_table_metrics.md)
+  : Formatted evaluation metrics table
+- [`tl_table_variance()`](https://tidylearn.sheetsolved.com/reference/tl_table_variance.md)
+  : Formatted PCA variance explained table
+
+## Compute and cloud
+
+Where the work runs, and what it is allowed to reach.
+
+- [`tl_check_gpu()`](https://tidylearn.sheetsolved.com/reference/tl_check_gpu.md)
+  : Detect local GPU availability for tidylearn methods
+- [`tl_compute_advisor()`](https://tidylearn.sheetsolved.com/reference/tl_compute_advisor.md)
+  : Advise on the best compute tier for a tidylearn fit
+- [`tl_transfer_learning()`](https://tidylearn.sheetsolved.com/reference/tl_transfer_learning.md)
+  : Transfer Learning Workflow
+
+## Utilities
+
+- [`tl_version()`](https://tidylearn.sheetsolved.com/reference/tl_version.md)
+  : Get tidylearn version information
+- [`` `%>%` ``](https://tidylearn.sheetsolved.com/reference/pipe.md) :
+  Pipe operator
+
+## Methods
+
+What [`print()`](https://rdrr.io/r/base/print.html),
+[`plot()`](https://rdrr.io/r/graphics/plot.default.html),
+[`predict()`](https://rdrr.io/r/stats/predict.html) and
+[`summary()`](https://rdrr.io/r/base/summary.html) do to each object the
+package returns.
+
+- [`plot(`*`<tidylearn_eda>`*`)`](https://tidylearn.sheetsolved.com/reference/plot.tidylearn_eda.md)
+  : Plot EDA results
+
+- [`plot(`*`<tidylearn_model>`*`)`](https://tidylearn.sheetsolved.com/reference/plot.tidylearn_model.md)
+  : Plot method for tidylearn models
+
+- [`predict(`*`<tidylearn_model>`*`)`](https://tidylearn.sheetsolved.com/reference/predict.tidylearn_model.md)
+  : Predict using a tidylearn model
+
+- [`predict(`*`<tidylearn_stratified>`*`)`](https://tidylearn.sheetsolved.com/reference/predict.tidylearn_stratified.md)
+  : Predict from stratified models
+
+- [`predict(`*`<tidylearn_transfer>`*`)`](https://tidylearn.sheetsolved.com/reference/predict.tidylearn_transfer.md)
+  : Predict with transfer learning model
+
+- [`print(`*`<tidy_apriori>`*`)`](https://tidylearn.sheetsolved.com/reference/print.tidy_apriori.md)
+  : Print Method for tidy_apriori
+
+- [`print(`*`<tidy_dbscan>`*`)`](https://tidylearn.sheetsolved.com/reference/print.tidy_dbscan.md)
+  : Print Method for tidy_dbscan
+
+- [`print(`*`<tidy_gap>`*`)`](https://tidylearn.sheetsolved.com/reference/print.tidy_gap.md)
+  : Print Method for tidy_gap
+
+- [`print(`*`<tidy_hclust>`*`)`](https://tidylearn.sheetsolved.com/reference/print.tidy_hclust.md)
+  : Print Method for tidy_hclust
+
+- [`print(`*`<tidy_kmeans>`*`)`](https://tidylearn.sheetsolved.com/reference/print.tidy_kmeans.md)
+  : Print Method for tidy_kmeans
+
+- [`print(`*`<tidy_mds>`*`)`](https://tidylearn.sheetsolved.com/reference/print.tidy_mds.md)
+  : Print Method for tidy_mds
+
+- [`print(`*`<tidy_pam>`*`)`](https://tidylearn.sheetsolved.com/reference/print.tidy_pam.md)
+  : Print Method for tidy_pam
+
+- [`print(`*`<tidy_pca>`*`)`](https://tidylearn.sheetsolved.com/reference/print.tidy_pca.md)
+  : Print Method for tidy_pca
+
+- [`print(`*`<tidy_silhouette>`*`)`](https://tidylearn.sheetsolved.com/reference/print.tidy_silhouette.md)
+  : Print Method for tidy_silhouette
+
+- [`print(`*`<tidylearn_automl>`*`)`](https://tidylearn.sheetsolved.com/reference/print.tidylearn_automl.md)
+  : Print auto ML results
+
+- [`print(`*`<tidylearn_compute_advice>`*`)`](https://tidylearn.sheetsolved.com/reference/print.tidylearn_compute_advice.md)
+  :
+
+  Print method for `tidylearn_compute_advice` objects
+
+- [`print(`*`<tidylearn_data>`*`)`](https://tidylearn.sheetsolved.com/reference/print.tidylearn_data.md)
+  : Print a tidylearn_data object
+
+- [`print(`*`<tidylearn_eda>`*`)`](https://tidylearn.sheetsolved.com/reference/print.tidylearn_eda.md)
+  : Print EDA results
+
+- [`print(`*`<tidylearn_gpu_check>`*`)`](https://tidylearn.sheetsolved.com/reference/print.tidylearn_gpu_check.md)
+  :
+
+  Print method for `tidylearn_gpu_check` objects
+
+- [`print(`*`<tidylearn_model>`*`)`](https://tidylearn.sheetsolved.com/reference/print.tidylearn_model.md)
+  : Print method for tidylearn models
+
+- [`print(`*`<tidylearn_pipeline>`*`)`](https://tidylearn.sheetsolved.com/reference/print.tidylearn_pipeline.md)
+  : Print a tidylearn pipeline
+
+- [`summary(`*`<tidylearn_model>`*`)`](https://tidylearn.sheetsolved.com/reference/summary.tidylearn_model.md)
+  : Summary method for tidylearn models
+
+- [`summary(`*`<tidylearn_pipeline>`*`)`](https://tidylearn.sheetsolved.com/reference/summary.tidylearn_pipeline.md)
+  : Summarize a tidylearn pipeline
+
+## Concepts
+
+Topic pages covering a whole area rather than a single function. Start
+here when you want the shape of something before the arguments.
+
+- [`tidylearn-classification`](https://tidylearn.sheetsolved.com/reference/tidylearn-classification.md)
+  : Classification Functions for tidylearn
+- [`tidylearn-core`](https://tidylearn.sheetsolved.com/reference/tidylearn-core.md)
+  : tidylearn: A Unified Tidy Interface to R's Machine Learning
+  Ecosystem
+- [`tidylearn-deep-learning`](https://tidylearn.sheetsolved.com/reference/tidylearn-deep-learning.md)
+  : Deep Learning for tidylearn
+- [`tidylearn-diagnostics`](https://tidylearn.sheetsolved.com/reference/tidylearn-diagnostics.md)
+  : Advanced Diagnostics Functions for tidylearn
+- [`tidylearn-interactions`](https://tidylearn.sheetsolved.com/reference/tidylearn-interactions.md)
+  : Interaction Analysis Functions for tidylearn
+- [`tidylearn-metrics`](https://tidylearn.sheetsolved.com/reference/tidylearn-metrics.md)
+  : Metrics Functionality for tidylearn
+- [`tidylearn-model-selection`](https://tidylearn.sheetsolved.com/reference/tidylearn-model-selection.md)
+  : Model Selection Functions for tidylearn
+- [`tidylearn-neural-networks`](https://tidylearn.sheetsolved.com/reference/tidylearn-neural-networks.md)
+  : Neural Networks for tidylearn
+- [`tidylearn-pipeline`](https://tidylearn.sheetsolved.com/reference/tidylearn-pipeline.md)
+  : Model Pipeline Functions for tidylearn
+- [`tidylearn-read-backends`](https://tidylearn.sheetsolved.com/reference/tidylearn-read-backends.md)
+  : Data Reading Backends for tidylearn
+- [`tidylearn-read`](https://tidylearn.sheetsolved.com/reference/tidylearn-read.md)
+  : Data Reading Functions for tidylearn
+- [`tidylearn-regression`](https://tidylearn.sheetsolved.com/reference/tidylearn-regression.md)
+  : Regression Functions for tidylearn
+- [`tidylearn-regularization`](https://tidylearn.sheetsolved.com/reference/tidylearn-regularization.md)
+  : Regularization Functions for tidylearn
+- [`tidylearn-svm`](https://tidylearn.sheetsolved.com/reference/tidylearn-svm.md)
+  : Support Vector Machines for tidylearn
+- [`tidylearn-tables`](https://tidylearn.sheetsolved.com/reference/tidylearn-tables.md)
+  : Table Functions for tidylearn
+- [`tidylearn-trees`](https://tidylearn.sheetsolved.com/reference/tidylearn-trees.md)
+  : Tree-based Methods for tidylearn
+- [`tidylearn-tuning`](https://tidylearn.sheetsolved.com/reference/tidylearn-tuning.md)
+  : Hyperparameter Tuning Functions for tidylearn
+- [`tidylearn-visualization`](https://tidylearn.sheetsolved.com/reference/tidylearn-visualization.md)
+  : Visualization Functions for tidylearn
+- [`tidylearn-workflows`](https://tidylearn.sheetsolved.com/reference/tidylearn-workflows.md)
+  : High-Level Workflows for Common Machine Learning Patterns
+- [`tidylearn-xgboost`](https://tidylearn.sheetsolved.com/reference/tidylearn-xgboost.md)
+  : XGBoost Functions for tidylearn
+
+# Articles
+
+### Start here
+
+- [Getting Started with
+  tidylearn](https://tidylearn.sheetsolved.com/articles/getting-started.md):
+- [Data Ingestion with
+  tidylearn](https://tidylearn.sheetsolved.com/articles/data-ingestion.md):
+
+### Modelling
+
+- [Supervised Learning with
+  tidylearn](https://tidylearn.sheetsolved.com/articles/supervised-learning.md):
+- [Unsupervised Learning with
+  tidylearn](https://tidylearn.sheetsolved.com/articles/unsupervised-learning.md):
+- [Market Basket
+  Analysis](https://tidylearn.sheetsolved.com/articles/market-basket.md):
+- [Tuning and
+  Pipelines](https://tidylearn.sheetsolved.com/articles/tuning-and-pipelines.md):
+- [Automated Machine Learning with
+  tidylearn](https://tidylearn.sheetsolved.com/articles/automl.md):
+
+### Checking the model
+
+- [Diagnostics](https://tidylearn.sheetsolved.com/articles/diagnostics.md):
+
+### Scaling and reporting
+
+- [Reporting with
+  tidylearn](https://tidylearn.sheetsolved.com/articles/reporting.md):
+- [Integration Workflows: Combining Supervised and Unsupervised
+  Learning](https://tidylearn.sheetsolved.com/articles/integration-workflows.md):
