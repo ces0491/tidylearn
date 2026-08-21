@@ -37,6 +37,27 @@ Development version.
   nothing, and `evaluation$best_metric` is checked against
   `evaluation$metrics`.
 
+* `tl_model(method = "nn")` failed on every two-class problem with
+  "formal argument 'entropy' matched by multiple actual arguments".
+  `nnet.formula()` supplies `entropy = TRUE` itself when the response is a
+  two-level factor, and `tl_fit_nn()` named it again, so `nnet.default()`
+  received it twice. Three or more classes were unaffected, because
+  `nnet.formula()` uses `softmax` there and `nnet.default()` sets `entropy`
+  to `FALSE` whenever `softmax` is on — so the argument it collided with was
+  never present. The criterion is now left to nnet, which picks the right one
+  from the response. Neural networks had no test coverage at all; there are
+  now four.
+
+* `tl_plot_nn_architecture()` failed on any neural network with a single
+  output unit — every regression fit, and every two-class fit once those
+  could be fitted at all. `NeuralNetTools::plotnet()` evaluates
+  `mod_in$call$formula` on that branch, and `nnet()` records its call
+  verbatim, so what it found was the symbol `formula` resolving to
+  `stats::formula`: "cannot coerce type 'closure' to vector of type
+  'character'". `tl_fit_nn()` now substitutes the formula into the recorded
+  call. Multiclass took the other branch, which is why the function's own
+  example passed.
+
 * XGBoost prediction no longer passes `ntreelimit` and `reshape` to
   `xgboost::predict()`. Both are deprecated upstream and warn that they will
   become errors; every XGBoost prediction emitted two warnings per call.
