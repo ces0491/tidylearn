@@ -253,6 +253,12 @@ tl_auto_ml <- function(data, formula, task = "auto",
             reduction_model = reduced$reduction_model,
             n_components = n_components
           )
+          # Carry the projection so predict() can apply it to raw new data
+          model$feature_transform <- list(
+            kind = "pca",
+            reduction_model = reduced$reduction_model,
+            response = response_var
+          )
           scored <- evaluate_model(
             model, reduced_data, formula_reduced, method, model_name
           )
@@ -286,6 +292,7 @@ tl_auto_ml <- function(data, formula, task = "auto",
         data, response = response_var,
         method = "kmeans", k = k
       )
+      cluster_column <- "cluster_kmeans"
 
       for (method in baseline_methods) {
         if (budget_left() < max(2, time_budget * 0.05)) break
@@ -295,6 +302,14 @@ tl_auto_ml <- function(data, formula, task = "auto",
 
         result <- safe_train(function() {
           model <- tl_model(data_clustered, formula, method = method)
+          # Carry the clustering so predict() can assign new rows to it
+          model$feature_transform <- list(
+            kind = "cluster",
+            cluster_model = attr(data_clustered, "cluster_model"),
+            column = cluster_column,
+            levels = levels(data_clustered[[cluster_column]]),
+            response = response_var
+          )
           scored <- evaluate_model(
             model, data_clustered, formula, method, model_name
           )

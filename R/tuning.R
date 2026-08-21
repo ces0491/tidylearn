@@ -800,7 +800,9 @@ tl_plot_tuning_results <- function(model,
         y = .data$value,
         group = .data$rank,
         color = .data$mean_metric,
-        size = .data$is_top,
+        # `size` on a line is deprecated since ggplot2 3.4.0 and warns
+        # the caller to file a bug against tidylearn
+        linewidth = .data$is_top,
         alpha = .data$is_top
       )
     ) +
@@ -813,7 +815,7 @@ tl_plot_tuning_results <- function(model,
           results_df$mean_metric, na.rm = TRUE
         )
       ) +
-      ggplot2::scale_size_manual(
+      ggplot2::scale_linewidth_manual(
         values = c(0.5, 1.5)
       ) +
       ggplot2::scale_alpha_manual(
@@ -831,7 +833,7 @@ tl_plot_tuning_results <- function(model,
         x = "Parameter",
         y = "Normalized Value",
         color = tuning_results$metric,
-        size = "Top Result",
+        linewidth = "Top Result",
         alpha = "Top Result"
       ) +
       ggplot2::theme_minimal() +
@@ -851,12 +853,25 @@ tl_plot_tuning_results <- function(model,
       param_names,
       function(param) {
         if (is.numeric(results_df[[param]])) {
-          # For numeric parameters, use correlation
-          cor_val <- cor(
-            results_df[[param]],
-            results_df$mean_metric,
-            use = "pairwise.complete.obs"
-          )
+          # For numeric parameters, use correlation. A parameter that took
+          # one value, or a metric that did not move across the grid, gives
+          # cor() a zero-variance input: it warns and returns NA, and the
+          # bar silently disappears from the plot. Zero variance means the
+          # parameter explained none of the score, so say that instead.
+          has_spread <- function(x) {
+            x <- x[!is.na(x)]
+            length(x) > 1L && stats::sd(x) > 0
+          }
+          cor_val <- if (has_spread(results_df[[param]]) &&
+                           has_spread(results_df$mean_metric)) {
+            cor(
+              results_df[[param]],
+              results_df$mean_metric,
+              use = "pairwise.complete.obs"
+            )
+          } else {
+            0
+          }
           data.frame(
             parameter = param,
             importance = abs(cor_val),
@@ -881,7 +896,8 @@ tl_plot_tuning_results <- function(model,
             anova_result[[1]]$"Sum Sq"
           )
           ss_param <- anova_result[[1]]$"Sum Sq"[1]
-          eta_squared <- ss_param / ss_total
+          # A constant metric makes ss_total zero and eta squared NaN
+          eta_squared <- if (isTRUE(ss_total > 0)) ss_param / ss_total else 0
 
           data.frame(
             parameter = param,
@@ -939,8 +955,11 @@ tl_plot_tuning_results <- function(model,
       ggplot2::theme_minimal()
   } else {
     stop(
-      "Invalid plot_type or insufficient ",
-      "parameters for plotting",
+      "plot_type must be one of \"scatter\", \"grid\", ",
+      "\"parallel\" or \"importance\"; got \"", plot_type, "\". ",
+      "\"scatter\" and \"grid\" additionally need two tuned ",
+      "parameters, and this search tuned ",
+      length(param_names), ".",
       call. = FALSE
     )
   }

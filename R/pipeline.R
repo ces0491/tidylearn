@@ -5,6 +5,135 @@
 #' @importFrom dplyr filter select mutate
 NULL
 
+#' Fill in and validate a pipeline evaluation specification
+#'
+#' @param evaluation A named list of evaluation settings, or NULL.
+#' @param is_classification Whether the response is categorical.
+#' @return The list, with every recognised setting present.
+#' @keywords internal
+#' @noRd
+merge_evaluation_spec <- function(evaluation, is_classification) {
+  defaults <- if (is_classification) {
+    list(
+      metrics = c("accuracy", "precision", "recall", "f1", "auc"),
+      validation = "cv",
+      cv_folds = 5,
+      train_prop = 0.7,
+      best_metric = "f1"
+    )
+  } else {
+    list(
+      metrics = c("rmse", "mae", "rsq", "mape"),
+      validation = "cv",
+      cv_folds = 5,
+      train_prop = 0.7,
+      best_metric = "rmse"
+    )
+  }
+
+  if (is.null(evaluation)) {
+    return(defaults)
+  }
+
+  if (!is.list(evaluation) ||
+        is.null(names(evaluation)) ||
+        any(names(evaluation) == "")) {
+    stop(
+      "'evaluation' must be a named list: ",
+      paste(names(defaults), collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
+  unknown <- setdiff(names(evaluation), names(defaults))
+  if (length(unknown) > 0) {
+    stop(
+      "Unknown evaluation setting(s): ",
+      paste(unknown, collapse = ", "),
+      ". Available settings: ", paste(names(defaults), collapse = ", "),
+      ".",
+      call. = FALSE
+    )
+  }
+
+  evaluation <- utils::modifyList(defaults, evaluation)
+
+  if (!evaluation$validation %in% c("cv", "split")) {
+    stop(
+      "evaluation$validation must be \"cv\" or \"split\"; got \"",
+      evaluation$validation, "\".",
+      call. = FALSE
+    )
+  }
+
+  if (!evaluation$best_metric %in% evaluation$metrics) {
+    stop(
+      "evaluation$best_metric (\"", evaluation$best_metric,
+      "\") must be one of evaluation$metrics: ",
+      paste(evaluation$metrics, collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
+  evaluation
+}
+
+#' Fill in and validate a pipeline preprocessing specification
+#'
+#' @param preprocessing A named list of preprocessing switches, or NULL.
+#' @return The list, with every recognised step present.
+#' @keywords internal
+#' @noRd
+merge_preprocessing_spec <- function(preprocessing) {
+  defaults <- list(
+    impute_missing = TRUE,
+    standardize = TRUE,
+    dummy_encode = TRUE
+  )
+
+  if (is.null(preprocessing)) {
+    return(defaults)
+  }
+
+  if (!is.list(preprocessing) ||
+        is.null(names(preprocessing)) ||
+        any(names(preprocessing) == "")) {
+    stop(
+      "'preprocessing' must be a named list of steps: ",
+      paste(names(defaults), collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
+  # An unrecognised name would otherwise be accepted and silently do
+  # nothing, which reads as a step that ran
+  unknown <- setdiff(names(preprocessing), names(defaults))
+  if (length(unknown) > 0) {
+    stop(
+      "Unknown preprocessing step(s): ",
+      paste(unknown, collapse = ", "),
+      ". Available steps: ", paste(names(defaults), collapse = ", "),
+      ".",
+      call. = FALSE
+    )
+  }
+
+  not_flag <- names(preprocessing)[
+    !vapply(preprocessing, function(x) {
+      is.logical(x) && length(x) == 1L && !is.na(x)
+    }, logical(1))
+  ]
+  if (length(not_flag) > 0) {
+    stop(
+      "Preprocessing step(s) must be TRUE or FALSE: ",
+      paste(not_flag, collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
+  utils::modifyList(defaults, preprocessing)
+}
+
 #' Create a modeling pipeline
 #'
 #' @param data A data frame containing the data
@@ -28,14 +157,11 @@ tl_pipeline <- function(data, formula,
                         preprocessing = NULL,
                         models = NULL,
                         evaluation = NULL, ...) {
-  # Create default preprocessing if not provided
-  if (is.null(preprocessing)) {
-    preprocessing <- list(
-      impute_missing = TRUE,
-      standardize = TRUE,
-      dummy_encode = TRUE
-    )
-  }
+  # Fill in whichever preprocessing steps the caller left unnamed. A
+  # partial list used to reach `if (preprocessing$standardize)` as NULL
+  # and fail with "argument is of length zero" inside tl_run_pipeline(),
+  # long after the mistake was made.
+  preprocessing <- merge_preprocessing_spec(preprocessing)
 
   # Create default models if not provided
   if (is.null(models)) {
@@ -59,29 +185,14 @@ tl_pipeline <- function(data, formula,
     }
   }
 
-  # Create default evaluation if not provided
-  if (is.null(evaluation)) {
-    # Determine if classification or regression
-    response_var <- all.vars(formula)[1]
-    y <- data[[response_var]]
-    is_classification <- is.factor(y) || is.character(y)
-
-    if (is_classification) {
-      evaluation <- list(
-        metrics = c("accuracy", "precision", "recall", "f1", "auc"),
-        validation = "cv",
-        cv_folds = 5,
-        best_metric = "f1"
-      )
-    } else {
-      evaluation <- list(
-        metrics = c("rmse", "mae", "rsq", "mape"),
-        validation = "cv",
-        cv_folds = 5,
-        best_metric = "rmse"
-      )
-    }
-  }
+  # Fill in whichever evaluation settings the caller left unnamed, for
+  # the same reason as the preprocessing spec above
+  response_var <- all.vars(formula)[1]
+  evaluation <- merge_evaluation_spec(
+    evaluation,
+    is_classification = is.factor(data[[response_var]]) ||
+      is.character(data[[response_var]])
+  )
 
   # Create pipeline object
   pipeline <- list(

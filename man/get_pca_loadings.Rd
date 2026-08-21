@@ -7,7 +7,8 @@
 get_pca_loadings(pca_obj, n_components = NULL)
 }
 \arguments{
-\item{pca_obj}{A tidy_pca object}
+\item{pca_obj}{A \code{tidy_pca} object from \code{\link{tidy_pca}}, or a
+PCA model from \code{\link{tl_model}}.}
 
 \item{n_components}{Number of components to include (default: all)}
 }

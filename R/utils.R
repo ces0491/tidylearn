@@ -172,3 +172,44 @@ tl_check_packages <- function(...) {
 
   invisible(TRUE)
 }
+
+#' Resolve a colour specification to a vector
+#'
+#' \code{color_by} is documented as a column name, but the tibbles these
+#' plots draw from carry only an id and the coordinates -- there is nowhere
+#' for a grouping variable to live. Accepting a bare vector of the right
+#' length makes the documented intent reachable, and a column name still
+#' works when the column really is present.
+#'
+#' @param color_by A column name, or a vector as long as \code{data} has rows.
+#' @param data The data frame being plotted.
+#' @param arg Argument name, used in error messages.
+#' @return A vector as long as \code{nrow(data)}, or NULL.
+#' @keywords internal
+#' @noRd
+resolve_color_by <- function(color_by, data, arg = "color_by") {
+  if (is.null(color_by)) {
+    return(NULL)
+  }
+
+  if (is.character(color_by) && length(color_by) == 1L &&
+        color_by %in% names(data)) {
+    return(data[[color_by]])
+  }
+
+  if (length(color_by) == nrow(data)) {
+    return(color_by)
+  }
+
+  stop(
+    "'", arg, "' must name a column of the data being plotted (",
+    paste(names(data), collapse = ", "),
+    ") or be a vector of length ", nrow(data),
+    "; got ", if (is.character(color_by) && length(color_by) == 1L) {
+      paste0("\"", color_by, "\"")
+    } else {
+      paste0("length ", length(color_by))
+    }, ".",
+    call. = FALSE
+  )
+}

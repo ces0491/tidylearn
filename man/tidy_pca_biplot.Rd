@@ -21,7 +21,8 @@ tidy_pca_biplot(
 
 \item{pc_y}{Principal component for y-axis (default: 2)}
 
-\item{color_by}{Optional column name to color points by}
+\item{color_by}{Optional grouping to colour points by: either a column
+name present in the PCA scores, or a vector as long as the data.}
 
 \item{arrow_scale}{Scaling factor for variable arrows (default: 1)}
 

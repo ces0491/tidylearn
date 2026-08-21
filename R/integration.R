@@ -56,6 +56,11 @@ tl_reduce_dimensions <- function(data,
   # Apply dimensionality reduction
   reduction_model <- tl_model(predictor_data, method = method, ...)
 
+  # Record the component budget on the model itself. Trimming only the
+  # returned $data leaves predict() projecting a test set onto every
+  # component, so the test matrix is wider than the model trained on $data.
+  reduction_model$spec$n_components <- n_components
+
   # Transform data
   if (method == "pca") {
     transformed <- reduction_model$fit$scores
