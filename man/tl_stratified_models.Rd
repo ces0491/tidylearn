@@ -9,7 +9,7 @@ tl_stratified_models(
   formula,
   cluster_method = "kmeans",
   k = 3,
-  supervised_method = "linear",
+  supervised_method = "tree",
   ...
 )
 }
@@ -22,7 +22,10 @@ tl_stratified_models(
 
 \item{k}{Number of clusters}
 
-\item{supervised_method}{Supervised learning method}
+\item{supervised_method}{Supervised learning method (default:
+\code{"tree"}, which handles both regression and classification).
+\code{"linear"} silently fits \code{lm()} to a factor response
+rather than refusing it, so it is not a safe default here.}
 
 \item{...}{Additional arguments}
 }

@@ -57,6 +57,9 @@ NULL
 #'   "forest" (randomForest), "boost" (gbm),
 #'   "ridge"/"lasso"/"elastic_net" (glmnet), "svm" (e1071),
 #'   "nn" (nnet), "deep" (keras), "xgboost" (xgboost).
+#'   \code{"logistic"} requires a two-level response and errors on
+#'   anything else; every other classification method handles more than
+#'   two classes.
 #'   Unsupervised: "pca" (stats::prcomp),
 #'   "mds" (stats/MASS/smacof), "kmeans" (stats::kmeans),
 #'   "pam"/"clara" (cluster), "hclust" (stats::hclust),

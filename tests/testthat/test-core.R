@@ -1,6 +1,10 @@
 test_that("tl_model creates supervised models correctly", {
-  # Test with classification
-  model <- tl_model(iris, Species ~ ., method = "logistic")
+  # Test with classification. Logistic is binary only, so this needs a
+  # two-level response -- three levels is an error at fit time.
+  # versicolor and virginica overlap. setosa is linearly separable from
+  # both, and glm() cannot converge on a perfectly separable response.
+  binary_iris <- droplevels(subset(iris, Species != "setosa"))
+  model <- tl_model(binary_iris, Species ~ ., method = "logistic")
 
   expect_s3_class(model, "tidylearn_model")
   expect_s3_class(model, "tidylearn_supervised")
@@ -38,7 +42,10 @@ test_that("tl_model validates inputs", {
 
 test_that("tl_model determines task type correctly", {
   # Classification with factor
-  model_factor <- tl_model(iris, Species ~ ., method = "logistic")
+  # versicolor and virginica overlap. setosa is linearly separable from
+  # both, and glm() cannot converge on a perfectly separable response.
+  binary_iris <- droplevels(subset(iris, Species != "setosa"))
+  model_factor <- tl_model(binary_iris, Species ~ ., method = "logistic")
   expect_true(model_factor$spec$is_classification)
 
   # Regression with numeric
@@ -47,15 +54,18 @@ test_that("tl_model determines task type correctly", {
 })
 
 test_that("predict.tidylearn_model works for supervised models", {
-  model <- tl_model(iris, Species ~ ., method = "logistic")
+  # versicolor and virginica overlap. setosa is linearly separable from
+  # both, and glm() cannot converge on a perfectly separable response.
+  binary_iris <- droplevels(subset(iris, Species != "setosa"))
+  model <- tl_model(binary_iris, Species ~ ., method = "logistic")
 
   # Predict on training data
   pred_train <- predict(model)
   expect_s3_class(pred_train, "tbl_df")
-  expect_equal(nrow(pred_train), nrow(iris))
+  expect_equal(nrow(pred_train), nrow(binary_iris))
 
   # Predict on new data
-  pred_new <- predict(model, new_data = iris[1:10, ])
+  pred_new <- predict(model, new_data = binary_iris[1:10, ])
   expect_equal(nrow(pred_new), 10)
 })
 

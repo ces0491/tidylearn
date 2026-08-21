@@ -10,7 +10,7 @@ tl_anomaly_aware(
   response,
   anomaly_method = "dbscan",
   action = "flag",
-  supervised_method = "logistic",
+  supervised_method = "tree",
   ...
 )
 }
@@ -26,7 +26,10 @@ tl_anomaly_aware(
 
 \item{action}{Action to take: "remove", "flag", "downweight"}
 
-\item{supervised_method}{Supervised learning method}
+\item{supervised_method}{Supervised learning method (default:
+\code{"tree"}, which handles both regression and classification with
+any number of classes). \code{"logistic"} is binary-only and errors
+on a response with more than two levels.}
 
 \item{...}{Additional arguments}
 }

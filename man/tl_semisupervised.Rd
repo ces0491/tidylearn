@@ -9,7 +9,7 @@ tl_semisupervised(
   formula,
   labeled_indices,
   cluster_method = "kmeans",
-  supervised_method = "logistic",
+  supervised_method = "tree",
   ...
 )
 }
@@ -22,7 +22,10 @@ tl_semisupervised(
 
 \item{cluster_method}{Clustering method for label propagation}
 
-\item{supervised_method}{Supervised learning method for final model}
+\item{supervised_method}{Supervised learning method for the final
+model (default: \code{"tree"}, which handles both regression and
+classification with any number of classes). \code{"logistic"} is
+binary-only and errors on a response with more than two levels.}
 
 \item{...}{Additional arguments}
 }

@@ -27,10 +27,59 @@ tl_fit_logistic <- function(data, formula, ...) {
     data[[response_var]] <- factor(data[[response_var]])
   }
 
+  # Reject a response glm(binomial) cannot model, here rather than at
+  # predict() or tl_evaluate(). glm() takes a three-level factor without
+  # complaint and fits the first level against the other two, so nothing
+  # upstream of prediction says the model is meaningless.
+  tl_check_binary_response(data[[response_var]], response_var)
+
   # Fit the logistic regression model
   glm_model <- stats::glm(formula, data = data, family = stats::binomial(), ...)
 
   glm_model
+}
+
+#' Refuse a response that logistic regression cannot model
+#'
+#' @param y The response, already coerced to a factor
+#' @param response_var Its name, for the message
+#' @return `TRUE`, invisibly, when the response has exactly two levels
+#' @keywords internal
+#' @noRd
+tl_check_binary_response <- function(y, response_var) {
+  class_levels <- levels(y)
+
+  if (length(class_levels) == 2) {
+    return(invisible(TRUE))
+  }
+
+  if (length(class_levels) < 2) {
+    found <- if (length(class_levels) == 0) {
+      "none"
+    } else {
+      paste0("only one ('", class_levels, "')")
+    }
+    stop(
+      "Logistic regression needs a response with two levels, but '",
+      response_var, "' has ", found,
+      ". There is nothing to discriminate.",
+      call. = FALSE
+    )
+  }
+
+  stop(
+    "Logistic regression is binary only, but '", response_var, "' has ",
+    length(class_levels), " levels (",
+    paste(class_levels, collapse = ", "), "). ",
+    "glm(family = binomial) would model '", class_levels[1],
+    "' against the rest without saying so, and the resulting model ",
+    "cannot be predicted from or evaluated. ",
+    "Refit with method = \"forest\", \"tree\", \"boost\", \"svm\", \"nn\", ",
+    "\"ridge\", \"lasso\", \"elastic_net\" or \"xgboost\", all of which ",
+    "handle more than two classes; or collapse '", response_var,
+    "' to two levels first.",
+    call. = FALSE
+  )
 }
 
 #' Predict using a logistic regression model

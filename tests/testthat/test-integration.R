@@ -65,7 +65,7 @@ test_that("tl_semisupervised performs label propagation", {
   model <- tl_semisupervised(iris, Species ~ .,
                              labeled_indices = labeled_idx,
                              cluster_method = "kmeans",
-                             supervised_method = "logistic")
+                             supervised_method = "forest")
 
   expect_s3_class(model, "tidylearn_semisupervised")
   expect_s3_class(model, "tidylearn_supervised")
@@ -87,7 +87,7 @@ test_that("tl_anomaly_aware detects and handles outliers", {
                                  response = "Species",
                                  anomaly_method = "dbscan",
                                  action = "flag",
-                                 supervised_method = "logistic")
+                                 supervised_method = "forest")
 
   expect_s3_class(model_flag, "tidylearn_anomaly_aware")
   expect_true("anomaly_info" %in% names(model_flag))
@@ -98,7 +98,7 @@ test_that("tl_anomaly_aware detects and handles outliers", {
                                    response = "Species",
                                    anomaly_method = "dbscan",
                                    action = "remove",
-                                   supervised_method = "logistic")
+                                   supervised_method = "forest")
 
   expect_s3_class(model_remove, "tidylearn_anomaly_aware")
   expect_true("anomalies_removed" %in% names(model_remove))
@@ -155,10 +155,11 @@ test_that("reduced data can be used for supervised learning", {
   reduced <- tl_reduce_dimensions(iris, response = "Species",
                                   method = "pca", n_components = 3)
 
-  # Train model on reduced data
-  model <- tl_model(reduced$data, Species ~ ., method = "logistic")
+  # Train model on reduced data. Species has three levels, so this needs
+  # a method that handles more than two classes.
+  model <- tl_model(reduced$data, Species ~ ., method = "forest")
 
-  expect_s3_class(model, "tidylearn_logistic")
+  expect_s3_class(model, "tidylearn_forest")
 
   # Can predict
   preds <- predict(model)
@@ -172,9 +173,9 @@ test_that("cluster features improve model", {
                                             method = "kmeans", k = 3)
 
   # Train model with cluster features
-  model <- tl_model(data_clustered, Species ~ ., method = "logistic")
+  model <- tl_model(data_clustered, Species ~ ., method = "forest")
 
-  expect_s3_class(model, "tidylearn_logistic")
+  expect_s3_class(model, "tidylearn_forest")
 
   # Can predict
   preds <- predict(model)

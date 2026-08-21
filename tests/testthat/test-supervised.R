@@ -11,14 +11,42 @@ test_that("linear regression models work", {
 })
 
 test_that("logistic regression models work for classification", {
-  model <- tl_model(iris, Species ~ ., method = "logistic")
+  # versicolor and virginica overlap. setosa is linearly separable from
+  # both, and glm() cannot converge on a perfectly separable response.
+  binary_iris <- droplevels(subset(iris, Species != "setosa"))
+  model <- tl_model(binary_iris, Species ~ ., method = "logistic")
 
   expect_s3_class(model, "tidylearn_logistic")
   expect_true(model$spec$is_classification)
 
   # Predictions
   preds <- predict(model)
-  expect_equal(nrow(preds), nrow(iris))
+  expect_equal(nrow(preds), nrow(binary_iris))
+})
+
+test_that("logistic regression refuses a response it cannot model", {
+  # glm(binomial) takes a three-level factor without complaint and fits
+  # the first level against the rest. The failure used to surface at
+  # predict() or tl_evaluate(), three calls after the mistake.
+  expect_error(
+    tl_model(iris, Species ~ ., method = "logistic"),
+    "binary only.*3 levels"
+  )
+
+  # The message has to name a way forward, not just refuse
+  err <- tryCatch(
+    tl_model(iris, Species ~ ., method = "logistic"),
+    error = function(e) conditionMessage(e)
+  )
+  expect_match(err, "forest")
+  expect_match(err, "xgboost")
+
+  # One level is a different problem and says so
+  one_class <- droplevels(subset(iris, Species == "setosa"))
+  expect_error(
+    tl_model(one_class, Species ~ ., method = "logistic"),
+    "only one"
+  )
 })
 
 test_that("tree models work for classification", {
@@ -125,7 +153,7 @@ test_that("supervised models handle new data correctly", {
   split <- tl_split(iris, prop = 0.7, seed = 123)
 
   # Train on training set
-  model <- tl_model(split$train, Species ~ ., method = "logistic")
+  model <- tl_model(split$train, Species ~ ., method = "forest")
 
   # Predict on test set
   preds <- predict(model, new_data = split$test)
@@ -139,11 +167,14 @@ test_that("supervised models work with formula variations", {
   expect_s3_class(model1, "tidylearn_linear")
 
   # Formula with all variables
-  model2 <- tl_model(iris, Species ~ ., method = "logistic")
+  # versicolor and virginica overlap. setosa is linearly separable from
+  # both, and glm() cannot converge on a perfectly separable response.
+  binary_iris <- droplevels(subset(iris, Species != "setosa"))
+  model2 <- tl_model(binary_iris, Species ~ ., method = "logistic")
   expect_s3_class(model2, "tidylearn_logistic")
 
   # Formula with subset of variables
-  model3 <- tl_model(iris, Species ~ Sepal.Length + Petal.Length,
+  model3 <- tl_model(binary_iris, Species ~ Sepal.Length + Petal.Length,
                      method = "logistic")
   expect_s3_class(model3, "tidylearn_logistic")
 })
