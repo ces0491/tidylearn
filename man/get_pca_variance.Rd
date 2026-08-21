@@ -7,7 +7,8 @@
 get_pca_variance(pca_obj)
 }
 \arguments{
-\item{pca_obj}{A tidy_pca object}
+\item{pca_obj}{A \code{tidy_pca} object from \code{\link{tidy_pca}},
+or a PCA model from \code{\link{tl_model}}.}
 }
 \value{
 A tibble with columns \code{component}, \code{sdev},
@@ -20,6 +21,9 @@ Get Variance Explained Summary
 \donttest{
 pca <- tidy_pca(USArrests)
 get_pca_variance(pca)
+
+# The same accessor works on a tl_model() PCA fit
+get_pca_variance(tl_model(USArrests, method = "pca"))
 }
 
 }

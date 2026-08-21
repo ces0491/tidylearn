@@ -4,65 +4,6 @@
 #'   tidylearn's ability to seamlessly combine multiple learning paradigms
 NULL
 
-#' Replay a PCA reduction on raw new data
-#'
-#' \code{tl_auto_ml()} fits some candidates on principal components
-#' rather than the original columns. Attaching the reduction to the model
-#' lets \code{predict()} rebuild those components, so a winning candidate
-#' can score raw data instead of failing on a missing \code{PC1}.
-#'
-#' @param reduction_model The fitted PCA model
-#' @param response_var Name of the response column
-#' @param n_components How many components the model was fitted on
-#' @return A function taking raw data and returning the component scores,
-#'   with the response carried through when present
-#' @keywords internal
-#' @noRd
-tl_pca_feature_transform <- function(reduction_model, response_var,
-                                     n_components) {
-  pc_cols <- paste0("PC", seq_len(n_components))
-
-  function(rows) {
-    predictors <- rows[, setdiff(names(rows), response_var), drop = FALSE]
-    scores <- predict(reduction_model, new_data = predictors)
-
-    out <- scores[, pc_cols, drop = FALSE]
-    if (response_var %in% names(rows)) {
-      out[[response_var]] <- rows[[response_var]]
-    }
-    out
-  }
-}
-
-#' Replay cluster features on raw new data
-#'
-#' @param cluster_model The fitted clustering model
-#' @param response_var Name of the response column
-#' @return A function taking raw data and returning it with the
-#'   \code{cluster_kmeans} column appended
-#' @keywords internal
-#' @noRd
-tl_cluster_feature_transform <- function(cluster_model, response_var) {
-  # Pin the levels to every centroid the model knows about. Taking them
-  # from whichever clusters happen to appear in the new rows would give a
-  # few rows a narrower factor than the model was fitted with, which
-  # randomForest rejects outright.
-  cluster_levels <- tl_cluster_levels(cluster_model)
-
-  function(rows) {
-    predictors <- rows[
-      , setdiff(names(rows), c(response_var, "cluster_kmeans")),
-      drop = FALSE
-    ]
-    assignments <- predict(cluster_model, new_data = predictors)
-
-    rows[["cluster_kmeans"]] <- factor(
-      assignments$cluster, levels = cluster_levels
-    )
-    rows
-  }
-}
-
 #' The full set of cluster labels a fitted clustering model can emit
 #'
 #' @param cluster_model A fitted tidylearn clustering model
@@ -357,9 +298,11 @@ tl_auto_ml <- function(data, formula, task = "auto",
             reduction_model = reduced$reduction_model,
             n_components = n_components
           )
-          # Replayed by predict() so the winner can score raw data
-          model$feature_transform <- tl_pca_feature_transform(
-            reduced$reduction_model, response_var, n_components
+          # Carry the projection so predict() can apply it to raw new data
+          model$feature_transform <- list(
+            kind = "pca",
+            reduction_model = reduced$reduction_model,
+            response = response_var
           )
           scored <- evaluate_model(
             model, data, formula_reduced, method, model_name,
@@ -395,6 +338,7 @@ tl_auto_ml <- function(data, formula, task = "auto",
         data, response = response_var,
         method = "kmeans", k = k
       )
+      cluster_column <- "cluster_kmeans"
 
       # Refit the centroids inside every fold, for the same reason as the
       # PCA variants above
@@ -430,9 +374,13 @@ tl_auto_ml <- function(data, formula, task = "auto",
 
         result <- safe_train(function() {
           model <- tl_model(data_clustered, formula, method = method)
-          # Replayed by predict() so the winner can score raw data
-          model$feature_transform <- tl_cluster_feature_transform(
-            attr(data_clustered, "cluster_model"), response_var
+          # Carry the clustering so predict() can assign new rows to it
+          model$feature_transform <- list(
+            kind = "cluster",
+            cluster_model = attr(data_clustered, "cluster_model"),
+            column = cluster_column,
+            levels = levels(data_clustered[[cluster_column]]),
+            response = response_var
           )
           scored <- evaluate_model(
             model, data, formula, method, model_name,

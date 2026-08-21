@@ -1,0 +1,65 @@
+# Workflow derived from https://github.com/r-lib/actions/tree/v2/examples
+# Need help debugging build failures? Start at https://github.com/r-lib/actions#where-to-find-help
+#
+# `docs/` is gitignored and built here rather than committed: it is
+# regenerated wholesale on every release, and a stale committed copy is
+# indistinguishable from a current one to anyone reading it.
+#
+# `build_site_github_pages` writes CNAME from the `url` in `_pkgdown.yml`, so
+# the custom domain survives every deploy without being restated here. One
+# definition of where the site lives.
+on:
+  push:
+    branches: [main, master]
+  # Build on pull requests too, without deploying. A dangling article name
+  # or a reference selector that matches nothing is a hard build error, and
+  # it should fail a PR check rather than the first push to main.
+  pull_request:
+    branches: [main, master]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+name: pkgdown.yaml
+
+permissions: read-all
+
+jobs:
+  pkgdown:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pkgdown-${{ github.event_name != 'pull_request' || github.run_id }}
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::pkgdown, local::.
+          needs: website
+
+      - name: Build site
+        run: pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE)
+        shell: Rscript {0}
+
+      - name: Deploy to GitHub Pages
+        if: github.event_name != 'pull_request'
+        uses: JamesIves/github-pages-deploy-action@v4.5.0
+        with:
+          # `clean: true` so a renamed or removed topic disappears from the
+          # live site. With `clean: false` gh-pages only ever grows, and a
+          # page nobody links to any more still answers its old URL.
+          # CNAME survives because build_site_github_pages() writes it into
+          # docs/ on every build, so it is part of what gets deployed.
+          clean: true
+          branch: gh-pages
+          folder: docs

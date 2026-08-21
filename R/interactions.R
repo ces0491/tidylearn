@@ -398,9 +398,17 @@ tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
 #' @param intervals Logical; whether to include confidence intervals
 #' @return For numeric \code{var}: a list with \code{effects} (data frame of
 #'   predicted values across the variable range for each level of
-#'   \code{by_var}) and \code{slopes} (data frame with estimated slopes and
-#'   standard errors per level). For categorical \code{var}: a data frame of
-#'   predicted values at each factor level for each level of \code{by_var}.
+#'   \code{by_var}) and \code{slopes} (data frame with the slope of
+#'   \code{var} at each level of \code{by_var}). For categorical
+#'   \code{var}: a data frame of predicted values at each factor level for
+#'   each level of \code{by_var}.
+#'
+#'   \code{slopes$slope_se} is the standard error of a straight line fitted
+#'   to the prediction grid, not the sampling uncertainty of the marginal
+#'   effect. For a linear model the grid is exactly linear in \code{var},
+#'   so this is near zero by construction and should not be read as a
+#'   precise estimate. Use \code{summary(model$fit)} for inference on the
+#'   interaction coefficient itself.
 #' @export
 tl_interaction_effects <- function(model, var, by_var,
                                    at_values = NULL,
@@ -532,10 +540,25 @@ tl_interaction_effects <- function(model, var, by_var,
         )
       }
 
-      # Fit linear model to get slope
+      # Fit linear model to get slope. The response here is the model's
+      # own fitted values on a regular grid, so for a linear model the
+      # points lie exactly on a line and summary.lm() warns about an
+      # "essentially perfect fit". That is expected by construction, not a
+      # problem with the data, so the warning is not passed on.
+      #
+      # Note this makes slope_se the standard error of the fit to the
+      # prediction grid, not the uncertainty in the marginal effect
+      # itself -- for a linear model it is near zero by construction.
       slope_formula <- stats::as.formula(paste("fit ~", var))
       slope_model <- lm(slope_formula, data = sub_grid)
-      slope_coef <- coef(summary(slope_model))
+      slope_coef <- withCallingHandlers(
+        coef(summary(slope_model)),
+        warning = function(w) {
+          if (grepl("perfect fit", conditionMessage(w), fixed = TRUE)) {
+            invokeRestart("muffleWarning")
+          }
+        }
+      )
 
       data.frame(
         by_value = bv,

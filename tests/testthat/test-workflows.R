@@ -199,3 +199,62 @@ test_that("tl_auto_ml handles errors gracefully", {
   # Should have trained at least one successful model
   expect_gte(length(result$models), 1)
 })
+
+test_that("every AutoML candidate can predict on raw new data", {
+  skip_on_cran()
+
+  split <- tl_split(iris, prop = 0.7, stratify = "Species", seed = 123)
+  result <- suppressMessages(
+    tl_auto_ml(split$train, Species ~ ., time_budget = 30, cv_folds = 3)
+  )
+
+  # The pca_ and clustered_ variants are fitted on columns that exist only
+  # inside the search. Without the transform they carry, predicting on raw
+  # new data fails with "object 'PC1' not found".
+  expect_true(any(grepl("^pca_", names(result$models))))
+  expect_true(any(grepl("^clustered_", names(result$models))))
+
+  for (model_name in names(result$models)) {
+    preds <- expect_no_error(
+      predict(result$models[[model_name]], new_data = split$test)
+    )
+    expect_equal(nrow(preds), nrow(split$test), info = model_name)
+    expect_true(all(preds$.pred %in% levels(iris$Species)), info = model_name)
+  }
+})
+
+test_that("the AutoML best model predicts whatever variant won", {
+  skip_on_cran()
+
+  split <- tl_split(iris, prop = 0.7, stratify = "Species", seed = 42)
+  result <- suppressMessages(
+    tl_auto_ml(split$train, Species ~ ., time_budget = 30, cv_folds = 3)
+  )
+
+  preds <- predict(result$best_model, new_data = split$test)
+  expect_equal(nrow(preds), nrow(split$test))
+  expect_false(anyNA(preds$.pred))
+})
+
+test_that("a model with no feature transform is untouched by predict", {
+  model <- tl_model(iris, Species ~ ., method = "tree")
+  expect_null(model$feature_transform)
+  expect_equal(nrow(predict(model, new_data = iris[1:10, ])), 10)
+})
+
+test_that("AutoML models predict a single row", {
+  skip_on_cran()
+
+  # The pca_ and clustered_ variants replay a transformation before
+  # dispatching, so they route through the unsupervised predict paths where
+  # a one-row frame is easiest to get wrong.
+  split <- tl_split(iris, prop = 0.7, stratify = "Species", seed = 123)
+  result <- suppressMessages(
+    tl_auto_ml(split$train, Species ~ ., time_budget = 30, cv_folds = 3)
+  )
+
+  for (model_name in names(result$models)) {
+    preds <- predict(result$models[[model_name]], new_data = split$test[1, ])
+    expect_equal(nrow(preds), 1, info = model_name)
+  }
+})

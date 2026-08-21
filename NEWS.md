@@ -1,5 +1,58 @@
 # tidylearn 0.4.0.9000
 
+Development version.
+
+## New Features
+
+### Cloud compute (security guards)
+
+* `tl_cloud_consent()` — grants or revokes permission for the rest of the
+  R session to upload training data to your Modal account. Cloud fits
+  otherwise require `confirm_upload = TRUE` on every call. The lock is
+  never written to disk and does not survive an R restart, and tidylearn
+  never prompts interactively, so scripts and CI behave the same as an
+  interactive session.
+
+* Cloud endpoints are read from the `TIDYLEARN_MODAL_ENDPOINT`
+  environment variable and validated before any request is built: the
+  scheme must be `https` and the host must be on the allowlist.
+  Lookalikes such as `modal.run.example.com` or `evil-modal.run` are
+  rejected. The endpoint is user-supplied configuration, so this check is
+  what stops a typo or a modified variable sending training data
+  somewhere other than Modal. An environment variable is used rather than
+  an R option because an option can be set silently by a shared
+  `.Rprofile`.
+
+* `tl_cloud_allow_host()` and `tl_cloud_allowed_hosts()` — the allowlist
+  defaults to Modal's own domains, and Modal customers serving Web
+  Functions from a custom domain can extend it. Extension is a
+  per-session call rather than an option or environment variable, for the
+  same reason: nothing inherited from the environment should be able to
+  add an upload destination. Added hosts must be bare host names, and a
+  single label such as `"com"` is refused because it would open an entire
+  top-level domain.
+
+  These implement T2 and T9 of
+  `system.file("security/threat-model.md", package = "tidylearn")`.
+  Submission itself is still not wired up — `compute = "cloud"` continues
+  to error.
+
+### Cloud compute (model serialisation)
+
+* Internal helpers now convert a fitted model to bytes and back for
+  transport from a remote worker. Twelve of the thirteen supervised
+  methods survive base R serialisation unchanged, xgboost included — its
+  booster is embedded in the byte stream rather than left as a dangling
+  pointer.
+
+  `method = "deep"` is the exception and is handled separately: a keras
+  model is a reference to a Python object and cannot cross a process
+  boundary that way, so its weights travel as their own hdf5 payload via
+  `keras::serialize_model()`. Detection is by the presence of a Python
+  object rather than by method name or keras class, because keras renamed
+  its classes between versions and matching those would silently stop
+  detecting models on one side of the change.
+
 ## Bug Fixes
 
 Several of these changed reported numbers. Results produced by 0.4.0 and
@@ -52,15 +105,51 @@ earlier should be recomputed.
   * Multinomial `"ridge"`/`"lasso"`/`"elastic_net"` with `type = "prob"`
     errored on single-row input.
 
-* `"xgboost"` prediction now pins the training factor levels, so new data
-  missing a level no longer changes the contrast coding, and uses
-  `iterationrange` instead of the removed `ntreelimit`/`reshape`
-  arguments.
+  The `nn` failure is worth its own note: `nnet.formula()` supplies
+  `entropy = TRUE` itself when the response is a two-level factor, and
+  `tl_fit_nn()` named it again, so `nnet.default()` received it twice and
+  reported "formal argument 'entropy' matched by multiple actual
+  arguments". Three or more classes were unaffected, because
+  `nnet.formula()` uses `softmax` there and `nnet.default()` sets
+  `entropy` to `FALSE` whenever `softmax` is on — so the argument it
+  collided with was never present. The criterion is now left to nnet.
+  Neural networks had no test coverage at all; there are now four tests
+  beyond the contract grid.
 
-* Out-of-sample PCA scores and k-means assignments matched columns by
-  position. Passing the same columns in a different order produced
-  silently wrong results; they are now matched by name, and a missing
-  variable errors.
+* `predict()` on a `tl_auto_ml()` model fitted with engineered features no
+  longer errors on raw new data. Four of the eight candidates a typical
+  search produces — the `pca_*` and `clustered_*` variants — were fitted on
+  columns that exist only inside the search, so predicting on a held-out set
+  failed with "object 'PC1' not found" or "object 'cluster_kmeans' not
+  found". Whenever one of those won the leaderboard,
+  `predict(result$best_model, new_data = ...)` was unusable. Each variant now
+  records the transformation that produced its features, and `predict()`
+  replays it — fitted on the training data — before dispatching.
+
+* `predict()` on a k-means model matched `new_data` to the cluster centres by
+  position, taking every numeric column in whatever order it arrived.
+  A mismatched width was recycled rather than rejected, producing cluster
+  numbers that looked valid and were not; a reordered frame silently measured
+  distance against the wrong centres. Columns are now matched by name, and a
+  missing or non-numeric column is an error naming the column.
+
+* `predict()` on a PCA model had the same defect and now aligns `new_data` to
+  the training predictors by name.
+
+* `tl_reduce_dimensions(n_components = k)` trimmed its returned data to `k`
+  components but left the reduction model projecting onto all of them, so
+  `predict(result$reduction_model, new_data)` returned a wider matrix than
+  the model trained on `$data` could consume. The component budget is now
+  recorded on the model and honoured by `predict()`.
+
+* XGBoost prediction pins the training factor levels, so new data missing a
+  level no longer changes the contrast coding, and no longer passes
+  `ntreelimit` or `reshape` to `xgboost::predict()`. Both are deprecated
+  upstream and warn that they will become errors; every XGBoost prediction
+  emitted two warnings per call. `tl_predict_xgboost()` gains
+  `iterationrange` and accepts `ntreelimit` with a deprecation warning that
+  translates it. Multiclass probabilities are reshaped to one named column
+  per class whichever shape the installed xgboost returns.
 
 ### Data leakage
 
@@ -81,10 +170,6 @@ earlier should be recomputed.
   Both are now refitted inside each fold, via a new `transform` argument
   to `tl_cv()`.
 
-* A winning `pca_*` or `clustered_*` model could not predict on raw data
-  at all. The transform now travels with the model and `predict()`
-  replays it.
-
 ### Ranking, splitting and tuning
 
 * `tl_auto_ml(metric = "mape")` returned the model with the **highest**
@@ -103,6 +188,13 @@ earlier should be recomputed.
   branch was unreachable and the literal `"log"` could be sampled as a
   value. `param_space` is now fully documented.
 
+* `tl_pipeline()` accepted a partial `preprocessing` or `evaluation` list and
+  then failed inside `tl_run_pipeline()` with "argument is of length zero".
+  Both specifications now fill in their defaults for anything unnamed. An
+  unrecognised name is an error rather than a step that silently does
+  nothing, and `evaluation$best_metric` is checked against
+  `evaluation$metrics`.
+
 ### Clustering, distance and plots
 
 * `tidy_dbscan()` converted a `dist` input with `as.matrix()` and passed
@@ -116,6 +208,11 @@ earlier should be recomputed.
 * `tidy_gower()` documented `weights` as a named vector but indexed it
   positionally, applying weights to the wrong variables. Named weights
   are now matched by name, and a mismatched length errors.
+
+* `tidy_mds(method = "sammon")` and `method = "kruskal"` passed MASS's
+  "zero or negative distance between objects i and j" straight through. The
+  cause is duplicated rows, which the message does not say. Both now check
+  first and name the offending pairs.
 
 * `tl_plot_cv_results()` could not plot `tl_cv()` output — it read
   `$fold_metrics` and `mean_value`, which are named `$folds` and `mean`.
@@ -132,6 +229,35 @@ earlier should be recomputed.
 * Influence plots used unnamed colour vectors, so when every point was
   influential they all rendered in the "not influential" colour.
 
+* `tl_plot_nn_architecture()` failed on any neural network with a single
+  output unit — every regression fit, and every two-class fit once those
+  could be fitted at all. `NeuralNetTools::plotnet()` evaluates
+  `mod_in$call$formula` on that branch, and `nnet()` records its call
+  verbatim, so what it found was the symbol `formula` resolving to
+  `stats::formula`: "cannot coerce type 'closure' to vector of type
+  'character'". `tl_fit_nn()` now substitutes the formula into the recorded
+  call. Multiclass took the other branch, which is why the function's own
+  example passed.
+
+* `tl_plot_tuning_results(plot_type = "parallel")` and
+  `tl_plot_regularization_path()` used the `size` aesthetic on a line, which
+  ggplot2 deprecated in 3.4.0 and which told the user to file a bug against
+  tidylearn. Both use `linewidth`.
+
+* `tidy_pca_biplot(color_by = )` and `plot_mds(color_by = )` accepted only a
+  column name, but the tibbles they draw from carry an identifier and the
+  coordinates — there is nowhere for a grouping variable to live, so the
+  documented use was unreachable. Both now also accept a vector as long as
+  the data, and a name that cannot resolve is an error rather than a plot
+  that fails when printed.
+
+* `tl_interaction_effects()` emitted "essentially perfect fit" warnings from
+  `summary.lm()`. The slope is estimated by regressing the model's own fitted
+  values on the grid, which for a linear model lie exactly on a line, so the
+  warning was expected by construction and is no longer passed on. The
+  documentation now says that `slopes$slope_se` describes the fit to the
+  prediction grid rather than the uncertainty of the marginal effect.
+
 ### Errors instead of misleading results
 
 * `tl_check_assumptions()` and `tl_influence_measures()` advertised
@@ -147,56 +273,75 @@ earlier should be recomputed.
   persisted by `saveRDS()` — into the progress message, and into the
   URL parse error. All are now redacted.
 
-## New Features
+* `tl_plot_tuning_results()` names the valid `plot_type` values in its error
+  instead of reporting "Invalid plot_type or insufficient parameters".
 
-### Cloud compute (security guards)
+* `get_pca_variance()` and `get_pca_loadings()` accept a PCA model from
+  `tl_model(method = "pca")` as well as a `tidy_pca()` object. The two
+  representations carry the same tables under different names, and the
+  accessors previously took only one of them.
 
-* `tl_cloud_consent()` — grants or revokes permission for the rest of the
-  R session to upload training data to your Modal account. Cloud fits
-  otherwise require `confirm_upload = TRUE` on every call. The lock is
-  never written to disk and does not survive an R restart, and tidylearn
-  never prompts interactively, so scripts and CI behave the same as an
-  interactive session.
+* `inst/examples/unified_workflow.R` reported "Reduced from 4 to 2 features"
+  after requesting three components, and passed `supervised_method =
+  "logistic"` on three-class iris in three places, producing convergence
+  warnings. It is now exercised by `tests/testthat/test-examples.R`, so it
+  cannot drift again unnoticed.
 
-* Cloud endpoints are read from the `TIDYLEARN_MODAL_ENDPOINT`
-  environment variable and validated before any request is built: the
-  scheme must be `https` and the host must be on the allowlist.
-  Lookalikes such as `modal.run.example.com` or `evil-modal.run` are
-  rejected. The endpoint is user-supplied configuration, so this check is
-  what stops a typo or a modified variable sending training data
-  somewhere other than Modal. An environment variable is used rather than
-  an R option because an option can be set silently by a shared
-  `.Rprofile`.
+## Documentation
 
-* `tl_cloud_allow_host()` and `tl_cloud_allowed_hosts()` — the allowlist
-  defaults to Modal's own domains, and Modal customers serving Web
-  Functions from a custom domain can extend it. Extension is a
-  per-session call rather than an option or environment variable, for the
-  same reason: nothing inherited from the environment should be able to
-  add an upload destination. Added hosts must be bare host names, and a
-  single label such as `"com"` is refused because it would open an entire
-  top-level domain.
+* New vignette `compute-backends`: how `compute = "auto"` routes a fit, what
+  the advisor estimates a cloud tier would cost, and the safety model that
+  governs data egress.
 
-  These implement T2 and T9 of
-  `system.file("security/threat-model.md", package = "tidylearn")`.
-  Submission itself is still not wired up — `compute = "cloud"` continues
-  to error.
+* New vignette `market-basket`: the association rules family
+  (`tidy_apriori()`, `inspect_rules()`, `filter_rules_by_item()`,
+  `find_related_items()`, `recommend_products()`, `summarize_rules()`,
+  `visualize_rules()`) had no narrative documentation.
 
-### Cloud compute (model serialisation)
+* New vignette `tuning-and-pipelines`: `tl_tune_grid()`, `tl_tune_random()`,
+  `tl_default_param_grid()`, `tl_plot_tuning_results()` and the
+  `tl_pipeline()` family, none of which were covered.
 
-* Internal helpers now convert a fitted model to bytes and back for
-  transport from a remote worker. Twelve of the thirteen supervised
-  methods survive base R serialisation unchanged, xgboost included — its
-  booster is embedded in the byte stream rather than left as a dangling
-  pointer.
+* New vignette `diagnostics`: `tl_check_assumptions()`,
+  `tl_influence_measures()`, `tl_detect_outliers()`,
+  `tl_diagnostic_dashboard()`, `tl_compare_cv()`,
+  `tl_test_model_difference()`, `tl_test_interactions()`,
+  `tl_interaction_effects()` and `tl_explore()`.
 
-  `method = "deep"` is the exception and is handled separately: a keras
-  model is a reference to a Python object and cannot cross a process
-  boundary that way, so its weights travel as their own hdf5 payload via
-  `keras::serialize_model()`. Detection is by the presence of a Python
-  object rather than by method name or keras class, because keras renamed
-  its classes between versions and matching those would silently stop
-  detecting models on one side of the change.
+* `unsupervised-learning` rewritten to use the package's own `tidy_*()` and
+  `augment_*()` interface. It previously reached into `model$fit$clusters`,
+  `$fit$centers`, `$fit$loadings` and `$fit$variance_explained` throughout,
+  and hand-rolled an elbow search, while `optimal_clusters()`,
+  `plot_elbow()`, `plot_silhouette()`, `suggest_eps()` and
+  `explore_dbscan_params()` went unmentioned.
+
+* `automl` now executes. Twenty-three of its twenty-five chunks were
+  `eval = FALSE`, with hand-written `#>` lines that read as console output
+  and were not. The budget-tier table of predicted model counts is replaced
+  by a sweep that measures them.
+
+* `integration-workflows` no longer emits 135 recycling warnings from the
+  PCA-then-cluster workflow, and its reported accuracy is no longer computed
+  from mis-assigned clusters.
+
+* `supervised-learning` seeds the missing-values example, which was
+  unreproducible across builds.
+
+* README links the documentation site and every article; `inst/CITATION`
+  reports the installed version and year rather than a hard-coded 2025.
+
+* `inst/security/threat-model.md` is rewritten for the architecture the
+  transport spike settled on: plain HTTPS to a Modal Web Function backed by
+  an R worker, rather than reticulate driving the Python SDK. T1 and T4
+  named constraints that no longer apply, and no threat covered a
+  user-supplied endpoint URL.
+
+## Internal
+
+* `.github/workflows/pkgdown.yaml` builds on pull requests without deploying,
+  so a dangling article name fails a PR check rather than the first push to
+  main, and deploys with `clean: true` so removed pages leave the live site.
+
 
 # tidylearn 0.4.0
 

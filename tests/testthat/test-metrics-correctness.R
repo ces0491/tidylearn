@@ -9,11 +9,13 @@
 
 # 90 negatives, 10 positives. The model calls everything positive, so
 # with "pos" as the positive class:
+# nolint start: commented_code_linter.
 #   TP = 10, FP = 90, TN = 0, FN = 0
 #   sensitivity = TP / (TP + FN) = 10/10  = 1.0
 #   specificity = TN / (TN + FP) =  0/90  = 0.0
 #   precision   = TP / (TP + FP) = 10/100 = 0.1
 #   F1          = 2PR / (P + R)           = 0.1818...
+# nolint end
 all_positive_truth <- factor(
   c(rep("neg", 90), rep("pos", 10)),
   levels = c("neg", "pos")
@@ -54,7 +56,10 @@ test_that("binary metrics agree with a hand-built confusion matrix", {
   )
   value_of <- function(name) result$value[result$metric == name]
 
-  tp <- 30; fn <- 20; tn <- 35; fp <- 15
+  tp <- 30
+  fn <- 20
+  tn <- 35
+  fp <- 15
   precision <- tp / (tp + fp)
   recall <- tp / (tp + fn)
 

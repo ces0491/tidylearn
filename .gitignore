@@ -20,3 +20,13 @@ check_output.log
 
 # Local-only planning docs (feature-scoped, not package-wide)
 SCOPE.md
+
+# pkgdown site - built by .github/workflows/pkgdown.yaml, never committed
+docs/
+
+# Editor/assistant instruction files. pkgdown renders every .md at the repo
+# root and under .github/ into the published site -- .Rbuildignore does not
+# stop it, only git does. Committing these would put them on
+# tidylearn.sheetsolved.com. Remove these lines if that is what you want.
+.github/copilot-instructions.md
+.github/instructions/

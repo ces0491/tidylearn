@@ -195,7 +195,7 @@ test_that("PCA and kmeans predict by variable name, not column order", {
 
   expect_error(
     predict(pca, new_data = iris[, 1:3]),
-    "missing variables used at fit time"
+    "new_data is missing: Petal.Width"
   )
 })
 

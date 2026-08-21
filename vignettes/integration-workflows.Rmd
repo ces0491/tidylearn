@@ -24,8 +24,8 @@ library(ggplot2)
 
 ## Introduction
 
-This vignette showcases tidylearn's capability to seamlessly integrate
-supervised and unsupervised learning in multi-step workflows.
+This vignette covers the functions that combine supervised and
+unsupervised learning into multi-step workflows.
 
 **Important:** These integration functions orchestrate the wrapped packages
 (stats, glmnet, randomForest, cluster, etc.) rather than implementing new
@@ -92,14 +92,18 @@ eval_pca <- tl_evaluate(model_pca, new_data = test_transformed)
 
 # Compare results
 acc <- function(x) round(x$value[x$metric == "accuracy"] * 100, 1)
-cat("Original features (4):", acc(eval_original), "%\n")
-cat("PCA features (3):", acc(eval_pca), "%\n")
-cat("Feature reduction:", round((1 - 3 / 4) * 100, 1), "%\n")
+n_original <- ncol(split$train) - 1
+n_reduced <- sum(grepl("^PC", names(reduced_train$data)))
+cat("Original features:", n_original, "->", acc(eval_original), "%\n")
+cat("PCA features:", n_reduced, "->", acc(eval_pca), "%\n")
+cat("Feature reduction:",
+    round((1 - n_reduced / n_original) * 100, 1), "%\n")
 ```
 
 ## Cluster-Based Feature Engineering
 
-Add cluster assignments as features to boost supervised learning performance.
+Add cluster assignments as a feature, so a model that cannot express
+group structure directly gets a column that encodes it.
 
 ### Adding Cluster Features
 
@@ -306,10 +310,11 @@ test_pca <- predict(workflow_reduced$reduction_model,
                     new_data = workflow_split$test[, -5])
 test_pca$Species <- workflow_split$test$Species
 
-# 2. Get cluster assignments
+# 2. Get cluster assignments. The cluster model was fitted on the PC
+# columns; predict() matches new_data to those columns by name and
+# errors on a mismatch rather than assigning against the wrong ones.
 cluster_model_wf <- attr(workflow_clustered, "cluster_model")
-test_clusters_wf <- predict(cluster_model_wf,
-                            new_data = test_pca[, grep("PC", names(test_pca))])
+test_clusters_wf <- predict(cluster_model_wf, new_data = test_pca)
 test_pca$cluster_kmeans <- as.factor(test_clusters_wf$cluster)
 
 # 3. Predict
@@ -369,13 +374,20 @@ accuracy_credit <- mean(preds_credit$.pred == credit_split$test$default)
 cat("Credit Risk Model Accuracy:", round(accuracy_credit * 100, 1), "%\n")
 ```
 
-## Key Advantages of Integration
+## What Each Combination Buys You
 
-1. **Better Performance**: Combining techniques often outperforms individual approaches
-2. **Feature Engineering**: Unsupervised methods create informative features
-3. **Data Efficiency**: Semi-supervised learning uses unlabeled data effectively
-4. **Robustness**: Anomaly detection improves model reliability
-5. **Interpretability**: Cluster-specific models are easier to understand
+- **Dimensionality reduction before fitting** trades some accuracy for a
+  smaller feature space. Whether the trade is worth making is empirical --
+  run the comparison above on your own data.
+- **Cluster features** give a model a handle on group structure it cannot
+  otherwise express. On data with no group structure they add noise.
+- **Semi-supervised learning** is worth reaching for when labels are
+  expensive and unlabelled observations are plentiful.
+- **Anomaly-aware modelling** decides what happens to outliers explicitly
+  rather than leaving it to the loss function.
+- **Stratified models** fit one model per cluster, which reads more easily
+  than a single model with many interaction terms, and needs enough
+  observations in every cluster to be estimable.
 
 ## Best Practices
 
@@ -387,7 +399,8 @@ cat("Credit Risk Model Accuracy:", round(accuracy_credit * 100, 1), "%\n")
 
 ## Summary
 
-tidylearn's integration functions provide powerful ways to combine supervised and unsupervised learning:
+tidylearn's integration functions combine supervised and unsupervised
+learning:
 
 - **`tl_reduce_dimensions()`**: Use PCA/MDS as preprocessing
 - **`tl_add_cluster_features()`**: Engineer features from clusters
@@ -416,6 +429,5 @@ final_clustered <- tl_add_cluster_features(final_reduced$data,
                                            k = 3)
 final_model <- tl_model(final_clustered, Species ~ ., method = "forest")
 
-cat("Final integrated model created successfully!\n")
 print(final_model)
 ```

@@ -107,9 +107,53 @@ tidy_pca <- function(data, cols = NULL, scale = TRUE,
 }
 
 
+#' Accept either PCA representation
+#'
+#' The package builds PCA two ways: \code{tidy_pca()} returns a
+#' \code{tidy_pca} list, and \code{tl_model(method = "pca")} returns a
+#' model whose \code{$fit} carries the same tables under different names.
+#' The accessors take either, so callers do not have to know which one
+#' produced the object they were handed.
+#'
+#' @param pca_obj A tidy_pca object or a tidylearn PCA model.
+#' @return A list with \code{variance}, \code{loadings} (long format)
+#'   and \code{scores}.
+#' @keywords internal
+#' @noRd
+as_pca_parts <- function(pca_obj) {
+  if (inherits(pca_obj, "tidy_pca")) {
+    return(pca_obj)
+  }
+
+  if (inherits(pca_obj, "tidylearn_pca")) {
+    fit <- pca_obj$fit
+    wide <- fit$loadings
+    long <- tidyr::pivot_longer(
+      wide,
+      cols = -"variable",
+      names_to = "component",
+      values_to = "loading"
+    )
+    return(list(
+      variance = fit$variance_explained,
+      loadings = long,
+      scores = fit$scores,
+      model = fit$model
+    ))
+  }
+
+  stop(
+    "pca_obj must come from tidy_pca() or tl_model(method = \"pca\"); ",
+    "got an object of class ",
+    paste(class(pca_obj), collapse = "/"), ".",
+    call. = FALSE
+  )
+}
+
 #' Get PCA Loadings in Wide Format
 #'
-#' @param pca_obj A tidy_pca object
+#' @param pca_obj A \code{tidy_pca} object from \code{\link{tidy_pca}}, or a
+#'   PCA model from \code{\link{tl_model}}.
 #' @param n_components Number of components to include (default: all)
 #'
 #' @return A tibble with one row per variable and one column per principal
@@ -123,10 +167,7 @@ tidy_pca <- function(data, cols = NULL, scale = TRUE,
 #'
 #' @export
 get_pca_loadings <- function(pca_obj, n_components = NULL) {
-  if (!inherits(pca_obj, "tidy_pca")) {
-    stop("pca_obj must be a tidy_pca object")
-  }
-
+  pca_obj <- as_pca_parts(pca_obj)
   loadings <- pca_obj$loadings
 
   if (!is.null(n_components)) {
@@ -145,7 +186,8 @@ get_pca_loadings <- function(pca_obj, n_components = NULL) {
 
 #' Get Variance Explained Summary
 #'
-#' @param pca_obj A tidy_pca object
+#' @param pca_obj A \code{tidy_pca} object from \code{\link{tidy_pca}},
+#'   or a PCA model from \code{\link{tl_model}}.
 #'
 #' @return A tibble with columns \code{component}, \code{sdev},
 #'   \code{variance}, \code{prop_variance}, and \code{cum_variance}.
@@ -154,14 +196,14 @@ get_pca_loadings <- function(pca_obj, n_components = NULL) {
 #' \donttest{
 #' pca <- tidy_pca(USArrests)
 #' get_pca_variance(pca)
+#'
+#' # The same accessor works on a tl_model() PCA fit
+#' get_pca_variance(tl_model(USArrests, method = "pca"))
 #' }
 #'
 #' @export
 get_pca_variance <- function(pca_obj) {
-  if (!inherits(pca_obj, "tidy_pca")) {
-    stop("pca_obj must be a tidy_pca object")
-  }
-
+  pca_obj <- as_pca_parts(pca_obj)
   pca_obj$variance
 }
 
@@ -269,7 +311,8 @@ tidy_pca_screeplot <- function(pca_obj, type = "proportion", add_line = TRUE) {
 #' @param pca_obj A tidy_pca object
 #' @param pc_x Principal component for x-axis (default: 1)
 #' @param pc_y Principal component for y-axis (default: 2)
-#' @param color_by Optional column name to color points by
+#' @param color_by Optional grouping to colour points by: either a column
+#'   name present in the PCA scores, or a vector as long as the data.
 #' @param arrow_scale Scaling factor for variable arrows (default: 1)
 #' @param label_obs Logical; label observations? (default: FALSE)
 #' @param label_vars Logical; label variables? (default: TRUE)
@@ -294,6 +337,10 @@ tidy_pca_biplot <- function(pca_obj, pc_x = 1, pc_y = 2,
 
   # Get scores
   scores <- pca_obj$scores
+  color_values <- resolve_color_by(color_by, scores)
+  if (!is.null(color_values)) {
+    scores[[".color_by"]] <- color_values
+  }
   pc_x_name <- paste0("PC", pc_x)
   pc_y_name <- paste0("PC", pc_y)
 
@@ -328,17 +375,23 @@ tidy_pca_biplot <- function(pca_obj, pc_x = 1, pc_y = 2,
   p <- ggplot2::ggplot()
 
   # Add observation points
-  if (!is.null(color_by)) {
+  if (!is.null(color_values)) {
     p <- p + ggplot2::geom_point(
       data = scores,
       ggplot2::aes(
         x = .data[[pc_x_name]],
         y = .data[[pc_y_name]],
-        color = .data[[color_by]]
+        color = .data[[".color_by"]]
       ),
       alpha = 0.7,
       size = 2
-    )
+    ) +
+      ggplot2::labs(color = if (is.character(color_by) &&
+                                  length(color_by) == 1L) {
+        color_by
+      } else {
+        NULL
+      })
   } else {
     p <- p + ggplot2::geom_point(
       data = scores,
@@ -368,7 +421,7 @@ tidy_pca_biplot <- function(pca_obj, pc_x = 1, pc_y = 2,
     data = loadings_wide,
     ggplot2::aes(x = 0, y = 0, xend = x_end, yend = y_end),
     arrow = ggplot2::arrow(length = ggplot2::unit(0.2, "cm")),
-    color = "red", size = 0.8, alpha = 0.7
+    color = "red", linewidth = 0.8, alpha = 0.7
   )
 
   # Add variable labels if requested

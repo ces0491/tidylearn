@@ -4,7 +4,14 @@
 \alias{tl_predict_xgboost}
 \title{Predict using an XGBoost model}
 \usage{
-tl_predict_xgboost(model, new_data, type = "response", ntreelimit = NULL, ...)
+tl_predict_xgboost(
+  model,
+  new_data,
+  type = "response",
+  iterationrange = NULL,
+  ntreelimit = NULL,
+  ...
+)
 }
 \arguments{
 \item{model}{A tidylearn XGBoost model object}
@@ -14,8 +21,10 @@ tl_predict_xgboost(model, new_data, type = "response", ntreelimit = NULL, ...)
 \item{type}{Type of prediction: "response" (default),
 "prob" (for classification), "class" (for classification)}
 
-\item{ntreelimit}{Limit number of trees used for prediction
-(default: NULL, uses all trees)}
+\item{iterationrange}{Boosting iterations to predict with, as
+\code{c(start, end)} (default: NULL, uses every iteration).}
+
+\item{ntreelimit}{Deprecated. Use \code{iterationrange} instead.}
 
 \item{...}{Additional arguments}
 }

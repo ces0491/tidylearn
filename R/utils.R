@@ -259,38 +259,6 @@ tl_predictor_matrix <- function(formula, new_data, xlev = NULL) {
   mm[, colnames(mm) != "(Intercept)", drop = FALSE]
 }
 
-#' Select and order columns to match a fitted model's variables
-#'
-#' Unsupervised transforms carry their variables by name (a rotation's
-#' rownames, a centroid matrix's colnames), but arithmetic against them
-#' is positional. Selecting numeric columns in whatever order new data
-#' happens to present them silently produces wrong scores, so resolve by
-#' name and fail loudly when a variable is absent.
-#'
-#' @param new_data Data to transform
-#' @param training_vars Variable names recorded at fit time
-#' @return A numeric matrix whose columns are \code{training_vars}, in
-#'   that order
-#' @keywords internal
-#' @noRd
-tl_align_training_columns <- function(new_data, training_vars) {
-  if (is.null(training_vars)) {
-    # Nothing recorded to align against (older fitted object)
-    return(as.matrix(dplyr::select(new_data, where(is.numeric))))
-  }
-
-  missing_vars <- setdiff(training_vars, names(new_data))
-  if (length(missing_vars) > 0) {
-    stop(
-      "New data is missing variables used at fit time: ",
-      paste(missing_vars, collapse = ", "),
-      call. = FALSE
-    )
-  }
-
-  as.matrix(new_data[, training_vars, drop = FALSE])
-}
-
 #' Check if required packages are installed
 #' @keywords internal
 #' @noRd
@@ -308,4 +276,45 @@ tl_check_packages <- function(...) {
   }
 
   invisible(TRUE)
+}
+
+#' Resolve a colour specification to a vector
+#'
+#' \code{color_by} is documented as a column name, but the tibbles these
+#' plots draw from carry only an id and the coordinates -- there is nowhere
+#' for a grouping variable to live. Accepting a bare vector of the right
+#' length makes the documented intent reachable, and a column name still
+#' works when the column really is present.
+#'
+#' @param color_by A column name, or a vector as long as \code{data} has rows.
+#' @param data The data frame being plotted.
+#' @param arg Argument name, used in error messages.
+#' @return A vector as long as \code{nrow(data)}, or NULL.
+#' @keywords internal
+#' @noRd
+resolve_color_by <- function(color_by, data, arg = "color_by") {
+  if (is.null(color_by)) {
+    return(NULL)
+  }
+
+  if (is.character(color_by) && length(color_by) == 1L &&
+        color_by %in% names(data)) {
+    return(data[[color_by]])
+  }
+
+  if (length(color_by) == nrow(data)) {
+    return(color_by)
+  }
+
+  stop(
+    "'", arg, "' must name a column of the data being plotted (",
+    paste(names(data), collapse = ", "),
+    ") or be a vector of length ", nrow(data),
+    "; got ", if (is.character(color_by) && length(color_by) == 1L) {
+      paste0("\"", color_by, "\"")
+    } else {
+      paste0("length ", length(color_by))
+    }, ".",
+    call. = FALSE
+  )
 }

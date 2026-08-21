@@ -45,7 +45,9 @@ test_that("worst-case cost is the timeout at the tier's rate", {
 })
 
 test_that("an unknown tier is an error, not a zero cost", {
-  expect_error(tl_cloud_worst_case_cost(600, "no-such-tier"), "Unknown Modal tier")
+  expect_error(
+    tl_cloud_worst_case_cost(600, "no-such-tier"), "Unknown Modal tier"
+  )
 })
 
 # ---- Budget gate ----

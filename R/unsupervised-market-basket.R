@@ -429,7 +429,10 @@ visualize_rules <- function(rules_obj, method = "scatter", top_n = 50, ...) {
 #' if (requireNamespace("arules", quietly = TRUE)) {
 #'   data("Groceries", package = "arules")
 #'   res <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
-#'   recommend_products(res, basket = c("whole milk", "butter"))
+#'   # The basket has to cover the whole left-hand side of a rule, so a
+#'   # basket of very common items usually matches nothing above the
+#'   # confidence floor
+#'   recommend_products(res, basket = c("flour", "baking powder"))
 #' }
 #' }
 #'

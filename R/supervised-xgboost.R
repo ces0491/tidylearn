@@ -134,35 +134,13 @@ tl_fit_xgboost <- function(data, formula, is_classification = FALSE,
   xgb_model
 }
 
-#' Predict from an xgboost booster over an optional tree range
-#'
-#' \code{ntreelimit} was renamed to \code{iterationrange} in xgboost 2.0
-#' and now warns on every call; it is scheduled to become an error.
-#' Translate here, and omit the argument entirely when no limit is asked
-#' for.
-#'
-#' @param xgb_model A fitted booster
-#' @param dtest An \code{xgb.DMatrix}
-#' @param ntreelimit Number of trees to use, or NULL for all
-#' @param ... Passed to \code{predict}
-#' @return The booster's predictions
-#' @keywords internal
-#' @noRd
-tl_xgb_predict <- function(xgb_model, dtest, ntreelimit = NULL, ...) {
-  args <- list(xgb_model, newdata = dtest, ...)
-  if (!is.null(ntreelimit)) {
-    args$iterationrange <- c(1L, as.integer(ntreelimit) + 1L)
-  }
-  do.call(stats::predict, args)
-}
-
 #' Multiclass xgboost probabilities as an n x k matrix
 #'
 #' xgboost 3.x returns a matrix directly and has dropped the
 #' \code{reshape} argument; earlier versions returned a flat row-major
 #' vector unless \code{reshape = TRUE} was passed. Normalise both.
 #'
-#' @param raw The value returned by \code{tl_xgb_predict}
+#' @param raw The value \code{predict} returned for the booster
 #' @param n_obs Number of observations predicted
 #' @param class_levels The response levels recorded at fit time
 #' @return A numeric matrix with one named column per class
@@ -188,14 +166,30 @@ tl_xgb_prob_matrix <- function(raw, n_obs, class_levels) {
 #' @param new_data A data frame containing the new data
 #' @param type Type of prediction: "response" (default),
 #'   "prob" (for classification), "class" (for classification)
-#' @param ntreelimit Limit number of trees used for prediction
-#'   (default: NULL, uses all trees)
+#' @param iterationrange Boosting iterations to predict with, as
+#'   \code{c(start, end)} (default: NULL, uses every iteration).
+#' @param ntreelimit Deprecated. Use \code{iterationrange} instead.
 #' @param ... Additional arguments
 #' @return Predictions
 #' @keywords internal
 tl_predict_xgboost <- function(model, new_data,
                                type = "response",
+                               iterationrange = NULL,
                                ntreelimit = NULL, ...) {
+  # xgboost renamed ntreelimit to iterationrange and made the old name an
+  # error-in-waiting. Translate rather than pass it through: "first k
+  # trees" is iterations 1 through k.
+  if (!is.null(ntreelimit)) {
+    warning(
+      "'ntreelimit' is deprecated; use iterationrange = c(1, ",
+      ntreelimit, ") instead.",
+      call. = FALSE
+    )
+    if (is.null(iterationrange)) {
+      iterationrange <- c(1L, as.integer(ntreelimit))
+    }
+  }
+
   # Extract XGBoost model
   xgb_model <- model$fit
 
@@ -242,7 +236,10 @@ tl_predict_xgboost <- function(model, new_data,
 
       if (n_classes == 2) {
         # Binary classification
-        prob <- tl_xgb_predict(xgb_model, dtest, ntreelimit)
+        prob <- predict(
+          xgb_model, newdata = dtest,
+          iterationrange = iterationrange
+        )
 
         # Create data frame with probabilities for both classes
         prob_df <- data.frame(
@@ -255,7 +252,10 @@ tl_predict_xgboost <- function(model, new_data,
       } else {
         # Multiclass classification
         probs <- tl_xgb_prob_matrix(
-          tl_xgb_predict(xgb_model, dtest, ntreelimit),
+          predict(
+            xgb_model, newdata = dtest,
+            iterationrange = iterationrange
+          ),
           n_obs = nrow(x_subset), class_levels = response_levels
         )
 
@@ -268,7 +268,10 @@ tl_predict_xgboost <- function(model, new_data,
 
       if (n_classes == 2) {
         # Binary classification
-        prob <- tl_xgb_predict(xgb_model, dtest, ntreelimit)
+        prob <- predict(
+          xgb_model, newdata = dtest,
+          iterationrange = iterationrange
+        )
         pred_classes <- ifelse(
           prob > 0.5,
           response_levels[2],
@@ -277,7 +280,10 @@ tl_predict_xgboost <- function(model, new_data,
       } else {
         # Multiclass classification
         probs <- tl_xgb_prob_matrix(
-          tl_xgb_predict(xgb_model, dtest, ntreelimit),
+          predict(
+            xgb_model, newdata = dtest,
+            iterationrange = iterationrange
+          ),
           n_obs = nrow(x_subset), class_levels = response_levels
         )
         pred_idx <- max.col(probs, ties.method = "first")
@@ -296,7 +302,10 @@ tl_predict_xgboost <- function(model, new_data,
     }
   } else {
     # Regression predictions
-    tl_xgb_predict(xgb_model, dtest, ntreelimit)
+    predict(
+      xgb_model, newdata = dtest,
+      iterationrange = iterationrange
+    )
   }
 }
 

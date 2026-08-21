@@ -1133,9 +1133,9 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
           progress = FALSE
         ) +
           ggplot2::scale_color_manual(
-        values = c("FALSE" = "blue", "TRUE" = "red"),
-        drop = FALSE
-      ) +
+            values = c("FALSE" = "blue", "TRUE" = "red"),
+            drop = FALSE
+          ) +
           ggplot2::labs(
             title = paste("Outlier Detection using", method_name),
             subtitle = threshold_label
@@ -1152,9 +1152,9 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
         ) +
           ggplot2::geom_point() +
           ggplot2::scale_color_manual(
-        values = c("FALSE" = "blue", "TRUE" = "red"),
-        drop = FALSE
-      ) +
+            values = c("FALSE" = "blue", "TRUE" = "red"),
+            drop = FALSE
+          ) +
           ggplot2::labs(
             title = paste("Outlier Detection using", method_name),
             subtitle = threshold_label,
@@ -1187,9 +1187,9 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
           color = "red"
         ) +
         ggplot2::scale_color_manual(
-        values = c("FALSE" = "blue", "TRUE" = "red"),
-        drop = FALSE
-      ) +
+          values = c("FALSE" = "blue", "TRUE" = "red"),
+          drop = FALSE
+        ) +
         ggplot2::labs(
           title = paste("Outlier Detection using", method_name),
           subtitle = threshold_label,
@@ -1240,9 +1240,9 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
         ) +
         ggplot2::scale_fill_manual(values = c("lightblue", "lightpink")) +
         ggplot2::scale_color_manual(
-        values = c("FALSE" = "blue", "TRUE" = "red"),
-        drop = FALSE
-      ) +
+          values = c("FALSE" = "blue", "TRUE" = "red"),
+          drop = FALSE
+        ) +
         ggplot2::labs(
           title = paste("Outlier Detection using", method_name),
           subtitle = threshold_label,

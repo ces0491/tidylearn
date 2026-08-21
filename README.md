@@ -5,6 +5,10 @@ Machine Learning for Tidynauts
 [![CRAN status](https://www.r-pkg.org/badges/version/tidylearn)](https://cran.r-project.org/package=tidylearn)
 [![R-CMD-check](https://github.com/ces0491/tidylearn/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/ces0491/tidylearn/actions/workflows/R-CMD-check.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![pkgdown](https://github.com/ces0491/tidylearn/actions/workflows/pkgdown.yaml/badge.svg)](https://tidylearn.sheetsolved.com)
+
+Full documentation, including every function reference page and all ten
+articles: **<https://tidylearn.sheetsolved.com>**
 
 ## Overview
 
@@ -18,6 +22,7 @@ implementations with the convenience of a consistent, tidy API.
 - Reads data from diverse sources (`tl_read()`) — CSV, Excel, Parquet,
   JSON, databases, S3, Kaggle, and more
 - Provides one consistent interface (`tl_model()`) to 20 ML algorithms
+  (13 supervised, 7 unsupervised)
 - Returns tidy tibbles instead of varied output formats
 - Offers unified ggplot2-based visualization and formatted `gt` tables
 - Enables pipe-friendly workflows with `%>%`
@@ -334,7 +339,7 @@ tl_dashboard(model, test_data)
 
 ## Formatted Tables
 
-The `tl_table()` family produces polished `gt` tables for reporting:
+The `tl_table()` family produces formatted `gt` tables for reporting:
 
 ```r
 # Auto-selects the best table type
@@ -365,34 +370,46 @@ tidylearn is built on these principles:
 3. **Accessibility**: Focus on your analysis, not on learning different package
    APIs.
 
-4. **Interoperability**: Results work seamlessly with dplyr, ggplot2, and the
-   broader tidyverse.
+4. **Interoperability**: Results are tibbles and ggplot2 objects, so they
+   work with dplyr and the rest of the tidyverse without conversion.
 
 ## Documentation
 
+The full site is at **<https://tidylearn.sheetsolved.com>** — every function
+reference page and every article, browsable without installing anything.
+
+From an R session:
+
 ```r
-# View package help
+# Package overview
 ?tidylearn
 
-# Explore main functions
+# Main entry points
 ?tl_read
 ?tl_model
 ?tl_evaluate
 ?tl_table
 ?tl_auto_ml
+
+# List the articles
+browseVignettes("tidylearn")
 ```
 
-### Vignettes
+### Articles
 
-- **Getting Started** — Overview of the tidylearn workflow
-- **Data Ingestion** — Reading from files, databases, and cloud sources
-- **Supervised Learning** — Classification and regression
-- **Unsupervised Learning** — PCA, clustering, and MDS
-- **Reporting** — Plots and formatted tables
-- **Integration Workflows** — Combining multiple techniques
-- **AutoML** — Automated machine learning
-- **Compute Backends** — CPU, GPU routing, cost estimates, and the cloud
-  safety model
+| Article | Covers |
+| --- | --- |
+| [Getting Started](https://tidylearn.sheetsolved.com/articles/getting-started.html) | The shape of a tidylearn workflow |
+| [Data Ingestion](https://tidylearn.sheetsolved.com/articles/data-ingestion.html) | `tl_read()` over files, databases and cloud sources |
+| [Supervised Learning](https://tidylearn.sheetsolved.com/articles/supervised-learning.html) | Classification and regression, and replaying preprocessing |
+| [Unsupervised Learning](https://tidylearn.sheetsolved.com/articles/unsupervised-learning.html) | PCA, MDS, clustering, and choosing *k* |
+| [Market Basket Analysis](https://tidylearn.sheetsolved.com/articles/market-basket.html) | Association rules with `tidy_apriori()` |
+| [Tuning and Pipelines](https://tidylearn.sheetsolved.com/articles/tuning-and-pipelines.html) | Hyperparameter search, then freezing the recipe |
+| [AutoML](https://tidylearn.sheetsolved.com/articles/automl.html) | Searching across methods under a time budget |
+| [Diagnostics](https://tidylearn.sheetsolved.com/articles/diagnostics.html) | Assumptions, influence, and comparing models |
+| [Reporting](https://tidylearn.sheetsolved.com/articles/reporting.html) | Plots and formatted `gt` tables |
+| [Integration Workflows](https://tidylearn.sheetsolved.com/articles/integration-workflows.html) | Combining supervised and unsupervised steps |
+| [Compute Backends](https://tidylearn.sheetsolved.com/articles/compute-backends.html) | CPU and GPU routing, cost estimates, and the cloud safety model |
 
 ## Contributing
 
@@ -409,8 +426,7 @@ Cesaire Tobias (<cesaire@sheetsolved.com>)
 
 ## Acknowledgments
 
-tidylearn is a wrapper that builds upon the excellent work of many R package
-authors. The actual algorithms are implemented in:
+tidylearn is a wrapper. The algorithms are implemented in:
 
 - **stats** (base R): lm, glm, prcomp, kmeans, hclust, cmdscale
 - **glmnet**: Ridge, LASSO, and elastic net regularization
@@ -426,6 +442,6 @@ authors. The actual algorithms are implemented in:
 - **smacof**: SMACOF MDS algorithm
 - **keras/tensorflow**: Deep learning (optional)
 
-Thank you to all the package maintainers whose work makes tidylearn possible.
+Thanks to their maintainers.
 
 ---

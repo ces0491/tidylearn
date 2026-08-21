@@ -1316,7 +1316,7 @@ create_cluster_dashboard <- function(data,
 
   # Combine plots
   if (length(plots) > 0) {
-  if (!requireNamespace("gridExtra", quietly = TRUE)) {
+    if (!requireNamespace("gridExtra", quietly = TRUE)) {
       stop(
         "Package 'gridExtra' is required to combine these panels. ",
         "Install it with: install.packages(\"gridExtra\")",

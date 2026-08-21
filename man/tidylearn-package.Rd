@@ -34,6 +34,7 @@ walkthrough.
 \seealso{
 Useful links:
 \itemize{
+  \item \url{https://tidylearn.sheetsolved.com}
   \item \url{https://github.com/ces0491/tidylearn}
   \item Report bugs at \url{https://github.com/ces0491/tidylearn/issues}
 }

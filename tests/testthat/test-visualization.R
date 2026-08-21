@@ -233,3 +233,47 @@ test_that("tl_dashboard returns shiny.appobj when packages available", {
 
   expect_s3_class(app, "shiny.appobj")
 })
+
+test_that("the neural network architecture plot handles one output unit", {
+  skip_if_not_installed("nnet")
+  skip_if_not_installed("NeuralNetTools")
+
+  # plotnet() reads mod_in$call$formula whenever the net has a single
+  # output unit -- every regression fit and every two-class fit. nnet()
+  # records its call verbatim, so without substituting the formula in that
+  # evaluates the symbol `formula` to stats::formula and dies with "cannot
+  # coerce type 'closure' to vector of type 'character'". Multiclass takes
+  # a different branch, which is why the one Rd example passed.
+  iris_binary <- iris[iris$Species != "setosa", ]
+  iris_binary$Species <- droplevels(iris_binary$Species)
+
+  set.seed(1)
+  binary <- tl_model(iris_binary, Species ~ ., method = "nn",
+                     size = 3, trace = FALSE)
+  expect_no_error(tl_plot_nn_architecture(binary))
+
+  set.seed(1)
+  regression <- tl_model(mtcars, mpg ~ wt + hp, method = "nn",
+                         size = 3, trace = FALSE)
+  expect_no_error(tl_plot_nn_architecture(regression))
+
+  set.seed(1)
+  multiclass <- tl_model(iris, Species ~ ., method = "nn",
+                         size = 3, trace = FALSE)
+  expect_no_error(tl_plot_nn_architecture(multiclass))
+})
+
+test_that("a fitted neural network records a usable formula", {
+  skip_if_not_installed("nnet")
+
+  # The property the plot depends on, stated directly so it is not only
+  # tested through a Suggests package.
+  model <- tl_model(mtcars, mpg ~ wt + hp, method = "nn",
+                    size = 2, trace = FALSE)
+
+  expect_s3_class(eval(model$fit$call$formula), "formula")
+  expect_equal(
+    deparse(eval(model$fit$call$formula)),
+    deparse(mpg ~ wt + hp)
+  )
+})
