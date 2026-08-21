@@ -335,6 +335,11 @@ predict.tidylearn_model <- function(object,
 
   if (training) {
     new_data <- object$data
+  } else {
+    # A model fitted on engineered features cannot read raw new data: the
+    # columns it was trained on do not exist there. Models that carry a
+    # record of how their features were built rebuild them first.
+    new_data <- apply_feature_transform(object, new_data)
   }
 
   # Route to appropriate predict method
@@ -345,6 +350,57 @@ predict.tidylearn_model <- function(object,
   } else {
     stop("Unknown model type", call. = FALSE)
   }
+}
+
+#' Rebuild engineered features on new data
+#'
+#' `tl_auto_ml()` fits some of its candidates on PCA scores or on a cluster
+#' assignment rather than on the raw columns. Those models record how their
+#' features were produced, so that predicting on raw new data reproduces the
+#' same transformation -- fitted on the training data, replayed here -- instead
+#' of failing on a column that only ever existed inside the search.
+#'
+#' @param object A tidylearn model.
+#' @param new_data Raw data supplied to `predict()`.
+#' @return `new_data`, with the engineered columns present.
+#' @keywords internal
+#' @noRd
+apply_feature_transform <- function(object, new_data) {
+  transform <- object$feature_transform
+  if (is.null(transform)) {
+    return(new_data)
+  }
+
+  response <- transform$response
+  has_response <- !is.null(response) && response %in% names(new_data)
+  response_values <- if (has_response) new_data[[response]] else NULL
+  predictors <- if (has_response) {
+    new_data[, setdiff(names(new_data), response), drop = FALSE]
+  } else {
+    new_data
+  }
+
+  out <- switch(
+    transform$kind,
+    "pca" = {
+      scores <- predict(transform$reduction_model, new_data = predictors)
+      scores[, setdiff(names(scores), ".obs_id"), drop = FALSE]
+    },
+    "cluster" = {
+      assignment <- predict(transform$cluster_model, new_data = predictors)
+      new_data[[transform$column]] <- factor(
+        assignment$cluster,
+        levels = transform$levels
+      )
+      return(new_data)
+    },
+    stop("Unknown feature transform: ", transform$kind, call. = FALSE)
+  )
+
+  if (has_response) {
+    out[[response]] <- response_values
+  }
+  out
 }
 
 #' Predict using supervised models
@@ -383,6 +439,62 @@ predict_supervised <- function(object, new_data, type = "response", ...) {
   }
 }
 
+#' Keep only the leading components a reduction was asked for
+#'
+#' `tl_reduce_dimensions(n_components = k)` trims its returned data to the
+#' first k components. The fitted model has to trim its predictions the same
+#' way, or projecting a test set yields more columns than the model that
+#' consumes them was trained on.
+#'
+#' @param x Matrix or data frame of component scores, widest first.
+#' @param n_components Number of leading components to keep, or NULL for all.
+#' @return `x`, trimmed to its first `n_components` columns.
+#' @keywords internal
+#' @noRd
+truncate_components <- function(x, n_components) {
+  if (is.null(n_components)) {
+    return(x)
+  }
+  keep <- min(as.integer(n_components), ncol(x))
+  x[, seq_len(keep), drop = FALSE]
+}
+
+#' Align new data to the columns a fitted unsupervised model was built on
+#'
+#' Selecting "every numeric column" from `new_data` silently produces a matrix
+#' of the wrong width whenever the caller passes extra columns, or the same
+#' columns in a different order. Downstream arithmetic then either recycles
+#' (k-means centres) or transposes meaning (PCA rotation) without complaint.
+#' Matching on name and erroring on a mismatch keeps that failure loud.
+#'
+#' @param new_data Data frame supplied to `predict()`.
+#' @param expected Character vector of column names the fit was built on.
+#' @param what Label used in the error message.
+#' @return A numeric matrix with columns in `expected` order.
+#' @keywords internal
+#' @noRd
+align_new_data <- function(new_data, expected, what) {
+  missing_cols <- setdiff(expected, names(new_data))
+  if (length(missing_cols) > 0) {
+    stop(
+      what, " was fitted on ", length(expected), " column(s) (",
+      paste(expected, collapse = ", "), ") but new_data is missing: ",
+      paste(missing_cols, collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+  x <- new_data[, expected, drop = FALSE]
+  non_numeric <- expected[!vapply(x, is.numeric, logical(1))]
+  if (length(non_numeric) > 0) {
+    stop(
+      what, " requires numeric columns, but new_data has non-numeric: ",
+      paste(non_numeric, collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+  as.matrix(x)
+}
+
 #' Predict using unsupervised models
 #' @keywords internal
 #' @noRd
@@ -409,10 +521,13 @@ predict_unsupervised <- function(object, new_data, type = "response",
       if (training) {
         object$fit$scores
       } else {
-        # Transform new data using the PCA rotation
-        x_mat <- new_data %>%
-          dplyr::select(where(is.numeric)) %>%
-          as.matrix()
+        # Transform new data using the PCA rotation. The rotation's row
+        # names are the training predictors, in the order prcomp() saw them.
+        x_mat <- align_new_data(
+          new_data,
+          rownames(object$fit$model$rotation),
+          "PCA"
+        )
         if (object$fit$settings$center) {
           x_mat <- scale(
             x_mat,
@@ -431,6 +546,7 @@ predict_unsupervised <- function(object, new_data, type = "response",
         colnames(scores) <- paste0(
           "PC", seq_len(ncol(scores))
         )
+        scores <- truncate_components(scores, object$spec$n_components)
         tibble::as_tibble(scores) %>%
           dplyr::mutate(
             .obs_id = as.character(seq_len(nrow(scores))),
@@ -442,15 +558,23 @@ predict_unsupervised <- function(object, new_data, type = "response",
       if (training) {
         object$fit$clusters
       } else {
-        # Assign to nearest center
-        x_mat <- new_data %>%
-          dplyr::select(where(is.numeric)) %>%
-          as.matrix()
+        # Assign to nearest center. Columns are matched to the centre
+        # matrix by name: recycling a mismatched row against a centre
+        # returns a cluster number that looks valid and is not.
         centers <- object$fit$model$centers
-        dists <- apply(x_mat, 1, function(x) {
-          apply(centers, 1, function(c) sum((x - c)^2))
-        })
-        clusters <- apply(dists, 2, which.min)
+        x_mat <- align_new_data(new_data, colnames(centers), "k-means")
+        # apply() drops to a length-k vector when x_mat has a single row,
+        # and max.col() then reads that as k rows of one column -- three
+        # cluster numbers for one observation, with no error. Pin the
+        # shape rather than trusting simplification.
+        dists <- matrix(
+          apply(centers, 1, function(centre) {
+            rowSums((x_mat - rep(centre, each = nrow(x_mat)))^2)
+          }),
+          nrow = nrow(x_mat),
+          ncol = nrow(centers)
+        )
+        clusters <- max.col(-dists, ties.method = "first")
         tibble::tibble(cluster = as.integer(clusters))
       }
     },
@@ -461,7 +585,7 @@ predict_unsupervised <- function(object, new_data, type = "response",
     },
     "mds" = {
       no_out_of_sample("Multidimensional scaling")
-      object$fit$points
+      truncate_components(object$fit$points, object$spec$n_components)
     },
     "hclust" = {
       no_out_of_sample("Hierarchical clustering")

@@ -11,7 +11,7 @@ tidy API.
 **What tidylearn does:**
 
 - Reads data from diverse sources (`tl_read()`) — files, databases, cloud, APIs
-- Provides one consistent interface (`tl_model()`) to 20+ ML algorithms
+- Provides one consistent interface (`tl_model()`) to 20 ML algorithms (13 supervised, 7 unsupervised)
 - Returns tidy tibbles instead of varied output formats
 - Offers unified ggplot2-based visualization and formatted `gt` tables
 - Enables pipe-friendly workflows with `%>%`
@@ -30,38 +30,19 @@ tidy API.
    all methods.
 3. **Accessibility**: Focus on your analysis, not on learning different package
    APIs.
-4. **Interoperability**: Results work seamlessly with dplyr, ggplot2, and the
-   broader tidyverse.
+4. **Interoperability**: Results are tibbles and ggplot2 objects, so they
+   work with dplyr and the rest of the tidyverse without conversion.
 
 ## Wrapped Packages
 
-### Supervised Learning
+The method-to-package mapping is maintained in one place, the
+[README](README.md#wrapped-packages), and repeated in
+`vignette("getting-started")`. Three copies of the same table drift; this
+document links to it rather than adding a fourth.
 
-| Method                                 | Underlying Package  | Function Called               |
-| -------------------------------------- | ------------------- | ----------------------------- |
-| `"linear"`                             | stats               | `lm()`                        |
-| `"polynomial"`                         | stats               | `lm()` with `poly()`          |
-| `"logistic"`                           | stats               | `glm(..., family = binomial)` |
-| `"ridge"`, `"lasso"`, `"elastic_net"`  | glmnet              | `glmnet()`                    |
-| `"tree"`                               | rpart               | `rpart()`                     |
-| `"forest"`                             | randomForest        | `randomForest()`              |
-| `"boost"`                              | gbm                 | `gbm()`                       |
-| `"xgboost"`                            | xgboost             | `xgb.train()`                 |
-| `"svm"`                                | e1071               | `svm()`                       |
-| `"nn"`                                 | nnet                | `nnet()`                      |
-| `"deep"`                               | keras               | `keras_model_sequential()`    |
-
-### Unsupervised Learning
-
-| Method      | Underlying Package   | Function Called                 |
-| ----------- | -------------------- | ------------------------------- |
-| `"pca"`     | stats                | `prcomp()`                      |
-| `"mds"`     | stats, MASS, smacof  | `cmdscale()`, `isoMDS()`, etc.  |
-| `"kmeans"`  | stats                | `kmeans()`                      |
-| `"pam"`     | cluster              | `pam()`                         |
-| `"clara"`   | cluster              | `clara()`                       |
-| `"hclust"`  | stats                | `hclust()`                      |
-| `"dbscan"`  | dbscan               | `dbscan()`                      |
+`tl_model()` dispatches on 20 methods: 13 supervised and 7 unsupervised. The
+authoritative list is `supervised_methods` and `unsupervised_methods` in
+`R/core.R`, which is what the error message for an unknown method prints.
 
 ## Package Structure
 
@@ -290,6 +271,6 @@ tidylearn/
 
 ## Acknowledgments
 
-tidylearn wraps the excellent work of many R package authors. The algorithms are
+tidylearn is a wrapper. The algorithms are
 implemented in stats, glmnet, randomForest, xgboost, gbm, e1071, nnet, rpart,
 cluster, dbscan, MASS, smacof, and keras/tensorflow.

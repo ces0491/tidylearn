@@ -1,14 +1,28 @@
 citHeader("To cite tidylearn in publications use:")
 
+# Version and year come from the installed package, so a citation always
+# names the release the user actually has rather than whichever one was
+# current when this file was written. `Date/Publication` is set by CRAN and
+# absent from a source install, hence the fallback.
+version <- meta$Version
+published <- meta[["Date/Publication"]]
+year <- if (!is.null(published) && nzchar(published)) {
+  substr(published, 1, 4)
+} else {
+  format(Sys.Date(), "%Y")
+}
+
 bibentry(
   bibtype  = "Manual",
   title    = "tidylearn: A Unified Tidy Interface to R's Machine Learning Ecosystem",
   author   = person("Cesaire", "Tobias"),
-  year     = "2025",
-  url      = "https://github.com/ces0491/tidylearn",
-  textVersion = paste(
-    "Tobias, C. (2025).",
-    "tidylearn: A Unified Tidy Interface to R's Machine Learning Ecosystem.",
-    "https://github.com/ces0491/tidylearn"
+  year     = year,
+  note     = paste("R package version", version),
+  url      = "https://tidylearn.sheetsolved.com",
+  textVersion = paste0(
+    "Tobias, C. (", year, "). ",
+    "tidylearn: A Unified Tidy Interface to R's Machine Learning Ecosystem. ",
+    "R package version ", version, ". ",
+    "https://tidylearn.sheetsolved.com"
   )
 )

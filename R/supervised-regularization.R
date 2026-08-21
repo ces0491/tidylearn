@@ -278,7 +278,8 @@ tl_plot_regularization_path <- function(model,
     )
   ) +
     ggplot2::geom_line(
-      ggplot2::aes(alpha = is_top, size = is_top)
+      # `size` on a line is deprecated since ggplot2 3.4.0
+      ggplot2::aes(alpha = is_top, linewidth = is_top)
     ) +
     ggplot2::geom_vline(
       xintercept = lambda_min,
@@ -294,7 +295,7 @@ tl_plot_regularization_path <- function(model,
     ggplot2::scale_alpha_manual(
       values = c(0.3, 1)
     ) +
-    ggplot2::scale_size_manual(
+    ggplot2::scale_linewidth_manual(
       values = c(0.5, 1.2)
     ) +
     ggplot2::scale_color_manual(

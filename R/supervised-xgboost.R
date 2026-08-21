@@ -140,14 +140,30 @@ tl_fit_xgboost <- function(data, formula, is_classification = FALSE,
 #' @param new_data A data frame containing the new data
 #' @param type Type of prediction: "response" (default),
 #'   "prob" (for classification), "class" (for classification)
-#' @param ntreelimit Limit number of trees used for prediction
-#'   (default: NULL, uses all trees)
+#' @param iterationrange Boosting iterations to predict with, as
+#'   \code{c(start, end)} (default: NULL, uses every iteration).
+#' @param ntreelimit Deprecated. Use \code{iterationrange} instead.
 #' @param ... Additional arguments
 #' @return Predictions
 #' @keywords internal
 tl_predict_xgboost <- function(model, new_data,
                                type = "response",
+                               iterationrange = NULL,
                                ntreelimit = NULL, ...) {
+  # xgboost renamed ntreelimit to iterationrange and made the old name an
+  # error-in-waiting. Translate rather than pass it through: "first k
+  # trees" is iterations 1 through k.
+  if (!is.null(ntreelimit)) {
+    warning(
+      "'ntreelimit' is deprecated; use iterationrange = c(1, ",
+      ntreelimit, ") instead.",
+      call. = FALSE
+    )
+    if (is.null(iterationrange)) {
+      iterationrange <- c(1L, as.integer(ntreelimit))
+    }
+  }
+
   # Extract XGBoost model
   xgb_model <- model$fit
 
@@ -183,7 +199,7 @@ tl_predict_xgboost <- function(model, new_data,
         # Binary classification
         prob <- predict(
           xgb_model, newdata = dtest,
-          ntreelimit = ntreelimit
+          iterationrange = iterationrange
         )
 
         # Create data frame with probabilities for both classes
@@ -198,8 +214,7 @@ tl_predict_xgboost <- function(model, new_data,
         # Multiclass classification
         probs <- predict(
           xgb_model, newdata = dtest,
-          ntreelimit = ntreelimit,
-          reshape = TRUE
+          iterationrange = iterationrange
         )
         colnames(probs) <- response_levels
 
@@ -214,7 +229,7 @@ tl_predict_xgboost <- function(model, new_data,
         # Binary classification
         prob <- predict(
           xgb_model, newdata = dtest,
-          ntreelimit = ntreelimit
+          iterationrange = iterationrange
         )
         pred_classes <- ifelse(
           prob > 0.5,
@@ -225,8 +240,7 @@ tl_predict_xgboost <- function(model, new_data,
         # Multiclass classification
         probs <- predict(
           xgb_model, newdata = dtest,
-          ntreelimit = ntreelimit,
-          reshape = TRUE
+          iterationrange = iterationrange
         )
         pred_idx <- max.col(probs)
         pred_classes <- response_levels[pred_idx]
@@ -246,7 +260,7 @@ tl_predict_xgboost <- function(model, new_data,
     # Regression predictions
     predict(
       xgb_model, newdata = dtest,
-      ntreelimit = ntreelimit
+      iterationrange = iterationrange
     )
   }
 }

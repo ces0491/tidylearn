@@ -35,7 +35,16 @@ tl_fit_nn <- function(data, formula, is_classification = FALSE,
       data[[response_var]] <- factor(data[[response_var]])
     }
 
-    # Fit classification neural network
+    # Fit classification neural network.
+    #
+    # The error criterion is deliberately left to nnet. nnet.formula()
+    # already chooses it from the response: cross-entropy for a two-level
+    # factor, softmax for three or more. Naming entropy = TRUE here reached
+    # nnet.default() through `...` alongside the one nnet.formula() supplies
+    # itself, and a two-class fit died with "formal argument 'entropy'
+    # matched by multiple actual arguments". Multiclass survived only
+    # because nnet.default() sets entropy <- FALSE whenever softmax is on,
+    # so the argument it collided with was never there.
     nn_model <- nnet::nnet(
       formula = formula,
       data = data,
@@ -43,8 +52,6 @@ tl_fit_nn <- function(data, formula, is_classification = FALSE,
       decay = decay,
       maxit = maxit,
       trace = trace,
-      # For classification
-      entropy = TRUE,  # Use cross-entropy error function
       ...
     )
   } else {
@@ -60,6 +67,16 @@ tl_fit_nn <- function(data, formula, is_classification = FALSE,
       ...
     )
   }
+
+  # nnet() records its call verbatim, so the stored call reads
+  # `nnet(formula = formula, ...)` -- the symbol, not the formula. Anything
+  # that later evaluates `mod_in$call$formula` outside this function gets
+  # stats::formula, the function. NeuralNetTools::plotnet() does exactly
+  # that for any net with a single output unit, which is every regression
+  # fit and every two-class fit, and fails with "cannot coerce type
+  # 'closure' to vector of type 'character'". Substituting the formula into
+  # the recorded call makes it mean what it says.
+  nn_model$call$formula <- formula
 
   nn_model
 }

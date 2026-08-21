@@ -25,7 +25,7 @@ implementations with the convenience of a consistent, tidy API.
 
 **What tidylearn does:**
 
-- Provides one consistent interface (`tl_model()`) to 20+ ML algorithms
+- Provides one consistent interface (`tl_model()`) to 20 ML algorithms
 - Returns tidy tibbles instead of varied output formats
 - Offers unified ggplot2-based visualization across all methods
 - Enables pipe-friendly workflows
@@ -39,11 +39,10 @@ implementations with the convenience of a consistent, tidy API.
 ## Installation
 
 ```{r, eval = FALSE}
-# Install from CRAN
+# From CRAN
 install.packages("tidylearn")
 
-# Or install development version from GitHub
-# Install the development version from GitHub:
+# Development version
 # devtools::install_github("ces0491/tidylearn") # nolint
 ```
 
@@ -154,7 +153,8 @@ table(clusters$cluster, iris$Species)
 
 ## Data Preprocessing
 
-tidylearn provides comprehensive preprocessing functions:
+`tl_prepare_data()` handles imputation, scaling and encoding in one call, and
+records what it did so the same transformation can be replayed on new data:
 
 ```{r}
 # Prepare data with multiple preprocessing steps
@@ -248,12 +248,20 @@ class(model_forest$fit)  # This is the randomForest object
 
 ## Next Steps
 
-Now that you understand the basics, explore:
-
-1. **Supervised Learning** - Dive deeper into classification and regression
-2. **Unsupervised Learning** - Explore clustering and dimensionality reduction
-3. **Integration Workflows** - Combine supervised and unsupervised learning
-4. **AutoML** - Automated machine learning with `tl_auto_ml()`
+- `vignette("data-ingestion")` — reading from files, databases and cloud
+  sources
+- `vignette("supervised-learning")` — classification and regression in depth,
+  and how to replay preprocessing on a test set
+- `vignette("unsupervised-learning")` — clustering, ordination, and choosing
+  the number of clusters
+- `vignette("market-basket")` — association rules
+- `vignette("tuning-and-pipelines")` — hyperparameter search, and bundling a
+  workflow you can save
+- `vignette("automl")` — searching across methods under a time budget
+- `vignette("diagnostics")` — assumptions, influence and model comparison
+- `vignette("reporting")` — plots and formatted `gt` tables
+- `vignette("integration-workflows")` — combining supervised and unsupervised
+  steps
 
 ## Summary
 

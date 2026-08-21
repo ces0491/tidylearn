@@ -9,7 +9,9 @@ plot_mds(mds_obj, color_by = NULL, label_points = TRUE, dim_x = 1, dim_y = 2)
 \arguments{
 \item{mds_obj}{A tidy_mds object}
 
-\item{color_by}{Optional variable to color points by}
+\item{color_by}{Optional grouping to colour points by: either a column
+name present in the MDS configuration, or a vector as long as the
+data.}
 
 \item{label_points}{Logical; add point labels? (default: TRUE)}
 

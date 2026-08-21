@@ -36,6 +36,31 @@ tidy_mds <- function(data, method = "classical",
     dist_mat <- stats::dist(data_matrix, method = distance)
   }
 
+  # sammon() and isoMDS() divide by the observed distances, so a pair of
+  # identical rows stops them with "zero or negative distance between
+  # objects i and j" -- a message that names the pair but not the cause.
+  # Classical MDS and smacof are unaffected.
+  if (method %in% c("sammon", "kruskal")) {
+    zero_pairs <- which(as.matrix(dist_mat) == 0, arr.ind = TRUE)
+    zero_pairs <- zero_pairs[zero_pairs[, 1] < zero_pairs[, 2], , drop = FALSE]
+    if (nrow(zero_pairs) > 0) {
+      shown <- utils::head(seq_len(nrow(zero_pairs)), 3)
+      stop(
+        "method = \"", method, "\" needs every pairwise distance to be ",
+        "positive, but ", nrow(zero_pairs),
+        " pair(s) of observations are identical: ",
+        paste(
+          sprintf("%d and %d", zero_pairs[shown, 1], zero_pairs[shown, 2]),
+          collapse = "; "
+        ),
+        if (nrow(zero_pairs) > length(shown)) ", ..." else "",
+        ". Drop the duplicates, or use method = \"classical\", ",
+        "\"metric\" or \"nonmetric\", which tolerate them.",
+        call. = FALSE
+      )
+    }
+  }
+
   # Call appropriate MDS method
   result <- switch(method,
     classical = tidy_mds_classical(dist_mat, ndim = ndim, ...),
@@ -292,7 +317,9 @@ tidy_mds_kruskal <- function(dist_mat, ndim = 2, ...) {
 #' Visualize MDS results
 #'
 #' @param mds_obj A tidy_mds object
-#' @param color_by Optional variable to color points by
+#' @param color_by Optional grouping to colour points by: either a column
+#'   name present in the MDS configuration, or a vector as long as the
+#'   data.
 #' @param label_points Logical; add point labels? (default: TRUE)
 #' @param dim_x Which dimension for x-axis (default: 1)
 #' @param dim_y Which dimension for y-axis (default: 2)
@@ -317,6 +344,11 @@ plot_mds <- function(mds_obj, color_by = NULL, label_points = TRUE,
   dim_x_name <- paste0("Dim", dim_x)
   dim_y_name <- paste0("Dim", dim_y)
 
+  color_values <- resolve_color_by(color_by, config)
+  if (!is.null(color_values)) {
+    config[[".color_by"]] <- color_values
+  }
+
   # Base plot
   p <- ggplot2::ggplot(
     config,
@@ -324,11 +356,17 @@ plot_mds <- function(mds_obj, color_by = NULL, label_points = TRUE,
   )
 
   # Add points
-  if (!is.null(color_by)) {
+  if (!is.null(color_values)) {
     p <- p + ggplot2::geom_point(
-      ggplot2::aes(color = .data[[color_by]]),
+      ggplot2::aes(color = .data[[".color_by"]]),
       size = 3, alpha = 0.7
-    )
+    ) +
+      ggplot2::labs(color = if (is.character(color_by) &&
+                                  length(color_by) == 1L) {
+        color_by
+      } else {
+        NULL
+      })
   } else {
     p <- p + ggplot2::geom_point(size = 3, alpha = 0.7, color = "steelblue")
   }

@@ -1,3 +1,157 @@
+# tidylearn 0.4.0.9000
+
+Development version.
+
+## Bug Fixes
+
+* `predict()` on a `tl_auto_ml()` model fitted with engineered features no
+  longer errors on raw new data. Four of the eight candidates a typical
+  search produces — the `pca_*` and `clustered_*` variants — were fitted on
+  columns that exist only inside the search, so predicting on a held-out set
+  failed with "object 'PC1' not found" or "object 'cluster_kmeans' not
+  found". Whenever one of those won the leaderboard,
+  `predict(result$best_model, new_data = ...)` was unusable. Each variant now
+  records the transformation that produced its features, and `predict()`
+  replays it — fitted on the training data — before dispatching.
+
+* `predict()` on a k-means model matched `new_data` to the cluster centres by
+  position, taking every numeric column in whatever order it arrived.
+  A mismatched width was recycled rather than rejected, producing cluster
+  numbers that looked valid and were not; a reordered frame silently measured
+  distance against the wrong centres. Columns are now matched by name, and a
+  missing or non-numeric column is an error naming the column.
+
+* `predict()` on a PCA model had the same defect and now aligns `new_data` to
+  the training predictors by name.
+
+* `tl_reduce_dimensions(n_components = k)` trimmed its returned data to `k`
+  components but left the reduction model projecting onto all of them, so
+  `predict(result$reduction_model, new_data)` returned a wider matrix than
+  the model trained on `$data` could consume. The component budget is now
+  recorded on the model and honoured by `predict()`.
+
+* `tl_pipeline()` accepted a partial `preprocessing` or `evaluation` list and
+  then failed inside `tl_run_pipeline()` with "argument is of length zero".
+  Both specifications now fill in their defaults for anything unnamed. An
+  unrecognised name is an error rather than a step that silently does
+  nothing, and `evaluation$best_metric` is checked against
+  `evaluation$metrics`.
+
+* `tl_model(method = "nn")` failed on every two-class problem with
+  "formal argument 'entropy' matched by multiple actual arguments".
+  `nnet.formula()` supplies `entropy = TRUE` itself when the response is a
+  two-level factor, and `tl_fit_nn()` named it again, so `nnet.default()`
+  received it twice. Three or more classes were unaffected, because
+  `nnet.formula()` uses `softmax` there and `nnet.default()` sets `entropy`
+  to `FALSE` whenever `softmax` is on — so the argument it collided with was
+  never present. The criterion is now left to nnet, which picks the right one
+  from the response. Neural networks had no test coverage at all; there are
+  now four.
+
+* `tl_plot_nn_architecture()` failed on any neural network with a single
+  output unit — every regression fit, and every two-class fit once those
+  could be fitted at all. `NeuralNetTools::plotnet()` evaluates
+  `mod_in$call$formula` on that branch, and `nnet()` records its call
+  verbatim, so what it found was the symbol `formula` resolving to
+  `stats::formula`: "cannot coerce type 'closure' to vector of type
+  'character'". `tl_fit_nn()` now substitutes the formula into the recorded
+  call. Multiclass took the other branch, which is why the function's own
+  example passed.
+
+* XGBoost prediction no longer passes `ntreelimit` and `reshape` to
+  `xgboost::predict()`. Both are deprecated upstream and warn that they will
+  become errors; every XGBoost prediction emitted two warnings per call.
+  `tl_predict_xgboost()` gains `iterationrange` and accepts `ntreelimit` with
+  a deprecation warning that translates it.
+
+* `tl_plot_tuning_results(plot_type = "parallel")` and
+  `tl_plot_regularization_path()` used the `size` aesthetic on a line, which
+  ggplot2 deprecated in 3.4.0 and which told the user to file a bug against
+  tidylearn. Both use `linewidth`.
+
+* `tidy_pca_biplot(color_by = )` and `plot_mds(color_by = )` accepted only a
+  column name, but the tibbles they draw from carry an identifier and the
+  coordinates — there is nowhere for a grouping variable to live, so the
+  documented use was unreachable. Both now also accept a vector as long as
+  the data, and a name that cannot resolve is an error rather than a plot
+  that fails when printed.
+
+* `tidy_mds(method = "sammon")` and `method = "kruskal"` passed MASS's
+  "zero or negative distance between objects i and j" straight through. The
+  cause is duplicated rows, which the message does not say. Both now check
+  first and name the offending pairs.
+
+* `tl_interaction_effects()` emitted "essentially perfect fit" warnings from
+  `summary.lm()`. The slope is estimated by regressing the model's own fitted
+  values on the grid, which for a linear model lie exactly on a line, so the
+  warning was expected by construction and is no longer passed on. The
+  documentation now says that `slopes$slope_se` describes the fit to the
+  prediction grid rather than the uncertainty of the marginal effect.
+
+* `tl_plot_tuning_results()` named the valid `plot_type` values in its error
+  instead of reporting "Invalid plot_type or insufficient parameters".
+
+* `get_pca_variance()` and `get_pca_loadings()` accept a PCA model from
+  `tl_model(method = "pca")` as well as a `tidy_pca()` object. The two
+  representations carry the same tables under different names, and the
+  accessors previously took only one of them.
+
+* `inst/examples/unified_workflow.R` reported "Reduced from 4 to 2 features"
+  after requesting three components, and passed `supervised_method =
+  "logistic"` on three-class iris in three places, producing convergence
+  warnings. It is now exercised by `tests/testthat/test-examples.R`, so it
+  cannot drift again unnoticed.
+
+## Documentation
+
+* New vignette `market-basket`: the association rules family
+  (`tidy_apriori()`, `inspect_rules()`, `filter_rules_by_item()`,
+  `find_related_items()`, `recommend_products()`, `summarize_rules()`,
+  `visualize_rules()`) had no narrative documentation.
+
+* New vignette `tuning-and-pipelines`: `tl_tune_grid()`, `tl_tune_random()`,
+  `tl_default_param_grid()`, `tl_plot_tuning_results()` and the
+  `tl_pipeline()` family, none of which were covered.
+
+* New vignette `diagnostics`: `tl_check_assumptions()`,
+  `tl_influence_measures()`, `tl_detect_outliers()`,
+  `tl_diagnostic_dashboard()`, `tl_compare_cv()`,
+  `tl_test_model_difference()`, `tl_test_interactions()`,
+  `tl_interaction_effects()` and `tl_explore()`.
+
+* `unsupervised-learning` rewritten to use the package's own `tidy_*()` and
+  `augment_*()` interface. It previously reached into `model$fit$clusters`,
+  `$fit$centers`, `$fit$loadings` and `$fit$variance_explained` throughout,
+  and hand-rolled an elbow search, while `optimal_clusters()`,
+  `plot_elbow()`, `plot_silhouette()`, `suggest_eps()` and
+  `explore_dbscan_params()` went unmentioned.
+
+* `automl` now executes. Twenty-three of its twenty-five chunks were
+  `eval = FALSE`, with hand-written `#>` lines that read as console output
+  and were not. The budget-tier table of predicted model counts is replaced
+  by a sweep that measures them.
+
+* `integration-workflows` no longer emits 135 recycling warnings from the
+  PCA-then-cluster workflow, and its reported accuracy is no longer computed
+  from mis-assigned clusters.
+
+* `supervised-learning` seeds the missing-values example, which was
+  unreproducible across builds.
+
+* README links the documentation site and every article; `inst/CITATION`
+  reports the installed version and year rather than a hard-coded 2025.
+
+## Internal
+
+* `.github/workflows/pkgdown.yaml` builds on pull requests without deploying,
+  so a dangling article name fails a PR check rather than the first push to
+  main, and deploys with `clean: true` so removed pages leave the live site.
+
+* `_pkgdown.yml` no longer references the `compute-backends` article or the
+  `tl_cloud` topics, which live on an unmerged branch. The article reference
+  was a hard build failure: pkgdown evaluates an unmatched article name as R
+  code.
+
 # tidylearn 0.4.0
 
 ## New Features
