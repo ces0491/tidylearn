@@ -8,7 +8,7 @@ tl_transfer_learning(
   data,
   formula,
   pretrain_method = "pca",
-  supervised_method = "logistic",
+  supervised_method = "tree",
   ...
 )
 }
@@ -19,7 +19,10 @@ tl_transfer_learning(
 
 \item{pretrain_method}{Pre-training method: "pca", "autoencoder"}
 
-\item{supervised_method}{Supervised learning method}
+\item{supervised_method}{Supervised learning method (default:
+\code{"tree"}, which handles both regression and classification with
+any number of classes). \code{"logistic"} is binary-only and errors
+on a response with more than two levels.}
 
 \item{...}{Additional arguments}
 }
@@ -39,6 +42,6 @@ features) before supervised learning
 \examples{
 \donttest{
 model <- tl_transfer_learning(iris, Species ~ .,
-  pretrain_method = "pca", supervised_method = "logistic")
+  pretrain_method = "pca", supervised_method = "tree")
 }
 }

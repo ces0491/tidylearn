@@ -23,7 +23,7 @@ Predict with transfer learning model
 \examples{
 \donttest{
 model <- tl_transfer_learning(iris, Species ~ .,
-  pretrain_method = "pca", supervised_method = "logistic")
+  pretrain_method = "pca", supervised_method = "tree")
 preds <- predict(model, iris[1:5, ])
 }
 }

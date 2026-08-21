@@ -795,7 +795,10 @@ tl_optimal_clusters <- function(data, k_range = 2:6, method = "silhouette") {
 #' @param data Training data
 #' @param formula Model formula
 #' @param pretrain_method Pre-training method: "pca", "autoencoder"
-#' @param supervised_method Supervised learning method
+#' @param supervised_method Supervised learning method (default:
+#'   \code{"tree"}, which handles both regression and classification with
+#'   any number of classes). \code{"logistic"} is binary-only and errors
+#'   on a response with more than two levels.
 #' @param ... Additional arguments
 #' @return A list with class \code{"tidylearn_transfer"} containing:
 #'   \describe{
@@ -808,10 +811,10 @@ tl_optimal_clusters <- function(data, k_range = 2:6, method = "silhouette") {
 #' @examples
 #' \donttest{
 #' model <- tl_transfer_learning(iris, Species ~ .,
-#'   pretrain_method = "pca", supervised_method = "logistic")
+#'   pretrain_method = "pca", supervised_method = "tree")
 #' }
 tl_transfer_learning <- function(data, formula, pretrain_method = "pca",
-                                 supervised_method = "logistic", ...) {
+                                 supervised_method = "tree", ...) {
   message("Transfer Learning Workflow")
   message("==========================")
 
@@ -861,7 +864,7 @@ tl_transfer_learning <- function(data, formula, pretrain_method = "pca",
 #' @examples
 #' \donttest{
 #' model <- tl_transfer_learning(iris, Species ~ .,
-#'   pretrain_method = "pca", supervised_method = "logistic")
+#'   pretrain_method = "pca", supervised_method = "tree")
 #' preds <- predict(model, iris[1:5, ])
 #' }
 #' @export

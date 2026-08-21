@@ -171,11 +171,16 @@ tl_pipeline <- function(data, formula,
     is_classification <- is.factor(y) || is.character(y)
 
     if (is_classification) {
+      # Logistic is binary-only and errors on a three-level response, so
+      # offering it as a default candidate would fail the whole pipeline
+      # rather than the one model. Same guard as tl_auto_ml().
       models <- list(
-        logistic = list(method = "logistic"),
         tree = list(method = "tree"),
         forest = list(method = "forest", ntree = 500)
       )
+      if (nlevels(as.factor(y)) == 2) {
+        models <- c(list(logistic = list(method = "logistic")), models)
+      }
     } else {
       models <- list(
         linear = list(method = "linear"),

@@ -184,7 +184,10 @@ tl_add_cluster_features <- function(data,
 #' @param formula Model formula
 #' @param labeled_indices Indices of labeled observations
 #' @param cluster_method Clustering method for label propagation
-#' @param supervised_method Supervised learning method for final model
+#' @param supervised_method Supervised learning method for the final
+#'   model (default: \code{"tree"}, which handles both regression and
+#'   classification with any number of classes). \code{"logistic"} is
+#'   binary-only and errors on a response with more than two levels.
 #' @param ... Additional arguments
 #' @return A tidylearn model object with additional class
 #'   \code{"tidylearn_semisupervised"}, trained on pseudo-labeled data. The
@@ -203,7 +206,7 @@ tl_add_cluster_features <- function(data,
 #' }
 tl_semisupervised <- function(data, formula, labeled_indices,
                               cluster_method = "kmeans",
-                              supervised_method = "logistic", ...) {
+                              supervised_method = "tree", ...) {
   # Extract response variable
   response_var <- all.vars(formula)[1]
 
@@ -276,7 +279,10 @@ tl_semisupervised <- function(data, formula, labeled_indices,
 #' @param anomaly_method Method for anomaly detection:
 #'   "dbscan", "isolation_forest"
 #' @param action Action to take: "remove", "flag", "downweight"
-#' @param supervised_method Supervised learning method
+#' @param supervised_method Supervised learning method (default:
+#'   \code{"tree"}, which handles both regression and classification with
+#'   any number of classes). \code{"logistic"} is binary-only and errors
+#'   on a response with more than two levels.
 #' @param ... Additional arguments
 #' @return A tidylearn model object with additional class
 #'   \code{"tidylearn_anomaly_aware"}. The model includes an
@@ -292,7 +298,7 @@ tl_semisupervised <- function(data, formula, labeled_indices,
 tl_anomaly_aware <- function(data, formula, response,
                              anomaly_method = "dbscan",
                              action = "flag",
-                             supervised_method = "logistic",
+                             supervised_method = "tree",
                              ...) {
   # Separate predictors for anomaly detection
   predictor_data <- data %>% dplyr::select(-dplyr::all_of(response))
@@ -356,7 +362,10 @@ tl_anomaly_aware <- function(data, formula, response,
 #' @param formula Model formula
 #' @param cluster_method Clustering method
 #' @param k Number of clusters
-#' @param supervised_method Supervised learning method
+#' @param supervised_method Supervised learning method (default:
+#'   \code{"tree"}, which handles both regression and classification).
+#'   \code{"linear"} silently fits \code{lm()} to a factor response
+#'   rather than refusing it, so it is not a safe default here.
 #' @param ... Additional arguments
 #' @return A list with class \code{"tidylearn_stratified"} containing:
 #'   \describe{
@@ -373,7 +382,7 @@ tl_anomaly_aware <- function(data, formula, response,
 #'                                 k = 3, supervised_method = "linear")
 #' }
 tl_stratified_models <- function(data, formula, cluster_method = "kmeans",
-                                 k = 3, supervised_method = "linear", ...) {
+                                 k = 3, supervised_method = "tree", ...) {
   # Extract response variable
   response_var <- all.vars(formula)[1]
 
