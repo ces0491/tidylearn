@@ -404,13 +404,51 @@
 <p><code><a href="reference/tl_compute_advisor.html">tl_compute_advisor()</a></code> estimates runtime, peak memory and cost across local CPU, local GPU and cloud tiers before you commit to a long fit:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/tl_compute_advisor.html">tl_compute_advisor</a></span><span class="op">(</span><span class="st">"xgboost"</span>, <span class="va">data</span>, <span class="va">y</span> <span class="op">~</span> <span class="va">.</span>, hyperparams <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>nrounds <span class="op">=</span> <span class="fl">5000</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p>Estimates are order-of-magnitude, not quotes. The cloud tier is reported for planning only - it is not yet executable.</p>
+<p>Estimates are order-of-magnitude, not quotes. The advisor covers all 13 supervised methods, and it treats cloud as a “does not fit on my machine” tier rather than a GPU-only one - it will recommend cloud for a CPU-only method like random forest if the job is RAM-infeasible locally.</p>
+<div class="section level3">
+<h3 id="cloud-compute">Cloud compute<a class="anchor" aria-label="anchor" href="#cloud-compute"></a>
+</h3>
+<p><strong><code>compute = "cloud"</code> is not executable yet</strong> and errors if you ask for it. The cloud tier is reported by the advisor for planning only.</p>
+<p>What is in place is the safety model, which lands before any code that could transmit data. Cloud fits will upload your training data to your own Modal account - a third party - so tidylearn will not do it without explicit consent, and will not send it anywhere except a host you have allowed:</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Consent, per call or for the session. Never persisted, never prompted</span></span>
+<span><span class="co"># for interactively, so scripts and CI behave like an interactive session</span></span>
+<span><span class="fu"><a href="reference/tl_cloud_consent.html">tl_cloud_consent</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/tl_cloud_consent.html">tl_cloud_consent</a></span><span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span>   <span class="co"># revoke</span></span>
+<span></span>
+<span><span class="co"># The endpoint comes from an environment variable, and must be https on</span></span>
+<span><span class="co"># a Modal host. A typo or a wrong host is an error, not a warning</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/Sys.setenv.html" class="external-link">Sys.setenv</a></span><span class="op">(</span>TIDYLEARN_MODAL_ENDPOINT <span class="op">=</span> <span class="st">"https://you--tidylearn-fit.modal.run"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Modal customers on a custom domain can add it, per session</span></span>
+<span><span class="fu"><a href="reference/tl_cloud_allow_host.html">tl_cloud_allow_host</a></span><span class="op">(</span><span class="st">"fits.example.com"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/tl_cloud_allowed_hosts.html">tl_cloud_allowed_hosts</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level3">
+<h3 id="cost-controls">Cost controls<a class="anchor" aria-label="anchor" href="#cost-controls"></a>
+</h3>
+<p>A job submitted to Modal runs to completion there whatever your R session does afterwards. Ctrl-C, a closed IDE, a crashed session and a closed laptop all leave it running and billing, because the session was only polling for a result - it was never what kept the work alive.</p>
+<p>So the bound on spend cannot be something tidylearn does in R. Every submission carries an explicit timeout, derived from the estimate with headroom and capped well below Modal’s 24-hour maximum, and the worker runs with retries off so a hung job cannot bill several timeouts over.</p>
+<p>What you are asked to accept before a fit is the <strong>worst case</strong> - the timeout at the tier’s rate - not the estimate, because the estimate is order-of-magnitude and the timeout is what actually binds:</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Refused before anything is uploaded if the worst case exceeds max_cost,</span></span>
+<span><span class="co"># or if the estimate is so large the job would be killed before finishing</span></span>
+<span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/tl_model.html">tl_model</a></span><span class="op">(</span><span class="va">data</span>, <span class="va">y</span> <span class="op">~</span> <span class="va">.</span>, method <span class="op">=</span> <span class="st">"xgboost"</span>, compute <span class="op">=</span> <span class="st">"cloud"</span>,</span>
+<span>                  confirm_upload <span class="op">=</span> <span class="cn">TRUE</span>, max_cost <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Anything currently running, so no job is invisible</span></span>
+<span><span class="fu"><a href="reference/tl_cloud_jobs.html">tl_cloud_jobs</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p>Set a spend budget on your Modal workspace as well. That is the only true hard cap, and it is not tidylearn’s to set - if a job escapes every check here, the workspace budget is what stops it.</p>
+<p>The full contract - what cloud compute will and will not do, with an audit checklist - ships with the package:</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/file.show.html" class="external-link">file.show</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"security/threat-model.md"</span>, package <span class="op">=</span> <span class="st">"tidylearn"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="unified-visualization">Unified Visualization<a class="anchor" aria-label="anchor" href="#unified-visualization"></a>
 </h2>
 <p>Consistent ggplot2-based plotting regardless of model type:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Generic plot method works for all model types</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">forest_model</span><span class="op">)</span>       <span class="co"># Automatic visualization based on model type</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">linear_model</span><span class="op">)</span>       <span class="co"># Diagnostic plots for regression</span></span>
@@ -429,7 +467,7 @@
 <h2 id="formatted-tables">Formatted Tables<a class="anchor" aria-label="anchor" href="#formatted-tables"></a>
 </h2>
 <p>The <code><a href="reference/tl_table.html">tl_table()</a></code> family produces formatted <code>gt</code> tables for reporting:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Auto-selects the best table type</span></span>
 <span><span class="fu"><a href="reference/tl_table.html">tl_table</a></span><span class="op">(</span><span class="va">model</span><span class="op">)</span></span>
 <span></span>
@@ -460,7 +498,7 @@
 </h2>
 <p>The full site is at <strong><a href="https://tidylearn.sheetsolved.com" class="uri">https://tidylearn.sheetsolved.com</a></strong> — every function reference page and every article, browsable without installing anything.</p>
 <p>From an R session:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Package overview</span></span>
 <span><span class="op">?</span><span class="va">tidylearn</span></span>
 <span></span>
@@ -528,6 +566,10 @@
 <tr>
 <td><a href="https://tidylearn.sheetsolved.com/articles/integration-workflows.html">Integration Workflows</a></td>
 <td>Combining supervised and unsupervised steps</td>
+</tr>
+<tr>
+<td><a href="https://tidylearn.sheetsolved.com/articles/compute-backends.html">Compute Backends</a></td>
+<td>CPU and GPU routing, cost estimates, and the cloud safety model</td>
 </tr>
 </tbody>
 </table>

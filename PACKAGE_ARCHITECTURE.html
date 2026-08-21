@@ -221,6 +221,29 @@
 </li>
 </ul></div>
 <div class="section level3">
+<h3 id="compute-backend-modules">Compute Backend Modules<a class="anchor" aria-label="anchor" href="#compute-backend-modules"></a></h3>
+<p>Where a fit runs. Most methods are CPU-only and never touch these; the modules exist so that the two methods with an upstream GPU path, and any method too large for the local machine, have a documented route.</p>
+<ul><li>
+<code>compute-detection.R</code>: <code><a href="reference/tl_check_gpu.html">tl_check_gpu()</a></code> — parses <code>nvidia-smi</code> and checks which GPU-capable backends are installed, without loading Python or fitting anything</li>
+<li>
+<code>compute-advisor.R</code>: <code><a href="reference/tl_compute_advisor.html">tl_compute_advisor()</a></code> — estimates runtime, peak RAM and cost across local CPU, local GPU and cloud tiers. Holds the method profile table and the Modal instance tier table</li>
+<li>
+<code>compute-routing.R</code>: <code>tl_resolve_compute()</code> — validates the <code>compute</code> argument, consults the advisor for <code>"auto"</code>, and applies the fallback rules</li>
+</ul></div>
+<div class="section level3">
+<h3 id="cloud-modules">Cloud Modules<a class="anchor" aria-label="anchor" href="#cloud-modules"></a></h3>
+<p>Sequenced deliberately: the guards land before the code that could transmit anything. The submission path is not implemented yet, so <code>compute = "cloud"</code> still errors.</p>
+<ul><li>
+<code>cloud-consent.R</code>: <code><a href="reference/tl_cloud_consent.html">tl_cloud_consent()</a></code> — the data-egress consent gate. Session state lives in a namespace environment, never an option or a file, so it cannot outlive the session or be set from outside it</li>
+<li>
+<code>cloud-endpoint.R</code>: endpoint resolution and the host allowlist — <code><a href="reference/tl_cloud_allow_host.html">tl_cloud_allow_host()</a></code>, <code><a href="reference/tl_cloud_allowed_hosts.html">tl_cloud_allowed_hosts()</a></code>. The single choke point that rejects any destination that is not <code>https</code> on an allowed host</li>
+<li>
+<code>cloud-serialize.R</code>: converts a fitted model to bytes and back. Twelve methods go through base R serialisation; <code>"deep"</code> needs its keras slot handled separately because a keras model is a Python reference</li>
+<li>
+<code>cloud-cost.R</code>: bounds what a submission can bill. Derives the job timeout from the advisor estimate, refuses a fit whose worst-case cost exceeds the budget, builds the metadata-only pre-upload summary, and records every submitted job in <code><a href="reference/tl_cloud_jobs.html">tl_cloud_jobs()</a></code> so nothing runs invisibly</li>
+</ul><p>The contract these implement is <code>inst/security/threat-model.md</code>, which is shipped with the package.</p>
+</div>
+<div class="section level3">
 <h3 id="supporting-modules">Supporting Modules<a class="anchor" aria-label="anchor" href="#supporting-modules"></a></h3>
 <ul><li>
 <code>pipeline.R</code>: Advanced modeling pipelines</li>
@@ -314,6 +337,13 @@
 │   ├── workflows.R               # High-level workflows
 │   ├── supervised-*.R            # Supervised wrappers (8 files)
 │   ├── unsupervised-*.R          # Unsupervised wrappers (8 files)
+│   ├── compute-detection.R       # Local GPU detection
+│   ├── compute-advisor.R         # Runtime/RAM/cost estimates
+│   ├── compute-routing.R         # compute = cpu/gpu/auto/cloud
+│   ├── cloud-consent.R           # Data-egress consent gate
+│   ├── cloud-endpoint.R          # Endpoint + host allowlist
+│   ├── cloud-serialize.R         # Model &lt;-&gt; bytes for transport
+│   ├── cloud-cost.R              # Timeouts, budget ceiling, job register
 │   ├── pipeline.R                # Advanced pipelines
 │   ├── model-selection.R         # Cross-validation
 │   ├── tuning.R                  # Hyperparameter tuning
@@ -322,6 +352,9 @@
 │   ├── metrics.R                 # Evaluation metrics
 │   ├── visualization.R           # Unified plotting
 │   └── tables.R                  # Formatted gt tables
+├── inst/
+│   └── security/
+│       └── threat-model.md       # Cloud compute contract
 ├── man/                          # Documentation (auto-generated)
 │   └── figures/
 │       └── logo.png              # Hex sticker
@@ -352,6 +385,8 @@
 <strong>Deep learning</strong>: keras, tensorflow</li>
 <li>
 <strong>Gradient boosting</strong>: xgboost</li>
+<li>
+<strong>Cloud compute</strong>: httr2</li>
 <li>
 <strong>Market basket</strong>: arules, arulesViz</li>
 <li>

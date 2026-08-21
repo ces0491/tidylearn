@@ -3,6 +3,7 @@ pkgdown: 2.2.1
 pkgdown_sha: ~
 articles:
   automl: automl.html
+  compute-backends: compute-backends.html
   data-ingestion: data-ingestion.html
   diagnostics: diagnostics.html
   getting-started: getting-started.html
@@ -12,7 +13,7 @@ articles:
   supervised-learning: supervised-learning.html
   tuning-and-pipelines: tuning-and-pipelines.html
   unsupervised-learning: unsupervised-learning.html
-last_built: 2026-08-21T13:03Z
+last_built: 2026-08-21T15:49Z
 urls:
   reference: https://tidylearn.sheetsolved.com/reference
   article: https://tidylearn.sheetsolved.com/articles

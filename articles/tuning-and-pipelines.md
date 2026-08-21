@@ -450,7 +450,7 @@ final_run <- tl_run_pipeline(final, verbose = FALSE)
 final_preds <- tl_predict_pipeline(final_run, new_data = split$test)
 
 mean(final_preds$.pred == split$test$Species)
-#> [1] 0.9333333
+#> [1] 0.9555556
 ```
 
 ## Cost

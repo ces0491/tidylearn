@@ -127,9 +127,9 @@ tl_evaluate(
 #>   metric    value
 #>   <chr>     <dbl>
 #> 1 accuracy  0.867
-#> 2 precision 0.789
-#> 3 recall    1    
-#> 4 f1        0.882
+#> 2 precision 1    
+#> 3 recall    0.733
+#> 4 f1        0.846
 #> 5 auc       0.991
 ```
 

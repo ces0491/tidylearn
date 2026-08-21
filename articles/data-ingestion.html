@@ -112,9 +112,9 @@ the right algorithm:</p>
 <span><span class="va">data</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_read.html">tl_read</a></span><span class="op">(</span><span class="va">tmp</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="va">data</span></span>
 <span><span class="co">#&gt; -- tidylearn data ---------</span></span>
-<span><span class="co">#&gt; Source: /tmp/RtmpbJ0kLJ/file2823200e7fe.csv </span></span>
+<span><span class="co">#&gt; Source: /tmp/RtmpUqE483/file28ac25850275.csv </span></span>
 <span><span class="co">#&gt; Format: csv </span></span>
-<span><span class="co">#&gt; Read at: 2026-08-21 13:04:33 </span></span>
+<span><span class="co">#&gt; Read at: 2026-08-21 15:50:23 </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 32 × 11</span></span></span>
 <span><span class="co">#&gt;      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb</span></span>
@@ -168,7 +168,7 @@ sheets by name or position:</p>
 <span><span class="co">#&gt; -- tidylearn data ---------</span></span>
 <span><span class="co">#&gt; Source: /home/runner/work/_temp/Library/readxl/extdata/datasets.xlsx </span></span>
 <span><span class="co">#&gt; Format: excel </span></span>
-<span><span class="co">#&gt; Read at: 2026-08-21 13:04:34 </span></span>
+<span><span class="co">#&gt; Read at: 2026-08-21 15:50:24 </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 3 × 11</span></span></span>
 <span><span class="co">#&gt;     mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb</span></span>
@@ -206,9 +206,9 @@ structures are automatically flattened:</p>
 <span><span class="va">json_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_read_json.html">tl_read_json</a></span><span class="op">(</span><span class="va">tmp_json</span><span class="op">)</span></span>
 <span><span class="va">json_data</span></span>
 <span><span class="co">#&gt; -- tidylearn data ---------</span></span>
-<span><span class="co">#&gt; Source: /tmp/RtmpbJ0kLJ/file28236d21d14a.json </span></span>
+<span><span class="co">#&gt; Source: /tmp/RtmpUqE483/file28ac55e4cbd0.json </span></span>
 <span><span class="co">#&gt; Format: json </span></span>
-<span><span class="co">#&gt; Read at: 2026-08-21 13:04:34 </span></span>
+<span><span class="co">#&gt; Read at: 2026-08-21 15:50:24 </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 5 × 11</span></span></span>
 <span><span class="co">#&gt;     mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb</span></span>
@@ -286,7 +286,7 @@ directly — it will not close your connection:</p>
 <span><span class="co">#&gt; -- tidylearn data ---------</span></span>
 <span><span class="co">#&gt; Source: SQLiteConnection: SELECT mpg, wt, hp FROM mtcars_tbl WHERE mpg &gt; 20 </span></span>
 <span><span class="co">#&gt; Format: database </span></span>
-<span><span class="co">#&gt; Read at: 2026-08-21 13:04:35 </span></span>
+<span><span class="co">#&gt; Read at: 2026-08-21 15:50:25 </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 14 × 3</span></span></span>
 <span><span class="co">#&gt;      mpg    wt    hp</span></span>
@@ -499,9 +499,9 @@ work transparently:</p>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">mpg</span>, <span class="va">wt</span>, <span class="va">hp</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fl">3</span><span class="op">)</span></span>
 <span><span class="co">#&gt; -- tidylearn data ---------</span></span>
-<span><span class="co">#&gt; Source: /tmp/RtmpbJ0kLJ/file28232ea1e576.csv </span></span>
+<span><span class="co">#&gt; Source: /tmp/RtmpUqE483/file28ac29f79e9c.csv </span></span>
 <span><span class="co">#&gt; Format: csv </span></span>
-<span><span class="co">#&gt; Read at: 2026-08-21 13:04:36 </span></span>
+<span><span class="co">#&gt; Read at: 2026-08-21 15:50:25 </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 3 × 3</span></span></span>
 <span><span class="co">#&gt;     mpg    wt    hp</span></span>

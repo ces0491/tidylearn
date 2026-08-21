@@ -5,6 +5,7 @@
 <url><loc>https://tidylearn.sheetsolved.com/LICENSE.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/PACKAGE_ARCHITECTURE.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/articles/automl.html</loc></url>
+<url><loc>https://tidylearn.sheetsolved.com/articles/compute-backends.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/articles/data-ingestion.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/articles/diagnostics.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/articles/getting-started.html</loc></url>
@@ -100,6 +101,10 @@
 <url><loc>https://tidylearn.sheetsolved.com/reference/tidy_silhouette.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/reference/tidy_silhouette_analysis.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/reference/tidylearn-classification.html</loc></url>
+<url><loc>https://tidylearn.sheetsolved.com/reference/tidylearn-cloud-consent.html</loc></url>
+<url><loc>https://tidylearn.sheetsolved.com/reference/tidylearn-cloud-cost.html</loc></url>
+<url><loc>https://tidylearn.sheetsolved.com/reference/tidylearn-cloud-endpoint.html</loc></url>
+<url><loc>https://tidylearn.sheetsolved.com/reference/tidylearn-cloud-serialize.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/reference/tidylearn-core.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/reference/tidylearn-deep-learning.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/reference/tidylearn-diagnostics.html</loc></url>
@@ -128,6 +133,10 @@
 <url><loc>https://tidylearn.sheetsolved.com/reference/tl_calculate_pr_auc.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/reference/tl_check_assumptions.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/reference/tl_check_gpu.html</loc></url>
+<url><loc>https://tidylearn.sheetsolved.com/reference/tl_cloud_allow_host.html</loc></url>
+<url><loc>https://tidylearn.sheetsolved.com/reference/tl_cloud_allowed_hosts.html</loc></url>
+<url><loc>https://tidylearn.sheetsolved.com/reference/tl_cloud_consent.html</loc></url>
+<url><loc>https://tidylearn.sheetsolved.com/reference/tl_cloud_jobs.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/reference/tl_compare_cv.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/reference/tl_compare_pipeline_models.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/reference/tl_compute_advisor.html</loc></url>
@@ -138,6 +147,7 @@
 <url><loc>https://tidylearn.sheetsolved.com/reference/tl_diagnostic_dashboard.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/reference/tl_evaluate.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/reference/tl_evaluate_thresholds.html</loc></url>
+<url><loc>https://tidylearn.sheetsolved.com/reference/tl_event_level_args.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/reference/tl_explore.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/reference/tl_extract_importance.html</loc></url>
 <url><loc>https://tidylearn.sheetsolved.com/reference/tl_fit_boost.html</loc></url>

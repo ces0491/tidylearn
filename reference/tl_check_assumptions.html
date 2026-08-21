@@ -85,9 +85,9 @@ summarises the number of assumptions checked, violated, and satisfied.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   na.action.merMod lme4</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Model Assumptions Check Summary:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> --------------------------------</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Linearity: SATISFIED</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   Details: Correlation between fitted values and residuals: 0</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   Recommendation: Linearity assumption appears satisfied</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Linearity: VIOLATED</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   Details: RESET-style test on powers of the fitted values: p-value = 0.002042</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   Recommendation: Consider non-linear transformations or polynomial terms</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Independence: VIOLATED</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   Details: Durbin-Watson statistic: 1.3624</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   Recommendation: Possible autocorrelation in residuals. Check for time-series structure or clustering.</span>
@@ -108,13 +108,13 @@ summarises the number of assumptions checked, violated, and satisfied.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Linearity"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $linearity$check</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] FALSE</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $linearity$details</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Correlation between fitted values and residuals: 0"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "RESET-style test on powers of the fitted values: p-value = 0.002042"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $linearity$recommendation</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Linearity assumption appears satisfied"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Consider non-linear transformations or polynomial terms"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $independence</span>
@@ -190,16 +190,16 @@ summarises the number of assumptions checked, violated, and satisfied.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $overall</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $overall$status</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "3 assumption(s) appear to be violated. See details."</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "4 assumption(s) appear to be violated. See details."</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $overall$n_checked</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] 6</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $overall$n_violated</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 4</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $overall$n_satisfied</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="co"># }</span></span></span>

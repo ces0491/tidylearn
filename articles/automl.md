@@ -36,14 +36,14 @@ result$leaderboard
 #> # A tibble: 8 × 3
 #>   model            score evaluation
 #>   <chr>            <dbl> <chr>     
-#> 1 clustered_forest 0.953 cv        
-#> 2 baseline_forest  0.953 cv        
-#> 3 baseline_tree    0.947 cv        
-#> 4 advanced_xgboost 0.947 cv        
-#> 5 clustered_tree   0.94  cv        
-#> 6 advanced_svm     0.94  cv        
-#> 7 pca_forest       0.88  cv        
-#> 8 pca_tree         0.86  cv
+#> 1 clustered_tree   0.953 cv        
+#> 2 baseline_tree    0.947 cv        
+#> 3 baseline_forest  0.947 cv        
+#> 4 clustered_forest 0.947 cv        
+#> 5 advanced_svm     0.947 cv        
+#> 6 advanced_xgboost 0.947 cv        
+#> 7 pca_tree         0.9   cv        
+#> 8 pca_forest       0.873 cv
 ```
 
 Three columns: which model, what it scored, and how the score was
@@ -55,7 +55,7 @@ result$best_model
 #> tidylearn Model
 #> ===============
 #> Paradigm: supervised 
-#> Method: forest 
+#> Method: tree 
 #> Task: Classification 
 #> Formula: Species ~ . 
 #> 
@@ -69,7 +69,7 @@ result$task
 result$metric
 #> [1] "accuracy"
 round(as.numeric(result$runtime, units = "secs"), 1)
-#> [1] 1
+#> [1] 0.9
 ```
 
 Regression is the same call with a numeric response — `task = "auto"`
@@ -93,17 +93,17 @@ result_reg$leaderboard
 #> # A tibble: 11 × 3
 #>    model            score evaluation
 #>    <chr>            <dbl> <chr>     
-#>  1 pca_linear        2.42 cv        
-#>  2 clustered_forest  2.44 cv        
-#>  3 advanced_ridge    2.61 cv        
-#>  4 baseline_forest   2.78 cv        
-#>  5 advanced_lasso    3.73 cv        
-#>  6 clustered_linear  3.75 cv        
-#>  7 pca_tree          3.77 cv        
-#>  8 baseline_linear   3.88 cv        
-#>  9 baseline_tree     4.39 cv        
-#> 10 clustered_tree    4.56 cv        
-#> 11 pca_forest        4.67 cv
+#>  1 advanced_ridge    2.66 cv        
+#>  2 clustered_forest  2.67 cv        
+#>  3 baseline_forest   2.70 cv        
+#>  4 pca_linear        2.97 cv        
+#>  5 advanced_lasso    2.97 cv        
+#>  6 baseline_linear   3.32 cv        
+#>  7 baseline_tree     4.11 cv        
+#>  8 pca_forest        4.16 cv        
+#>  9 clustered_linear  4.34 cv        
+#> 10 clustered_tree    4.48 cv        
+#> 11 pca_tree          4.65 cv
 ```
 
 ## How the Search Works
@@ -216,11 +216,11 @@ sweep <- lapply(budgets, function(b) {
 })
 
 do.call(rbind, sweep)
-#>   budget elapsed models cv_scored          best
-#> 1      2     0.0      1         1 baseline_tree
-#> 2      5     0.0      1         1 baseline_tree
-#> 3     10     0.1      3         3 baseline_tree
-#> 4     30     0.8      8         8  advanced_svm
+#>   budget elapsed models cv_scored             best
+#> 1      2     0.0      1         1    baseline_tree
+#> 2      5     0.0      1         1    baseline_tree
+#> 3     10     0.1      3         3    baseline_tree
+#> 4     30     0.6      8         8 clustered_forest
 ```
 
 iris is 150 rows, so everything here is quick and the budget is barely
@@ -284,17 +284,17 @@ by_f1$leaderboard
 #> # A tibble: 11 × 3
 #>    model              score evaluation
 #>    <chr>              <dbl> <chr>     
-#>  1 baseline_logistic  0.967 cv        
-#>  2 baseline_forest    0.935 cv        
-#>  3 advanced_xgboost   0.935 cv        
-#>  4 clustered_forest   0.929 cv        
-#>  5 advanced_svm       0.928 cv        
-#>  6 clustered_tree     0.917 cv        
-#>  7 pca_forest         0.903 cv        
-#>  8 clustered_logistic 0.902 cv        
-#>  9 pca_logistic       0.897 cv        
-#> 10 baseline_tree      0.896 cv        
-#> 11 pca_tree           0.831 cv
+#>  1 advanced_svm       0.947 cv        
+#>  2 clustered_logistic 0.932 cv        
+#>  3 baseline_logistic  0.928 cv        
+#>  4 clustered_tree     0.928 cv        
+#>  5 clustered_forest   0.923 cv        
+#>  6 advanced_xgboost   0.921 cv        
+#>  7 baseline_forest    0.905 cv        
+#>  8 baseline_tree      0.893 cv        
+#>  9 pca_forest         0.888 cv        
+#> 10 pca_logistic       0.845 cv        
+#> 11 pca_tree           0.764 cv
 ```
 
 ## Using the Result
@@ -432,7 +432,7 @@ winner:
 
 winner <- automl$best_model$spec$method
 winner
-#> [1] "svm"
+#> [1] "forest"
 ```
 
 ``` r
@@ -446,17 +446,17 @@ tuned <- tl_tune_grid(
 )
 
 attr(tuned, "tuning_results")$best_params
-#> $kernel
-#> [1] "linear"
+#> $mtry
+#> [1] 2
 #> 
-#> $cost
-#> [1] 1
+#> $ntree
+#> [1] 100
 ```
 
 ``` r
 
 mean(predict(tuned, new_data = split$test)$.pred == split$test$Species)
-#> [1] 0.9777778
+#> [1] 0.9333333
 ```
 
 ## Guidance

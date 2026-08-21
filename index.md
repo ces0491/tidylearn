@@ -273,8 +273,76 @@ cloud tiers before you commit to a long fit:
 tl_compute_advisor("xgboost", data, y ~ ., hyperparams = list(nrounds = 5000))
 ```
 
-Estimates are order-of-magnitude, not quotes. The cloud tier is reported
-for planning only - it is not yet executable.
+Estimates are order-of-magnitude, not quotes. The advisor covers all 13
+supervised methods, and it treats cloud as a “does not fit on my
+machine” tier rather than a GPU-only one - it will recommend cloud for a
+CPU-only method like random forest if the job is RAM-infeasible locally.
+
+### Cloud compute
+
+**`compute = "cloud"` is not executable yet** and errors if you ask for
+it. The cloud tier is reported by the advisor for planning only.
+
+What is in place is the safety model, which lands before any code that
+could transmit data. Cloud fits will upload your training data to your
+own Modal account - a third party - so tidylearn will not do it without
+explicit consent, and will not send it anywhere except a host you have
+allowed:
+
+``` r
+
+# Consent, per call or for the session. Never persisted, never prompted
+# for interactively, so scripts and CI behave like an interactive session
+tl_cloud_consent()
+tl_cloud_consent(FALSE)   # revoke
+
+# The endpoint comes from an environment variable, and must be https on
+# a Modal host. A typo or a wrong host is an error, not a warning
+Sys.setenv(TIDYLEARN_MODAL_ENDPOINT = "https://you--tidylearn-fit.modal.run")
+
+# Modal customers on a custom domain can add it, per session
+tl_cloud_allow_host("fits.example.com")
+tl_cloud_allowed_hosts()
+```
+
+### Cost controls
+
+A job submitted to Modal runs to completion there whatever your R
+session does afterwards. Ctrl-C, a closed IDE, a crashed session and a
+closed laptop all leave it running and billing, because the session was
+only polling for a result - it was never what kept the work alive.
+
+So the bound on spend cannot be something tidylearn does in R. Every
+submission carries an explicit timeout, derived from the estimate with
+headroom and capped well below Modal’s 24-hour maximum, and the worker
+runs with retries off so a hung job cannot bill several timeouts over.
+
+What you are asked to accept before a fit is the **worst case** - the
+timeout at the tier’s rate - not the estimate, because the estimate is
+order-of-magnitude and the timeout is what actually binds:
+
+``` r
+
+# Refused before anything is uploaded if the worst case exceeds max_cost,
+# or if the estimate is so large the job would be killed before finishing
+model <- tl_model(data, y ~ ., method = "xgboost", compute = "cloud",
+                  confirm_upload = TRUE, max_cost = 5)
+
+# Anything currently running, so no job is invisible
+tl_cloud_jobs()
+```
+
+Set a spend budget on your Modal workspace as well. That is the only
+true hard cap, and it is not tidylearn’s to set - if a job escapes every
+check here, the workspace budget is what stops it.
+
+The full contract - what cloud compute will and will not do, with an
+audit checklist - ships with the package:
+
+``` r
+
+file.show(system.file("security/threat-model.md", package = "tidylearn"))
+```
 
 ## Unified Visualization
 
@@ -376,6 +444,7 @@ browseVignettes("tidylearn")
 | [Diagnostics](https://tidylearn.sheetsolved.com/articles/diagnostics.html) | Assumptions, influence, and comparing models |
 | [Reporting](https://tidylearn.sheetsolved.com/articles/reporting.html) | Plots and formatted `gt` tables |
 | [Integration Workflows](https://tidylearn.sheetsolved.com/articles/integration-workflows.html) | Combining supervised and unsupervised steps |
+| [Compute Backends](https://tidylearn.sheetsolved.com/articles/compute-backends.html) | CPU and GPU routing, cost estimates, and the cloud safety model |
 
 ## Contributing
 

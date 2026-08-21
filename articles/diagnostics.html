@@ -130,16 +130,16 @@ verdict on each.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">assumptions</span><span class="op">$</span><span class="va">overall</span></span>
 <span><span class="co">#&gt; $status</span></span>
-<span><span class="co">#&gt; [1] "4 assumption(s) appear to be violated. See details."</span></span>
+<span><span class="co">#&gt; [1] "5 assumption(s) appear to be violated. See details."</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $n_checked</span></span>
 <span><span class="co">#&gt; [1] 6</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $n_violated</span></span>
-<span><span class="co">#&gt; [1] 4</span></span>
+<span><span class="co">#&gt; [1] 5</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $n_satisfied</span></span>
-<span><span class="co">#&gt; [1] 2</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 1</span></span></code></pre></div>
 <p>Each entry carries the test that was run, the verdict, and what to do
 about it. Nothing here is a pass/fail gate — the recommendation is a
 prompt, not an instruction.</p>
@@ -183,19 +183,19 @@ prompt, not an instruction.</p>
 <span>  row.names <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt;                assumption holds</span></span>
-<span><span class="co">#&gt; 1               Linearity  TRUE</span></span>
+<span><span class="co">#&gt; 1               Linearity FALSE</span></span>
 <span><span class="co">#&gt; 2            Independence FALSE</span></span>
 <span><span class="co">#&gt; 3        Homoscedasticity  TRUE</span></span>
 <span><span class="co">#&gt; 4  Normality of Residuals FALSE</span></span>
 <span><span class="co">#&gt; 5    No Multicollinearity FALSE</span></span>
 <span><span class="co">#&gt; 6 No Influential Outliers FALSE</span></span>
-<span><span class="co">#&gt;                                               detail</span></span>
-<span><span class="co">#&gt; 1 Correlation between fitted values and residuals: 0</span></span>
-<span><span class="co">#&gt; 2                    Durbin-Watson statistic: 1.3673</span></span>
-<span><span class="co">#&gt; 3                 Breusch-Pagan test p-value: 0.8143</span></span>
-<span><span class="co">#&gt; 4                   Shapiro-Wilk test p-value: 0.033</span></span>
-<span><span class="co">#&gt; 5                                Maximum VIF: 7.3245</span></span>
-<span><span class="co">#&gt; 6                4 influential observations detected</span></span></code></pre></div>
+<span><span class="co">#&gt;                                                                detail</span></span>
+<span><span class="co">#&gt; 1 RESET-style test on powers of the fitted values: p-value = 0.001944</span></span>
+<span><span class="co">#&gt; 2                                     Durbin-Watson statistic: 1.3673</span></span>
+<span><span class="co">#&gt; 3                                  Breusch-Pagan test p-value: 0.8143</span></span>
+<span><span class="co">#&gt; 4                                    Shapiro-Wilk test p-value: 0.033</span></span>
+<span><span class="co">#&gt; 5                                                 Maximum VIF: 7.3245</span></span>
+<span><span class="co">#&gt; 6                                 4 influential observations detected</span></span></code></pre></div>
 <p><code>disp</code> correlating with both <code>wt</code> and
 <code>hp</code> is what drives the VIF here, and it is the kind of thing
 that is invisible in a coefficient table.</p>
@@ -430,11 +430,11 @@ says what it does at different levels of the moderator.</p>
 <span></span>
 <span><span class="va">effects</span><span class="op">$</span><span class="va">slopes</span></span>
 <span><span class="co">#&gt;      by_value by_label     slope     slope_se</span></span>
-<span><span class="co">#&gt; Q0       52.0       Q0 -6.768521 3.505829e-16</span></span>
-<span><span class="co">#&gt; Q25      96.5      Q25 -5.529278 4.039654e-16</span></span>
-<span><span class="co">#&gt; Q50     123.0      Q50 -4.791302 3.746703e-16</span></span>
-<span><span class="co">#&gt; Q75     180.0      Q75 -3.203958 4.635819e-16</span></span>
-<span><span class="co">#&gt; Q100    335.0     Q100  1.112505 2.313524e-16</span></span></code></pre></div>
+<span><span class="co">#&gt; Q0       52.0       Q0 -6.768521 5.695734e-16</span></span>
+<span><span class="co">#&gt; Q25      96.5      Q25 -5.529278 4.387243e-16</span></span>
+<span><span class="co">#&gt; Q50     123.0      Q50 -4.791302 6.071491e-16</span></span>
+<span><span class="co">#&gt; Q75     180.0      Q75 -3.203958 4.018576e-16</span></span>
+<span><span class="co">#&gt; Q100    335.0     Q100  1.112505 4.116338e-16</span></span></code></pre></div>
 <p>The slope of <code>mpg</code> on <code>wt</code> weakens as
 <code>hp</code> rises: weight costs less economy in a car that was never
 economical.</p>

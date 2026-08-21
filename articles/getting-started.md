@@ -393,6 +393,9 @@ class(model_forest$fit)  # This is the randomForest object
   — plots and formatted `gt` tables
 - [`vignette("integration-workflows")`](https://tidylearn.sheetsolved.com/articles/integration-workflows.md)
   — combining supervised and unsupervised steps
+- [`vignette("compute-backends")`](https://tidylearn.sheetsolved.com/articles/compute-backends.md)
+  — when a fit is too slow or too large for this machine: GPU routing,
+  cost estimates, and the cloud safety model
 
 ## Summary
 

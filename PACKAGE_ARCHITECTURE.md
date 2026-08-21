@@ -207,6 +207,54 @@ Each module wraps specific packages:
   [`tl_table_clusters()`](https://tidylearn.sheetsolved.com/reference/tl_table_clusters.md),
   [`tl_table_comparison()`](https://tidylearn.sheetsolved.com/reference/tl_table_comparison.md)
 
+### Compute Backend Modules
+
+Where a fit runs. Most methods are CPU-only and never touch these; the
+modules exist so that the two methods with an upstream GPU path, and any
+method too large for the local machine, have a documented route.
+
+- `compute-detection.R`:
+  [`tl_check_gpu()`](https://tidylearn.sheetsolved.com/reference/tl_check_gpu.md)
+  — parses `nvidia-smi` and checks which GPU-capable backends are
+  installed, without loading Python or fitting anything
+- `compute-advisor.R`:
+  [`tl_compute_advisor()`](https://tidylearn.sheetsolved.com/reference/tl_compute_advisor.md)
+  — estimates runtime, peak RAM and cost across local CPU, local GPU and
+  cloud tiers. Holds the method profile table and the Modal instance
+  tier table
+- `compute-routing.R`: `tl_resolve_compute()` — validates the `compute`
+  argument, consults the advisor for `"auto"`, and applies the fallback
+  rules
+
+### Cloud Modules
+
+Sequenced deliberately: the guards land before the code that could
+transmit anything. The submission path is not implemented yet, so
+`compute = "cloud"` still errors.
+
+- `cloud-consent.R`:
+  [`tl_cloud_consent()`](https://tidylearn.sheetsolved.com/reference/tl_cloud_consent.md)
+  — the data-egress consent gate. Session state lives in a namespace
+  environment, never an option or a file, so it cannot outlive the
+  session or be set from outside it
+- `cloud-endpoint.R`: endpoint resolution and the host allowlist —
+  [`tl_cloud_allow_host()`](https://tidylearn.sheetsolved.com/reference/tl_cloud_allow_host.md),
+  [`tl_cloud_allowed_hosts()`](https://tidylearn.sheetsolved.com/reference/tl_cloud_allowed_hosts.md).
+  The single choke point that rejects any destination that is not
+  `https` on an allowed host
+- `cloud-serialize.R`: converts a fitted model to bytes and back. Twelve
+  methods go through base R serialisation; `"deep"` needs its keras slot
+  handled separately because a keras model is a Python reference
+- `cloud-cost.R`: bounds what a submission can bill. Derives the job
+  timeout from the advisor estimate, refuses a fit whose worst-case cost
+  exceeds the budget, builds the metadata-only pre-upload summary, and
+  records every submitted job in
+  [`tl_cloud_jobs()`](https://tidylearn.sheetsolved.com/reference/tl_cloud_jobs.md)
+  so nothing runs invisibly
+
+The contract these implement is `inst/security/threat-model.md`, which
+is shipped with the package.
+
 ### Supporting Modules
 
 - `pipeline.R`: Advanced modeling pipelines
@@ -296,6 +344,13 @@ best_model <- result$best_model
     │   ├── workflows.R               # High-level workflows
     │   ├── supervised-*.R            # Supervised wrappers (8 files)
     │   ├── unsupervised-*.R          # Unsupervised wrappers (8 files)
+    │   ├── compute-detection.R       # Local GPU detection
+    │   ├── compute-advisor.R         # Runtime/RAM/cost estimates
+    │   ├── compute-routing.R         # compute = cpu/gpu/auto/cloud
+    │   ├── cloud-consent.R           # Data-egress consent gate
+    │   ├── cloud-endpoint.R          # Endpoint + host allowlist
+    │   ├── cloud-serialize.R         # Model <-> bytes for transport
+    │   ├── cloud-cost.R              # Timeouts, budget ceiling, job register
     │   ├── pipeline.R                # Advanced pipelines
     │   ├── model-selection.R         # Cross-validation
     │   ├── tuning.R                  # Hyperparameter tuning
@@ -304,6 +359,9 @@ best_model <- result$best_model
     │   ├── metrics.R                 # Evaluation metrics
     │   ├── visualization.R           # Unified plotting
     │   └── tables.R                  # Formatted gt tables
+    ├── inst/
+    │   └── security/
+    │       └── threat-model.md       # Cloud compute contract
     ├── man/                          # Documentation (auto-generated)
     │   └── figures/
     │       └── logo.png              # Hex sticker
@@ -327,6 +385,7 @@ best_model <- result$best_model
 - **Tables**: gt
 - **Deep learning**: keras, tensorflow
 - **Gradient boosting**: xgboost
+- **Cloud compute**: httr2
 - **Market basket**: arules, arulesViz
 - **Dashboards**: shiny, shinydashboard
 - Various visualization packages

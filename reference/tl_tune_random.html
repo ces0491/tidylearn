@@ -78,8 +78,31 @@ data</p></dd>
 
 
 <dt id="arg-param-space">param_space<a class="anchor" aria-label="anchor" href="#arg-param-space"></a></dt>
-<dd><p>A named list of parameter spaces
-to sample from</p></dd>
+<dd><p>A named list of parameter spaces to sample from.
+Each element is read by its type and length:</p><dl><dt>a function</dt>
+<dd><p>called with no arguments to draw one value</p></dd>
+
+<dt><code>c(min, max, "log")</code></dt>
+<dd><p>log-uniform draw between
+<code>min</code> and <code>max</code></p></dd>
+
+<dt>two whole numbers</dt>
+<dd><p>integer range, e.g.
+<code>c(10, 20)</code> draws from 10:20</p></dd>
+
+<dt>three or more whole numbers</dt>
+<dd><p>a discrete set, sampled from
+as given</p></dd>
+
+<dt>two other numbers</dt>
+<dd><p>uniform draw between them, e.g.
+<code>c(0.01, 0.1)</code></p></dd>
+
+<dt>character or factor</dt>
+<dd><p>categorical, sampled from as given</p></dd>
+
+
+</dl></dd>
 
 
 <dt id="arg-n-iter">n_iter<a class="anchor" aria-label="anchor" href="#arg-n-iter"></a></dt>

@@ -100,14 +100,14 @@ model, so <code><a href="https://rdrr.io/r/stats/predict.html" class="external-l
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 8 × 3</span></span></span>
 <span><span class="co">#&gt;   model            score evaluation</span></span>
 <span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>            <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> clustered_forest 0.953 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> baseline_forest  0.953 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> baseline_tree    0.947 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> advanced_xgboost 0.947 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> clustered_tree   0.94  cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> advanced_svm     0.94  cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">7</span> pca_forest       0.88  cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">8</span> pca_tree         0.86  cv</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> clustered_tree   0.953 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> baseline_tree    0.947 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> baseline_forest  0.947 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> clustered_forest 0.947 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> advanced_svm     0.947 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> advanced_xgboost 0.947 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">7</span> pca_tree         0.9   cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">8</span> pca_forest       0.873 cv</span></span></code></pre></div>
 <p>Three columns: which model, what it scored, and how the score was
 obtained.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
@@ -115,7 +115,7 @@ obtained.</p>
 <span><span class="co">#&gt; tidylearn Model</span></span>
 <span><span class="co">#&gt; ===============</span></span>
 <span><span class="co">#&gt; Paradigm: supervised </span></span>
-<span><span class="co">#&gt; Method: forest </span></span>
+<span><span class="co">#&gt; Method: tree </span></span>
 <span><span class="co">#&gt; Task: Classification </span></span>
 <span><span class="co">#&gt; Formula: Species ~ . </span></span>
 <span><span class="co">#&gt; </span></span>
@@ -126,7 +126,7 @@ obtained.</p>
 <span><span class="va">result</span><span class="op">$</span><span class="va">metric</span></span>
 <span><span class="co">#&gt; [1] "accuracy"</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">runtime</span>, units <span class="op">=</span> <span class="st">"secs"</span><span class="op">)</span>, <span class="fl">1</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 1</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 0.9</span></span></code></pre></div>
 <p>Regression is the same call with a numeric response —
 <code>task = "auto"</code> reads it off the data:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
@@ -143,17 +143,17 @@ obtained.</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 11 × 3</span></span></span>
 <span><span class="co">#&gt;    model            score evaluation</span></span>
 <span><span class="co">#&gt;    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>            <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> pca_linear        2.42 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> clustered_forest  2.44 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> advanced_ridge    2.61 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> baseline_forest   2.78 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> advanced_lasso    3.73 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> clustered_linear  3.75 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> pca_tree          3.77 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> baseline_linear   3.88 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span> baseline_tree     4.39 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> clustered_tree    4.56 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">11</span> pca_forest        4.67 cv</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> advanced_ridge    2.66 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> clustered_forest  2.67 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> baseline_forest   2.70 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> pca_linear        2.97 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> advanced_lasso    2.97 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> baseline_linear   3.32 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> baseline_tree     4.11 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> pca_forest        4.16 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span> clustered_linear  4.34 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> clustered_tree    4.48 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">11</span> pca_tree          4.65 cv</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="how-the-search-works">How the Search Works<a class="anchor" aria-label="anchor" href="#how-the-search-works"></a>
@@ -283,11 +283,11 @@ machine:</p>
 <span><span class="op">}</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="va">sweep</span><span class="op">)</span></span>
-<span><span class="co">#&gt;   budget elapsed models cv_scored          best</span></span>
-<span><span class="co">#&gt; 1      2     0.0      1         1 baseline_tree</span></span>
-<span><span class="co">#&gt; 2      5     0.0      1         1 baseline_tree</span></span>
-<span><span class="co">#&gt; 3     10     0.1      3         3 baseline_tree</span></span>
-<span><span class="co">#&gt; 4     30     0.8      8         8  advanced_svm</span></span></code></pre></div>
+<span><span class="co">#&gt;   budget elapsed models cv_scored             best</span></span>
+<span><span class="co">#&gt; 1      2     0.0      1         1    baseline_tree</span></span>
+<span><span class="co">#&gt; 2      5     0.0      1         1    baseline_tree</span></span>
+<span><span class="co">#&gt; 3     10     0.1      3         3    baseline_tree</span></span>
+<span><span class="co">#&gt; 4     30     0.6      8         8 clustered_forest</span></span></code></pre></div>
 <p>iris is 150 rows, so everything here is quick and the budget is
 barely touched. On data where a single forest fit takes ten seconds the
 same numbers look very different — which is the point of running the
@@ -344,17 +344,17 @@ accepts <code>rmse</code>, <code>mse</code>, <code>mae</code>,
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 11 × 3</span></span></span>
 <span><span class="co">#&gt;    model              score evaluation</span></span>
 <span><span class="co">#&gt;    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>              <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> baseline_logistic  0.967 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> baseline_forest    0.935 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> advanced_xgboost   0.935 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> clustered_forest   0.929 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> advanced_svm       0.928 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> clustered_tree     0.917 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> pca_forest         0.903 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> clustered_logistic 0.902 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span> pca_logistic       0.897 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> baseline_tree      0.896 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">11</span> pca_tree           0.831 cv</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> advanced_svm       0.947 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> clustered_logistic 0.932 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> baseline_logistic  0.928 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> clustered_tree     0.928 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> clustered_forest   0.923 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> advanced_xgboost   0.921 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> baseline_forest    0.905 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> baseline_tree      0.893 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span> pca_forest         0.888 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> pca_logistic       0.845 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">11</span> pca_tree           0.764 cv</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="using-the-result">Using the Result<a class="anchor" aria-label="anchor" href="#using-the-result"></a>
@@ -471,7 +471,7 @@ the winner:</p>
 <div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">winner</span> <span class="op">&lt;-</span> <span class="va">automl</span><span class="op">$</span><span class="va">best_model</span><span class="op">$</span><span class="va">spec</span><span class="op">$</span><span class="va">method</span></span>
 <span><span class="va">winner</span></span>
-<span><span class="co">#&gt; [1] "svm"</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] "forest"</span></span></code></pre></div>
 <div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tuned</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_tune_grid.html">tl_tune_grid</a></span><span class="op">(</span></span>
 <span>  <span class="va">split</span><span class="op">$</span><span class="va">train</span>, <span class="va">Species</span> <span class="op">~</span> <span class="va">.</span>,</span>
@@ -482,14 +482,14 @@ the winner:</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">tuned</span>, <span class="st">"tuning_results"</span><span class="op">)</span><span class="op">$</span><span class="va">best_params</span></span>
-<span><span class="co">#&gt; $kernel</span></span>
-<span><span class="co">#&gt; [1] "linear"</span></span>
+<span><span class="co">#&gt; $mtry</span></span>
+<span><span class="co">#&gt; [1] 2</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; $cost</span></span>
-<span><span class="co">#&gt; [1] 1</span></span></code></pre></div>
+<span><span class="co">#&gt; $ntree</span></span>
+<span><span class="co">#&gt; [1] 100</span></span></code></pre></div>
 <div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">tuned</span>, new_data <span class="op">=</span> <span class="va">split</span><span class="op">$</span><span class="va">test</span><span class="op">)</span><span class="op">$</span><span class="va">.pred</span> <span class="op">==</span> <span class="va">split</span><span class="op">$</span><span class="va">test</span><span class="op">$</span><span class="va">Species</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 0.9777778</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 0.9333333</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="guidance">Guidance<a class="anchor" aria-label="anchor" href="#guidance"></a>

@@ -143,6 +143,6 @@ result$leaderboard
 #> # A tibble: 1 × 3
 #>   model         score evaluation
 #>   <chr>         <dbl> <chr>     
-#> 1 baseline_tree 0.933 cv        
+#> 1 baseline_tree 0.953 cv        
 # }
 ```

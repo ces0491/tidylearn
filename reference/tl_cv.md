@@ -5,7 +5,7 @@ Cross-validation for tidylearn models
 ## Usage
 
 ``` r
-tl_cv(data, formula, method, folds = 5, metrics = NULL, ...)
+tl_cv(data, formula, method, folds = 5, metrics = NULL, transform = NULL, ...)
 ```
 
 ## Arguments
@@ -31,6 +31,16 @@ tl_cv(data, formula, method, folds = 5, metrics = NULL, ...)
   Character vector of metrics to compute on each fold, passed to
   [`tl_evaluate`](https://tidylearn.sheetsolved.com/reference/tl_evaluate.md).
   If `NULL` (the default), `tl_evaluate`'s per-task defaults are used.
+
+- transform:
+
+  Optional function for feature engineering that has to be refitted per
+  fold. It is called with the training rows of each fold and must return
+  a list with an `apply` function (applied to both the training and
+  assessment rows) and, optionally, a `formula` to fit under. Use this
+  for anything that learns parameters from the data – PCA rotations,
+  cluster centroids, target encodings – since fitting those before the
+  split inflates every fold's score.
 
 - ...:
 
@@ -60,10 +70,10 @@ A list with two elements:
 cv <- tl_cv(mtcars, mpg ~ wt + hp, method = "linear", folds = 3)
 cv$summary
 #> # A tibble: 3 × 3
-#>   metric  mean    sd
-#>   <chr>  <dbl> <dbl>
-#> 1 mae    2.24  0.333
-#> 2 rmse   2.79  0.308
-#> 3 rsq    0.613 0.230
+#>   metric  mean     sd
+#>   <chr>  <dbl>  <dbl>
+#> 1 mae    2.16  0.766 
+#> 2 rmse   2.70  0.959 
+#> 3 rsq    0.758 0.0981
 # }
 ```

@@ -42,9 +42,9 @@ tl_check_assumptions(model)
 #>   na.action.merMod lme4
 #> Model Assumptions Check Summary:
 #> --------------------------------
-#> Linearity: SATISFIED
-#>   Details: Correlation between fitted values and residuals: 0
-#>   Recommendation: Linearity assumption appears satisfied
+#> Linearity: VIOLATED
+#>   Details: RESET-style test on powers of the fitted values: p-value = 0.002042
+#>   Recommendation: Consider non-linear transformations or polynomial terms
 #> Independence: VIOLATED
 #>   Details: Durbin-Watson statistic: 1.3624
 #>   Recommendation: Possible autocorrelation in residuals. Check for time-series structure or clustering.
@@ -65,13 +65,13 @@ tl_check_assumptions(model)
 #> [1] "Linearity"
 #> 
 #> $linearity$check
-#> [1] TRUE
+#> [1] FALSE
 #> 
 #> $linearity$details
-#> [1] "Correlation between fitted values and residuals: 0"
+#> [1] "RESET-style test on powers of the fitted values: p-value = 0.002042"
 #> 
 #> $linearity$recommendation
-#> [1] "Linearity assumption appears satisfied"
+#> [1] "Consider non-linear transformations or polynomial terms"
 #> 
 #> 
 #> $independence
@@ -147,16 +147,16 @@ tl_check_assumptions(model)
 #> 
 #> $overall
 #> $overall$status
-#> [1] "3 assumption(s) appear to be violated. See details."
+#> [1] "4 assumption(s) appear to be violated. See details."
 #> 
 #> $overall$n_checked
 #> [1] 6
 #> 
 #> $overall$n_violated
-#> [1] 3
+#> [1] 4
 #> 
 #> $overall$n_satisfied
-#> [1] 3
+#> [1] 2
 #> 
 #> 
 # }

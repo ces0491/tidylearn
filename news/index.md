@@ -4,7 +4,130 @@
 
 Development version.
 
+### New Features
+
+#### Cloud compute (security guards)
+
+- [`tl_cloud_consent()`](https://tidylearn.sheetsolved.com/reference/tl_cloud_consent.md)
+  — grants or revokes permission for the rest of the R session to upload
+  training data to your Modal account. Cloud fits otherwise require
+  `confirm_upload = TRUE` on every call. The lock is never written to
+  disk and does not survive an R restart, and tidylearn never prompts
+  interactively, so scripts and CI behave the same as an interactive
+  session.
+
+- Cloud endpoints are read from the `TIDYLEARN_MODAL_ENDPOINT`
+  environment variable and validated before any request is built: the
+  scheme must be `https` and the host must be on the allowlist.
+  Lookalikes such as `modal.run.example.com` or `evil-modal.run` are
+  rejected. The endpoint is user-supplied configuration, so this check
+  is what stops a typo or a modified variable sending training data
+  somewhere other than Modal. An environment variable is used rather
+  than an R option because an option can be set silently by a shared
+  `.Rprofile`.
+
+- [`tl_cloud_allow_host()`](https://tidylearn.sheetsolved.com/reference/tl_cloud_allow_host.md)
+  and
+  [`tl_cloud_allowed_hosts()`](https://tidylearn.sheetsolved.com/reference/tl_cloud_allowed_hosts.md)
+  — the allowlist defaults to Modal’s own domains, and Modal customers
+  serving Web Functions from a custom domain can extend it. Extension is
+  a per-session call rather than an option or environment variable, for
+  the same reason: nothing inherited from the environment should be able
+  to add an upload destination. Added hosts must be bare host names, and
+  a single label such as `"com"` is refused because it would open an
+  entire top-level domain.
+
+  These implement T2 and T9 of
+  `system.file("security/threat-model.md", package = "tidylearn")`.
+  Submission itself is still not wired up — `compute = "cloud"`
+  continues to error.
+
+#### Cloud compute (model serialisation)
+
+- Internal helpers now convert a fitted model to bytes and back for
+  transport from a remote worker. Twelve of the thirteen supervised
+  methods survive base R serialisation unchanged, xgboost included — its
+  booster is embedded in the byte stream rather than left as a dangling
+  pointer.
+
+  `method = "deep"` is the exception and is handled separately: a keras
+  model is a reference to a Python object and cannot cross a process
+  boundary that way, so its weights travel as their own hdf5 payload via
+  [`keras::serialize_model()`](https://rdrr.io/pkg/keras/man/serialize_model.html).
+  Detection is by the presence of a Python object rather than by method
+  name or keras class, because keras renamed its classes between
+  versions and matching those would silently stop detecting models on
+  one side of the change.
+
 ### Bug Fixes
+
+Several of these changed reported numbers. Results produced by 0.4.0 and
+earlier should be recomputed.
+
+#### Metrics and evaluation
+
+- [`tl_calc_classification_metrics()`](https://tidylearn.sheetsolved.com/reference/tl_calc_classification_metrics.md)
+  computed precision, recall, sensitivity, specificity and F1 for the
+  **wrong class**. The `yardstick` calls omitted `event_level`, so they
+  defaulted to the first factor level while the rest of the package —
+  AUC, class prediction, lift and gain — treats the second level as
+  positive. A binary model predicting only positives reported
+  specificity 1.0 where the true value is 0.0. Threshold metrics from
+  [`tl_evaluate_thresholds()`](https://tidylearn.sheetsolved.com/reference/tl_evaluate_thresholds.md)
+  were affected the same way, so reported precision fell as the
+  threshold rose. Multiclass metrics were never affected.
+
+- [`tl_cv()`](https://tidylearn.sheetsolved.com/reference/tl_cv.md)
+  never evaluated the last `n %% folds` observations: folds were sized
+  with `floor(n / folds)` and sliced forward, leaving the remainder in
+  every training set and no test set. On `mtcars` with `folds = 5`, 30
+  of 32 rows were scored. Rows are now assigned to folds so that the
+  folds partition the data and differ in size by at most one.
+  [`tl_cv()`](https://tidylearn.sheetsolved.com/reference/tl_cv.md) also
+  rejects fold counts below 2 or above `nrow(data)`.
+
+- [`tl_check_assumptions()`](https://tidylearn.sheetsolved.com/reference/tl_check_assumptions.md)
+  tested linearity with `cor(fitted, residuals)`, which is identically
+  zero for any OLS fit with an intercept — the check could only ever
+  report SATISFIED. It is now a RESET-style test on powers of the fitted
+  values.
+
+#### Prediction
+
+- [`predict()`](https://rdrr.io/r/stats/predict.html) failed or returned
+  wrong output for six method-and-task combinations, all now fixed and
+  covered by a contract test that runs every method through the same
+  grid:
+
+  - Multiclass `"boost"` returned a **single** prediction for the whole
+    input, because `predict.gbm` hands back a 3-D array that
+    [`is.matrix()`](https://rdrr.io/r/base/matrix.html) does not
+    recognise. `type = "prob"` errored for any input with more than one
+    row.
+  - `"svm"` with `type = "prob"` always errored: the fitted object
+    records the flag as `$compprob`, not `$probability`.
+  - Binary classification with `method = "nn"` could not fit at all —
+    `entropy` was passed explicitly and collided with the value
+    `nnet.formula()` supplies itself.
+  - `"xgboost"` built its design matrix from the full two-sided formula,
+    so scoring data without the response column was impossible.
+  - `"svm"` and `"xgboost"` silently dropped rows with missing
+    predictors, returning a shorter vector so that predictions no longer
+    lined up with the input rows.
+  - Multinomial `"ridge"`/`"lasso"`/`"elastic_net"` with `type = "prob"`
+    errored on single-row input.
+
+  The `nn` failure is worth its own note: `nnet.formula()` supplies
+  `entropy = TRUE` itself when the response is a two-level factor, and
+  [`tl_fit_nn()`](https://tidylearn.sheetsolved.com/reference/tl_fit_nn.md)
+  named it again, so `nnet.default()` received it twice and reported
+  “formal argument ‘entropy’ matched by multiple actual arguments”.
+  Three or more classes were unaffected, because `nnet.formula()` uses
+  `softmax` there and `nnet.default()` sets `entropy` to `FALSE`
+  whenever `softmax` is on — so the argument it collided with was never
+  present. The criterion is now left to nnet. Neural networks had no
+  test coverage at all; there are now four tests beyond the contract
+  grid.
 
 - [`predict()`](https://rdrr.io/r/stats/predict.html) on a
   [`tl_auto_ml()`](https://tidylearn.sheetsolved.com/reference/tl_auto_ml.md)
@@ -38,6 +161,62 @@ Development version.
   budget is now recorded on the model and honoured by
   [`predict()`](https://rdrr.io/r/stats/predict.html).
 
+- XGBoost prediction pins the training factor levels, so new data
+  missing a level no longer changes the contrast coding, and no longer
+  passes `ntreelimit` or `reshape` to `xgboost::predict()`. Both are
+  deprecated upstream and warn that they will become errors; every
+  XGBoost prediction emitted two warnings per call.
+  [`tl_predict_xgboost()`](https://tidylearn.sheetsolved.com/reference/tl_predict_xgboost.md)
+  gains `iterationrange` and accepts `ntreelimit` with a deprecation
+  warning that translates it. Multiclass probabilities are reshaped to
+  one named column per class whichever shape the installed xgboost
+  returns.
+
+#### Data leakage
+
+- [`tl_pipeline()`](https://tidylearn.sheetsolved.com/reference/tl_pipeline.md)
+  learned imputation medians and standardisation centres and scales from
+  the **whole** dataset and only then split, so every assessment row
+  helped define the transformation it was scored under. Each fold, and
+  each side of a train/test split, now learns its own statistics. The
+  final model still uses the full-data statistics, which
+  [`tl_predict_pipeline()`](https://tidylearn.sheetsolved.com/reference/tl_predict_pipeline.md)
+  continues to replay.
+
+- [`tl_pipeline()`](https://tidylearn.sheetsolved.com/reference/tl_pipeline.md)
+  also imputed the **response**, replacing missing outcomes with the
+  median and turning them into both training targets and evaluation
+  ground truth. Imputation now skips the response.
+
+- [`tl_auto_ml()`](https://tidylearn.sheetsolved.com/reference/tl_auto_ml.md)
+  fitted PCA rotations and cluster centroids on all rows before
+  cross-validating on the transformed data, so the `pca_*` and
+  `clustered_*` candidates competed against honestly scored baselines.
+  Both are now refitted inside each fold, via a new `transform` argument
+  to [`tl_cv()`](https://tidylearn.sheetsolved.com/reference/tl_cv.md).
+
+#### Ranking, splitting and tuning
+
+- `tl_auto_ml(metric = "mape")` returned the model with the **highest**
+  error as the best one — `mape` was missing from the ascending-sort
+  list. Unrecognised metrics now error rather than assume a direction.
+  [`tl_auto_ml()`](https://tidylearn.sheetsolved.com/reference/tl_auto_ml.md)
+  also returns `best_model_name`.
+
+- [`tl_split()`](https://tidylearn.sheetsolved.com/reference/tl_split.md)
+  could return an empty training set *and* an empty test set:
+  `floor(n * prop)` can be zero, and `data[-integer(0), ]` selects
+  nothing. Every group now keeps at least one row on each side.
+
+- [`tl_tune_random()`](https://tidylearn.sheetsolved.com/reference/tl_tune_random.md)
+  ignored two documented parameter forms. Any two-element numeric was
+  caught by the continuous branch first, so an integer range like
+  `c(100, 500)` was sampled with
+  [`runif()`](https://rdrr.io/r/stats/Uniform.html); and the log-uniform
+  form `c(min, max, "log")` is a character vector, so its branch was
+  unreachable and the literal `"log"` could be sampled as a value.
+  `param_space` is now fully documented.
+
 - [`tl_pipeline()`](https://tidylearn.sheetsolved.com/reference/tl_pipeline.md)
   accepted a partial `preprocessing` or `evaluation` list and then
   failed inside
@@ -47,17 +226,49 @@ Development version.
   rather than a step that silently does nothing, and
   `evaluation$best_metric` is checked against `evaluation$metrics`.
 
-- `tl_model(method = "nn")` failed on every two-class problem with
-  “formal argument ‘entropy’ matched by multiple actual arguments”.
-  `nnet.formula()` supplies `entropy = TRUE` itself when the response is
-  a two-level factor, and
-  [`tl_fit_nn()`](https://tidylearn.sheetsolved.com/reference/tl_fit_nn.md)
-  named it again, so `nnet.default()` received it twice. Three or more
-  classes were unaffected, because `nnet.formula()` uses `softmax` there
-  and `nnet.default()` sets `entropy` to `FALSE` whenever `softmax` is
-  on — so the argument it collided with was never present. The criterion
-  is now left to nnet, which picks the right one from the response.
-  Neural networks had no test coverage at all; there are now four.
+#### Clustering, distance and plots
+
+- [`tidy_dbscan()`](https://tidylearn.sheetsolved.com/reference/tidy_dbscan.md)
+  converted a `dist` input with
+  [`as.matrix()`](https://rdrr.io/r/base/matrix.html) and passed it as
+  coordinates, clustering each observation’s vector of distances rather
+  than the dissimilarity. It also read a non-existent `"core"`
+  attribute, so every point was reported as a non-core point.
+
+- [`tidy_kmeans()`](https://tidylearn.sheetsolved.com/reference/tidy_kmeans.md)
+  lost its entire metrics tibble for the Lloyd, Forgy and MacQueen
+  algorithms, which leave `ifault` NULL.
+
+- [`tidy_gower()`](https://tidylearn.sheetsolved.com/reference/tidy_gower.md)
+  documented `weights` as a named vector but indexed it positionally,
+  applying weights to the wrong variables. Named weights are now matched
+  by name, and a mismatched length errors.
+
+- `tidy_mds(method = "sammon")` and `method = "kruskal"` passed MASS’s
+  “zero or negative distance between objects i and j” straight through.
+  The cause is duplicated rows, which the message does not say. Both now
+  check first and name the offending pairs.
+
+- [`tl_plot_cv_results()`](https://tidylearn.sheetsolved.com/reference/tl_plot_cv_results.md)
+  could not plot
+  [`tl_cv()`](https://tidylearn.sheetsolved.com/reference/tl_cv.md)
+  output — it read `$fold_metrics` and `mean_value`, which are named
+  `$folds` and `mean`.
+
+- Lift and gain charts indexed past the end of the data in their final
+  deciles, corrupting the cumulative curve.
+
+- The outlier plot from
+  [`tl_detect_outliers()`](https://tidylearn.sheetsolved.com/reference/tl_detect_outliers.md)
+  attached flags to the wrong observations whenever more than one
+  variable was plotted.
+
+- [`plot_distance_heatmap()`](https://tidylearn.sheetsolved.com/reference/plot_distance_heatmap.md)
+  sorted its axes alphabetically, moving the diagonal off the diagonal
+  and discarding any `cluster_order`.
+
+- Influence plots used unnamed colour vectors, so when every point was
+  influential they all rendered in the “not influential” colour.
 
 - [`tl_plot_nn_architecture()`](https://tidylearn.sheetsolved.com/reference/tl_plot_nn_architecture.md)
   failed on any neural network with a single output unit — every
@@ -72,14 +283,6 @@ Development version.
   now substitutes the formula into the recorded call. Multiclass took
   the other branch, which is why the function’s own example passed.
 
-- XGBoost prediction no longer passes `ntreelimit` and `reshape` to
-  `xgboost::predict()`. Both are deprecated upstream and warn that they
-  will become errors; every XGBoost prediction emitted two warnings per
-  call.
-  [`tl_predict_xgboost()`](https://tidylearn.sheetsolved.com/reference/tl_predict_xgboost.md)
-  gains `iterationrange` and accepts `ntreelimit` with a deprecation
-  warning that translates it.
-
 - `tl_plot_tuning_results(plot_type = "parallel")` and
   [`tl_plot_regularization_path()`](https://tidylearn.sheetsolved.com/reference/tl_plot_regularization_path.md)
   used the `size` aesthetic on a line, which ggplot2 deprecated in 3.4.0
@@ -93,11 +296,6 @@ Development version.
   vector as long as the data, and a name that cannot resolve is an error
   rather than a plot that fails when printed.
 
-- `tidy_mds(method = "sammon")` and `method = "kruskal"` passed MASS’s
-  “zero or negative distance between objects i and j” straight through.
-  The cause is duplicated rows, which the message does not say. Both now
-  check first and name the offending pairs.
-
 - [`tl_interaction_effects()`](https://tidylearn.sheetsolved.com/reference/tl_interaction_effects.md)
   emitted “essentially perfect fit” warnings from
   [`summary.lm()`](https://rdrr.io/r/stats/summary.lm.html). The slope
@@ -107,8 +305,29 @@ Development version.
   now says that `slopes$slope_se` describes the fit to the prediction
   grid rather than the uncertainty of the marginal effect.
 
+#### Errors instead of misleading results
+
+- [`tl_check_assumptions()`](https://tidylearn.sheetsolved.com/reference/tl_check_assumptions.md)
+  and
+  [`tl_influence_measures()`](https://tidylearn.sheetsolved.com/reference/tl_influence_measures.md)
+  advertised support for `"ridge"`, `"lasso"` and `"elastic_net"`, but
+  glmnet provides no residuals, hat values or influence measures. They
+  now explain this instead of failing partway through.
+
+- [`plot_cluster_comparison()`](https://tidylearn.sheetsolved.com/reference/plot_cluster_comparison.md)
+  and
+  [`create_cluster_dashboard()`](https://tidylearn.sheetsolved.com/reference/create_cluster_dashboard.md)
+  called `gridExtra` without a
+  [`requireNamespace()`](https://rdrr.io/r/base/ns-load.html) guard.
+
+- Database connection strings carried the password into the returned
+  object’s `tl_source` attribute — printed on every
+  [`print()`](https://rdrr.io/r/base/print.html) and persisted by
+  [`saveRDS()`](https://rdrr.io/r/base/readRDS.html) — into the progress
+  message, and into the URL parse error. All are now redacted.
+
 - [`tl_plot_tuning_results()`](https://tidylearn.sheetsolved.com/reference/tl_plot_tuning_results.md)
-  named the valid `plot_type` values in its error instead of reporting
+  names the valid `plot_type` values in its error instead of reporting
   “Invalid plot_type or insufficient parameters”.
 
 - [`get_pca_variance()`](https://tidylearn.sheetsolved.com/reference/get_pca_variance.md)
@@ -126,6 +345,10 @@ Development version.
   `tests/testthat/test-examples.R`, so it cannot drift again unnoticed.
 
 ### Documentation
+
+- New vignette `compute-backends`: how `compute = "auto"` routes a fit,
+  what the advisor estimates a cloud tier would cost, and the safety
+  model that governs data egress.
 
 - New vignette `market-basket`: the association rules family
   ([`tidy_apriori()`](https://tidylearn.sheetsolved.com/reference/tidy_apriori.md),
@@ -186,17 +409,18 @@ Development version.
 - README links the documentation site and every article; `inst/CITATION`
   reports the installed version and year rather than a hard-coded 2025.
 
+- `inst/security/threat-model.md` is rewritten for the architecture the
+  transport spike settled on: plain HTTPS to a Modal Web Function backed
+  by an R worker, rather than reticulate driving the Python SDK. T1 and
+  T4 named constraints that no longer apply, and no threat covered a
+  user-supplied endpoint URL.
+
 ### Internal
 
 - `.github/workflows/pkgdown.yaml` builds on pull requests without
   deploying, so a dangling article name fails a PR check rather than the
   first push to main, and deploys with `clean: true` so removed pages
   leave the live site.
-
-- `_pkgdown.yml` no longer references the `compute-backends` article or
-  the `tl_cloud` topics, which live on an unmerged branch. The article
-  reference was a hard build failure: pkgdown evaluates an unmatched
-  article name as R code.
 
 ## tidylearn 0.4.0
 
@@ -292,10 +516,11 @@ CRAN release: 2026-08-03
   compute in tidylearn will and will not do once the Modal integration
   lands. Covers token handling (never read in R), data egress consent
   (per-call `confirm_upload = TRUE` plus session-level
-  `tl_cloud_consent()`), ephemeral compute (no persistent Modal volumes
-  by default), no telemetry, and an audit checklist that reviewers can
-  grep / verify against the Modal-integration PR. The doc is shipped
-  with the package so users (and CRAN reviewers) can find it via
+  [`tl_cloud_consent()`](https://tidylearn.sheetsolved.com/reference/tl_cloud_consent.md)),
+  ephemeral compute (no persistent Modal volumes by default), no
+  telemetry, and an audit checklist that reviewers can grep / verify
+  against the Modal-integration PR. The doc is shipped with the package
+  so users (and CRAN reviewers) can find it via
   `system.file("security/threat-model.md", package = "tidylearn")`.
 
 ### Bug Fixes

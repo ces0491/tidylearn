@@ -20,7 +20,7 @@ suggest_eps(data, minPts = 5, method = "percentile", percentile = 0.95)
 
 - method:
 
-  Method to suggest eps: "knee" (default), "percentile"
+  Method to suggest eps: "percentile" (default), "knee"
 
 - percentile:
 

@@ -26,6 +26,8 @@
 
 ### Scaling and reporting
 
+- [Compute Backends: CPU, GPU and
+  Cloud](https://tidylearn.sheetsolved.com/articles/compute-backends.md):
 - [Reporting with
   tidylearn](https://tidylearn.sheetsolved.com/articles/reporting.md):
 - [Integration Workflows: Combining Supervised and Unsupervised

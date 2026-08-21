@@ -45,8 +45,8 @@ print(db)
 #> # A tibble: 2 × 3
 #>   cluster  size n_core
 #>     <int> <int>  <int>
-#> 1       1    49      0
-#> 2       2    84      0
+#> 1       1    49     45
+#> 2       2    84     72
 #> 
 #> Use augment_dbscan() to add cluster assignments to your data
 # }

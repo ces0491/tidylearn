@@ -350,6 +350,14 @@ Where the work runs, and what it is allowed to reach.
   : Advise on the best compute tier for a tidylearn fit
 - [`tl_transfer_learning()`](https://tidylearn.sheetsolved.com/reference/tl_transfer_learning.md)
   : Transfer Learning Workflow
+- [`tl_cloud_allow_host()`](https://tidylearn.sheetsolved.com/reference/tl_cloud_allow_host.md)
+  : Allow an additional host for cloud uploads in this R session
+- [`tl_cloud_allowed_hosts()`](https://tidylearn.sheetsolved.com/reference/tl_cloud_allowed_hosts.md)
+  : Hosts tidylearn will currently upload to
+- [`tl_cloud_consent()`](https://tidylearn.sheetsolved.com/reference/tl_cloud_consent.md)
+  : Grant or revoke cloud upload consent for this R session
+- [`tl_cloud_jobs()`](https://tidylearn.sheetsolved.com/reference/tl_cloud_jobs.md)
+  : Cloud jobs submitted in this R session
 
 ## Utilities
 
@@ -446,6 +454,14 @@ here when you want the shape of something before the arguments.
 
 - [`tidylearn-classification`](https://tidylearn.sheetsolved.com/reference/tidylearn-classification.md)
   : Classification Functions for tidylearn
+- [`tidylearn-cloud-consent`](https://tidylearn.sheetsolved.com/reference/tidylearn-cloud-consent.md)
+  : Cloud data-egress consent for tidylearn
+- [`tidylearn-cloud-cost`](https://tidylearn.sheetsolved.com/reference/tidylearn-cloud-cost.md)
+  : Cost controls for tidylearn cloud compute
+- [`tidylearn-cloud-endpoint`](https://tidylearn.sheetsolved.com/reference/tidylearn-cloud-endpoint.md)
+  : Cloud endpoint resolution for tidylearn
+- [`tidylearn-cloud-serialize`](https://tidylearn.sheetsolved.com/reference/tidylearn-cloud-serialize.md)
+  : Model serialisation for tidylearn cloud compute
 - [`tidylearn-core`](https://tidylearn.sheetsolved.com/reference/tidylearn-core.md)
   : tidylearn: A Unified Tidy Interface to R's Machine Learning
   Ecosystem

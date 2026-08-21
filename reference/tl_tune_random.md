@@ -36,7 +36,32 @@ tl_tune_random(
 
 - param_space:
 
-  A named list of parameter spaces to sample from
+  A named list of parameter spaces to sample from. Each element is read
+  by its type and length:
+
+  a function
+
+  :   called with no arguments to draw one value
+
+  `c(min, max, "log")`
+
+  :   log-uniform draw between `min` and `max`
+
+  two whole numbers
+
+  :   integer range, e.g. `c(10, 20)` draws from 10:20
+
+  three or more whole numbers
+
+  :   a discrete set, sampled from as given
+
+  two other numbers
+
+  :   uniform draw between them, e.g. `c(0.01, 0.1)`
+
+  character or factor
+
+  :   categorical, sampled from as given
 
 - n_iter:
 
