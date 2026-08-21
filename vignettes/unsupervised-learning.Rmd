@@ -22,407 +22,466 @@ library(dplyr)
 library(ggplot2)
 ```
 
-## Introduction
+## Two Ways In
 
-This vignette explores unsupervised learning in tidylearn. All methods wrap
-established R packages - the algorithms are unchanged, tidylearn simply provides
-a consistent interface and tidy output.
+tidylearn offers two entry points to the same algorithms, and which one you
+want depends on what you are doing.
 
-**Wrapped packages include:**
+`tl_model(method = "kmeans")` puts clustering behind the same signature as
+every supervised method, which is what you want when the clustering is a step
+inside a larger workflow — see `vignette("integration-workflows")`.
+
+The `tidy_*()` family is the fuller interface, and the subject of this
+vignette. Each function returns a list of tibbles rather than a fitted object
+you have to take apart, and each has a matching `augment_*()` that glues the
+result back onto your data.
+
+```{r}
+# Same algorithm, two interfaces
+model <- tl_model(iris[, 1:4], method = "kmeans", k = 3)
+km <- tidy_kmeans(iris[, 1:4], k = 3)
+
+names(km)
+```
+
+Both wrap `stats::kmeans()`; the algorithms are unchanged. Reach the raw
+object through `model$fit` or `km$model`.
+
+**Wrapped packages:**
 
 - stats (`prcomp()`, `kmeans()`, `hclust()`, `cmdscale()`)
 - cluster (`pam()`, `clara()`)
 - dbscan for density-based clustering
 - MASS (`isoMDS()`, `sammon()`)
 - smacof for MDS algorithms
+- arules for association rules — see `vignette("market-basket")`
 
-Access raw model objects via `model$fit` for package-specific functionality.
+## Scale First
 
-## Dimensionality Reduction
+Every distance-based method here answers a question about distance, and
+distance is measured in whatever units your columns happen to use. A variable
+measured in thousands will dominate one measured in tenths, whatever its
+actual relevance.
 
-Dimensionality reduction techniques help visualize high-dimensional data and extract key patterns.
-
-### Principal Component Analysis (PCA)
+`standardize_data()` centres and scales:
 
 ```{r}
-# Perform PCA on iris data (excluding species)
-model_pca <- tl_model(iris[, 1:4], method = "pca")
-print(model_pca)
+iris_scaled <- standardize_data(iris[, 1:4])
+
+sapply(iris_scaled, function(x) round(c(mean = mean(x), sd = sd(x)), 3))
+```
+
+iris happens to have four variables on a similar scale, so the examples below
+use the raw values and stay comparable to the species labels. On real data,
+scale first.
+
+## Principal Component Analysis
+
+```{r}
+pca <- tidy_pca(iris[, 1:4], scale = TRUE)
+names(pca)
+```
+
+Accessors rather than list-digging:
+
+```{r}
+get_pca_variance(pca)
 ```
 
 ```{r}
-# Extract variance explained
-variance_explained <- model_pca$fit$variance_explained
-print(variance_explained)
+get_pca_loadings(pca, n_components = 2)
+```
+
+Two components carry 96% of the variance. `plot_variance_explained()` marks
+where a threshold is crossed:
+
+```{r}
+plot_variance_explained(get_pca_variance(pca), threshold = 0.9)
+```
+
+`tidy_pca_screeplot()` is the conventional scree plot:
+
+```{r}
+tidy_pca_screeplot(pca)
+```
+
+### Scores back on the data
+
+`augment_pca()` returns the original data with component scores appended, so
+the labels you already have stay attached:
+
+```{r}
+scored <- augment_pca(pca, iris, n_components = 2)
+head(scored, 3)
 ```
 
 ```{r}
-# Cumulative variance explained
-cumsum(variance_explained$prop_variance)
-```
-
-```{r}
-# Transform data to principal components
-pca_scores <- predict(model_pca)
-head(pca_scores)
-```
-
-```{r}
-# Visualize first two components
-pca_plot_data <- pca_scores %>%
-  mutate(Species = iris$Species)
-
-ggplot(pca_plot_data, aes(x = PC1, y = PC2, color = Species)) +
+ggplot(scored, aes(x = PC1, y = PC2, color = Species)) +
   geom_point(size = 3, alpha = 0.7) +
   labs(
-    title = "PCA of Iris Dataset",
-    x = paste0(
-      "PC1 (", round(variance_explained$prop_variance[1] * 100, 1), "%)"
-    ),
-    y = paste0(
-      "PC2 (", round(variance_explained$prop_variance[2] * 100, 1), "%)"
-    )
+    title = "PCA of Iris",
+    x = paste0("PC1 (",
+               round(get_pca_variance(pca)$prop_variance[1] * 100, 1), "%)"),
+    y = paste0("PC2 (",
+               round(get_pca_variance(pca)$prop_variance[2] * 100, 1), "%)")
   ) +
   theme_minimal()
 ```
 
+`tidy_pca_biplot()` overlays the loadings on the same scatter, which is how
+you read what the components mean:
+
 ```{r}
-# Examine loadings (variable contributions)
-loadings <- model_pca$fit$loadings
-print(loadings)
+tidy_pca_biplot(pca, color_by = iris$Species)
 ```
 
-### Multidimensional Scaling (MDS)
+## How Many Clusters?
+
+Guessing *k* and checking the answer against labels you happen to have is not
+a method. `optimal_clusters()` runs three criteria at once.
 
 ```{r}
-# Perform MDS
-model_mds <- tl_model(iris[, 1:4], method = "mds", k = 2)
-print(model_mds)
-```
-
-```{r}
-# Extract MDS coordinates
-mds_points <- predict(model_mds)
-head(mds_points)
+opt <- optimal_clusters(iris[, 1:4], max_k = 8)
+names(opt)
 ```
 
 ```{r}
-# Visualize MDS
-mds_plot_data <- mds_points %>%
-  mutate(Species = iris$Species)
-
-ggplot(mds_plot_data, aes(x = Dim1, y = Dim2, color = Species)) +
-  geom_point(size = 3, alpha = 0.7) +
-  labs(title = "MDS of Iris Dataset") +
-  theme_minimal()
-```
-
-## Clustering
-
-Clustering algorithms group similar observations together without using labels.
-
-### K-means Clustering
-
-```{r}
-# Perform k-means with k=3
-model_kmeans <- tl_model(iris[, 1:4], method = "kmeans", k = 3)
-print(model_kmeans)
+opt$wss
 ```
 
 ```{r}
-# Extract cluster assignments
-clusters <- model_kmeans$fit$clusters
-head(clusters)
+opt$silhouette
 ```
 
 ```{r}
-# Compare clusters with actual species
-table(Cluster = clusters$cluster, Species = iris$Species)
+c(silhouette = attr(opt$silhouette, "optimal_k"),
+  gap = opt$gap$recommended_k)
+```
+
+The three criteria disagree, which is normal and worth saying plainly: the
+elbow is a judgement call, silhouette favours well-separated compact clusters,
+and the gap statistic compares against a null of no structure. Silhouette says
+2 here because *versicolor* and *virginica* overlap; the botanical answer is
+3.
+
+```{r}
+plot_elbow(opt$wss, suggested_k = 3)
 ```
 
 ```{r}
-# Visualize clusters using PCA
-cluster_viz <- pca_scores %>%
-  mutate(
-    Cluster = as.factor(clusters$cluster),
-    Species = iris$Species
-  )
+plot_gap_stat(opt$gap)
+```
 
-ggplot(cluster_viz, aes(x = PC1, y = PC2, color = Cluster, shape = Species)) +
-  geom_point(size = 3, alpha = 0.7) +
-  labs(title = "K-means Clusters vs True Species") +
-  theme_minimal()
+`calc_wss()` gives the within-cluster sums of squares on their own if that is
+all you need:
+
+```{r}
+calc_wss(iris[, 1:4], max_k = 6)
+```
+
+## K-means
+
+```{r}
+km <- tidy_kmeans(iris[, 1:4], k = 3)
+km$centers
 ```
 
 ```{r}
-# Access cluster centers
-centers <- model_kmeans$fit$centers
-print(centers)
+km$clusters
 ```
 
-### PAM (K-medoids)
-
-PAM is more robust to outliers than k-means:
+`augment_kmeans()` puts the assignment back on the data:
 
 ```{r}
-# Perform PAM clustering
-model_pam <- tl_model(iris[, 1:4], method = "pam", k = 3)
-print(model_pam)
-
-# Extract clusters
-clusters_pam <- model_pam$fit$clusters
-table(Cluster = clusters_pam$cluster, Species = iris$Species)
-```
-
-### Hierarchical Clustering
-
-```{r}
-# Perform hierarchical clustering
-model_hclust <- tl_model(iris[, 1:4], method = "hclust")
-print(model_hclust)
+iris_clustered <- augment_kmeans(km, iris)
+table(Cluster = iris_clustered$cluster, Species = iris_clustered$Species)
 ```
 
 ```{r}
-# plot() dispatches on the model type -- a dendrogram for hclust,
-# a variance plot for PCA, a cluster scatter plot for k-means and friends
-plot(model_hclust)
+plot_cluster_sizes(km$clusters$cluster)
 ```
 
 ```{r}
-# Or work with the underlying hclust object directly
-plot(model_hclust$fit$model,
-     labels = FALSE,
-     main = "Hierarchical Clustering of Iris")
+plot_clusters(iris_clustered, cluster_col = "cluster",
+              x_col = "Petal.Length", y_col = "Petal.Width")
+```
+
+### Was it a good clustering?
+
+Silhouette width scores each observation on how much better it fits its own
+cluster than the next-nearest one. Values near 1 are comfortable, near 0
+borderline, negative means the point is on the wrong side.
+
+```{r}
+dist_mat <- tidy_dist(iris[, 1:4])
+sil <- tidy_silhouette(km$clusters$cluster, dist_mat)
+
+sil$avg_width
 ```
 
 ```{r}
-# Cut tree to get clusters
-k <- 3
-clusters_hc <- cutree(model_hclust$fit$model, k = k)
-table(Cluster = clusters_hc, Species = iris$Species)
+sil$cluster_avg
 ```
 
 ```{r}
-# Visualize hierarchical clusters
-hc_viz <- pca_scores %>%
-  mutate(
-    Cluster = as.factor(clusters_hc),
-    Species = iris$Species
-  )
-
-ggplot(hc_viz, aes(x = PC1, y = PC2, color = Cluster)) +
-  geom_point(size = 3, alpha = 0.7) +
-  labs(title = "Hierarchical Clustering Results") +
-  theme_minimal()
+plot_silhouette(sil)
 ```
 
-### DBSCAN (Density-Based Clustering)
+Cluster 1 is clean; the other two are the *versicolor*/*virginica* boundary,
+and their scores say so without needing the labels.
 
-DBSCAN can find arbitrarily shaped clusters and identify outliers:
+`calc_validation_metrics()` collects the summary numbers in one row:
 
 ```{r}
-# Perform DBSCAN
-model_dbscan <- tl_model(iris[, 1:4], method = "dbscan", eps = 0.5, minPts = 5)
-print(model_dbscan)
-
-# Extract clusters (0 = noise/outliers)
-clusters_dbscan <- model_dbscan$fit$clusters
-table(clusters_dbscan$cluster)
-
-# Compare with species
-table(Cluster = clusters_dbscan$cluster, Species = iris$Species)
+calc_validation_metrics(km$clusters$cluster, iris[, 1:4], dist_mat)
 ```
 
-### CLARA (for Large Datasets)
+## PAM and CLARA
 
-CLARA is efficient for large datasets:
+PAM picks actual observations as cluster centres, which makes it less
+sensitive to outliers than k-means and gives you a representative row rather
+than an average.
 
 ```{r}
-# Create larger dataset
+pam_result <- tidy_pam(iris[, 1:4], k = 3)
+pam_result$medoids
+```
+
+```{r}
+pam_result$silhouette_avg
+```
+
+```{r}
+table(Cluster = augment_pam(pam_result, iris)$cluster, Species = iris$Species)
+```
+
+CLARA samples rather than computing the full distance matrix, which is what
+makes it usable when *n* is large enough that an *n × n* matrix is not:
+
+```{r}
 large_data <- iris[rep(seq_len(nrow(iris)), 10), 1:4]
+clara_result <- tidy_clara(large_data, k = 3, samples = 5)
 
-# Perform CLARA
-model_clara <- tl_model(large_data, method = "clara", k = 3, samples = 5)
-print(model_clara)
-
-# Extract clusters
-clusters_clara <- model_clara$fit$clusters
+table(clara_result$clusters$cluster)
 ```
 
-## Choosing the Number of Clusters
+## Hierarchical Clustering
 
-### Elbow Method
+`tidy_hclust()` builds the tree; cutting it is a separate decision.
 
 ```{r}
-# Try different values of k
-k_values <- 2:8
-within_ss <- numeric(length(k_values))
-
-for (i in seq_along(k_values)) {
-  k <- k_values[i]
-  model <- tl_model(iris[, 1:4], method = "kmeans", k = k)
-  within_ss[i] <- model$fit$model$tot.withinss
-}
-
-# Plot elbow curve
-elbow_data <- data.frame(k = k_values, within_ss = within_ss)
-
-ggplot(elbow_data, aes(x = k, y = within_ss)) +
-  geom_line(linewidth = 1) +
-  geom_point(size = 3) +
-  labs(
-    title = "Elbow Method for Optimal k",
-    x = "Number of Clusters (k)",
-    y = "Total Within-Cluster Sum of Squares"
-  ) +
-  theme_minimal()
+hc <- tidy_hclust(iris[, 1:4], method = "average")
+plot_dendrogram(hc, k = 3)
 ```
 
-## Predicting on New Data
-
-### Clustering New Observations
+`optimal_hclust_k()` scores cut heights the way `optimal_clusters()` scores
+*k*:
 
 ```{r}
-# Train clustering model
-model_train <- tl_model(iris[1:100, 1:4], method = "kmeans", k = 3)
-
-# Predict cluster assignments for new data
-new_data <- iris[101:150, 1:4]
-new_clusters <- predict(model_train, new_data = new_data)
-
-head(new_clusters)
+optimal_hclust_k(hc, method = "silhouette", max_k = 8)$optimal_k
 ```
 
-### Transforming New Data with PCA
-
 ```{r}
-# Train PCA model
-pca_train <- tl_model(iris[1:100, 1:4], method = "pca")
-
-# Transform new data
-new_pca <- predict(pca_train, new_data = new_data)
-head(new_pca)
+cuts <- tidy_cutree(hc, k = 3)
+head(cuts, 3)
 ```
 
-## Combining Multiple Techniques
-
-### PCA followed by Clustering
-
 ```{r}
-# Reduce dimensions with PCA
-pca_model <- tl_model(iris[, 1:4], method = "pca")
-pca_data <- predict(pca_model)
-
-# Select first 2 components
-pca_reduced <- pca_data %>% select(PC1, PC2)
-
-# Cluster in reduced space
-kmeans_pca <- tl_model(pca_reduced, method = "kmeans", k = 3)
-clusters_pca <- kmeans_pca$fit$clusters
-
-# Visualize
-viz_combined <- pca_data %>%
-  mutate(
-    Cluster = as.factor(clusters_pca$cluster),
-    Species = iris$Species
-  )
-
-ggplot(viz_combined, aes(x = PC1, y = PC2, color = Cluster, shape = Species)) +
-  geom_point(size = 3, alpha = 0.7) +
-  labs(title = "Clustering in PCA Space") +
-  theme_minimal()
+hc_data <- augment_hclust(hc, iris, k = 3)
+table(Cluster = hc_data$cluster, Species = hc_data$Species)
 ```
 
-## Practical Applications
-
-### Customer Segmentation
+Linkage matters more than most people expect. `"average"`, `"complete"`,
+`"single"` and `"ward.D2"` can produce different trees from the same distances:
 
 ```{r}
-# Simulate customer data
-set.seed(42)
-customers <- data.frame(
-  age = rnorm(200, 40, 15),
-  income = rnorm(200, 50000, 20000),
-  spending_score = rnorm(200, 50, 25)
+linkages <- c("single", "average", "complete", "ward.D2")
+
+sapply(linkages, function(m) {
+  cl <- tidy_cutree(tidy_hclust(iris[, 1:4], method = m), k = 3)$cluster
+  max(table(cl))
+})
+```
+
+Single linkage chains, so it puts almost everything in one cluster. That is a
+property of the linkage, not a finding about irises.
+
+## DBSCAN
+
+DBSCAN finds arbitrarily shaped clusters and labels sparse points as noise.
+It needs `eps` (the neighbourhood radius) and `minPts`. Rather than guessing,
+`suggest_eps()` reads it off the k-nearest-neighbour distance curve.
+
+```{r}
+eps_suggestion <- suggest_eps(iris[, 1:4], minPts = 5)
+eps_suggestion$eps
+```
+
+```{r}
+plot_knn_dist(iris[, 1:4], k = 5)
+```
+
+The elbow in that curve is where points stop having close neighbours, which
+is the radius you want.
+
+```{r}
+db <- tidy_dbscan(iris[, 1:4], eps = eps_suggestion$eps, minPts = 5)
+
+c(clusters = db$n_clusters, noise = db$n_noise)
+```
+
+```{r}
+db_data <- augment_dbscan(db, iris)
+table(Cluster = db_data$cluster, Species = db_data$Species)
+```
+
+Cluster 0 is noise, not a cluster.
+
+`explore_dbscan_params()` sweeps the two parameters together, which is more
+informative than tuning either alone:
+
+```{r}
+explore_dbscan_params(
+  iris[, 1:4],
+  eps_values = c(0.4, 0.6, 0.8, 1.0),
+  minPts_values = c(4, 5, 10)
+)
+```
+
+Read `prop_noise` alongside `n_clusters`: a setting that finds many clusters
+by discarding a third of the data has not found structure.
+
+## Multidimensional Scaling
+
+MDS places observations so that their plotted distances reproduce their
+distances in the original space. Unlike PCA it can work from any distance
+matrix, including non-Euclidean ones.
+
+```{r}
+mds <- tidy_mds(iris[, 1:4], method = "classical", ndim = 2)
+head(mds$config, 3)
+```
+
+```{r}
+plot_mds(mds, color_by = iris$Species, label_points = FALSE)
+```
+
+`method` also takes `"metric"` and `"nonmetric"` (both via smacof),
+`"sammon"` and `"kruskal"`. The last two minimise a stress function by
+dividing through the observed distances, so they need every pairwise distance
+to be strictly positive. iris contains one duplicated row, which is enough to
+stop them:
+
+```{r, error = TRUE}
+tidy_mds(iris[, 1:4], method = "sammon", ndim = 2)
+```
+
+Drop the duplicates and they run:
+
+```{r}
+distinct_iris <- iris[!duplicated(iris[, 1:4]), 1:4]
+sammon <- tidy_mds(distinct_iris, method = "sammon", ndim = 2)
+sammon$stress
+```
+
+Stress is the number to check before reading anything into a non-metric
+layout: below about 0.05 the picture is a faithful rendering of the
+distances, and above about 0.2 it is decoration.
+
+## Comparing Clusterings
+
+`compare_clusterings()` scores several partitions of the same data side by
+side.
+
+```{r}
+comparison <- compare_clusterings(
+  list(
+    kmeans = km$clusters$cluster,
+    pam = pam_result$clusters$cluster,
+    hclust = cuts$cluster,
+    dbscan = db$clusters$cluster
+  ),
+  iris[, 1:4],
+  dist_mat
 )
 
-# Standardize features
-customers_scaled <- scale(customers) %>% as.data.frame()
-
-# Cluster customers
-customer_segments <- tl_model(customers_scaled, method = "kmeans", k = 4)
-customers$segment <- customer_segments$fit$clusters$cluster
-
-# Visualize segments
-ggplot(customers,
-       aes(x = income, y = spending_score,
-           color = as.factor(segment))) +
-  geom_point(size = 3, alpha = 0.7) +
-  labs(
-    title = "Customer Segmentation",
-    color = "Segment"
-  ) +
-  theme_minimal()
+comparison
 ```
 
-### Feature Extraction
-
 ```{r}
-# Use PCA for feature extraction
-pca_features <- tl_model(mtcars, method = "pca")
-
-# Keep components explaining 90% of variance
-var_exp <- pca_features$fit$variance_explained
-cumulative_var <- cumsum(var_exp$prop_variance)
-n_components <- which(cumulative_var >= 0.90)[1]
-
-cat("Components needed for 90% variance:", n_components, "\n")
-cat("Original features:", ncol(mtcars), "\n")
-dim_reduction <- round(
-  (1 - n_components / ncol(mtcars)) * 100, 1
+plot_cluster_comparison(
+  iris[, 1:4] %>%
+    mutate(kmeans = km$clusters$cluster, hclust = cuts$cluster),
+  cluster_cols = c("kmeans", "hclust"),
+  x_col = "Petal.Length",
+  y_col = "Petal.Width"
 )
-cat("Dimension reduction:", dim_reduction, "%\n")
 ```
 
-## Best Practices
-
-1. **Scale your data** before clustering or PCA for fair feature comparison
-2. **Determine optimal k** using elbow method or silhouette analysis
-3. **Try multiple methods** - different algorithms work better for different data
-4. **Visualize results** to understand cluster structure
-5. **Consider domain knowledge** when interpreting clusters
-6. **Use PCA for visualization** when data has more than 2-3 dimensions
-
-## Summary
-
-tidylearn provides comprehensive unsupervised learning tools:
-
-- **Dimensionality Reduction**: PCA, MDS for visualization and feature extraction
-- **Clustering**: K-means, PAM, CLARA, hierarchical, DBSCAN
-- **Unified API**: Same `tl_model()` function for all methods
-- **Prediction Support**: Transform new data with learned patterns
-- **Flexible**: Works with different data types and sizes
+The distance metric is a choice too. `compare_distances()` computes several
+so you can see whether your conclusion depends on it:
 
 ```{r}
-# Complete unsupervised workflow
-workflow_data <- iris[, 1:4]
-
-# 1. Reduce dimensions
-pca_final <- tl_model(workflow_data, method = "pca")
-
-# 2. Cluster in reduced space
-pca_coords <- predict(pca_final) %>% select(PC1, PC2)
-clusters_final <- tl_model(pca_coords, method = "kmeans", k = 3)
-
-# 3. Visualize
-final_viz <- pca_coords %>%
-  mutate(
-    Cluster = as.factor(clusters_final$fit$clusters$cluster),
-    Species = iris$Species
-  )
-
-ggplot(final_viz, aes(x = PC1, y = PC2, color = Cluster)) +
-  geom_point(size = 3, alpha = 0.7) +
-  labs(title = "Complete Unsupervised Workflow") +
-  theme_minimal()
+names(compare_distances(iris[, 1:4]))
 ```
+
+```{r}
+plot_distance_heatmap(dist_mat)
+```
+
+Block structure on the diagonal is what a real cluster looks like in a
+distance matrix.
+
+## A Worked Sequence
+
+Putting the pieces in the order they belong:
+
+```{r}
+data_matrix <- standardize_data(iris[, 1:4])
+
+# 1. How many clusters does the data support?
+choice <- optimal_clusters(data_matrix, max_k = 8)
+k <- attr(choice$silhouette, "optimal_k")
+k
+```
+
+```{r}
+# 2. Cluster at that k
+final_km <- tidy_kmeans(data_matrix, k = k)
+
+# 3. Score the result before believing it
+final_sil <- tidy_silhouette(final_km$clusters$cluster, tidy_dist(data_matrix))
+final_sil$avg_width
+```
+
+```{r}
+# 4. Attach the assignment and look at it
+final_data <- augment_kmeans(final_km, iris)
+table(Cluster = final_data$cluster, Species = final_data$Species)
+```
+
+```{r}
+plot_clusters(final_data, cluster_col = "cluster",
+              x_col = "Petal.Length", y_col = "Petal.Width")
+```
+
+Silhouette chose 2, and the table shows what that means: *setosa* separated,
+the other two species merged. That is the honest reading of this data at this
+metric — the third cluster exists botanically but is not well separated in
+these four measurements.
+
+## Function Reference
+
+| Task | Function |
+|---|---|
+| Prepare | `standardize_data()`, `tidy_dist()`, `compare_distances()` |
+| Choose *k* | `optimal_clusters()`, `calc_wss()`, `tidy_gap_stat()`, `optimal_hclust_k()` |
+| Reduce | `tidy_pca()`, `tidy_mds()` |
+| Cluster | `tidy_kmeans()`, `tidy_pam()`, `tidy_clara()`, `tidy_hclust()`, `tidy_dbscan()` |
+| Attach results | `augment_pca()`, `augment_kmeans()`, `augment_pam()`, `augment_hclust()`, `augment_dbscan()` |
+| Validate | `tidy_silhouette()`, `calc_validation_metrics()`, `compare_clusterings()` |
+| Tune DBSCAN | `suggest_eps()`, `plot_knn_dist()`, `explore_dbscan_params()` |
+| Plot | `plot_elbow()`, `plot_silhouette()`, `plot_gap_stat()`, `plot_clusters()`, `plot_cluster_sizes()`, `plot_dendrogram()`, `plot_mds()`, `plot_distance_heatmap()`, `plot_variance_explained()` |
+| Accessors | `get_pca_variance()`, `get_pca_loadings()`, `tidy_cutree()` |
+
+Association rules have their own vignette: `vignette("market-basket")`.

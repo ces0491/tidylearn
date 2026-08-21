@@ -1,0 +1,327 @@
+---
+title: "Market Basket Analysis"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Market Basket Analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+# arules supplies the algorithm and the example data; arulesViz backs the
+# graph and grouped-matrix plots. Both are in Suggests, so the whole
+# vignette is conditional on them.
+has_arules <- requireNamespace("arules", quietly = TRUE)
+has_arulesviz <- requireNamespace("arulesViz", quietly = TRUE)
+
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5,
+  message = FALSE,
+  warning = FALSE,
+  eval = has_arules
+)
+```
+
+```{r, echo = FALSE, results = "asis", eval = TRUE}
+if (!has_arules) {
+  cat(
+    "> **Note:** the arules package is not installed, so the examples",
+    "below are shown without output.\n"
+  )
+}
+```
+
+```{r setup}
+library(tidylearn)
+library(dplyr)
+```
+
+## Overview
+
+Association rule mining finds statements of the form *when a basket contains
+A, it tends to also contain B*. It is unsupervised: there is no response
+variable, and every item is a candidate on both sides.
+
+`tidy_apriori()` wraps the Apriori algorithm from
+[arules](https://cran.r-project.org/package=arules) and returns the rules as
+a tibble instead of an S4 object you have to `inspect()` to read. The rest of
+the family filters, ranks and applies those rules.
+
+We use `Groceries`, a month of point-of-sale data from a grocery outlet:
+9,835 transactions over 169 item categories.
+
+```{r}
+data("Groceries", package = "arules")
+Groceries
+```
+
+## Mining Rules
+
+Three numbers describe every rule, and two of them are thresholds you set up
+front:
+
+- **Support** — the fraction of all transactions containing the whole rule.
+  A support floor is what makes the search tractable, and what stops you
+  acting on a pattern that occurred four times.
+- **Confidence** — of the baskets containing the left-hand side, the fraction
+  that also contain the right-hand side. This is the conditional probability.
+- **Lift** — confidence divided by the right-hand side's own frequency. Lift
+  of 1 means the two are independent; above 1 means the left-hand side makes
+  the right-hand side more likely than chance.
+
+```{r}
+rules <- tidy_apriori(
+  Groceries,
+  support = 0.001,      # at least ~10 of the 9,835 transactions
+  confidence = 0.5,     # right-hand side follows at least half the time
+  minlen = 2            # rules with something on both sides
+)
+```
+
+```{r}
+print(rules)
+```
+
+The tibble is the part you work with:
+
+```{r}
+rules$rules_tbl
+```
+
+```{r}
+names(rules)
+```
+
+`$rules` holds the underlying arules object for anything the tidy layer does
+not cover, in the same way `$fit` does for `tl_model()`.
+
+### Choosing the thresholds
+
+Support and confidence trade recall against volume, and the trade is steep.
+
+```{r}
+grid <- expand.grid(
+  support = c(0.001, 0.005, 0.01),
+  confidence = c(0.3, 0.5, 0.7)
+)
+
+grid$n_rules <- mapply(function(s, c) {
+  tidy_apriori(Groceries, support = s, confidence = c)$n_rules
+}, grid$support, grid$confidence)
+
+grid
+```
+
+Dropping the support floor by a factor of ten multiplies the rule count by
+more than a hundred. A high-confidence rule at very low support is usually a
+description of a handful of shoppers, not of the shop.
+
+## Reading the Rules
+
+`inspect_rules()` sorts and takes the head, which is what you want almost
+every time:
+
+```{r}
+inspect_rules(rules, by = "lift", n = 10)
+```
+
+`by` also accepts `"support"`, `"confidence"` and `"count"`. Set
+`decreasing = FALSE` to look at the other end.
+
+`summarize_rules()` gives the distribution of each quality measure across the
+whole rule set:
+
+```{r}
+summary_stats <- summarize_rules(rules)
+summary_stats$n_rules
+```
+
+```{r}
+data.frame(
+  measure = c("support", "confidence", "lift"),
+  min = c(summary_stats$support$min, summary_stats$confidence$min,
+          summary_stats$lift$min),
+  median = c(summary_stats$support$median, summary_stats$confidence$median,
+             summary_stats$lift$median),
+  max = c(summary_stats$support$max, summary_stats$confidence$max,
+          summary_stats$lift$max)
+)
+```
+
+Because the result is a tibble, dplyr works directly:
+
+```{r}
+rules$rules_tbl %>%
+  filter(lift > 5, count >= 15) %>%
+  arrange(desc(confidence)) %>%
+  select(lhs, rhs, confidence, lift, count)
+```
+
+## Working With One Item
+
+`filter_rules_by_item()` narrows to rules mentioning an item. `where` picks
+the side: `"lhs"` for what the item leads to, `"rhs"` for what leads to it,
+`"both"` for either.
+
+```{r}
+# What predicts a purchase of whole milk?
+filter_rules_by_item(rules, "whole milk", where = "rhs") %>%
+  arrange(desc(lift)) %>%
+  select(lhs, confidence, lift, count) %>%
+  head(5)
+```
+
+```{r}
+# And what does a basket containing yoghurt lead to?
+filter_rules_by_item(rules, "yogurt", where = "lhs") %>%
+  arrange(desc(lift)) %>%
+  select(lhs, rhs, confidence, lift) %>%
+  head(5)
+```
+
+`find_related_items()` is the shortcut for the common question, with a lift
+floor built in so that co-occurrence by sheer popularity is excluded:
+
+```{r}
+find_related_items(rules, "yogurt", min_lift = 1.5, top_n = 5) %>%
+  select(lhs, rhs, confidence, lift)
+```
+
+## Recommending From a Basket
+
+`recommend_products()` takes the items currently in a basket and returns what
+the rules suggest adding.
+
+```{r}
+recommend_products(
+  rules,
+  basket = c("flour", "baking powder"),
+  top_n = 5
+)
+```
+
+A rule only fires when the basket covers its **entire** left-hand side, so a
+basket of one or two very common items often matches nothing above the
+confidence floor:
+
+```{r}
+recommend_products(rules, basket = c("whole milk", "butter"))
+```
+
+That empty result is the honest answer rather than a failure. `whole milk`
+appears in about a quarter of all baskets, so very little follows it with 50%
+confidence.
+
+`min_confidence` filters the rules you already mined, so raising the ceiling
+means re-mining, not re-filtering. `rules` above was mined at
+`confidence = 0.5`, and no amount of filtering will produce a rule that was
+never generated:
+
+```{r}
+broad <- tidy_apriori(
+  Groceries,
+  support = 0.001, confidence = 0.15, minlen = 2
+)
+
+broad$n_rules
+```
+
+```{r}
+recommend_products(
+  broad,
+  basket = c("whole milk", "butter"),
+  min_confidence = 0.15,
+  top_n = 5
+)
+```
+
+Confidence around 0.2 is weak on its own — one basket in five. Lift near 3.4
+is what makes these worth reading: eggs are three times more likely in a
+basket that already holds milk and butter than in a basket picked at random.
+For common items, mine wide and rank on lift.
+
+## Visualising
+
+`visualize_rules()` returns a ggplot2 object for the scatter method, so it
+composes like any other plot in the package.
+
+```{r}
+visualize_rules(rules, method = "scatter", top_n = 200)
+```
+
+Support on one axis against confidence on the other, coloured by lift, is the
+standard first look: the interesting rules are the ones pushed away from the
+crowd.
+
+```{r, eval = has_arules && has_arulesviz}
+visualize_rules(rules, method = "graph", top_n = 20)
+```
+
+The graph method needs arulesViz and draws items as nodes with rules as
+edges, which is the more useful view once you have narrowed to a handful of
+rules worth reading.
+
+## From a Data Frame
+
+`Groceries` is already a `transactions` object. Real data usually arrives as
+one row per line item, which `arules` coerces:
+
+```{r}
+receipts <- data.frame(
+  basket_id = c(1, 1, 1, 2, 2, 3, 3, 3, 4, 4, 5, 5, 5),
+  item = c("bread", "butter", "jam",
+           "bread", "butter",
+           "bread", "butter", "jam",
+           "milk", "bread",
+           "bread", "butter", "jam"),
+  stringsAsFactors = TRUE
+)
+
+baskets <- split(as.character(receipts$item), receipts$basket_id)
+transactions <- as(baskets, "transactions")
+transactions
+```
+
+```{r}
+small_rules <- tidy_apriori(
+  transactions,
+  support = 0.4, confidence = 0.6, minlen = 2
+)
+
+small_rules$rules_tbl %>%
+  arrange(desc(lift)) %>%
+  select(lhs, rhs, support, confidence, lift)
+```
+
+With five baskets these numbers mean nothing — the point is the shape of the
+input. Anything `arules` accepts as `transactions`, `tidy_apriori()` accepts.
+
+## What the Numbers Do Not Tell You
+
+Three cautions worth carrying:
+
+1. **Lift is symmetric; the rule is not.** *A ⇒ B* and *B ⇒ A* have the same
+   lift and usually different confidence. Which direction you act on is a
+   decision about the business, not a result from the data.
+2. **A rule is not a cause.** Bread and butter co-occur because people buy
+   both, not because one drives the other. Moving butter next to bread is a
+   testable hypothesis, and the test is an experiment.
+3. **Rules describe the period you mined.** A month of grocery data carries
+   that month's seasonality. Re-mine rather than reusing a stored rule set
+   across a season boundary.
+
+## Function Reference
+
+| Function | Purpose |
+|---|---|
+| `tidy_apriori()` | Mine rules, return a tibble |
+| `tidy_rules()` | Convert an arules rules object to a tibble |
+| `inspect_rules()` | Sort by a quality measure and take the head |
+| `summarize_rules()` | Distribution of support, confidence and lift |
+| `filter_rules_by_item()` | Rules mentioning an item, by side |
+| `find_related_items()` | Items associated with one item, above a lift floor |
+| `recommend_products()` | Suggestions for a given basket |
+| `visualize_rules()` | Scatter, graph and grouped-matrix plots |

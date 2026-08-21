@@ -46,13 +46,19 @@ Access raw model objects via `model$fit` for package-specific functionality.
 Let's create a binary classification problem from the iris dataset:
 
 ```{r}
-# Create binary classification dataset
+# Create binary classification dataset. setosa is linearly separable from
+# the other two species, and logistic regression has no finite maximum
+# likelihood estimate on separable data -- glm() fits, warns that the
+# algorithm did not converge, and returns coefficients that diverged.
+# versicolor and virginica overlap, so this is a real classification
+# problem. Even here, a 70% split of 100 rows is separable at some seeds;
+# this one is not.
 iris_binary <- iris %>%
-  filter(Species %in% c("setosa", "versicolor")) %>%
+  filter(Species %in% c("versicolor", "virginica")) %>%
   mutate(Species = droplevels(Species))
 
 # Split data
-split <- tl_split(iris_binary, prop = 0.7, stratify = "Species", seed = 123)
+split <- tl_split(iris_binary, prop = 0.7, stratify = "Species", seed = 42)
 ```
 
 #### Logistic Regression
@@ -334,7 +340,9 @@ print(model_cat)
 ### Missing Values
 
 ```{r}
-# Create data with missing values
+# Create data with missing values. Seeded so the vignette renders the
+# same output on every build.
+set.seed(123)
 mtcars_missing <- mtcars
 mtcars_missing[sample(seq_len(nrow(mtcars_missing)), 5), "hp"] <- NA
 mtcars_missing[sample(seq_len(nrow(mtcars_missing)), 3), "wt"] <- NA
@@ -353,12 +361,18 @@ model_imputed <- tl_model(processed_missing$data, mpg ~ ., method = "linear")
 
 ## Best Practices
 
-1. **Always split your data** before training to properly evaluate performance
-2. **Use stratified splitting** for classification to maintain class proportions
-3. **Preprocess your data** for better model performance
-4. **Compare multiple models** to find the best approach
-5. **Consider regularization** when dealing with many predictors
-6. **Use appropriate metrics** - accuracy for classification, RMSE/MAE for regression
+1. **Split before training.** A metric computed on the rows the model was
+   fitted to measures memorisation, not performance.
+2. **Stratify classification splits** so both sets carry the same class
+   proportions as the source data.
+3. **Scale inputs for methods that need it** -- regularised regression,
+   SVM and neural networks -- and replay the training transformation on
+   the test set, as shown below. Trees and forests are scale-invariant.
+4. **Compare several models** on the same split before committing to one.
+5. **Reach for regularisation** when predictors outnumber observations,
+   or when they are strongly correlated.
+6. **Match the metric to the task** -- accuracy, F1 or AUC for
+   classification; RMSE or MAE for regression.
 
 ## Summary
 

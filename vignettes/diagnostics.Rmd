@@ -1,0 +1,336 @@
+---
+title: "Diagnostics"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Diagnostics}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+
+# car, lmtest and moments back individual assumption tests; gridExtra
+# arranges the dashboard. All are in Suggests.
+has_assumption_pkgs <- requireNamespace("car", quietly = TRUE) &&
+  requireNamespace("lmtest", quietly = TRUE)
+has_gridextra <- requireNamespace("gridExtra", quietly = TRUE)
+```
+
+```{r setup}
+library(tidylearn)
+library(dplyr)
+```
+
+## Overview
+
+A model that fits is not the same as a model you should use. These functions
+answer four questions:
+
+- **Do the assumptions hold?** `tl_check_assumptions()`
+- **Which observations drove the fit?** `tl_influence_measures()`,
+  `tl_detect_outliers()`
+- **Is the difference between two models real?** `tl_compare_cv()`,
+  `tl_test_model_difference()`
+- **Are there interactions I have not modelled?** `tl_test_interactions()`,
+  `tl_interaction_effects()`
+
+`tl_explore()` runs an unsupervised sweep over a dataset before you model it
+at all.
+
+We use a linear model throughout, because that is where assumption checking
+has teeth.
+
+```{r}
+model <- tl_model(mtcars, mpg ~ wt + hp + disp, method = "linear")
+```
+
+## Checking Assumptions
+
+`tl_check_assumptions()` runs six checks and returns a verdict on each.
+
+```{r, eval = has_assumption_pkgs}
+assumptions <- tl_check_assumptions(model, verbose = FALSE)
+names(assumptions)
+```
+
+```{r, eval = has_assumption_pkgs}
+assumptions$overall
+```
+
+Each entry carries the test that was run, the verdict, and what to do about
+it. Nothing here is a pass/fail gate — the recommendation is a prompt, not an
+instruction.
+
+```{r, eval = has_assumption_pkgs}
+assumptions$normality
+```
+
+```{r, eval = has_assumption_pkgs}
+assumptions$multicollinearity
+```
+
+A compact table of every check:
+
+```{r, eval = has_assumption_pkgs}
+checks <- c("linearity", "independence", "homoscedasticity",
+            "normality", "multicollinearity", "outliers")
+
+data.frame(
+  assumption = vapply(checks, function(x) assumptions[[x]]$assumption,
+                      character(1)),
+  holds = vapply(checks, function(x) isTRUE(assumptions[[x]]$check),
+                 logical(1)),
+  detail = vapply(checks, function(x) assumptions[[x]]$details, character(1)),
+  row.names = NULL
+)
+```
+
+`disp` correlating with both `wt` and `hp` is what drives the VIF here, and it
+is the kind of thing that is invisible in a coefficient table.
+
+### The dashboard
+
+`tl_diagnostic_dashboard()` draws the standard panels in one grid.
+
+```{r, eval = has_assumption_pkgs && has_gridextra, fig.height = 7}
+tl_diagnostic_dashboard(model)
+```
+
+Switch off any section you do not want with `include_influence`,
+`include_assumptions` or `include_performance`.
+
+## Influence
+
+`tl_influence_measures()` returns one row per observation with Cook's
+distance, leverage, DFFITS, standardised and studentised residuals, DFBETAS
+per coefficient, and a flag for each.
+
+```{r}
+influence <- tl_influence_measures(model)
+dim(influence)
+```
+
+```{r}
+influence %>%
+  filter(is_influential) %>%
+  select(observation, cooks_distance, leverage, dffits, std_residual)
+```
+
+The flags use conventional cutoffs, which you can override with
+`threshold_cook`, `threshold_leverage` and `threshold_dffits`.
+
+The DFBETAS columns say *which coefficient* an observation moved, which is
+usually the more useful question:
+
+```{r}
+influence %>%
+  select(observation, starts_with("dfbetas_")) %>%
+  arrange(desc(abs(dfbetas_wt))) %>%
+  head(4)
+```
+
+### Refit without the influential rows
+
+The point of the exercise is to see whether the conclusion survives.
+
+```{r}
+keep <- !influence$is_influential
+refit <- tl_model(mtcars[keep, ], mpg ~ wt + hp + disp, method = "linear")
+
+data.frame(
+  term = names(coef(model$fit)),
+  all_rows = round(unname(coef(model$fit)), 4),
+  without_influential = round(unname(coef(refit$fit)), 4)
+)
+```
+
+```{r}
+sum(!keep)
+```
+
+If dropping a handful of rows moves a coefficient materially, the coefficient
+is a statement about those rows.
+
+## Outliers in the Data
+
+`tl_influence_measures()` is about a fitted model. `tl_detect_outliers()`
+works on the data itself, before or independently of any fit.
+
+```{r}
+outliers <- tl_detect_outliers(
+  mtcars,
+  variables = c("mpg", "hp", "wt"),
+  method = "iqr",
+  plot = FALSE
+)
+
+outliers$outlier_counts$total
+outliers$outlier_counts$by_variable
+```
+
+```{r}
+mtcars[outliers$outlier_indices, c("mpg", "hp", "wt")]
+```
+
+`method` also takes `"zscore"` and `"mahalanobis"`. The first two treat each
+variable separately; Mahalanobis distance accounts for the correlation
+between them, so it finds points that are unremarkable on every single axis
+and unusual in combination.
+
+```{r}
+mahal <- tl_detect_outliers(
+  mtcars,
+  variables = c("mpg", "hp", "wt"),
+  method = "mahalanobis",
+  plot = FALSE
+)
+
+mahal$outlier_indices
+```
+
+Set `plot = TRUE` to get a ggplot2 object back in `$plot`.
+
+## Comparing Models
+
+A difference in a single held-out score is not evidence. `tl_compare_cv()`
+scores several fitted models over the same folds.
+
+```{r}
+simple <- tl_model(mtcars, mpg ~ wt, method = "linear")
+full <- tl_model(mtcars, mpg ~ wt + hp + disp, method = "linear")
+tree <- tl_model(mtcars, mpg ~ wt + hp + disp, method = "tree")
+
+cv <- tl_compare_cv(
+  mtcars,
+  models = list(simple = simple, full = full, tree = tree),
+  folds = 5,
+  metrics = c("rmse", "rsq")
+)
+
+names(cv)
+```
+
+```{r}
+cv$summary
+```
+
+Per-fold scores are kept as well, which is what makes a test possible:
+
+```{r}
+head(cv$fold_metrics)
+```
+
+### Is the difference real?
+
+`tl_test_model_difference()` compares each model against a baseline using the
+per-fold scores.
+
+```{r}
+tl_test_model_difference(
+  cv,
+  baseline_model = "simple",
+  metric = "rmse",
+  test = "t.test"
+)
+```
+
+With five folds this has very little power, so treat a non-significant result
+as "these folds do not separate the models" rather than as evidence they are
+equivalent. `test = "wilcox.test"` drops the normality assumption, which
+matters more at small fold counts than the loss of power costs you.
+
+## Interactions
+
+`tl_test_interactions()` fits each candidate interaction and reports whether
+it earns its degrees of freedom.
+
+```{r}
+interactions <- tl_test_interactions(
+  mtcars, mpg ~ wt + hp + disp,
+  all_pairs = TRUE
+)
+
+interactions
+```
+
+`delta_r2` is the more useful column: a p-value tells you the term is
+detectable, `delta_r2` tells you whether it is worth carrying.
+
+Restrict the search with `numeric_only`, `categorical_only` or `mixed_only`,
+or name a single pair with `var1` and `var2`.
+
+### Reading an interaction
+
+Once a term is in the model, `tl_interaction_effects()` says what it does at
+different levels of the moderator.
+
+```{r}
+model_int <- tl_model(mtcars, mpg ~ wt * hp, method = "linear")
+effects <- tl_interaction_effects(model_int, var = "wt", by_var = "hp")
+
+effects$slopes
+```
+
+The slope of `mpg` on `wt` weakens as `hp` rises: weight costs less economy
+in a car that was never economical.
+
+`slope_se` describes the straight line fitted to the prediction grid rather
+than the sampling uncertainty of the marginal effect — for a linear model the
+grid is exactly linear, so it is near zero by construction. Use
+`summary(model_int$fit)` for inference on the interaction coefficient.
+
+```{r}
+summary(model_int$fit)$coefficients
+```
+
+`tl_auto_interactions()` does the search and the refit in one step, returning
+a model with the surviving interactions already in the formula:
+
+```{r}
+auto <- tl_auto_interactions(mtcars, mpg ~ wt + hp + disp)
+auto$spec$formula
+```
+
+## Exploring Before Modelling
+
+`tl_explore()` runs PCA, picks a cluster count, clusters, and computes a
+distance summary in one call. It is a first look at a dataset, not a
+diagnostic of a fit.
+
+```{r}
+eda <- tl_explore(iris, response = "Species", max_components = 4, k_range = 2:5)
+names(eda)
+```
+
+```{r}
+eda$optimal_k
+```
+
+```{r}
+get_pca_variance(eda$pca)
+```
+
+```{r, fig.height = 6}
+plot(eda)
+```
+
+## A Checklist
+
+For a linear model, in order:
+
+1. `tl_check_assumptions()` — six checks, with the reason each one failed.
+2. `tl_influence_measures()` — refit without the flagged rows and see whether
+   the coefficients hold.
+3. `tl_test_interactions()` — the effect you assumed was additive may not be.
+4. `tl_compare_cv()` then `tl_test_model_difference()` — before preferring
+   one model over another.
+
+For tree-based and other non-parametric methods, steps 1 and 3 do not apply;
+step 2 is available through `tl_detect_outliers()` on the data, and step 4
+works unchanged.

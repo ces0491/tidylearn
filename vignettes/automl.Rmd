@@ -12,523 +12,358 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
   fig.width = 7,
-  fig.height = 5
+  fig.height = 5,
+  # tl_auto_ml() narrates its progress through message(); the narration is
+  # useful at the console and noise in a document
+  message = FALSE
 )
 ```
 
 ```{r setup}
 library(tidylearn)
 library(dplyr)
-library(ggplot2)
 ```
 
 ## Introduction
 
-Automated Machine Learning (AutoML) streamlines the model development process by
-automatically trying multiple approaches and selecting the best one. tidylearn's
-`tl_auto_ml()` function explores various modeling strategies including
-dimensionality reduction, clustering, and different supervised methods.
+`tl_auto_ml()` searches across methods rather than within one. It trains
+several models, engineers a couple of feature sets, cross-validates what the
+budget allows, and ranks the results.
 
-**Note:** AutoML orchestrates the wrapped packages (glmnet, randomForest,
-xgboost, etc.) rather than implementing new algorithms. Each model in the
-leaderboard wraps an established package, and you can access the raw model
-objects via `model$fit`.
+It orchestrates the wrapped packages rather than implementing anything new.
+Every model on the leaderboard is an ordinary tidylearn model, so
+`predict()`, `plot()` and `$fit` all work on it.
 
-## Basic Usage
+## A First Run
 
-### Classification Task
-
-```{r, eval=FALSE}
-# Run AutoML on iris dataset
-result <- tl_auto_ml(iris, Species ~ .,
-                     task = "classification",
-                     time_budget = 60)
-
-# View best model
-print(result$best_model)
+```{r}
+result <- tl_auto_ml(
+  iris, Species ~ .,
+  time_budget = 30,
+  cv_folds = 3
+)
 ```
 
-```{r, eval=FALSE}
-# View all models tried
-names(result$models)
-```
-
-```{r, eval=FALSE}
-# View leaderboard
+```{r}
 result$leaderboard
 ```
 
-### Regression Task
+Three columns: which model, what it scored, and how the score was obtained.
 
-```{r, eval=FALSE}
-# Run AutoML on regression problem
-result_reg <- tl_auto_ml(mtcars, mpg ~ .,
-                         task = "regression",
-                         time_budget = 60)
-
-# Best model
-print(result_reg$best_model)
+```{r}
+result$best_model
 ```
 
-## How AutoML Works
-
-The `tl_auto_ml()` function follows a four-phase pipeline. Which phases
-actually run -- and how thoroughly -- depends on the `time_budget` and the
-toggle parameters `use_reduction` and `use_clustering`.
-
-| Phase | What it does | Models added (classification) | Models added (regression) |
-|-------|-------------|-------------------------------|---------------------------|
-| 1. Baselines | Trains standard models | tree, logistic\*, forest | tree, linear, forest |
-| 2. PCA variants | PCA preprocessing + baseline methods | pca\_tree, pca\_logistic\*, pca\_forest | pca\_tree, pca\_linear, pca\_forest |
-| 3. Cluster variants | Adds cluster assignments as features | clustered\_tree, clustered\_logistic\*, clustered\_forest | clustered\_tree, clustered\_linear, clustered\_forest |
-| 4. Advanced | Tries heavier methods | svm, xgboost | ridge, lasso |
-
-\* Logistic regression is binary only, so it is included only when the
-response has exactly two classes. On a multiclass problem such as `iris`
-the baselines are tree and forest, and the `_logistic` variants are absent.
-
-Each model is first fit on the full training data, then (if budget allows)
-evaluated with k-fold cross-validation. When time is tight, models fall back
-to training-set metrics instead of CV.
-
-The `evaluation` column on the leaderboard records which of the two produced
-each score — `"cv"` or `"train"`. Training metrics are optimistically biased,
-so a leaderboard mixing the two is not ranking like with like. If you see
-both, raise the budget.
-
-## Understanding the Time Budget
-
-The `time_budget` parameter (in seconds) is the most important knob for
-controlling the speed/thoroughness trade-off. It is checked **between** model
-fits, not during them. Once a model starts training it runs to completion,
-because many of the wrapped packages (randomForest, xgboost, e1071) execute
-C-level code that R cannot safely interrupt mid-execution. This means the
-actual wall-clock time may modestly exceed the budget by the duration of the
-last model that started before the budget expired.
-
-### Budget tiers at a glance
-
-| Budget | Baselines | CV | PCA/Cluster variants | Advanced models | Typical models | Use case |
-|--------|-----------|-----|----------------------|-----------------|----------------|----------|
-| < 30 s | tree + logistic/linear only | No (training metrics) | No | No | 1--2 | Quick sanity check, interactive use |
-| 30--120 s | tree + logistic/linear + forest | When time remains | If enabled and > 10 % budget left | If > 40 % budget left | 3--7 | Development iteration, notebook exploration |
-| 120 s+ | All | Yes | Yes (if enabled) | Yes | 8--11 | Thorough comparison, final model selection |
-
-Model counts are for a binary response. A multiclass problem drops the
-logistic variants, so expect one fewer per phase.
-
-The "forest" baseline and all advanced models (SVM, XGBoost, ridge, lasso)
-involve C-level code that typically takes 3--15 seconds per fit depending on
-data size. They are only attempted when `time_budget >= 30`.
-
-### Why CV is the expensive step
-
-A single `tl_model()` call fits one model. Cross-validation
-(`tl_cv(folds = 5)`) fits **five** models on subsets, so it
-costs roughly 5x the time. The function checks the remaining
-budget after each model fit and skips CV when it would likely
-exceed the budget, falling back to training-set evaluation instead.
-Reducing `cv_folds` (e.g. from 5 to 2) is the most effective way to
-stay closer to the budget while still getting out-of-sample estimates.
-
-### Practical examples
-
-```{r, eval=FALSE}
-# Quick sanity check -- 2 fast models, no CV, done in ~1s
-quick <- tl_auto_ml(iris, Species ~ .,
-                    time_budget = 10,
-                    use_reduction = FALSE,
-                    use_clustering = FALSE)
-quick$leaderboard
-#> baseline_tree only -- iris is multiclass, so logistic is skipped.
-#> On a two-class response this would be baseline_tree, baseline_logistic.
-
-# Development iteration -- baselines + forest, some CV
-medium <- tl_auto_ml(iris, Species ~ .,
-                     time_budget = 60,
-                     cv_folds = 3)
-medium$leaderboard
-#> 4--7 models depending on data size and number of classes
-
-# Thorough search -- all phases, full CV
-thorough <- tl_auto_ml(iris, Species ~ .,
-                       time_budget = 300,
-                       cv_folds = 5)
-thorough$leaderboard
-#> 8--11 models with cross-validated scores (iris is multiclass,
-#> so the logistic variants are skipped)
+```{r}
+result$task
+result$metric
+round(as.numeric(result$runtime, units = "secs"), 1)
 ```
 
-## Task Type Detection
+Regression is the same call with a numeric response — `task = "auto"` reads
+it off the data:
 
-AutoML automatically detects the task type from the response variable:
+```{r}
+result_reg <- tl_auto_ml(
+  mtcars, mpg ~ .,
+  time_budget = 30,
+  cv_folds = 3
+)
 
-```{r, eval=FALSE}
-# Factor/character response -> classification
-result_class <- tl_auto_ml(iris, Species ~ ., task = "auto")
-
-# Numeric response -> regression
-result_reg <- tl_auto_ml(mtcars, mpg ~ ., task = "auto")
+result_reg$task
 ```
+
+```{r}
+result_reg$leaderboard
+```
+
+## How the Search Works
+
+Four phases run in order, each gated on the remaining budget and on the
+`use_reduction` and `use_clustering` toggles.
+
+| Phase | What it does | Classification | Regression |
+|-------|-------------|----------------|------------|
+| 1. Baselines | Standard models on the raw features | tree, logistic\*, forest | tree, linear, forest |
+| 2. PCA variants | PCA preprocessing, then the baselines | pca\_tree, pca\_logistic\*, pca\_forest | pca\_tree, pca\_linear, pca\_forest |
+| 3. Cluster variants | Cluster assignment added as a feature | clustered\_tree, clustered\_logistic\*, clustered\_forest | clustered\_tree, clustered\_linear, clustered\_forest |
+| 4. Advanced | Heavier methods | svm, xgboost | ridge, lasso |
+
+\* Logistic regression is binary only, so it appears only when the response
+has exactly two classes. On a multiclass problem such as `iris` the baselines
+are tree and forest.
+
+You can see the phases in what actually got trained:
+
+```{r}
+names(result$models)
+```
+
+```{r, warning = FALSE}
+# The same search on a two-class problem picks up the logistic variants
+iris_binary <- iris %>%
+  filter(Species != "setosa") %>%
+  mutate(Species = droplevels(Species))
+
+binary_result <- tl_auto_ml(iris_binary, Species ~ ., time_budget = 30,
+                            cv_folds = 3)
+names(binary_result$models)
+```
+
+That call emits a run of `glm.fit: algorithm did not converge` warnings,
+which this chunk hides only because there are a dozen of them. They are worth
+understanding rather than ignoring: *versicolor* and *virginica* overlap only
+slightly, and a three-fold split of 100 rows will sometimes produce a fold
+where the two are perfectly separable. Logistic regression has no finite
+maximum likelihood estimate on separable data, so the coefficients diverge
+and `glm()` says so.
+
+The fit on the full data is fine:
+
+```{r}
+tl_model(iris_binary, Species ~ ., method = "logistic")$spec$method
+```
+
+It is the folds, not the dataset. Seeing this on your own data means the
+classes are close to separable at that sample size — a reason to prefer a
+regularised method, which is what `ridge` and `lasso` are doing in phase 4 of
+the regression search.
+
+### The evaluation column
+
+Each model is fitted on the full training data, then cross-validated if the
+budget allows. When it does not, the leaderboard falls back to training-set
+metrics.
+
+```{r}
+table(result$leaderboard$evaluation)
+```
+
+Training metrics are optimistically biased, so a leaderboard mixing `"cv"`
+and `"train"` is not ranking like with like. If you see both, raise the
+budget or lower `cv_folds`.
+
+## The Time Budget
+
+`time_budget` is in seconds and is checked **between** model fits, not during
+them. Once a model starts it runs to completion, because the wrapped packages
+execute C-level code that R cannot safely interrupt. Wall-clock time can
+therefore overshoot by the duration of whichever model started last.
+
+The budget controls how much gets tried. Rather than quote a table of
+predictions, here is the actual relationship on this data and this machine:
+
+```{r}
+budgets <- c(2, 5, 10, 30)
+
+sweep <- lapply(budgets, function(b) {
+  t0 <- Sys.time()
+  r <- tl_auto_ml(iris, Species ~ ., time_budget = b, cv_folds = 3)
+  data.frame(
+    budget = b,
+    elapsed = round(as.numeric(difftime(Sys.time(), t0, units = "secs")), 1),
+    models = nrow(r$leaderboard),
+    cv_scored = sum(r$leaderboard$evaluation == "cv"),
+    best = r$leaderboard$model[1]
+  )
+})
+
+do.call(rbind, sweep)
+```
+
+iris is 150 rows, so everything here is quick and the budget is barely
+touched. On data where a single forest fit takes ten seconds the same numbers
+look very different — which is the point of running the sweep on your own
+data rather than trusting a table.
+
+Two things are worth knowing regardless of size:
+
+- The forest baseline and every advanced model are only attempted when
+  `time_budget >= 30`.
+- Cross-validation is the expensive step. `tl_cv(folds = 5)` fits five models
+  where a plain fit costs one, so `cv_folds` is the most effective lever.
 
 ## Controlling the Search
 
-### Feature Engineering Options
+```{r}
+# Baselines only -- no PCA, no cluster features
+baseline_only <- tl_auto_ml(
+  iris, Species ~ .,
+  use_reduction = FALSE,
+  use_clustering = FALSE,
+  time_budget = 30,
+  cv_folds = 3
+)
 
-```{r, eval=FALSE}
-# Disable dimensionality reduction
-no_reduction <- tl_auto_ml(iris, Species ~ .,
-                           use_reduction = FALSE,
-                           time_budget = 60)
-
-# Disable cluster features
-no_clustering <- tl_auto_ml(iris, Species ~ .,
-                            use_clustering = FALSE,
-                            time_budget = 60)
-
-# Baseline models only
-baseline_only <- tl_auto_ml(iris, Species ~ .,
-                            use_reduction = FALSE,
-                            use_clustering = FALSE,
-                            time_budget = 30)
+names(baseline_only$models)
 ```
 
-### Cross-Validation Settings
+```{r}
+# Keep PCA, drop clustering
+no_clustering <- tl_auto_ml(
+  iris, Species ~ .,
+  use_clustering = FALSE,
+  time_budget = 30,
+  cv_folds = 3
+)
 
-```{r, eval=FALSE}
-# Adjust cross-validation folds
-result_cv <- tl_auto_ml(iris, Species ~ .,
-                        cv_folds = 10,
-                        time_budget = 120)
-
-# Fewer folds for faster evaluation
-result_fast <- tl_auto_ml(iris, Species ~ .,
-                          cv_folds = 3,
-                          time_budget = 60)
+names(no_clustering$models)
 ```
 
-## Understanding Results
+Naming a metric changes what the leaderboard optimises. Classification
+accepts `accuracy`, `precision`, `recall`, `sensitivity`, `specificity`,
+`f1`, `auc` and `pr_auc`; regression accepts `rmse`, `mse`, `mae`, `mape`
+and `rsq`.
 
-### Accessing Models
+```{r, warning = FALSE}
+by_f1 <- tl_auto_ml(iris_binary, Species ~ ., metric = "f1",
+                    time_budget = 30, cv_folds = 3)
 
-```{r, eval=FALSE}
-result <- tl_auto_ml(iris, Species ~ ., time_budget = 60)
-
-# Best performing model
-best_model <- result$best_model
-
-# All models trained
-all_models <- result$models
-
-# Specific model
-baseline_logistic <- result$models$baseline_logistic
-pca_forest <- result$models$pca_forest
+by_f1$metric
+by_f1$leaderboard
 ```
 
-### Leaderboard
+## Using the Result
 
-```{r, eval=FALSE}
-# View performance comparison. Columns are model, score and evaluation
-# ("cv" or "train" -- see "How AutoML Works" above).
-leaderboard <- result$leaderboard
-
-# Already sorted best-first, but to re-sort explicitly:
-# higher is better for accuracy, lower for RMSE
-leaderboard <- leaderboard %>%
-  arrange(desc(score))
-
-print(leaderboard)
-```
-
-### Making Predictions
-
-```{r, eval=FALSE}
-# Use best model for predictions
-predictions <- predict(result$best_model, new_data = new_data)
-
-# Or use a specific model
-predictions_pca <- predict(result$models$pca_forest, new_data = new_data)
-```
-
-## Practical Examples
-
-### Example 1: Iris Classification
-
-```{r, eval=FALSE}
-# Split data for evaluation
+```{r}
 split <- tl_split(iris, prop = 0.7, stratify = "Species", seed = 123)
 
-# Run AutoML on training data
-automl_iris <- tl_auto_ml(split$train, Species ~ .,
-                          time_budget = 90,
-                          cv_folds = 5)
+automl <- tl_auto_ml(split$train, Species ~ ., time_budget = 30, cv_folds = 3)
 
-# Evaluate on test set
-test_preds <- predict(automl_iris$best_model, new_data = split$test)
-test_accuracy <- mean(test_preds$.pred == split$test$Species)
-
-cat("AutoML Test Accuracy:", round(test_accuracy * 100, 1), "%\n")
+test_preds <- predict(automl$best_model, new_data = split$test)
+mean(test_preds$.pred == split$test$Species)
 ```
 
-```{r, eval=FALSE}
-# Compare models
-for (model_name in names(automl_iris$models)) {
-  model <- automl_iris$models[[model_name]]
-  preds <- predict(model, new_data = split$test)
-  acc <- mean(preds$.pred == split$test$Species)
-  cat(model_name, ":", round(acc * 100, 1), "%\n")
-}
+Any model on the leaderboard can be pulled out by name:
+
+```{r}
+available <- names(automl$models)
+available
 ```
 
-### Example 2: MPG Prediction
+```{r}
+scores <- vapply(available, function(nm) {
+  preds <- predict(automl$models[[nm]], new_data = split$test)
+  mean(preds$.pred == split$test$Species)
+}, numeric(1))
 
-```{r, eval=FALSE}
-# Split mtcars data
-split_mtcars <- tl_split(mtcars, prop = 0.7, seed = 42)
-
-# Run AutoML
-automl_mpg <- tl_auto_ml(split_mtcars$train, mpg ~ .,
-                         task = "regression",
-                         time_budget = 90)
-
-# Evaluate
-test_preds_mpg <- predict(automl_mpg$best_model, new_data = split_mtcars$test)
-rmse <- sqrt(mean((test_preds_mpg$.pred - split_mtcars$test$mpg)^2))
-
-cat("AutoML Test RMSE:", round(rmse, 2), "\n")
+data.frame(model = available, test_accuracy = round(scores, 3),
+           row.names = NULL) %>%
+  arrange(desc(test_accuracy))
 ```
 
-### Example 3: Custom Preprocessing + AutoML
+Comparing the leaderboard against held-out accuracy is worth doing: the
+model that won the search is not always the one that generalises, and with a
+dataset this small the difference between the top few is noise.
 
-```{r, eval=FALSE}
-# Preprocess data first
+## AutoML Against a Single Choice
+
+```{r}
+manual <- tl_model(split$train, Species ~ ., method = "forest")
+manual_acc <- mean(
+  predict(manual, new_data = split$test)$.pred == split$test$Species
+)
+
+automl_acc <- mean(test_preds$.pred == split$test$Species)
+
+data.frame(
+  approach = c("forest, chosen by hand", "AutoML best"),
+  test_accuracy = round(c(manual_acc, automl_acc), 3)
+)
+```
+
+On iris a random forest is already the right answer, so the search does not
+improve on it. That is the expected result on an easy, well-understood
+dataset — AutoML earns its cost when you do not already know which method
+suits the data.
+
+## Preprocessing First
+
+AutoML does not impute. Handle missing values before the call, and apply the
+same transformation to any data you later predict on:
+
+```{r}
 processed <- tl_prepare_data(
-  split$train,
-  Species ~ .,
+  split$train, Species ~ .,
   scale_method = "standardize",
   remove_correlated = TRUE
 )
 
-# Run AutoML on preprocessed data
 automl_processed <- tl_auto_ml(processed$data, Species ~ .,
-                               time_budget = 60)
+                               time_budget = 30, cv_folds = 3)
 
-# Note: Need to apply same preprocessing to test data
-test_processed <- tl_prepare_data(
-  split$test,
-  Species ~ .,
-  scale_method = "standardize"
+automl_processed$leaderboard$model[1]
+```
+
+`tl_pipeline()` handles that bookkeeping properly — see
+`vignette("tuning-and-pipelines")`.
+
+## When a Model Is Missing or Scores NA
+
+A model that fails to fit, or errors during evaluation, is dropped with a
+message explaining why and never reaches the leaderboard. Run without
+`message = FALSE` to see which and why.
+
+A model that evaluates but produces no value for the chosen metric appears
+with an `NA` score. That usually means the metric is not one `tl_evaluate()`
+recognises for the task. If every score is `NA`, `tl_auto_ml()` warns and
+returns the first model trained rather than pretending to have ranked them.
+
+```{r}
+sum(is.na(result$leaderboard$score))
+```
+
+## AutoML or Tuning?
+
+They search different axes and compose in one direction:
+
+- `tl_auto_ml()` searches **across methods** at default hyperparameters.
+- `tl_tune_grid()` and `tl_tune_random()` search **within one method**.
+
+Run AutoML first to find out which family suits the data, then tune the
+winner:
+
+```{r}
+winner <- automl$best_model$spec$method
+winner
+```
+
+```{r}
+tuned <- tl_tune_grid(
+  split$train, Species ~ .,
+  method = winner,
+  param_grid = tl_default_param_grid(winner, size = "small"),
+  folds = 3,
+  verbose = FALSE
 )
 
-test_preds_proc <- predict(
-  automl_processed$best_model,
-  new_data = test_processed$data
-)
+attr(tuned, "tuning_results")$best_params
 ```
 
-## Comparing AutoML with Manual Selection
-
-```{r, eval=FALSE}
-# Manual approach: choose one model
-manual_model <- tl_model(split$train, Species ~ ., method = "forest")
-manual_preds <- predict(manual_model, new_data = split$test)
-manual_acc <- mean(manual_preds$.pred == split$test$Species)
-
-# AutoML approach
-automl_model <- tl_auto_ml(split$train, Species ~ ., time_budget = 60)
-automl_preds <- predict(automl_model$best_model, new_data = split$test)
-automl_acc <- mean(automl_preds$.pred == split$test$Species)
-
-cat("Manual Selection:", round(manual_acc * 100, 1), "%\n")
-cat("AutoML:", round(automl_acc * 100, 1), "%\n")
+```{r}
+mean(predict(tuned, new_data = split$test)$.pred == split$test$Species)
 ```
 
-## Advanced AutoML Strategies
+## Guidance
 
-### Strategy 1: Iterative AutoML
+1. **Start at `time_budget = 10`** to confirm the call is well formed, then
+   raise it. Nothing about a 10-second run tells you which model is best.
+2. **Lower `cv_folds` before lowering `time_budget`.** Going from 5 folds to
+   2 removes 60% of the evaluation cost and still gives out-of-sample
+   estimates. A 30-second budget at `cv_folds = 2` is more informative than
+   the same budget at the default 5, which will skip CV entirely.
+3. **Preprocess first.** AutoML does not impute or scale.
+4. **Score on held-out data.** The leaderboard ranks; it does not report
+   final performance.
+5. **Read past the first row.** When the top few scores are within noise of
+   each other, pick on interpretability or fit time instead.
+6. **Check the `evaluation` column** before comparing scores.
 
-```{r, eval=FALSE}
-# First pass: quick exploration
-quick_automl <- tl_auto_ml(split$train, Species ~ .,
-                           time_budget = 30,
-                           use_reduction = TRUE,
-                           use_clustering = FALSE)
+## Where to Go Next
 
-# Analyze what worked — best model name is in the leaderboard
-best_name <- quick_automl$leaderboard$model[1]
-best_method <- quick_automl$best_model$spec$method
-cat("Best model:", best_name, "(method:", best_method, ")\n")
-
-# Second pass: if a PCA variant won, invest more in reduction
-if (grepl("^pca_", best_name)) {
-  refined_automl <- tl_auto_ml(split$train, Species ~ .,
-                               time_budget = 60,
-                               use_reduction = TRUE,
-                               use_clustering = TRUE)
-}
-```
-
-### Strategy 2: Ensemble of AutoML Models
-
-```{r, eval=FALSE}
-# Get top 3 models
-top_models <- automl_iris$leaderboard %>%
-  arrange(desc(score)) %>%
-  head(3)
-
-# Make predictions with each
-ensemble_preds <- list()
-for (i in seq_len(nrow(top_models))) {
-  model_name <- top_models$model[i]
-  model <- automl_iris$models[[model_name]]
-  ensemble_preds[[i]] <- predict(model, new_data = split$test)$.pred
-}
-
-# Majority vote for classification
-final_pred <- apply(do.call(cbind, ensemble_preds), 1, function(x) {
-  names(which.max(table(x)))
-})
-
-ensemble_acc <- mean(final_pred == split$test$Species)
-cat("Ensemble Accuracy:", round(ensemble_acc * 100, 1), "%\n")
-```
-
-## Performance Metrics
-
-### Classification Metrics
-
-```{r, eval=FALSE}
-# AutoML automatically uses accuracy for classification
-result_class <- tl_auto_ml(iris, Species ~ .,
-                           metric = "accuracy",
-                           time_budget = 60)
-```
-
-### Regression Metrics
-
-```{r, eval=FALSE}
-# AutoML automatically uses RMSE for regression
-result_reg <- tl_auto_ml(mtcars, mpg ~ .,
-                         metric = "rmse",
-                         time_budget = 60)
-```
-
-## Best Practices
-
-1. **Start fast, then expand**: Use `time_budget = 10` to verify the pipeline
-   runs, then increase to 60--120s for real evaluation, and 300s for final
-   model selection.
-2. **Reduce `cv_folds` before reducing `time_budget`**: Going from 5-fold to
-   2-fold CV cuts evaluation time by ~60% while still providing out-of-sample
-   estimates. A 30s budget with `cv_folds = 2` is often more useful than a
-   30s budget with the default 5 folds (which will skip CV entirely).
-3. **Preprocess when needed**: Handle missing values before AutoML.
-4. **Split your data**: Always evaluate on held-out test data.
-5. **Examine multiple models**: The "best" model may not always be robust.
-6. **Consider ensemble approaches**: Combine top models for better performance.
-7. **Understand training-set metrics**: When CV is skipped (short budgets),
-   the leaderboard uses training-set metrics which are optimistically biased.
-   These are useful for ranking but not for reporting final performance.
-
-## When to Use AutoML
-
-**Good use cases:**
-
-- Quick prototyping and baseline establishment
-- When you're unsure which algorithm to use
-- Feature engineering exploration
-- Benchmark for manual approaches
-- Limited ML expertise
-
-**Consider manual selection when:**
-
-- You have domain knowledge about the best approach
-- Interpretability is critical
-- You need fine-grained control over hyperparameters
-- Computational resources are very limited
-
-## Troubleshooting
-
-### AutoML takes longer than `time_budget`
-
-The budget is checked **between** model fits. A single random forest or
-XGBoost fit can take 5--30 seconds depending on data size, and R cannot
-safely interrupt C-level code mid-execution. To stay closer to the budget:
-
-```{r, eval=FALSE}
-# 1. Reduce CV folds (biggest impact)
-fast_result <- tl_auto_ml(data, formula,
-                          cv_folds = 2,
-                          time_budget = 30)
-
-# 2. Disable slow phases
-baseline_result <- tl_auto_ml(data, formula,
-                              use_reduction = FALSE,
-                              use_clustering = FALSE,
-                              time_budget = 30)
-
-# 3. Use a budget under 30s to skip forest/SVM/XGBoost entirely
-quick_result <- tl_auto_ml(data, formula, time_budget = 10)
-```
-
-### A model is missing, or its score is NA
-
-A model that fails to fit, or that errors during evaluation, is dropped
-with a message explaining why — it never reaches the leaderboard. Run with
-messages enabled to see which ones and why.
-
-A model that evaluates successfully but produces no value for the chosen
-metric appears with an `NA` score. That usually means the metric name is
-not one `tl_evaluate()` recognises for the task: classification supports
-`accuracy`, `precision`, `recall`, `sensitivity`, `specificity`, `f1`,
-`auc` and `pr_auc`; regression supports `rmse`, `mse`, `mae`, `mape` and
-`rsq`. If every score is `NA`, `tl_auto_ml()` warns and returns the first
-model trained rather than pretending to have ranked them.
-
-### Not enough models tried
-
-```{r, eval=FALSE}
-# Increase time budget to unlock all phases
-thorough_result <- tl_auto_ml(data, formula, time_budget = 300)
-
-# Ensure feature engineering is enabled
-full_result <- tl_auto_ml(data, formula,
-                          use_reduction = TRUE,
-                          use_clustering = TRUE,
-                          time_budget = 300)
-```
-
-## Summary
-
-tidylearn's AutoML provides:
-
-- **Automated model selection** across multiple algorithms
-- **Feature engineering** with PCA and clustering
-- **Cross-validation** for robust performance estimates
-- **Easy comparison** through leaderboard
-- **Flexible configuration** for different scenarios
-- **Integration workflows** combining supervised and unsupervised learning
-
-```{r, eval=FALSE}
-# Complete AutoML workflow
-workflow_split <- tl_split(iris, prop = 0.7, stratify = "Species", seed = 123)
-
-automl_result <- tl_auto_ml(
-  data = workflow_split$train,
-  formula = Species ~ .,
-  task = "auto",
-  use_reduction = TRUE,
-  use_clustering = TRUE,
-  time_budget = 120,
-  cv_folds = 5
-)
-
-# Evaluate best model
-final_preds <- predict(automl_result$best_model, new_data = workflow_split$test)
-final_accuracy <- mean(final_preds$.pred == workflow_split$test$Species)
-
-cat("Final AutoML Accuracy:", round(final_accuracy * 100, 1), "%\n")
-cat("Best approach:", automl_result$best_model$spec$method, "\n")
-```
-
-AutoML makes machine learning accessible and efficient, allowing you to quickly find good solutions while learning which approaches work best for your data.
+- **Tuning and pipelines** (`vignette("tuning-and-pipelines")`) — search
+  within a method, then freeze the recipe.
+- **Diagnostics** (`vignette("diagnostics")`) — what to check about the model
+  AutoML handed you.
+- **Integration workflows** (`vignette("integration-workflows")`) — the PCA
+  and clustering steps AutoML applies, driven by hand.

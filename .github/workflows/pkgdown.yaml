@@ -1,7 +1,7 @@
 # Workflow derived from https://github.com/r-lib/actions/tree/v2/examples
 # Need help debugging build failures? Start at https://github.com/r-lib/actions#where-to-find-help
 #
-# `docs/` is gitignored and built here rather than committed: it is 265 files
+# `docs/` is gitignored and built here rather than committed: it is
 # regenerated wholesale on every release, and a stale committed copy is
 # indistinguishable from a current one to anyone reading it.
 #
@@ -10,6 +10,11 @@
 # definition of where the site lives.
 on:
   push:
+    branches: [main, master]
+  # Build on pull requests too, without deploying. A dangling article name
+  # or a reference selector that matches nothing is a hard build error, and
+  # it should fail a PR check rather than the first push to main.
+  pull_request:
     branches: [main, master]
   release:
     types: [published]
@@ -47,8 +52,14 @@ jobs:
         shell: Rscript {0}
 
       - name: Deploy to GitHub Pages
+        if: github.event_name != 'pull_request'
         uses: JamesIves/github-pages-deploy-action@v4.5.0
         with:
-          clean: false
+          # `clean: true` so a renamed or removed topic disappears from the
+          # live site. With `clean: false` gh-pages only ever grows, and a
+          # page nobody links to any more still answers its old URL.
+          # CNAME survives because build_site_github_pages() writes it into
+          # docs/ on every build, so it is part of what gets deployed.
+          clean: true
           branch: gh-pages
           folder: docs

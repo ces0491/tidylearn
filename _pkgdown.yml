@@ -128,12 +128,14 @@ reference:
   contents:
   - starts_with("tl_table")
 
+# `starts_with("tl_cloud")` belongs here once the cloud-execution branch
+# lands. A selector matching nothing is silently dropped rather than erroring,
+# so it would sit here unnoticed until someone wondered where the topics went.
 - title: Compute and cloud
   desc: Where the work runs, and what it is allowed to reach.
   contents:
   - tl_check_gpu
   - tl_compute_advisor
-  - starts_with("tl_cloud")
   - tl_transfer_learning
 
 - title: Utilities
@@ -166,10 +168,18 @@ articles:
   contents:
   - supervised-learning
   - unsupervised-learning
+  - market-basket
+  - tuning-and-pipelines
   - automl
 
+- title: Checking the model
+  contents:
+  - diagnostics
+
+# `compute-backends` is listed here once its vignette merges from the
+# cloud-execution branch. Unlike a reference selector, an article name that
+# matches no file is a hard build error: pkgdown evaluates it as R code.
 - title: Scaling and reporting
   contents:
-  - compute-backends
   - reporting
   - integration-workflows

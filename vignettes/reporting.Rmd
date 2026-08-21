@@ -36,7 +36,7 @@ if (!has_gt) {
 
 tidylearn is designed so that analysis results flow directly into reports.
 Every model produces tidy tibbles, ggplot2 visualisations, and — with the
-`tl_table_*()` functions — polished `gt` tables, all with a consistent
+`tl_table_*()` functions — formatted `gt` tables, all with a consistent
 interface. This vignette walks through the reporting tools available.
 
 ```{r setup}
