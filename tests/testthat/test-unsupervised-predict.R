@@ -173,3 +173,54 @@ test_that("an unset component budget still returns every component", {
     c("PC1", "PC2", "PC3", "PC4")
   )
 })
+
+test_that("prediction returns one row per observation, down to one", {
+  # apply() simplifies a one-row result to a bare vector, and max.col() then
+  # reads that as k rows of one column: three cluster numbers for a single
+  # observation, returned without an error. Row counts are checked at every
+  # size a caller can actually pass.
+  model <- tl_model(iris[, 1:4], method = "kmeans", k = 3)
+
+  for (n in c(10, 2, 1)) {
+    assignment <- predict(model, new_data = iris[seq_len(n), 1:4])
+    expect_equal(nrow(assignment), n)
+  }
+
+  expect_equal(nrow(predict(model, new_data = iris[0, 1:4])), 0)
+
+  pca <- tl_model(iris[, 1:4], method = "pca")
+  expect_equal(nrow(predict(pca, new_data = iris[1, 1:4])), 1)
+})
+
+test_that("predicting one row at a time agrees with the whole frame", {
+  # The property that catches any shape collapse, whichever function grows
+  # one next: an observation's cluster cannot depend on what it was
+  # submitted alongside.
+  model <- tl_model(iris[, 1:4], method = "kmeans", k = 3)
+
+  batch <- predict(model, new_data = iris[, 1:4])$cluster
+  one_at_a_time <- vapply(
+    seq_len(nrow(iris)),
+    function(i) predict(model, new_data = iris[i, 1:4])$cluster,
+    integer(1)
+  )
+
+  expect_identical(one_at_a_time, batch)
+})
+
+test_that("a single row survives the reduce-then-cluster path", {
+  reduced <- tl_reduce_dimensions(
+    iris,
+    response = "Species", method = "pca", n_components = 2
+  )
+  projected <- predict(reduced$reduction_model, new_data = iris[1, 1:4])
+  expect_equal(nrow(projected), 1)
+  expect_identical(grep("^PC", names(projected), value = TRUE), c("PC1", "PC2"))
+
+  clustered <- tl_add_cluster_features(
+    iris,
+    response = "Species", method = "kmeans", k = 3
+  )
+  cluster_model <- attr(clustered, "cluster_model")
+  expect_equal(nrow(predict(cluster_model, new_data = iris[1, 1:4])), 1)
+})

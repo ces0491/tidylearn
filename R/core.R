@@ -563,9 +563,17 @@ predict_unsupervised <- function(object, new_data, type = "response",
         # returns a cluster number that looks valid and is not.
         centers <- object$fit$model$centers
         x_mat <- align_new_data(new_data, colnames(centers), "k-means")
-        dists <- apply(centers, 1, function(centre) {
-          rowSums((x_mat - rep(centre, each = nrow(x_mat)))^2)
-        })
+        # apply() drops to a length-k vector when x_mat has a single row,
+        # and max.col() then reads that as k rows of one column -- three
+        # cluster numbers for one observation, with no error. Pin the
+        # shape rather than trusting simplification.
+        dists <- matrix(
+          apply(centers, 1, function(centre) {
+            rowSums((x_mat - rep(centre, each = nrow(x_mat)))^2)
+          }),
+          nrow = nrow(x_mat),
+          ncol = nrow(centers)
+        )
         clusters <- max.col(-dists, ties.method = "first")
         tibble::tibble(cluster = as.integer(clusters))
       }

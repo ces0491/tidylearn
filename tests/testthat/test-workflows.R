@@ -241,3 +241,20 @@ test_that("a model with no feature transform is untouched by predict", {
   expect_null(model$feature_transform)
   expect_equal(nrow(predict(model, new_data = iris[1:10, ])), 10)
 })
+
+test_that("AutoML models predict a single row", {
+  skip_on_cran()
+
+  # The pca_ and clustered_ variants replay a transformation before
+  # dispatching, so they route through the unsupervised predict paths where
+  # a one-row frame is easiest to get wrong.
+  split <- tl_split(iris, prop = 0.7, stratify = "Species", seed = 123)
+  result <- suppressMessages(
+    tl_auto_ml(split$train, Species ~ ., time_budget = 30, cv_folds = 3)
+  )
+
+  for (model_name in names(result$models)) {
+    preds <- predict(result$models[[model_name]], new_data = split$test[1, ])
+    expect_equal(nrow(preds), 1, info = model_name)
+  }
+})
