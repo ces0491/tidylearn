@@ -1,0 +1,175 @@
+# The published documentation site.
+#
+# `url` is load-bearing rather than cosmetic: pkgdown writes canonical links,
+# absolute Open Graph URLs and a sitemap only when it knows where the site
+# lives, and CRAN links to whatever `URL:` in DESCRIPTION names.
+url: https://tidylearn.sheetsolved.com
+
+template:
+  bootstrap: 5
+  opengraph:
+    twitter:
+      creator: "@sheetsolved"
+      card: summary_large_image
+
+home:
+  title: A unified tidy interface to R's machine learning ecosystem
+  description: >
+    tidylearn gives one consistent interface to R's machine learning
+    ecosystem, from reading data through modelling to publishing results.
+    The underlying algorithms are unchanged - glmnet, randomForest, xgboost,
+    e1071, rpart and others do the work - and tidylearn makes them easier to
+    use together.
+  links:
+  - text: More from Sheet Solved
+    href: https://sheetsolved.com
+
+navbar:
+  structure:
+    left: [intro, reference, articles, news]
+    right: [search, github]
+
+# Sections use pattern selectors wherever a family shares a prefix. A
+# hand-written list of 155 topics goes stale the first time a function is
+# exported, and pkgdown fails the build on a topic missing from the index -
+# which is a build break caused by adding a function, not by breaking one.
+reference:
+- title: Reading data
+  desc: >
+    One interface over files, databases and cloud sources. Every reader
+    returns a tibble.
+  contents:
+  - starts_with("tl_read")
+
+- title: Modelling
+  desc: >
+    Fit, split, evaluate and cross-validate. Reach the underlying model
+    object through the `$fit` slot.
+  contents:
+  - tl_model
+  - tl_split
+  - tl_prepare_data
+  - tl_evaluate
+  - tl_cv
+  - tl_compare_cv
+  - tl_calc_classification_metrics
+  - tl_get_best_model
+  - tl_stratified_models
+  - tl_semisupervised
+  - tl_anomaly_aware
+  - tl_step_selection
+  - tl_reduce_dimensions
+  - tl_add_cluster_features
+
+- title: Pipelines
+  desc: Compose the steps above into something you can save and re-run.
+  contents:
+  - starts_with("tl_pipeline")
+  - tl_run_pipeline
+  - tl_save_pipeline
+  - tl_load_pipeline
+  - tl_predict_pipeline
+  - tl_compare_pipeline_models
+
+- title: Tuning and AutoML
+  contents:
+  - starts_with("tl_tune")
+  - tl_auto_ml
+  - tl_auto_interactions
+  - tl_default_param_grid
+
+- title: Diagnostics
+  desc: What the model got wrong, and which observations drove it.
+  contents:
+  - tl_check_assumptions
+  - tl_diagnostic_dashboard
+  - tl_influence_measures
+  - tl_detect_outliers
+  - tl_interaction_effects
+  - tl_test_interactions
+  - tl_test_model_difference
+  - tl_explore
+  - tl_dashboard
+
+- title: Unsupervised learning
+  desc: >
+    Clustering, ordination and dimension reduction, each returning a tibble
+    rather than a fitted object you have to take apart.
+  contents:
+  - starts_with("tidy_")
+  - starts_with("augment_")
+  - starts_with("optimal_")
+  - starts_with("compare_")
+  - starts_with("calc_")
+  - starts_with("explore_")
+  - starts_with("get_pca")
+  - suggest_eps
+  - standardize_data
+  - create_cluster_dashboard
+
+- title: Association rules
+  contents:
+  - inspect_rules
+  - filter_rules_by_item
+  - find_related_items
+  - recommend_products
+  - summarize_rules
+  - visualize_rules
+
+- title: Plots
+  desc: ggplot2 objects, returned rather than printed, so you can keep editing them.
+  contents:
+  - starts_with("tl_plot")
+  - starts_with("plot_")
+  - tl_xgboost_shap
+
+- title: Tables
+  desc: Formatted gt tables for reporting.
+  contents:
+  - starts_with("tl_table")
+
+- title: Compute and cloud
+  desc: Where the work runs, and what it is allowed to reach.
+  contents:
+  - tl_check_gpu
+  - tl_compute_advisor
+  - starts_with("tl_cloud")
+  - tl_transfer_learning
+
+- title: Utilities
+  contents:
+  - tl_version
+  - "%>%"
+
+- title: Methods
+  desc: >
+    What `print()`, `plot()`, `predict()` and `summary()` do to each object
+    the package returns.
+  contents:
+  - matches("^(print|plot|predict|summary)[.]")
+
+- title: Concepts
+  desc: >
+    Topic pages covering a whole area rather than a single function. Start
+    here when you want the shape of something before the arguments.
+  contents:
+  - starts_with("tidylearn-")
+
+articles:
+- title: Start here
+  navbar: ~
+  contents:
+  - getting-started
+  - data-ingestion
+
+- title: Modelling
+  contents:
+  - supervised-learning
+  - unsupervised-learning
+  - automl
+
+- title: Scaling and reporting
+  contents:
+  - compute-backends
+  - reporting
+  - integration-workflows

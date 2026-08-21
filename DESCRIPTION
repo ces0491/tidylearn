@@ -82,7 +82,7 @@ Suggests:
     testthat (>= 3.1.7),
     xgboost
 Config/testthat/edition: 3
-URL: https://github.com/ces0491/tidylearn
+URL: https://tidylearn.sheetsolved.com, https://github.com/ces0491/tidylearn
 BugReports: https://github.com/ces0491/tidylearn/issues
 VignetteBuilder: knitr
 Collate:
