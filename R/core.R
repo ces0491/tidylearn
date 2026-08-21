@@ -185,6 +185,17 @@ tl_model_supervised <- function(data, formula, method, ..., compute = "cpu") {
     compute = compute, hyperparams = hyperparams
   )
 
+  # Record the training-time factor levels. Predict methods that build
+  # their own design matrix need these to keep contrast coding identical
+  # to the fit; without them, new data missing a level silently changes
+  # the encoding.
+  predictor_vars <- intersect(get_formula_vars(formula, data), names(data))
+  xlev <- lapply(
+    Filter(function(v) is.factor(data[[v]]), predictor_vars),
+    function(v) levels(data[[v]])
+  )
+  names(xlev) <- Filter(function(v) is.factor(data[[v]]), predictor_vars)
+
   # Create model specification
   model_spec <- list(
     paradigm = "supervised",
@@ -192,6 +203,8 @@ tl_model_supervised <- function(data, formula, method, ..., compute = "cpu") {
     method = method,
     is_classification = is_classification,
     response_var = response_var,
+    response_levels = if (is_classification) levels(as.factor(y)) else NULL,
+    xlev = xlev,
     compute = effective_compute
   )
 

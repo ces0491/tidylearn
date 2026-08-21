@@ -4,6 +4,21 @@
 #'   tidylearn's ability to seamlessly combine multiple learning paradigms
 NULL
 
+#' The full set of cluster labels a fitted clustering model can emit
+#'
+#' @param cluster_model A fitted tidylearn clustering model
+#' @return A character vector of cluster labels
+#' @keywords internal
+#' @noRd
+tl_cluster_levels <- function(cluster_model) {
+  centers <- cluster_model$fit$model$centers
+  if (!is.null(centers)) {
+    return(as.character(seq_len(nrow(centers))))
+  }
+
+  as.character(sort(unique(cluster_model$fit$clusters$cluster)))
+}
+
 #' Auto ML: Automated Machine Learning Workflow
 #'
 #' Automatically explores multiple modeling approaches including
@@ -107,11 +122,12 @@ tl_auto_ml <- function(data, formula, task = "auto",
   # otherwise training-set metrics. Training metrics are optimistic, so the
   # kind is recorded and reported on the leaderboard -- without it, models
   # scored in-sample would outrank cross-validated ones by overfitting.
-  evaluate_model <- function(model, eval_data, eval_formula, method, label) {
+  evaluate_model <- function(model, eval_data, eval_formula, method, label,
+                             transform = NULL) {
     if (budget_left() > time_budget * 0.3) {
       cv <- safe_train(function() {
         tl_cv(eval_data, eval_formula, method = method,
-              folds = cv_folds, metrics = metric)
+              folds = cv_folds, metrics = metric, transform = transform)
       }, paste0(label, " CV"))
 
       if (!is.null(cv)) {
@@ -170,6 +186,8 @@ tl_auto_ml <- function(data, formula, task = "auto",
   models <- list()
   results <- list()
   eval_kinds <- character()
+
+  response_var <- all.vars(formula)[1]
 
   # 1. Baseline models (ordered fast to slow)
   # Slow methods (forest, svm, xgboost) involve C code that cannot be
@@ -241,6 +259,33 @@ tl_auto_ml <- function(data, formula, task = "auto",
                                      drop = FALSE]
       }
 
+      # Refit the rotation inside every fold. Scoring against a rotation
+      # derived from the assessment rows themselves would put these
+      # variants on the leaderboard with an advantage the baselines
+      # never get.
+      pca_transform <- function(train_rows) {
+        fold_reduction <- tl_model(
+          train_rows[, setdiff(names(train_rows), response_var),
+                     drop = FALSE],
+          method = "pca"
+        )
+        pc_cols <- paste0("PC", seq_len(n_components))
+
+        list(
+          formula = formula_reduced,
+          apply = function(rows) {
+            scores <- predict(
+              fold_reduction,
+              new_data = rows[, setdiff(names(rows), response_var),
+                              drop = FALSE]
+            )
+            out <- scores[, pc_cols, drop = FALSE]
+            out[[response_var]] <- rows[[response_var]]
+            out
+          }
+        )
+      }
+
       for (method in baseline_methods) {
         if (budget_left() < max(2, time_budget * 0.05)) break
 
@@ -260,7 +305,8 @@ tl_auto_ml <- function(data, formula, task = "auto",
             response = response_var
           )
           scored <- evaluate_model(
-            model, reduced_data, formula_reduced, method, model_name
+            model, data, formula_reduced, method, model_name,
+            transform = pca_transform
           )
           list(model = model, scored = scored)
         }, model_name)
@@ -294,6 +340,32 @@ tl_auto_ml <- function(data, formula, task = "auto",
       )
       cluster_column <- "cluster_kmeans"
 
+      # Refit the centroids inside every fold, for the same reason as the
+      # PCA variants above
+      cluster_transform <- function(train_rows) {
+        fold_clusters <- tl_model(
+          train_rows[, setdiff(names(train_rows), response_var),
+                     drop = FALSE],
+          method = "kmeans", k = k
+        )
+
+        fold_levels <- tl_cluster_levels(fold_clusters)
+
+        list(
+          apply = function(rows) {
+            assignments <- predict(
+              fold_clusters,
+              new_data = rows[, setdiff(names(rows), response_var),
+                              drop = FALSE]
+            )
+            rows[["cluster_kmeans"]] <- factor(
+              assignments$cluster, levels = fold_levels
+            )
+            rows
+          }
+        )
+      }
+
       for (method in baseline_methods) {
         if (budget_left() < max(2, time_budget * 0.05)) break
 
@@ -311,7 +383,8 @@ tl_auto_ml <- function(data, formula, task = "auto",
             response = response_var
           )
           scored <- evaluate_model(
-            model, data_clustered, formula, method, model_name
+            model, data, formula, method, model_name,
+            transform = cluster_transform
           )
           list(model = model, scored = scored)
         }, model_name)
@@ -386,6 +459,7 @@ tl_auto_ml <- function(data, formula, task = "auto",
   structure(
     list(
       best_model = best_model,
+      best_model_name = best_model_name,
       models = models,              # Add for test compatibility
       all_models = models,          # Keep for backward compatibility
       results = results,            # Add for test compatibility
@@ -484,11 +558,25 @@ create_leaderboard <- function(results, metric, task, eval_kinds = NULL) {
     evaluation = kinds
   )
 
-  # Sort: ascending for error metrics, descending for accuracy metrics
-  if (metric %in% c("rmse", "mae", "mse")) {
+  # Sort: ascending for error metrics, descending for accuracy metrics.
+  # Anything not recognised as an error metric would be treated as
+  # higher-is-better and hand back the worst model as the winner, so
+  # refuse rather than guess.
+  error_metrics <- c("rmse", "mae", "mse", "mape", "logloss", "mlogloss")
+  score_metrics <- c("accuracy", "precision", "recall", "f1",
+                     "auc", "roc_auc", "pr_auc", "rsq", "kap")
+
+  if (metric %in% error_metrics) {
     leaderboard <- leaderboard %>% dplyr::arrange(score)
-  } else {
+  } else if (metric %in% score_metrics) {
     leaderboard <- leaderboard %>% dplyr::arrange(dplyr::desc(score))
+  } else {
+    stop(
+      "Cannot rank models by '", metric, "': tidylearn does not know ",
+      "whether higher or lower is better. Use one of: ",
+      paste(sort(c(error_metrics, score_metrics)), collapse = ", "), ".",
+      call. = FALSE
+    )
   }
 
   leaderboard

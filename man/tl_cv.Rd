@@ -4,7 +4,7 @@
 \alias{tl_cv}
 \title{Cross-validation for tidylearn models}
 \usage{
-tl_cv(data, formula, method, folds = 5, metrics = NULL, ...)
+tl_cv(data, formula, method, folds = 5, metrics = NULL, transform = NULL, ...)
 }
 \arguments{
 \item{data}{Data frame}
@@ -18,6 +18,15 @@ tl_cv(data, formula, method, folds = 5, metrics = NULL, ...)
 \item{metrics}{Character vector of metrics to compute on each fold,
 passed to \code{\link{tl_evaluate}}. If \code{NULL} (the default),
 \code{tl_evaluate}'s per-task defaults are used.}
+
+\item{transform}{Optional function for feature engineering that has to
+be refitted per fold. It is called with the training rows of each
+fold and must return a list with an \code{apply} function (applied
+to both the training and assessment rows) and, optionally, a
+\code{formula} to fit under. Use this for anything that learns
+parameters from the data -- PCA rotations, cluster centroids,
+target encodings -- since fitting those before the split inflates
+every fold's score.}
 
 \item{...}{Additional arguments passed to \code{\link{tl_model}}}
 }

@@ -138,10 +138,17 @@ tl_predict_svm <- function(model, new_data,
   fit <- model$fit
   is_classification <- model$spec$is_classification
 
+  # predict.svm defaults to na.omit and silently returns a shorter vector,
+  # so drop incomplete rows here and put NA back afterwards -- otherwise
+  # row i of the output stops describing row i of new_data.
+  keep <- tl_complete_predictor_rows(model$spec$formula, new_data)
+  predict_data <- new_data[keep, , drop = FALSE]
+
   if (is_classification) {
     if (type == "prob") {
-      # Check if probability model was enabled
-      if (!fit$probability) {
+      # e1071 records the probability flag as $compprob; $probability is
+      # the argument name, not a slot on the fitted object
+      if (!isTRUE(fit$compprob)) {
         stop(
           "Probability estimates not available. ",
           "Refit the model with probability = TRUE.",
@@ -152,22 +159,26 @@ tl_predict_svm <- function(model, new_data,
       # Get class probabilities
       probs <- attr(
         predict(
-          fit, newdata = new_data,
+          fit, newdata = predict_data,
           probability = TRUE, ...
         ),
         "probabilities"
       )
 
-      # Convert to tibble with appropriate column names
-      class_levels <- colnames(probs)
-      prob_df <- as.data.frame(probs)
-      names(prob_df) <- class_levels
+      # e1071 orders the probability columns by its own internal class
+      # ordering; align them with the response factor levels so every
+      # method returns the same column order
+      class_levels <- model$spec$response_levels %||% colnames(probs)
+      if (setequal(class_levels, colnames(probs))) {
+        probs <- probs[, class_levels, drop = FALSE]
+      }
 
-      tibble::as_tibble(prob_df)
+      probs <- tl_realign_prob_matrix(probs, keep)
+      tibble::as_tibble(as.data.frame(probs))
     } else if (type == "class" || type == "response") {
       # Get predicted classes
-      preds <- predict(fit, newdata = new_data, ...)
-      preds
+      preds <- predict(fit, newdata = predict_data, ...)
+      tl_realign_predictions(preds, keep)
     } else {
       stop(
         "Invalid prediction type for SVM ",
@@ -178,8 +189,8 @@ tl_predict_svm <- function(model, new_data,
     }
   } else {
     # Regression predictions
-    preds <- predict(fit, newdata = new_data, ...)
-    preds
+    preds <- predict(fit, newdata = predict_data, ...)
+    tl_realign_predictions(preds, keep)
   }
 }
 

@@ -11,7 +11,7 @@ suggest_eps(data, minPts = 5, method = "percentile", percentile = 0.95)
 
 \item{minPts}{Minimum points parameter (used as k for k-NN)}
 
-\item{method}{Method to suggest eps: "knee" (default), "percentile"}
+\item{method}{Method to suggest eps: "percentile" (default), "knee"}
 
 \item{percentile}{If method="percentile", which
 percentile to use (default: 0.95)}

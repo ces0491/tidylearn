@@ -15,6 +15,8 @@ check_output.log
 
 # Editor / tooling caches
 .claude/
+.github/copilot-instructions.md
+.github/instructions/
 
 # Local-only planning docs (feature-scoped, not package-wide)
 SCOPE.md

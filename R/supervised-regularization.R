@@ -579,8 +579,12 @@ tl_predict_glmnet <- function(model, new_data,
         !!class_levels[2] := positive
       )
     } else {
-      # Multinomial: an [observation, class, lambda] array
-      prob_mat <- probs[, , 1, drop = TRUE]
+      # Multinomial: an [observation, class, lambda] array. drop = TRUE
+      # would flatten a single-row prediction to a bare vector, so pin
+      # the shape explicitly instead.
+      prob_mat <- matrix(
+        probs[, , 1], nrow = nrow(x_new), ncol = length(class_levels)
+      )
       colnames(prob_mat) <- class_levels
       tibble::as_tibble(as.data.frame(prob_mat))
     }

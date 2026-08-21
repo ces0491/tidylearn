@@ -262,6 +262,8 @@ class(model_forest$fit)  # This is the randomForest object
 - `vignette("reporting")` — plots and formatted `gt` tables
 - `vignette("integration-workflows")` — combining supervised and unsupervised
   steps
+- `vignette("compute-backends")` — when a fit is too slow or too large for
+  this machine: GPU routing, cost estimates, and the cloud safety model
 
 ## Summary
 

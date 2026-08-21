@@ -269,8 +269,20 @@ tl_tune_grid <- function(data, formula, method,
 #'   data
 #' @param formula A formula specifying the model
 #' @param method The modeling method to tune
-#' @param param_space A named list of parameter spaces
-#'   to sample from
+#' @param param_space A named list of parameter spaces to sample from.
+#'   Each element is read by its type and length:
+#'   \describe{
+#'     \item{a function}{called with no arguments to draw one value}
+#'     \item{\code{c(min, max, "log")}}{log-uniform draw between
+#'       \code{min} and \code{max}}
+#'     \item{two whole numbers}{integer range, e.g.
+#'       \code{c(10, 20)} draws from 10:20}
+#'     \item{three or more whole numbers}{a discrete set, sampled from
+#'       as given}
+#'     \item{two other numbers}{uniform draw between them, e.g.
+#'       \code{c(0.01, 0.1)}}
+#'     \item{character or factor}{categorical, sampled from as given}
+#'   }
 #' @param n_iter Number of random parameter
 #'   combinations to try
 #' @param folds Number of cross-validation folds
@@ -356,26 +368,27 @@ tl_tune_random <- function(data, formula, method,
     for (param_name in names(param_space)) {
       param_def <- param_space[[param_name]]
 
+      # Order matters here. A log-uniform spec c(min, max, "log") is a
+      # CHARACTER vector -- c() coerces -- so it has to be recognised
+      # before any is.numeric() branch, and the whole-number test has to
+      # come before the continuous one or an integer set like c(100, 500)
+      # gets sampled with runif() and yields 234.66.
+      is_log_spec <- length(param_def) == 3 &&
+        identical(as.character(param_def[3]), "log") &&
+        !anyNA(suppressWarnings(as.numeric(param_def[1:2])))
+
       if (is.function(param_def)) {
         # Custom sampling function
         params[[param_name]] <- param_def()
-      } else if (is.numeric(param_def) &&
-                   length(param_def) == 2) {
-        # Numeric range: [min, max]
-        params[[param_name]] <- runif(
-          1, param_def[1], param_def[2]
-        )
-      } else if (is.numeric(param_def) &&
-                   length(param_def) == 3 &&
-                   param_def[3] == "log") {
+      } else if (is_log_spec) {
         # Log-uniform range: [min, max, "log"]
+        bounds <- as.numeric(param_def[1:2])
         params[[param_name]] <- exp(runif(
-          1, log(param_def[1]), log(param_def[2])
+          1, log(bounds[1]), log(bounds[2])
         ))
       } else if (is.integer(param_def) ||
                    (is.numeric(param_def) &&
                       all(param_def == floor(param_def)))) {
-        # Integer range or discrete values
         if (length(param_def) == 2) {
           # Integer range: [min, max]
           params[[param_name]] <- sample(
@@ -383,10 +396,14 @@ tl_tune_random <- function(data, formula, method,
           )
         } else {
           # Discrete values
-          params[[param_name]] <- sample(
-            param_def, 1
-          )
+          params[[param_name]] <- sample(param_def, 1)
         }
+      } else if (is.numeric(param_def) &&
+                   length(param_def) == 2) {
+        # Continuous range: [min, max]
+        params[[param_name]] <- runif(
+          1, param_def[1], param_def[2]
+        )
       } else if (is.character(param_def) ||
                    is.factor(param_def)) {
         # Categorical parameter

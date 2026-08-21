@@ -154,6 +154,111 @@ tl_validate_file_path <- function(path) {
   invisible(TRUE)
 }
 
+#' Identify rows usable for prediction
+#'
+#' Several upstream predict methods default to \code{na.omit} and return a
+#' vector shorter than the input, so row \emph{i} of the result stops
+#' corresponding to row \emph{i} of the data. Callers use this to drop and
+#' then re-expand explicitly, keeping predictions aligned.
+#'
+#' @param formula The model formula
+#' @param new_data Data to predict on
+#' @return A logical vector of length \code{nrow(new_data)}, TRUE where
+#'   every predictor is present
+#' @keywords internal
+#' @noRd
+tl_complete_predictor_rows <- function(formula, new_data) {
+  # terms() expands a "." right-hand side against the columns actually
+  # present; all.vars() on the raw formula would return nothing for
+  # "y ~ ." and the check would silently pass every row.
+  predictors <- tryCatch(
+    all.vars(stats::delete.response(stats::terms(formula, data = new_data))),
+    error = function(e) get_formula_vars(formula, new_data)
+  )
+  predictors <- intersect(predictors, names(new_data))
+
+  if (length(predictors) == 0) {
+    return(rep(TRUE, nrow(new_data)))
+  }
+
+  stats::complete.cases(new_data[, predictors, drop = FALSE])
+}
+
+#' Re-expand predictions to the full input length
+#'
+#' @param values Predictions computed on the complete-case subset
+#' @param keep The logical vector returned by
+#'   \code{tl_complete_predictor_rows()}
+#' @return A vector of length \code{length(keep)} with NA in the dropped
+#'   positions, preserving factor levels where applicable
+#' @keywords internal
+#' @noRd
+tl_realign_predictions <- function(values, keep) {
+  # Row identity in the returned tibble is positional, so names carried
+  # over from new_data's rownames are noise -- and dropping them only on
+  # the NA path would make the output shape depend on the data.
+  if (all(keep)) {
+    return(unname(values))
+  }
+
+  if (is.factor(values)) {
+    out <- factor(rep(NA_character_, length(keep)),
+                  levels = levels(values))
+  } else {
+    out <- rep(NA_real_, length(keep))
+  }
+  out[keep] <- unname(values)
+  out
+}
+
+#' Re-expand a probability matrix to the full input length
+#'
+#' @param probs A matrix or data frame of probabilities, one row per
+#'   complete case
+#' @param keep The logical vector returned by
+#'   \code{tl_complete_predictor_rows()}
+#' @return An object of the same type with NA rows reinstated
+#' @keywords internal
+#' @noRd
+tl_realign_prob_matrix <- function(probs, keep) {
+  if (all(keep)) {
+    return(probs)
+  }
+
+  out <- matrix(
+    NA_real_, nrow = length(keep), ncol = ncol(probs),
+    dimnames = list(NULL, colnames(probs))
+  )
+  out[keep, ] <- as.matrix(probs)
+  out
+}
+
+#' Build a predictor design matrix for new data
+#'
+#' Uses the right-hand side of the formula only, so scoring unlabelled
+#' data does not require the response column, and pins the factor levels
+#' seen during training so contrast coding stays stable.
+#'
+#' @param formula The model formula
+#' @param new_data Data to predict on
+#' @param xlev Factor levels recorded at fit time (may be NULL)
+#' @return A model matrix with the intercept column dropped
+#' @keywords internal
+#' @noRd
+tl_predictor_matrix <- function(formula, new_data, xlev = NULL) {
+  rhs_terms <- stats::delete.response(stats::terms(formula, data = new_data))
+
+  frame <- if (is.null(xlev)) {
+    stats::model.frame(rhs_terms, new_data, na.action = stats::na.pass)
+  } else {
+    stats::model.frame(rhs_terms, new_data, na.action = stats::na.pass,
+                       xlev = xlev)
+  }
+
+  mm <- stats::model.matrix(rhs_terms, frame)
+  mm[, colnames(mm) != "(Intercept)", drop = FALSE]
+}
+
 #' Check if required packages are installed
 #' @keywords internal
 #' @noRd

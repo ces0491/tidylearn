@@ -209,6 +209,114 @@ tl_pipeline <- function(data, formula,
   pipeline
 }
 
+#' Learn preprocessing statistics from a training set
+#'
+#' Split out from \code{tl_run_pipeline()} so that every resampling fold
+#' can learn its own statistics. Learning them once on the full dataset
+#' and then splitting lets each assessment row influence the centre,
+#' scale and median applied to the rows it is scored against, which
+#' inflates every reported metric.
+#'
+#' The response is deliberately excluded from imputation: replacing a
+#' missing outcome with the median fabricates both a training target and
+#' a piece of evaluation ground truth.
+#'
+#' @param data The training rows only
+#' @param formula The model formula
+#' @param preprocessing The pipeline's preprocessing specification
+#' @return A list with \code{medians}, \code{modes}, \code{center} and
+#'   \code{scale}, each a named list keyed by column
+#' @keywords internal
+#' @noRd
+tl_learn_preprocessing <- function(data, formula, preprocessing) {
+  stats_learned <- list(
+    medians = list(), modes = list(),
+    center = list(), scale = list()
+  )
+
+  response_var <- all.vars(formula)[1]
+
+  if (isTRUE(preprocessing$impute_missing)) {
+    for (col in setdiff(names(data), response_var)) {
+      if (is.numeric(data[[col]])) {
+        # Record the median even when this column is complete -- new data
+        # may still have gaps here
+        stats_learned$medians[[col]] <- median(data[[col]], na.rm = TRUE)
+      } else if (is.factor(data[[col]]) || is.character(data[[col]])) {
+        tab <- if (is.factor(data[[col]])) {
+          table(data[[col]])
+        } else {
+          table(data[[col]], useNA = "no")
+        }
+        stats_learned$modes[[col]] <- if (length(tab) > 0) {
+          names(tab)[which.max(tab)]
+        } else {
+          NA_character_
+        }
+      }
+    }
+  }
+
+  if (isTRUE(preprocessing$standardize)) {
+    numeric_cols <- vapply(data, is.numeric, logical(1))
+    numeric_cols[response_var] <- FALSE  # Don't standardize response
+
+    for (col in names(data)[numeric_cols]) {
+      col_mean <- mean(data[[col]], na.rm = TRUE)
+      col_sd <- stats::sd(data[[col]], na.rm = TRUE)
+
+      # A constant column would divide by zero; centre it only
+      if (is.na(col_sd) || col_sd == 0) {
+        col_sd <- 1
+      }
+
+      stats_learned$center[[col]] <- col_mean
+      stats_learned$scale[[col]] <- col_sd
+    }
+  }
+
+  stats_learned
+}
+
+#' Apply learned preprocessing statistics to a data frame
+#'
+#' @param data Rows to transform -- a training fold, an assessment fold,
+#'   or unseen data
+#' @param preprocessing The pipeline's preprocessing specification
+#' @param stats_learned The output of \code{tl_learn_preprocessing()}
+#' @return \code{data} with imputation and standardisation applied
+#' @keywords internal
+#' @noRd
+tl_apply_preprocessing <- function(data, preprocessing, stats_learned) {
+  if (isTRUE(preprocessing$impute_missing)) {
+    for (col in names(data)) {
+      na_idx <- is.na(data[[col]])
+      if (!any(na_idx)) next
+
+      if (is.numeric(data[[col]])) {
+        med <- stats_learned$medians[[col]]
+        if (is.null(med)) next
+        data[[col]][na_idx] <- med
+      } else if (is.factor(data[[col]]) || is.character(data[[col]])) {
+        mode_val <- stats_learned$modes[[col]]
+        if (is.null(mode_val) || is.na(mode_val)) next
+        data[[col]][na_idx] <- mode_val
+      }
+    }
+  }
+
+  if (isTRUE(preprocessing$standardize)) {
+    for (col in names(stats_learned$center)) {
+      if (!col %in% names(data)) next
+
+      data[[col]] <- (data[[col]] - stats_learned$center[[col]]) /
+        stats_learned$scale[[col]]
+    }
+  }
+
+  data
+}
+
 #' Run a tidylearn pipeline
 #'
 #' @param pipeline A tidylearn pipeline object
@@ -260,95 +368,31 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
     message("Applying preprocessing steps...")
   }
 
-  processed_data <- data
-
-  # Preprocessing statistics learned from the training data. These are
-  # recorded on the scale each step sees, so tl_predict_pipeline() can
-  # replay the same transformation on raw new data.
-  preprocessing_stats <- list(
-    medians = list(),
-    modes = list(),
-    center = list(),
-    scale = list()
-  )
-
-  if (preprocessing$impute_missing) {
-    if (verbose) {
+  if (verbose) {
+    if (preprocessing$impute_missing) {
       message("  - Imputing missing values")
     }
-
-    # Simple imputation for numeric and categorical variables
-    for (col in names(processed_data)) {
-      if (is.numeric(processed_data[[col]])) {
-        # Record the median even when this column is complete -- new data
-        # may still have gaps here
-        med <- median(processed_data[[col]], na.rm = TRUE)
-        preprocessing_stats$medians[[col]] <- med
-
-        na_idx <- is.na(processed_data[[col]])
-        if (any(na_idx)) {
-          processed_data[[col]][na_idx] <- med
-        }
-      } else if (is.factor(processed_data[[col]]) ||
-                   is.character(processed_data[[col]])) {
-        # Calculate mode
-        if (is.factor(processed_data[[col]])) {
-          tab <- table(processed_data[[col]])
-        } else {
-          tab <- table(processed_data[[col]], useNA = "no")
-        }
-        mode_val <- if (length(tab) > 0) {
-          names(tab)[which.max(tab)]
-        } else {
-          NA_character_
-        }
-        preprocessing_stats$modes[[col]] <- mode_val
-
-        na_idx <- is.na(processed_data[[col]])
-        if (any(na_idx) && !is.na(mode_val)) {
-          processed_data[[col]][na_idx] <- mode_val
-        }
-      }
-    }
-  }
-
-  if (preprocessing$standardize) {
-    if (verbose) {
+    if (preprocessing$standardize) {
       message("  - Standardizing numeric features")
     }
-
-    # Identify numeric columns (excluding response)
-    response_var <- all.vars(formula)[1]
-    numeric_cols <- sapply(processed_data, is.numeric)
-    numeric_cols[response_var] <- FALSE  # Don't standardize response
-
-    # Standardize each numeric column, recording the centre and scale
-    for (col in names(processed_data)[numeric_cols]) {
-      col_mean <- mean(processed_data[[col]], na.rm = TRUE)
-      col_sd <- stats::sd(processed_data[[col]], na.rm = TRUE)
-
-      # A constant column would divide by zero; centre it only
-      if (is.na(col_sd) || col_sd == 0) {
-        col_sd <- 1
-      }
-
-      preprocessing_stats$center[[col]] <- col_mean
-      preprocessing_stats$scale[[col]] <- col_sd
-
-      processed_data[[col]] <- (processed_data[[col]] - col_mean) / col_sd
-    }
-  }
-
-  if (preprocessing$dummy_encode) {
-    if (verbose) {
+    if (preprocessing$dummy_encode) {
+      # Left to model.matrix during model fitting
       message("  - Creating dummy variables for categorical features")
     }
-
-    # Let model.matrix handle this during model fitting
-    # We don't modify the processed_data here
   }
 
-  # Set up validation strategy
+  # Statistics for the final model, which is legitimately fitted on
+  # everything. tl_predict_pipeline() replays these on raw new data.
+  #
+  # Resampling below deliberately does NOT use them: each fold relearns
+  # from its own analysis rows, so no assessment row contributes to the
+  # transformation it is later scored under.
+  preprocessing_stats <- tl_learn_preprocessing(data, formula, preprocessing)
+  processed_data <- tl_apply_preprocessing(
+    data, preprocessing, preprocessing_stats
+  )
+
+  # Set up validation strategy. Splits are drawn from the RAW data.
   if (evaluation$validation == "cv") {
     cv_folds <- evaluation$cv_folds
 
@@ -357,7 +401,7 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
     }
 
     # Create cross-validation splits
-    cv_splits <- rsample::vfold_cv(processed_data, v = cv_folds)
+    cv_splits <- rsample::vfold_cv(data, v = cv_folds)
   } else if (evaluation$validation == "split") {
     train_prop <- evaluation$train_prop
     if (is.null(train_prop)) train_prop <- 0.8
@@ -367,13 +411,21 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
               (1 - train_prop) * 100, "%)")
     }
 
-    # Create a single train/test split
+    # Create a single train/test split, then learn the transformation
+    # from the training rows alone and replay it on the test rows
     train_idx <- sample(
-      nrow(processed_data),
-      round(train_prop * nrow(processed_data))
+      nrow(data),
+      round(train_prop * nrow(data))
     )
-    train_data <- processed_data[train_idx, ]
-    test_data <- processed_data[-train_idx, ]
+    split_stats <- tl_learn_preprocessing(
+      data[train_idx, ], formula, preprocessing
+    )
+    train_data <- tl_apply_preprocessing(
+      data[train_idx, ], preprocessing, split_stats
+    )
+    test_data <- tl_apply_preprocessing(
+      data[-train_idx, ], preprocessing, split_stats
+    )
   }
 
   # Train and evaluate models
@@ -400,9 +452,21 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
           message("  - Fold ", i, "/", cv_folds)
         }
 
-        # Get training and testing data for this fold
-        train_fold <- rsample::analysis(cv_splits$splits[[i]])
-        test_fold <- rsample::assessment(cv_splits$splits[[i]])
+        # Get training and testing data for this fold, then learn the
+        # transformation from the analysis rows only and replay it on
+        # the assessment rows
+        raw_train_fold <- rsample::analysis(cv_splits$splits[[i]])
+        raw_test_fold <- rsample::assessment(cv_splits$splits[[i]])
+
+        fold_stats <- tl_learn_preprocessing(
+          raw_train_fold, formula, preprocessing
+        )
+        train_fold <- tl_apply_preprocessing(
+          raw_train_fold, preprocessing, fold_stats
+        )
+        test_fold <- tl_apply_preprocessing(
+          raw_test_fold, preprocessing, fold_stats
+        )
 
         # Fit model on training fold
         model_args <- c(
@@ -782,38 +846,10 @@ tl_predict_pipeline <- function(pipeline,
       )
     }
 
-    if (isTRUE(pipeline$preprocessing$impute_missing)) {
-      # Impute with the statistics learned from the raw training data
-      for (col in names(processed_new_data)) {
-        na_idx <- is.na(processed_new_data[[col]])
-        if (!any(na_idx)) next
-
-        if (is.numeric(processed_new_data[[col]])) {
-          med <- stats_learned$medians[[col]]
-          if (is.null(med)) {
-            med <- median(processed_new_data[[col]], na.rm = TRUE)
-          }
-          processed_new_data[[col]][na_idx] <- med
-        } else if (is.factor(processed_new_data[[col]]) ||
-                     is.character(processed_new_data[[col]])) {
-          mode_val <- stats_learned$modes[[col]]
-          if (is.null(mode_val) || is.na(mode_val)) next
-          processed_new_data[[col]][na_idx] <- mode_val
-        }
-      }
-    }
-
-    if (isTRUE(pipeline$preprocessing$standardize)) {
-      # Standardize exactly the columns that were standardized during
-      # training, using the training centre and scale
-      for (col in names(stats_learned$center)) {
-        if (!col %in% names(processed_new_data)) next
-
-        processed_new_data[[col]] <-
-          (processed_new_data[[col]] - stats_learned$center[[col]]) /
-          stats_learned$scale[[col]]
-      }
-    }
+    # Replay exactly the transformation the final model was fitted under
+    processed_new_data <- tl_apply_preprocessing(
+      processed_new_data, pipeline$preprocessing, stats_learned
+    )
   }
 
   # Make predictions

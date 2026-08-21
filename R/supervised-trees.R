@@ -176,6 +176,49 @@ tl_predict_forest <- function(model, new_data, type = "response", ...) {
   }
 }
 
+#' Normalise multinomial gbm probabilities to an n x k matrix
+#'
+#' \code{predict.gbm} returns a 3-D array \code{[n, nclass, 1]} for the
+#' multinomial distribution, so \code{is.matrix()} is FALSE and naive
+#' handling collapses every row into one prediction. Drop the trailing
+#' dimension and restore the class names.
+#'
+#' @param probs The raw return value of \code{gbm::predict.gbm}
+#' @param model The tidylearn model, used for the class levels
+#' @return A numeric matrix with one row per observation and one named
+#'   column per class
+#' @keywords internal
+#' @noRd
+tl_gbm_multinomial_matrix <- function(probs, model) {
+  class_levels <- model$spec$response_levels
+  if (is.null(class_levels)) {
+    response_var <- all.vars(model$spec$formula)[1]
+    class_levels <- levels(factor(model$data[[response_var]]))
+  }
+
+  dims <- dim(probs)
+
+  out <- if (length(dims) == 3L) {
+    matrix(probs, nrow = dims[1], ncol = dims[2])
+  } else if (length(dims) == 2L) {
+    probs
+  } else {
+    # A bare vector is one observation's class probabilities
+    matrix(probs, nrow = 1)
+  }
+
+  if (ncol(out) != length(class_levels)) {
+    stop(
+      "gbm returned ", ncol(out), " probability columns for ",
+      length(class_levels), " classes.",
+      call. = FALSE
+    )
+  }
+
+  colnames(out) <- class_levels
+  out
+}
+
 #' Fit a gradient boosting model
 #'
 #' @param data A data frame containing the training data
@@ -339,7 +382,7 @@ tl_predict_boost <- function(
       }
     } else if (fit$distribution$name == "multinomial") {
       # Multiclass classification
-      if (type == "prob") {
+      if (type == "prob" || type == "class" || type == "response") {
         # Get class probabilities
         probs <- gbm::predict.gbm(
           fit, newdata = new_data,
@@ -347,60 +390,18 @@ tl_predict_boost <- function(
           type = "response", ...
         )
 
-        # Reshape to data frame
-        if (is.matrix(probs)) {
-          # Get class levels from column names
-          class_levels <- colnames(probs)
+        probs <- tl_gbm_multinomial_matrix(probs, model)
+
+        if (type == "prob") {
           prob_df <- as.data.frame(probs)
-          names(prob_df) <- class_levels
+          names(prob_df) <- colnames(probs)
+          tibble::as_tibble(prob_df)
         } else {
-          # For single prediction
-          response_var <- all.vars(
-            model$spec$formula
-          )[1]
-          class_levels <- levels(
-            factor(model$data[[response_var]])
-          )
-          prob_df <- as.data.frame(
-            matrix(probs, nrow = 1)
-          )
-          names(prob_df) <- class_levels
-        }
-
-        tibble::as_tibble(prob_df)
-      } else if (type == "class" || type == "response") {
-        # Get class probabilities
-        probs <- gbm::predict.gbm(
-          fit, newdata = new_data,
-          n.trees = n.trees,
-          type = "response", ...
-        )
-
-        # Convert to classes
-        if (is.matrix(probs)) {
-          # Find class with highest probability
-          class_idx <- apply(probs, 1, which.max)
+          # Find class with highest probability, one row at a time
           class_levels <- colnames(probs)
-          pred_classes <- factor(
-            class_levels[class_idx],
-            levels = class_levels
-          )
-        } else {
-          # For single prediction
-          response_var <- all.vars(
-            model$spec$formula
-          )[1]
-          class_levels <- levels(
-            factor(model$data[[response_var]])
-          )
-          class_idx <- which.max(probs)
-          pred_classes <- factor(
-            class_levels[class_idx],
-            levels = class_levels
-          )
+          class_idx <- max.col(probs, ties.method = "first")
+          factor(class_levels[class_idx], levels = class_levels)
         }
-
-        pred_classes
       } else {
         stop(
           "Invalid prediction type for boosting. ",

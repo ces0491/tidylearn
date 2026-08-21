@@ -195,12 +195,16 @@ tl_read_postgres <- function(dsn, query, dbname = NULL, user = NULL,
     warning("Query returned 0 rows.", call. = FALSE)
   }
 
+  # Redact before the DSN becomes an attribute of the returned object:
+  # print.tidylearn_data() shows it and saveRDS() persists it
   source_desc <- if (grepl("^postgres", dsn)) {
     dsn
   } else {
     paste0("postgres://", dsn)
   }
-  new_tidylearn_data(data, source = source_desc, format = "postgres")
+  new_tidylearn_data(
+    data, source = tl_redact_db_url(source_desc), format = "postgres"
+  )
 }
 
 #' Read from a MySQL/MariaDB database
@@ -299,7 +303,9 @@ tl_read_mysql <- function(dsn, query, dbname = NULL, user = NULL,
   }
 
   source_desc <- if (grepl("^mysql", dsn)) dsn else paste0("mysql://", dsn)
-  new_tidylearn_data(data, source = source_desc, format = "mysql")
+  new_tidylearn_data(
+    data, source = tl_redact_db_url(source_desc), format = "mysql"
+  )
 }
 
 #' Read from Google BigQuery
@@ -684,6 +690,36 @@ tl_parse_kaggle_url <- function(url) {
   parts
 }
 
+#' Strip credentials out of a database connection string
+#'
+#' A DSN carries the password in the clear. It must never reach the
+#' \code{tl_source} attribute (which \code{print.tidylearn_data()}
+#' displays and \code{saveRDS()} persists), a progress message, or an
+#' error string.
+#'
+#' @param url A connection string, or any other source description
+#' @return The same string with any \code{user:password@@} userinfo
+#'   replaced by \code{user:***@@}; non-URL input is returned unchanged
+#' @keywords internal
+#' @noRd
+tl_redact_db_url <- function(url) {
+  if (!is.character(url) || length(url) != 1 || is.na(url)) {
+    return(url)
+  }
+
+  # scheme://user:password@rest  ->  scheme://user:***@rest
+  redacted <- sub(
+    "^([a-z][a-z0-9+.-]*://)([^:@/]+):([^@/]*)@",
+    "\\1\\2:***@",
+    url,
+    perl = TRUE
+  )
+
+  # A bare "user:password@host" with no scheme is also accepted by the
+  # backends below, so cover that shape too
+  sub("^([^:@/]+):([^@/]*)@", "\\1:***@", redacted, perl = TRUE)
+}
+
 #' Parse a database connection URL
 #' @keywords internal
 #' @noRd
@@ -697,7 +733,8 @@ tl_parse_db_url <- function(url) {
   m <- regmatches(url, regexec(pattern, url))[[1]]
 
   if (length(m) == 0) {
-    stop("Cannot parse database URL: '", url, "'.", call. = FALSE)
+    stop("Cannot parse database URL: '", tl_redact_db_url(url), "'.",
+         call. = FALSE)
   }
 
   list(

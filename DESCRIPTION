@@ -60,6 +60,7 @@ Suggests:
     ggforce,
     gridExtra,
     gt,
+    httr2 (>= 1.0.0),
     jsonlite,
     keras,
     knitr,
@@ -80,6 +81,7 @@ Suggests:
     shinydashboard,
     tensorflow,
     testthat (>= 3.1.7),
+    withr,
     xgboost
 Config/testthat/edition: 3
 URL: https://tidylearn.sheetsolved.com, https://github.com/ces0491/tidylearn
@@ -114,6 +116,10 @@ Collate:
     'compute-detection.R'
     'compute-advisor.R'
     'compute-routing.R'
+    'cloud-consent.R'
+    'cloud-endpoint.R'
+    'cloud-cost.R'
+    'cloud-serialize.R'
     'tuning.R'
     'interactions.R'
     'diagnostics.R'
