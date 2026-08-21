@@ -18,3 +18,6 @@ check_output.log
 
 # Local-only planning docs (feature-scoped, not package-wide)
 SCOPE.md
+
+# pkgdown site - built by .github/workflows/pkgdown.yaml, never committed
+docs/
