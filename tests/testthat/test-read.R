@@ -507,6 +507,84 @@ test_that("tl_read_kaggle errors when kaggle CLI not installed", {
   expect_error(tl_read_kaggle("user/dataset"), "Kaggle CLI not found")
 })
 
+# The slug is interpolated into a command line: system2() applies
+# shQuote() to the command and leaves the arguments as written. A pasted
+# dataset URL is the vector, and the URL branch is skipped entirely when
+# the caller passes a bare string, so the slug is not necessarily
+# anything Kaggle produced.
+#
+# These run without the Kaggle CLI on purpose -- validation happens
+# before the CLI is looked for, so a malformed slug is reported as the
+# caller's mistake rather than as a missing dependency.
+
+test_that("tl_read_kaggle refuses a slug carrying shell metacharacters", {
+  injections <- c(
+    "owner/data;whoami",
+    "owner/data|whoami",
+    "owner/data`whoami`",
+    "owner/data$(whoami)",
+    "owner/data && rm -rf .",
+    "owner/data
+whoami"
+  )
+  for (slug in injections) {
+    expect_error(
+      tl_read_kaggle(slug), "not a valid Kaggle dataset slug", info = slug
+    )
+  }
+
+  # Same check after URL parsing, which is where a pasted link lands
+  expect_error(
+    tl_read_kaggle("https://www.kaggle.com/datasets/owner/data;whoami"),
+    "not a valid Kaggle dataset slug"
+  )
+
+  # Structurally wrong, if harmless
+  expect_error(tl_read_kaggle("nosuchslug"), "not a valid Kaggle dataset slug")
+  expect_error(tl_read_kaggle("a/b/c"), "not a valid Kaggle dataset slug")
+  expect_error(
+    tl_read_kaggle("titanic/x", type = "competition"),
+    "not a valid Kaggle competition name"
+  )
+})
+
+test_that("tl_read_kaggle refuses a file name that escapes the download", {
+  expect_error(
+    tl_read_kaggle("owner/data", file = "../../etc/passwd"),
+    "must be a relative path"
+  )
+  expect_error(
+    tl_read_kaggle("owner/data", file = "/etc/passwd"),
+    "must be a relative path"
+  )
+  expect_error(
+    tl_read_kaggle("owner/data", file = paste0("C:", "\\", "windows")),
+    "must be a relative path"
+  )
+  expect_error(
+    tl_read_kaggle("owner/data", file = "train;whoami.csv"),
+    "may contain only"
+  )
+})
+
+test_that("a well-formed Kaggle request gets past validation", {
+  skip_on_cran()
+  skip_if(nzchar(Sys.which("kaggle")), "kaggle CLI is installed")
+
+  # Reaching the CLI check is how we know validation accepted the input;
+  # going further would need the CLI and the network.
+  for (slug in c("zillow/zecon", "owner/data-set_1.0", "a/b")) {
+    expect_error(tl_read_kaggle(slug), "Kaggle CLI not found", info = slug)
+  }
+  expect_error(
+    tl_read_kaggle("titanic", type = "competition"), "Kaggle CLI not found"
+  )
+  expect_error(
+    tl_read_kaggle("owner/data", file = "data/train.csv"),
+    "Kaggle CLI not found"
+  )
+})
+
 # ---- tl_read_s3 (error path only) ----
 
 test_that("tl_read_s3 errors on invalid URI", {
