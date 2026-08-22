@@ -312,10 +312,8 @@ tl_tune_random <- function(data, formula, method,
                            maximize = NULL,
                            verbose = TRUE,
                            seed = NULL, ...) {
-  # Set seed if provided
-  if (!is.null(seed)) {
-    set.seed(seed)
-  }
+  # Seed this call without rewriting the caller's random stream
+  tl_local_seed(seed)
 
   # Input validation
   if (!is.list(param_space)) {

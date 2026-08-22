@@ -408,7 +408,10 @@ tl_read_dir <- function(path, pattern = NULL, format = NULL,
 #' @param path Path to a zip file.
 #' @param file Optional name of a specific file within the archive to read.
 #'   Supports partial matching.
-#' @param format Optional format override for the file(s) inside the archive.
+#' @param format Optional format override for the file(s) inside the
+#'   archive. When the archive holds more than one kind of data file,
+#'   this selects the members of that format rather than forcing it
+#'   onto all of them.
 #' @param .quiet Suppress messages. Default is \code{FALSE}.
 #' @param ... Additional arguments passed to the format-specific reader.
 #'
@@ -474,6 +477,29 @@ tl_read_zip <- function(path, file = NULL, format = NULL,
     stop("No recognized data files found in archive.",
          "\nFiles in archive: ", paste(all_files, collapse = ", "),
          call. = FALSE)
+  }
+
+  # An archive can hold more than one kind of file. Forcing `format` onto
+  # every member read a JSON as a CSV and row-bound the result, producing
+  # a column named after the JSON's first line and no error at all. When
+  # the caller names a format, take it to mean the members of that format.
+  if (!is.null(format) && length(data_files) > 1) {
+    detected <- vapply(data_files, tl_detect_format, character(1))
+    wanted <- detected == format
+
+    if (!any(wanted)) {
+      stop("No ", format, " files in archive.",
+           "\nFound: ", paste(unique(detected), collapse = ", "),
+           call. = FALSE)
+    }
+
+    if (!all(wanted) && !.quiet) {
+      message("Reading the ", sum(wanted), " ", format, " file(s); ",
+              "ignoring ", paste(unique(detected[!wanted]), collapse = ", "),
+              ".")
+    }
+
+    data_files <- data_files[wanted]
   }
 
   if (length(data_files) == 1) {

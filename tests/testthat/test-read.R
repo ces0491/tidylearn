@@ -829,3 +829,37 @@ test_that("tl_read dispatches to tl_read_zip for .zip files", {
   expect_s3_class(result, "tidylearn_data")
   expect_equal(nrow(result), 150)
 })
+
+# ---- tl_read_zip format selection ----
+
+test_that("tl_read_zip(format=) selects members rather than forcing them", {
+  d <- file.path(tempdir(), "tl_mixed_zip")
+  unlink(d, recursive = TRUE)
+  dir.create(d, recursive = TRUE)
+  on.exit(unlink(d, recursive = TRUE), add = TRUE)
+
+  write.csv(data.frame(a = 1:2), file.path(d, "a.csv"), row.names = FALSE)
+  write.csv(data.frame(a = 3:4), file.path(d, "b.csv"), row.names = FALSE)
+  writeLines('[{"a":1}]', file.path(d, "c.json"))
+
+  archive <- file.path(d, "mixed.zip")
+  old <- setwd(d)
+  on.exit(setwd(old), add = TRUE)
+  utils::zip(archive, c("a.csv", "b.csv", "c.json"), flags = "-q")
+  setwd(old)
+
+  # Forcing csv onto the json read its first line as a header, so the
+  # result carried a column literally named [{"a":1}] and the row-bind
+  # succeeded without complaint.
+  result <- suppressMessages(tl_read_zip(archive, format = "csv"))
+  expect_equal(nrow(result), 4L)
+  expect_setequal(names(result), c("a", "source_file"))
+  expect_false(any(grepl("[{]", names(result))))
+  expect_setequal(result$a, 1:4)
+
+  # A format nothing matches is an error naming what is there
+  expect_error(
+    tl_read_zip(archive, format = "parquet"),
+    "No parquet files in archive"
+  )
+})

@@ -154,6 +154,46 @@ tl_validate_file_path <- function(path) {
   invisible(TRUE)
 }
 
+#' Seed the RNG for this call only
+#'
+#' \code{set.seed()} rewrites the session's random stream, so a function
+#' that takes a \code{seed} argument for its own reproducibility was also
+#' deciding what every later \code{sample()} or \code{rnorm()} in the
+#' caller's script would return. Two scripts differing only in whether
+#' they passed \code{seed} would diverge everywhere downstream.
+#'
+#' Registers the restore on the calling function's frame, so the stream
+#' goes back to what it was however that function exits.
+#'
+#' @param seed The seed to set, or NULL to leave the RNG untouched
+#' @param envir The frame to restore on; defaults to the caller
+#' @return `TRUE`, invisibly
+#' @keywords internal
+#' @noRd
+tl_local_seed <- function(seed, envir = parent.frame()) {
+  if (is.null(seed)) {
+    return(invisible(TRUE))
+  }
+
+  # An R session that has not drawn a random number yet has no
+  # .Random.seed at all. Restoring one we invented would be its own
+  # side effect, so remove it instead.
+  if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
+    previous <- get(".Random.seed", envir = globalenv(), inherits = FALSE)
+    restore <- bquote(
+      assign(".Random.seed", .(previous), envir = globalenv()) # nolint
+    )
+  } else {
+    restore <- quote(
+      suppressWarnings(rm(".Random.seed", envir = globalenv()))
+    )
+  }
+
+  do.call(base::on.exit, list(restore, add = TRUE), envir = envir)
+  set.seed(seed)
+  invisible(TRUE)
+}
+
 #' Normalise a classification response
 #'
 #' Subsetting a data frame keeps every factor level, so

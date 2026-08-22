@@ -311,3 +311,42 @@ test_that("unsupervised methods work with formula", {
                      method = "kmeans", k = 3)
   expect_s3_class(model2, "tidylearn_kmeans")
 })
+
+# ---- princomp loadings -----------------------------------------------
+
+test_that("tidy_pca(method = 'princomp') produces usable loadings", {
+  # princomp() returns a "loadings" object rather than a plain matrix, and
+  # as_tibble() read that as one long vector -- 16 values against 4 row
+  # names -- so get_pca_loadings() failed outright with
+  # "Can't recycle ..1 (size 16) to match ..3 (size 4)".
+  pca <- tidy_pca(iris[, 1:4], method = "princomp")
+
+  expect_equal(nrow(pca$loadings), 16L)
+  expect_setequal(names(pca$loadings), c("variable", "component", "loading"))
+  expect_setequal(unique(pca$loadings$variable), names(iris)[1:4])
+  expect_length(unique(pca$loadings$component), 4L)
+
+  wide <- get_pca_loadings(pca)
+  expect_equal(nrow(wide), 4L)
+  expect_setequal(wide$variable, names(iris)[1:4])
+  expect_true(all(vapply(wide[-1], is.numeric, logical(1))))
+})
+
+test_that("princomp and prcomp agree on the loadings, up to sign", {
+  # The two routines are the same decomposition by different algorithms,
+  # so a component may come back negated but not different. Comparing the
+  # numbers is what catches a reshape that silently transposes or
+  # recycles; checking only that columns exist would not.
+  wide_p <- get_pca_loadings(tidy_pca(iris[, 1:4], method = "prcomp"))
+  wide_c <- get_pca_loadings(tidy_pca(iris[, 1:4], method = "princomp"))
+
+  expect_equal(wide_p$variable, wide_c$variable)
+
+  for (i in seq_len(4)) {
+    from_prcomp <- wide_p[[i + 1L]]
+    from_princomp <- wide_c[[i + 1L]]
+    agree <- isTRUE(all.equal(from_prcomp, from_princomp, tolerance = 1e-6)) ||
+      isTRUE(all.equal(from_prcomp, -from_princomp, tolerance = 1e-6))
+    expect_true(agree, info = paste("component", i))
+  }
+})

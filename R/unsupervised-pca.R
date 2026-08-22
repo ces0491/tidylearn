@@ -72,6 +72,13 @@ tidy_pca <- function(data, cols = NULL, scale = TRUE,
   scores_tbl <- tibble::as_tibble(scores_matrix) %>%
     dplyr::mutate(.obs_id = obs_id, .before = 1)
 
+  # princomp() returns its loadings as a "loadings" object rather than a
+  # plain matrix, and as_tibble() reads that as one long vector -- 16
+  # values against 4 row names for a 4-variable PCA, which fails with
+  # "Can't recycle ..1 (size 16) to match ..3 (size 4)". prcomp()'s
+  # rotation is already a matrix, so this is a no-op there.
+  loadings_matrix <- as.matrix(unclass(loadings_matrix))
+
   # Create tidy loadings tibble (long format)
   loadings_tbl <- tibble::as_tibble(loadings_matrix, rownames = "variable") %>%
     tidyr::pivot_longer(

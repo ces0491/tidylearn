@@ -719,15 +719,16 @@ tl_check_kaggle_slug <- function(slug, type = "dataset") {
   }
 
   if (!grepl(pattern, slug)) {
+    is_competition <- identical(type, "competition")
+    noun <- if (is_competition) "competition name" else "dataset slug"
+    shape <- if (is_competition) {
+      "a name like \"titanic\""
+    } else {
+      "\"owner/dataset-name\""
+    }
     stop(
-      "'", slug, "' is not a valid Kaggle ",
-      if (identical(type, "competition")) "competition name" else "dataset slug",
-      ". Expected ",
-      if (identical(type, "competition")) {
-        "a name like \"titanic\""
-      } else {
-        "\"owner/dataset-name\""
-      },
+      "'", slug, "' is not a valid Kaggle ", noun,
+      ". Expected ", shape,
       ", using only letters, digits, dots, hyphens and underscores.",
       call. = FALSE
     )
