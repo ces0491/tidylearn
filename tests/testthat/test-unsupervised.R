@@ -350,3 +350,58 @@ test_that("princomp and prcomp agree on the loadings, up to sign", {
     expect_true(agree, info = paste("component", i))
   }
 })
+
+# ---- gap statistic for hierarchical clustering -----------------------
+
+test_that("optimal_hclust_k(method = 'gap') runs at all", {
+  # clusGap() requires FUN to return a list with a `cluster` element and
+  # cutree() returns a bare integer vector, so this branch died on its
+  # first call with "$ operator is invalid for atomic vectors" -- which
+  # kept two further faults below from ever showing themselves.
+  hc <- tidy_hclust(USArrests[1:25, ], method = "average")
+  result <- optimal_hclust_k(hc, method = "gap", max_k = 4)
+
+  expect_true(is.list(result))
+  expect_true("gap_data" %in% names(result))
+  expect_equal(nrow(result$gap_data), 4L)
+  expect_true(all(is.finite(result$gap_data$gap)))
+})
+
+test_that("the gap refit uses the model's own distance", {
+  # The refit called stats::dist(), whose default is Euclidean, so a model
+  # built with any other distance was scored against clusterings it would
+  # never produce. Identical numbers here would mean the fallback is back.
+  d <- USArrests[1:25, ]
+
+  set.seed(1)
+  euclidean <- optimal_hclust_k(
+    tidy_hclust(d, method = "average", distance = "euclidean"),
+    method = "gap", max_k = 4
+  )
+  set.seed(1)
+  manhattan <- optimal_hclust_k(
+    tidy_hclust(d, method = "average", distance = "manhattan"),
+    method = "gap", max_k = 4
+  )
+
+  expect_false(isTRUE(all.equal(
+    euclidean$gap_data$gap, manhattan$gap_data$gap
+  )))
+})
+
+test_that("the gap statistic says why it cannot run from a distance alone", {
+  # clusGap() resamples observations; a model built from a dist has none.
+  # This used to surface as "no applicable method for 'select' applied to
+  # an object of class NULL".
+  hc <- tidy_hclust(tidy_dist(USArrests[1:25, ]), method = "average")
+  expect_null(hc$data)
+  expect_error(
+    optimal_hclust_k(hc, method = "gap", max_k = 4),
+    "needs the observations"
+  )
+
+  # Silhouette works from the distances, and still does
+  expect_type(
+    optimal_hclust_k(hc, method = "silhouette", max_k = 4)$optimal_k, "double"
+  )
+})

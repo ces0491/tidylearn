@@ -14,6 +14,7 @@ tl_fit_deep(
   epochs = 30,
   batch_size = 32,
   validation_split = 0.2,
+  learning_rate = NULL,
   verbose = 0,
   ...,
   compute = "cpu"
@@ -39,7 +40,10 @@ classification problem}
 
 \item{batch_size}{Batch size for training (default: 32)}
 
-\item{validation_split}{Proportion of data for validation
+\item{validation_split}{Proportion of data for validation}
+
+\item{learning_rate}{Optimizer learning rate. NULL (default) leaves
+keras's own adam default in place.
 (default: 0.2)}
 
 \item{verbose}{Verbosity mode (0 = silent, 1 = progress bar,

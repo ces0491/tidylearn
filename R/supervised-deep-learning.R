@@ -20,6 +20,8 @@ NULL
 #' @param epochs Number of training epochs (default: 30)
 #' @param batch_size Batch size for training (default: 32)
 #' @param validation_split Proportion of data for validation
+#' @param learning_rate Optimizer learning rate. NULL (default) leaves
+#'   keras's own adam default in place.
 #'   (default: 0.2)
 #' @param verbose Verbosity mode (0 = silent, 1 = progress bar,
 #'   2 = one line per epoch) (default: 0)
@@ -40,6 +42,7 @@ tl_fit_deep <- function(data, formula,
                         dropout = 0.2,
                         epochs = 30, batch_size = 32,
                         validation_split = 0.2,
+                        learning_rate = NULL,
                         verbose = 0, ...,
                         compute = "cpu") {
   # Check if keras is installed
@@ -128,9 +131,17 @@ tl_fit_deep <- function(data, formula,
     activation = output_activation
   )
 
-  # Compile the model
+  # Compile the model. The optimizer carries the learning rate, and
+  # compile() is the only place it can be set -- passing an optimizer to
+  # fit() does nothing, because the model has already been compiled.
+  optimizer <- if (is.null(learning_rate)) {
+    "adam"
+  } else {
+    keras::optimizer_adam(learning_rate = learning_rate)
+  }
+
   model %>% keras::compile(
-    optimizer = "adam",
+    optimizer = optimizer,
     loss = loss,
     metrics = metrics
   )
@@ -446,9 +457,7 @@ tl_tune_deep <- function(data, formula,
         epochs = epochs,
         batch_size = batch_size,
         validation_split = validation_split,
-        optimizer = keras::optimizer_adam(
-          learning_rate = learning_rate
-        ),
+        learning_rate = learning_rate,
         verbose = 0,
         ...
       )

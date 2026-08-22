@@ -198,6 +198,15 @@ earlier should be recomputed.
 
 ### Ranking, splitting and tuning
 
+* `tl_tune_deep(learning_rates = )` searched over a value that changed
+  nothing. It passed `optimizer = optimizer_adam(learning_rate = )` into
+  `tl_fit_deep()`, which has no such formal, so the argument fell into
+  `...` and was forwarded to `keras::fit()` — by which point the model is
+  compiled, and `compile()` is what sets the optimizer. Every point on the
+  grid therefore trained at the same rate, and `best_learning_rate` was
+  whichever happened to score highest on noise. `tl_fit_deep()` gains a
+  `learning_rate` argument that reaches `compile()`.
+
 * `tl_auto_ml(metric = "mape")` returned the model with the **highest**
   error as the best one — `mape` was missing from the ascending-sort
   list. Unrecognised metrics now error rather than assume a direction.
@@ -222,6 +231,20 @@ earlier should be recomputed.
   `evaluation$metrics`.
 
 ### Clustering, distance and plots
+
+* `optimal_hclust_k(method = "gap")` never ran. `cluster::clusGap()`
+  requires its clustering function to return a list with a `cluster`
+  element and `cutree()` returns a bare integer vector, so every call
+  failed with "$ operator is invalid for atomic vectors". Two further
+  faults sat behind that one and could not show themselves while it
+  errored on the first call: the refit used `stats::dist()`, whose default
+  is Euclidean, so a model built with any other distance was scored
+  against clusterings it would never produce; and a model built from a
+  `dist` object has no observations to resample, which surfaced as "no
+  applicable method for 'select' applied to an object of class NULL"
+  rather than as an explanation. All three are fixed, and the last is now
+  an error that says to refit from the data or use `"silhouette"`, which
+  works from distances alone.
 
 * `tidy_dbscan()` converted a `dist` input with `as.matrix()` and passed
   it as coordinates, clustering each observation's vector of distances
