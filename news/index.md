@@ -341,6 +341,30 @@ earlier should be recomputed.
 
 #### Errors instead of misleading results
 
+- The method and the response now have to agree. `"linear"` and
+  `"polynomial"` need a numeric response and `"logistic"` needs exactly
+  two classes; every other supervised method takes either. A mismatch is
+  an error at
+  [`tl_model()`](https://tidylearn.sheetsolved.com/reference/tl_model.md),
+  naming the methods that would fit.
+
+  `tl_model(iris, Species ~ ., method = "linear")` previously succeeded.
+  [`lm()`](https://rdrr.io/r/stats/lm.html) estimates from a factor’s
+  underlying integer codes — its coefficients are identical to
+  regressing on `as.integer(Species)` — so the classes were treated as
+  equally spaced points on a scale and
+  [`predict()`](https://rdrr.io/r/stats/predict.html) returned numbers
+  between them. Nothing failed at any stage, which made this quieter
+  than the logistic case: there was no later error to work back from.
+
+  In the other direction,
+  `tl_model(mtcars, mpg ~ wt, method = "logistic")` reported that `mpg`
+  “has 25 levels”, listed all of them, and recommended classification
+  methods for what is plainly a regression problem. It now says the
+  response is numeric with 25 distinct values and points at the
+  regression methods, while still accepting a two-class response stored
+  as 0/1.
+
 - `tl_model(method = "logistic")` now errors when the response does not
   have exactly two levels. `glm(family = binomial)` accepts a
   three-level factor without complaint and fits the first level against
