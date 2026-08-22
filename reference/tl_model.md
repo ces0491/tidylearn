@@ -26,7 +26,7 @@ tl_model(data, formula = NULL, method = "linear", ..., compute = "cpu")
   The modeling method. Supervised: "linear" (stats::lm), "logistic"
   (stats::glm), "tree" (rpart), "forest" (randomForest), "boost" (gbm),
   "ridge"/"lasso"/"elastic_net" (glmnet), "svm" (e1071), "nn" (nnet),
-  "deep" (keras), "xgboost" (xgboost). `"logistic"` requires a two-level
+  "deep" (keras), "xgboost" (xgboost). `"logistic"` requires a two-class
   response and errors on anything else; every other classification
   method handles more than two classes. Unsupervised: "pca"
   (stats::prcomp), "mds" (stats/MASS/smacof), "kmeans" (stats::kmeans),
@@ -64,6 +64,12 @@ dbscan. The underlying algorithms are unchanged - this function provides
 a consistent interface and returns tidy output.
 
 Access the raw model object from the underlying package via `model$fit`.
+
+For classification, the response is reduced to the classes it actually
+contains: subsetting a data frame keeps every factor level, and a level
+no row uses would otherwise be reported as a class, given its own (zero)
+probability column, and counted when deciding whether the problem is
+binary. The fit is unaffected.
 
 ## Examples
 

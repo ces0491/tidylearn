@@ -74,11 +74,15 @@
 
 <dt id="arg-iterationrange">iterationrange<a class="anchor" aria-label="anchor" href="#arg-iterationrange"></a></dt>
 <dd><p>Boosting iterations to predict with, as
-<code>c(start, end)</code> (default: NULL, uses every iteration).</p></dd>
+<code>c(start, end)</code> – base-1 and inclusive of both ends, so
+<code>c(1, 20)</code> predicts from the first twenty iterations and
+<code>end</code> may not exceed the number fitted. NULL (default) uses
+every iteration.</p></dd>
 
 
 <dt id="arg-ntreelimit">ntreelimit<a class="anchor" aria-label="anchor" href="#arg-ntreelimit"></a></dt>
-<dd><p>Deprecated. Use <code>iterationrange</code> instead.</p></dd>
+<dd><p>Deprecated. Use <code>iterationrange</code> instead.
+<code>ntreelimit = n</code> is translated to <code>c(1, n)</code>.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
