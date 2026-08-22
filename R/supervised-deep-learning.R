@@ -483,6 +483,19 @@ tl_tune_deep <- function(data, formula,
   }
 
   # Find best hyperparameters (minimizing validation loss)
+  # Every configuration can fail -- a bad argument forwarded through ...
+  # reaches keras::fit() and each fit is caught individually, leaving
+  # val_loss all NA. which.min() then returns integer(0) and the indexing
+  # below failed with "attempt to select less than one element in
+  # get1index", which says nothing about what went wrong.
+  if (all(is.na(hyperparams$val_loss))) {
+    stop(
+      "No deep learning configuration could be fitted. The messages above ",
+      "report why each one failed.",
+      call. = FALSE
+    )
+  }
+
   best_idx <- which.min(hyperparams$val_loss)
   best_hl_idx <- hyperparams$hidden_layers_idx[best_idx]
   best_hidden_layers <-
@@ -500,9 +513,7 @@ tl_tune_deep <- function(data, formula,
     epochs = epochs,
     batch_size = best_batch_size,
     validation_split = validation_split,
-    optimizer = keras::optimizer_adam(
-      learning_rate = best_learning_rate
-    ),
+    learning_rate = best_learning_rate,
     ...
   )
 

@@ -205,7 +205,14 @@ earlier should be recomputed.
   compiled, and `compile()` is what sets the optimizer. Every point on the
   grid therefore trained at the same rate, and `best_learning_rate` was
   whichever happened to score highest on noise. `tl_fit_deep()` gains a
-  `learning_rate` argument that reaches `compile()`.
+  `learning_rate` argument that reaches `compile()`, and the final refit
+  on the winning configuration uses it too.
+
+* `tl_tune_deep()` reports when no configuration could be fitted. Each fit
+  is wrapped individually, so a bad argument forwarded through `...` left
+  every `val_loss` as `NA`; `which.min()` then returned `integer(0)` and
+  the function failed with "attempt to select less than one element in
+  get1index", which describes nothing.
 
 * `tl_auto_ml(metric = "mape")` returned the model with the **highest**
   error as the best one — `mape` was missing from the ascending-sort
