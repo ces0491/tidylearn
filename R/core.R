@@ -54,7 +54,6 @@ NULL
 #' and a level no row uses would otherwise be reported as a class, given
 #' its own (zero) probability column, and counted when deciding whether
 #' the problem is binary. The fit is unaffected.
-
 #'
 #' @param data A data frame containing the training data
 #' @param formula A formula specifying the model. For
@@ -64,9 +63,11 @@ NULL
 #'   "forest" (randomForest), "boost" (gbm),
 #'   "ridge"/"lasso"/"elastic_net" (glmnet), "svm" (e1071),
 #'   "nn" (nnet), "deep" (keras), "xgboost" (xgboost).
-#'   \code{"logistic"} requires a two-class response and errors on
-#'   anything else; every other classification method handles more than
-#'   two classes.
+#'   The method and the response have to agree, and a mismatch is an
+#'   error rather than a meaningless fit: \code{"linear"} and
+#'   \code{"polynomial"} need a numeric response, \code{"logistic"}
+#'   needs exactly two classes, and every other supervised method takes
+#'   either.
 #'   Unsupervised: "pca" (stats::prcomp),
 #'   "mds" (stats/MASS/smacof), "kmeans" (stats::kmeans),
 #'   "pam"/"clara" (cluster), "hclust" (stats::hclust),
@@ -165,11 +166,15 @@ tl_model_supervised <- function(data, formula, method, ..., compute = "cpu") {
   y <- data[[response_var]]
   is_classification <- is.factor(y) || is.character(y)
 
+  # Refuse a method that cannot fit this response before anything
+  # reinterprets it, so the message describes what the caller passed.
+  tl_check_method_response(method, y, response_var, is_classification)
+
   # Logistic regression is a classification method whatever the response
   # is stored as. Left alone, a 0/1 integer response produced a binomial
-  # glm described by a spec that said is_classification = FALSE, and
-  # tl_evaluate() then scored it with regression metrics -- returning a
-  # tibble with no .metric column at all.
+  # glm described by a spec that said is_classification = FALSE, so
+  # tl_evaluate() scored it with rmse, mae and rsq, and asking it for
+  # accuracy returned an empty tibble -- no error, no warning.
   if (method == "logistic" && !is_classification) {
     warning(
       "Converting response variable to factor ",
@@ -448,6 +453,83 @@ apply_feature_transform <- function(object, new_data) {
     out[[response]] <- response_values
   }
   out
+}
+
+#' Methods to offer when the requested one cannot fit the response
+#'
+#' Every method that takes either a numeric or a categorical response,
+#' less the two whose packages are only suggested. \code{"deep"} needs
+#' keras and a Python backend and \code{"xgboost"} needs xgboost, so
+#' naming them here would answer one error with another on the machines
+#' that do not have them. Both still work when installed; they are absent
+#' from the advice, not from the package.
+#'
+#' @keywords internal
+#' @noRd
+tl_dual_task_suggestions <- function() {
+  c("tree", "forest", "boost", "ridge", "lasso",
+    "elastic_net", "svm", "nn")
+}
+
+#' Refuse a method that cannot fit the response it was handed
+#'
+#' Both directions of the mismatch used to be accepted.
+#' \code{lm()} on a factor estimates from the underlying integer codes, so
+#' \code{tl_model(iris, Species ~ ., method = "linear")} returned numbers on
+#' a scale where setosa is 1 and virginica is 3 -- and never failed, at any
+#' point, so nothing told the caller. Checking here keeps the complaint next
+#' to the decision that caused it.
+#'
+#' @param method The requested method
+#' @param y The response, as supplied
+#' @param response_var Its name, for the message
+#' @param is_classification Whether the response is a factor or character
+#' @return `TRUE`, invisibly, when the method can fit the response
+#' @keywords internal
+#' @noRd
+tl_check_method_response <- function(method, y, response_var,
+                                     is_classification) {
+  quoted <- function(x) paste0("\"", x, "\"", collapse = ", ")
+
+  if (method %in% c("linear", "polynomial") && is_classification) {
+    n_classes <- nlevels(tl_normalise_response(y))
+    alternatives <- if (n_classes == 2) {
+      c("logistic", tl_dual_task_suggestions())
+    } else {
+      tl_dual_task_suggestions()
+    }
+    stop(
+      "Method \"", method, "\" fits a numeric response, but '",
+      response_var, "' is a ",
+      if (is.factor(y)) "factor" else "character vector",
+      " with ", n_classes, " classes. lm() estimates from the underlying ",
+      "integer codes, so the classes would be treated as equally spaced ",
+      "points on a scale and the predictions would be numbers between ",
+      "them. Refit with method = ", quoted(alternatives), ".",
+      call. = FALSE
+    )
+  }
+
+  # A 0/1 or 1/2 coding is a two-class response stored as a number, and is
+  # allowed. Anything with more distinct values is either a measurement or
+  # a multiclass coding, and neither is something binomial glm can fit.
+  if (method == "logistic" && is.numeric(y)) {
+    n_distinct <- length(unique(stats::na.omit(y)))
+    if (n_distinct > 2) {
+      stop(
+        "Logistic regression needs a two-class response, but '",
+        response_var, "' is numeric with ", n_distinct,
+        " distinct values. If those are measurements, use a regression ",
+        "method: ",
+        quoted(c("linear", "polynomial", tl_dual_task_suggestions())),
+        ". If they encode classes, convert '", response_var,
+        "' to a factor first -- though logistic still handles only two.",
+        call. = FALSE
+      )
+    }
+  }
+
+  invisible(TRUE)
 }
 
 #' Predict using supervised models

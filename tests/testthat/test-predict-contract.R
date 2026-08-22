@@ -274,3 +274,82 @@ test_that("method = 'logistic' scores as classification whatever the storage", {
   expect_true(all(is.finite(scored$value)))
   expect_false(any(c("rmse", "mae", "rsq") %in% scored$metric))
 })
+
+# ---------------------------------------------------------------------
+# The method and the response have to agree.
+#
+# Both directions used to be accepted. lm() on a factor estimates from the
+# underlying integer codes, so tl_model(iris, Species ~ ., method =
+# "linear") returned numbers on a scale where setosa is 1 and virginica
+# is 3 -- and unlike the logistic case it never failed at any point, so
+# nothing told the caller the numbers were meaningless.
+
+test_that("a numeric-response method refuses a factor response", {
+  for (method in c("linear", "polynomial")) {
+    expect_error(
+      fit_quietly(iris, Species ~ ., method = method),
+      "fits a numeric response",
+      info = method
+    )
+    # The message has to name a way forward
+    err <- tryCatch(
+      fit_quietly(iris, Species ~ ., method = method),
+      error = function(e) conditionMessage(e)
+    )
+    expect_match(err, "3 classes", info = method)
+    expect_match(err, "forest", info = method)
+  }
+
+  # Two classes -- logistic becomes worth naming, and is
+  expect_match(
+    tryCatch(
+      fit_quietly(droplevels(subset(iris, Species != "setosa")),
+                  Species ~ ., method = "linear"),
+      error = function(e) conditionMessage(e)
+    ),
+    "logistic"
+  )
+
+  # A character response is the same mistake stored differently
+  chr <- iris
+  chr$Species <- as.character(chr$Species)
+  expect_error(
+    fit_quietly(chr, Species ~ ., method = "linear"),
+    "character vector with 3 classes"
+  )
+})
+
+test_that("logistic refuses a continuous response, and says so as such", {
+  # Previously reported as "'mpg' has 25 levels (10.4, 13.3, ...)" with a
+  # list of classification methods -- describing a measurement as classes
+  # and recommending the wrong family of models.
+  err <- tryCatch(
+    fit_quietly(mtcars, mpg ~ wt, method = "logistic"),
+    error = function(e) conditionMessage(e)
+  )
+  expect_match(err, "numeric with 25 distinct values")
+  expect_match(err, "regression method")
+  expect_false(grepl("levels", err))
+
+  # But a two-class response stored as 0/1 is still fine
+  set.seed(1)
+  d <- data.frame(x = stats::rnorm(60))
+  d$y <- as.integer(d$x + stats::rnorm(60) > 0)
+  expect_s3_class(
+    fit_quietly(d, y ~ x, method = "logistic"), "tidylearn_logistic"
+  )
+})
+
+test_that("the methods that take either response still take either", {
+  # binary_data and regression_data are the fixtures the rest of this
+  # file uses; both are sized for gbm's minimum-node constraint.
+  for (method in intersect(classification_methods, regression_methods)) {
+    expect_s3_class(
+      fit_model(method, binary_data, Species ~ .), "tidylearn_supervised"
+    )
+    expect_s3_class(
+      fit_model(method, regression_data, mpg ~ wt + hp),
+      "tidylearn_supervised"
+    )
+  }
+})

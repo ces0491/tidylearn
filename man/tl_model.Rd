@@ -17,9 +17,11 @@ unsupervised methods, use \code{~ vars} or NULL.}
 "forest" (randomForest), "boost" (gbm),
 "ridge"/"lasso"/"elastic_net" (glmnet), "svm" (e1071),
 "nn" (nnet), "deep" (keras), "xgboost" (xgboost).
-\code{"logistic"} requires a two-class response and errors on
-anything else; every other classification method handles more than
-two classes.
+The method and the response have to agree, and a mismatch is an
+error rather than a meaningless fit: \code{"linear"} and
+\code{"polynomial"} need a numeric response, \code{"logistic"}
+needs exactly two classes, and every other supervised method takes
+either.
 Unsupervised: "pca" (stats::prcomp),
 "mds" (stats/MASS/smacof), "kmeans" (stats::kmeans),
 "pam"/"clara" (cluster), "hclust" (stats::hclust),
