@@ -178,7 +178,9 @@ tl_pipeline <- function(data, formula,
         tree = list(method = "tree"),
         forest = list(method = "forest", ntree = 500)
       )
-      if (nlevels(as.factor(y)) == 2) {
+      # Count classes that occur, not levels that are declared -- a
+      # subset of a larger frame keeps the levels it no longer uses.
+      if (nlevels(tl_normalise_response(y)) == 2) {
         models <- c(list(logistic = list(method = "logistic")), models)
       }
     } else {

@@ -22,9 +22,13 @@ tl_predict_xgboost(
 "prob" (for classification), "class" (for classification)}
 
 \item{iterationrange}{Boosting iterations to predict with, as
-\code{c(start, end)} (default: NULL, uses every iteration).}
+\code{c(start, end)} -- base-1 and inclusive of both ends, so
+\code{c(1, 20)} predicts from the first twenty iterations and
+\code{end} may not exceed the number fitted. NULL (default) uses
+every iteration.}
 
-\item{ntreelimit}{Deprecated. Use \code{iterationrange} instead.}
+\item{ntreelimit}{Deprecated. Use \code{iterationrange} instead.
+\code{ntreelimit = n} is translated to \code{c(1, n)}.}
 
 \item{...}{Additional arguments}
 }

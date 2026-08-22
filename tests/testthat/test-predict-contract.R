@@ -188,3 +188,89 @@ for (method in regression_methods) {
     expect_equal(preds$.pred[c(1, 3, 4, 5)], clean$.pred, tolerance = 1e-6)
   })
 }
+
+# ---------------------------------------------------------------------
+# A response that declares more levels than it uses.
+#
+# Subsetting keeps every factor level, so iris[iris$Species != "setosa", ]
+# holds two classes and declares three. That frame used to break seven of
+# the eight classification methods in seven different ways: randomForest
+# and glmnet refused to fit, gbm and nnet failed at predict or evaluate,
+# rpart returned a probability column for the absent class, and
+# tl_event_level_args() read the declared count and so let yardstick score
+# the first level as positive -- reopening the metric bug 0.4.0.9000 fixed.
+#
+# The model itself was never in question: glm() and friends drop the empty
+# level internally, so the fit was always identical to the dropped frame's.
+# Only tidylearn's description of it was wrong. These assert the two are
+# now indistinguishable.
+
+undropped_binary <- iris[iris$Species != "setosa", ][c(1:25, 51:75), ]
+dropped_binary <- droplevels(undropped_binary)
+
+test_that("the fixture really does declare a level it never uses", {
+  expect_equal(nlevels(undropped_binary$Species), 3L)
+  expect_equal(length(unique(as.character(undropped_binary$Species))), 2L)
+})
+
+for (method in classification_methods) {
+  label <- paste0("'", method, "'")
+
+  test_that(paste(label, "ignores a declared but unused response level"), {
+    model <- fit_model(method, undropped_binary, Species ~ .)
+
+    # The spec describes the classes present, not the levels declared
+    expect_equal(model$spec$response_levels, levels(dropped_binary$Species))
+
+    probs <- suppressWarnings(predict(model, type = "prob"))
+    expect_equal(ncol(probs), 2L)
+    expect_equal(names(probs), levels(dropped_binary$Species))
+    expect_equal(nrow(probs), nrow(undropped_binary))
+
+    classes <- suppressWarnings(predict(model, type = "class"))
+    expect_equal(nrow(classes), nrow(undropped_binary))
+
+    # Every metric must land on the same number as the dropped frame.
+    # Asserting only that metrics are present is what let the
+    # event_level defect survive a green suite once already.
+    wanted <- c("accuracy", "precision", "recall", "specificity", "f1")
+    score <- function(d) {
+      m <- fit_model(method, d, Species ~ .)
+      e <- suppressWarnings(suppressMessages(tl_evaluate(m, metrics = wanted)))
+      stats::setNames(e$value, e$metric)
+    }
+    set.seed(1)
+    from_undropped <- score(undropped_binary)
+    set.seed(1)
+    from_dropped <- score(dropped_binary)
+
+    expect_equal(sort(names(from_undropped)), sort(names(from_dropped)))
+    expect_equal(
+      from_undropped[sort(names(from_undropped))],
+      from_dropped[sort(names(from_dropped))],
+      tolerance = 1e-8
+    )
+  })
+}
+
+test_that("method = 'logistic' scores as classification whatever the storage", {
+  # A 0/1 integer response produced a binomial glm described by a spec
+  # that said is_classification = FALSE. tl_evaluate() then returned
+  # rmse/mae/rsq for it, and asking for accuracy returned an empty tibble
+  # -- no error, no warning, no metrics.
+  set.seed(1)
+  d <- data.frame(x = stats::rnorm(60))
+  d$y <- as.integer(d$x + stats::rnorm(60) > 0)
+
+  model <- fit_quietly(d, y ~ x, method = "logistic")
+
+  expect_true(model$spec$is_classification)
+  expect_equal(model$spec$response_levels, c("0", "1"))
+
+  scored <- suppressWarnings(suppressMessages(
+    tl_evaluate(model, metrics = c("accuracy", "f1"))
+  ))
+  expect_setequal(scored$metric, c("accuracy", "f1"))
+  expect_true(all(is.finite(scored$value)))
+  expect_false(any(c("rmse", "mae", "rsq") %in% scored$metric))
+})

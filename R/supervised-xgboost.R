@@ -167,8 +167,12 @@ tl_xgb_prob_matrix <- function(raw, n_obs, class_levels) {
 #' @param type Type of prediction: "response" (default),
 #'   "prob" (for classification), "class" (for classification)
 #' @param iterationrange Boosting iterations to predict with, as
-#'   \code{c(start, end)} (default: NULL, uses every iteration).
+#'   \code{c(start, end)} -- base-1 and inclusive of both ends, so
+#'   \code{c(1, 20)} predicts from the first twenty iterations and
+#'   \code{end} may not exceed the number fitted. NULL (default) uses
+#'   every iteration.
 #' @param ntreelimit Deprecated. Use \code{iterationrange} instead.
+#'   \code{ntreelimit = n} is translated to \code{c(1, n)}.
 #' @param ... Additional arguments
 #' @return Predictions
 #' @keywords internal
