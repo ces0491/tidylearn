@@ -49,6 +49,13 @@ NULL
 #'
 #' Access the raw model object from the underlying package via \code{model$fit}.
 #'
+#' For classification, the response is reduced to the classes it
+#' actually contains: subsetting a data frame keeps every factor level,
+#' and a level no row uses would otherwise be reported as a class, given
+#' its own (zero) probability column, and counted when deciding whether
+#' the problem is binary. The fit is unaffected.
+
+#'
 #' @param data A data frame containing the training data
 #' @param formula A formula specifying the model. For
 #'   unsupervised methods, use \code{~ vars} or NULL.
@@ -57,7 +64,7 @@ NULL
 #'   "forest" (randomForest), "boost" (gbm),
 #'   "ridge"/"lasso"/"elastic_net" (glmnet), "svm" (e1071),
 #'   "nn" (nnet), "deep" (keras), "xgboost" (xgboost).
-#'   \code{"logistic"} requires a two-level response and errors on
+#'   \code{"logistic"} requires a two-class response and errors on
 #'   anything else; every other classification method handles more than
 #'   two classes.
 #'   Unsupervised: "pca" (stats::prcomp),
@@ -158,6 +165,20 @@ tl_model_supervised <- function(data, formula, method, ..., compute = "cpu") {
   y <- data[[response_var]]
   is_classification <- is.factor(y) || is.character(y)
 
+  # Logistic regression is a classification method whatever the response
+  # is stored as. Left alone, a 0/1 integer response produced a binomial
+  # glm described by a spec that said is_classification = FALSE, and
+  # tl_evaluate() then scored it with regression metrics -- returning a
+  # tibble with no .metric column at all.
+  if (method == "logistic" && !is_classification) {
+    warning(
+      "Converting response variable to factor ",
+      "for logistic regression",
+      call. = FALSE
+    )
+    is_classification <- TRUE
+  }
+
   if (!is_classification && is.numeric(y) &&
         length(unique(y)) <= 10) {
     message(
@@ -166,6 +187,16 @@ tl_model_supervised <- function(data, formula, method, ..., compute = "cpu") {
       "Treating as regression. Convert to factor ",
       "for classification."
     )
+  }
+
+  # Normalise the response once, so the spec, the fitted model and every
+  # predict path agree on what the classes are. Writing it back into
+  # `data` matters as much as the local copy: `data` is what gets fitted
+  # and what is stored on the model, and predict methods read the levels
+  # back off it.
+  if (is_classification) {
+    y <- tl_normalise_response(y)
+    data[[response_var]] <- y
   }
 
   # Resolve the effective compute tier (handles auto/gpu fallbacks).
@@ -206,7 +237,7 @@ tl_model_supervised <- function(data, formula, method, ..., compute = "cpu") {
     method = method,
     is_classification = is_classification,
     response_var = response_var,
-    response_levels = if (is_classification) levels(as.factor(y)) else NULL,
+    response_levels = if (is_classification) levels(y) else NULL,
     xlev = xlev,
     compute = effective_compute
   )

@@ -84,6 +84,32 @@ earlier should be recomputed.
 
 ### Prediction
 
+* Classification now reduces the response to the classes it contains. A
+  subset keeps every factor level, so `iris[iris$Species != "setosa", ]`
+  holds two classes and declares three, and that frame broke seven of the
+  eight classification methods in seven different ways: `randomForest` and
+  `glmnet` refused to fit, `gbm` and `nnet` failed at `predict()` or
+  `tl_evaluate()`, and `rpart` returned a probability column for the class
+  that was not there. Worst of the set, `tl_calc_classification_metrics()`
+  read the declared level count when deciding whether the problem was
+  binary, so it stopped passing `event_level` and let `yardstick` score the
+  first class as positive — silently reopening, for any such response, the
+  metric defect fixed above.
+
+  The fitted models were never wrong: `glm()` and the rest drop an empty
+  level internally, so the coefficients always matched the explicitly
+  dropped frame. Only tidylearn's description of them was wrong. The
+  response is normalised once in `tl_model()`, so the specification, the
+  fit and every predict path now agree, and metrics from a subset match
+  those from `droplevels()` exactly.
+
+* `tl_model(method = "logistic")` records a classification model when the
+  response is stored as something other than a factor. A 0/1 integer
+  response produced a binomial `glm()` described by a specification that
+  said `is_classification = FALSE`, so `tl_evaluate()` scored it with
+  `rmse`, `mae` and `rsq` — and asking it for `accuracy` returned an empty
+  tibble, with no error and no warning.
+
 * `predict()` failed or returned wrong output for six method-and-task
   combinations, all now fixed and covered by a contract test that runs
   every method through the same grid:

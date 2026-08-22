@@ -16,20 +16,17 @@ NULL
 #' @return A fitted logistic regression model
 #' @keywords internal
 tl_fit_logistic <- function(data, formula, ...) {
-  # Ensure response variable is a factor
+  # tl_model() has already made the response a factor and dropped levels
+  # that no row uses. Normalise again rather than assume it, because the
+  # count below has to be of classes that are present: a subset of a
+  # larger frame keeps every original level, and rejecting a two-class
+  # response for declaring a third would refuse data glm() fits happily.
   response_var <- all.vars(formula)[1]
-  if (!is.factor(data[[response_var]])) {
-    warning(
-      "Converting response variable to factor ",
-      "for logistic regression",
-      call. = FALSE
-    )
-    data[[response_var]] <- factor(data[[response_var]])
-  }
+  data[[response_var]] <- tl_normalise_response(data[[response_var]])
 
   # Reject a response glm(binomial) cannot model, here rather than at
-  # predict() or tl_evaluate(). glm() takes a three-level factor without
-  # complaint and fits the first level against the other two, so nothing
+  # predict() or tl_evaluate(). glm() takes a three-class factor without
+  # complaint and fits the first class against the other two, so nothing
   # upstream of prediction says the model is meaningless.
   tl_check_binary_response(data[[response_var]], response_var)
 
@@ -41,9 +38,9 @@ tl_fit_logistic <- function(data, formula, ...) {
 
 #' Refuse a response that logistic regression cannot model
 #'
-#' @param y The response, already coerced to a factor
+#' @param y The response, as a factor whose levels are the classes present
 #' @param response_var Its name, for the message
-#' @return `TRUE`, invisibly, when the response has exactly two levels
+#' @return `TRUE`, invisibly, when the response has exactly two classes
 #' @keywords internal
 #' @noRd
 tl_check_binary_response <- function(y, response_var) {

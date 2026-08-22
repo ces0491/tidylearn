@@ -154,6 +154,30 @@ tl_validate_file_path <- function(path) {
   invisible(TRUE)
 }
 
+#' Normalise a classification response
+#'
+#' Subsetting a data frame keeps every factor level, so
+#' \code{iris[iris$Species != "setosa", ]} carries three levels while
+#' holding two classes. Nothing downstream copes with that consistently:
+#' \code{randomForest} and \code{glmnet} refuse to fit, \code{rpart}
+#' returns a probability column for the class that is not there, and
+#' \code{tl_event_level_args()} reads the declared count and so falls back
+#' to \code{yardstick}'s first-level default -- silently scoring the wrong
+#' class. Dropping the empty levels once, here, leaves every method a
+#' response that says what it holds. It does not change any fit:
+#' \code{glm()} and friends drop the empty level internally anyway.
+#'
+#' @param y A response vector
+#' @return `y` as a factor whose levels are the ones actually present
+#' @keywords internal
+#' @noRd
+tl_normalise_response <- function(y) {
+  if (!is.factor(y)) {
+    y <- factor(y)
+  }
+  droplevels(y)
+}
+
 #' Identify rows usable for prediction
 #'
 #' Several upstream predict methods default to \code{na.omit} and return a

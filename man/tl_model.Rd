@@ -17,7 +17,7 @@ unsupervised methods, use \code{~ vars} or NULL.}
 "forest" (randomForest), "boost" (gbm),
 "ridge"/"lasso"/"elastic_net" (glmnet), "svm" (e1071),
 "nn" (nnet), "deep" (keras), "xgboost" (xgboost).
-\code{"logistic"} requires a two-level response and errors on
+\code{"logistic"} requires a two-class response and errors on
 anything else; every other classification method handles more than
 two classes.
 Unsupervised: "pca" (stats::prcomp),
@@ -56,6 +56,12 @@ algorithms are unchanged - this function provides a
 consistent interface and returns tidy output.
 
 Access the raw model object from the underlying package via \code{model$fit}.
+
+For classification, the response is reduced to the classes it
+actually contains: subsetting a data frame keeps every factor level,
+and a level no row uses would otherwise be reported as a class, given
+its own (zero) probability column, and counted when deciding whether
+the problem is binary. The fit is unaffected.
 }
 \examples{
 \donttest{
