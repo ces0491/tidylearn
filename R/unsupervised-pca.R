@@ -46,6 +46,8 @@ tidy_pca <- function(data, cols = NULL, scale = TRUE,
     data_selected <- data %>% dplyr::select(where(is.numeric))
   }
 
+  tl_check_complete_numeric(data_selected, "PCA", tolerates = NULL)
+
   # Preserve row names/identifiers
   if (!is.null(rownames(data))) {
     obs_id <- rownames(data)

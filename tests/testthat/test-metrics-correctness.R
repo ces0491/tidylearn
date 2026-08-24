@@ -173,3 +173,64 @@ test_that("tl_cv rejects fold counts it cannot honour", {
     "must be between 2"
   )
 })
+
+# ---- cross-validation on folds too small for a metric ----------------
+
+test_that("tl_cv explains a metric that no fold could compute", {
+  # folds = nrow(data) is leave-one-out, so every test fold holds one
+  # observation and rsq -- which needs variation in the truth -- is
+  # undefined. mean() over nothing then put a bare NaN in the summary,
+  # which reads as a malfunction rather than as a property of the request.
+  set.seed(1)
+  n <- 10
+  d <- data.frame(x = stats::rnorm(n))
+  d$y <- d$x * 2 + stats::rnorm(n, sd = 0.2)
+
+  expect_message(
+    suppressWarnings(tl_cv(d, y ~ x, method = "linear", folds = n)),
+    "rsq could not be computed for any fold"
+  )
+  expect_message(
+    suppressWarnings(tl_cv(d, y ~ x, method = "linear", folds = n)),
+    "smallest fold holds 1 observation"
+  )
+
+  # rmse and mae are defined for a single observation and still are
+  cv <- suppressWarnings(suppressMessages(
+    tl_cv(d, y ~ x, method = "linear", folds = n)
+  ))
+  defined <- cv$summary[cv$summary$metric %in% c("rmse", "mae"), ]
+  expect_equal(nrow(defined), 2L)
+  expect_true(all(is.finite(defined$mean)))
+})
+
+test_that("a fold count that leaves room for every metric says nothing", {
+  set.seed(1)
+  n <- 40
+  d <- data.frame(x = stats::rnorm(n))
+  d$y <- d$x * 2 + stats::rnorm(n, sd = 0.2)
+
+  expect_no_message(
+    suppressWarnings(tl_cv(d, y ~ x, method = "linear", folds = 5))
+  )
+  cv <- suppressWarnings(tl_cv(d, y ~ x, method = "linear", folds = 5))
+  expect_true(all(is.finite(cv$summary$mean)))
+})
+
+test_that("tl_cv does not repeat tl_model's notes once per fold", {
+  # The response note is about the data, not the fold, and fired k times.
+  set.seed(1)
+  n <- 40
+  d <- data.frame(x = stats::rnorm(n))
+  d$y <- as.numeric(d$x > 0)
+
+  emitted <- character()
+  withCallingHandlers(
+    suppressWarnings(tl_cv(d, y ~ x, method = "linear", folds = 5)),
+    message = function(m) {
+      emitted <<- c(emitted, conditionMessage(m))
+      invokeRestart("muffleMessage")
+    }
+  )
+  expect_false(any(grepl("Treating as regression", emitted)))
+})

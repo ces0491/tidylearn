@@ -365,3 +365,88 @@ test_that("tl_compare_cv returns per-fold and summary tables", {
   )
   expect_false(any(is.na(result$summary$mean_value)))
 })
+
+# ---- parameter spaces that cannot be sampled -------------------------
+
+test_that("tl_tune_random refuses a range that runs backwards", {
+  # runif(1, 0.1, 0.001) is NaN, and R only warns. Every iteration
+  # therefore drew NaN, models were fitted with cp = NaN, and
+  # best_params came back as NaN -- with nothing failing anywhere.
+  set.seed(1)
+  n <- 60
+  d <- data.frame(x1 = stats::rnorm(n), x2 = stats::rnorm(n))
+  d$y <- 2 * d$x1 - d$x2 + stats::rnorm(n, sd = 0.3)
+
+  expect_error(
+    tl_tune_random(d, y ~ x1 + x2, "tree", list(cp = c(0.1, 0.001)),
+                   n_iter = 3, folds = 3),
+    "but a range is"
+  )
+  expect_error(
+    tl_tune_random(d, y ~ x1 + x2, "tree", list(cp = c(0.01, 0.01)),
+                   n_iter = 3, folds = 3),
+    "but a range is"
+  )
+  expect_error(
+    tl_tune_random(d, y ~ x1 + x2, "tree", list(cp = c(0.1, 0.001, "log")),
+                   n_iter = 3, folds = 3),
+    "but a range is"
+  )
+  # A log-uniform draw needs log(min), so a non-positive bound is no good
+  expect_error(
+    tl_tune_random(d, y ~ x1 + x2, "tree", list(cp = c(0, 0.1, "log")),
+                   n_iter = 3, folds = 3),
+    "both bounds must be positive"
+  )
+
+  # The forms that were always valid still are
+  expect_s3_class(
+    suppressWarnings(suppressMessages(
+      tl_tune_random(d, y ~ x1 + x2, "tree", list(cp = c(0.001, 0.1)),
+                     n_iter = 2, folds = 3, seed = 1)
+    )),
+    "tidylearn_tree"
+  )
+})
+
+test_that("a discrete set need not be whole numbers", {
+  # Only whole numbers reached the discrete branch, so the natural way to
+  # write candidate cp values -- which are never integers -- was rejected
+  # as an "Unsupported parameter space definition", while tl_tune_grid()
+  # accepted the same vector.
+  set.seed(1)
+  n <- 60
+  d <- data.frame(x1 = stats::rnorm(n), x2 = stats::rnorm(n))
+  d$y <- 2 * d$x1 - d$x2 + stats::rnorm(n, sd = 0.3)
+
+  candidates <- c(0.001, 0.01, 0.1)
+  tuned <- suppressWarnings(suppressMessages(
+    tl_tune_random(d, y ~ x1 + x2, "tree", list(cp = candidates),
+                   n_iter = 8, folds = 3, seed = 7)
+  ))
+  drawn <- attr(tuned, "tuning_results")$results$cp
+  expect_length(drawn, 8L)
+  expect_true(all(drawn %in% candidates))
+})
+
+test_that("a metric the task cannot produce is named, not a length error", {
+  set.seed(1)
+  n <- 60
+  d <- data.frame(x1 = stats::rnorm(n), x2 = stats::rnorm(n))
+  d$y <- 2 * d$x1 - d$x2 + stats::rnorm(n, sd = 0.3)
+
+  # Both of these failed with "replacement has length zero"
+  for (bad in c("accuracy", "not_a_metric")) {
+    msg <- tryCatch(
+      suppressWarnings(suppressMessages(
+        tl_tune_grid(d, y ~ x1 + x2, "tree", list(cp = c(0.001, 0.01)),
+                     folds = 3, metric = bad)
+      )),
+      error = function(e) conditionMessage(e)
+    )
+    expect_match(msg, "was not produced for this task", info = bad)
+    # The message has to say what it could have used instead
+    expect_match(msg, "rmse", info = bad)
+    expect_false(grepl("replacement has length zero", msg), info = bad)
+  }
+})

@@ -355,3 +355,43 @@ test_that("tl_tune_deep actually searches over the learning rate", {
   )
   expect_equal(final_rate, tuned$best_learning_rate, tolerance = 1e-6)
 })
+
+# ---- glmnet and missing predictors -----------------------------------
+
+test_that("ridge/lasso/elastic_net tolerate a missing predictor value", {
+  # The response was read straight from `data` while the design matrix
+  # came from model.frame(), which applies na.omit. One missing predictor
+  # therefore left y one row longer than x, and glmnet reported "number of
+  # observations in y (60) not equal to the number of rows of x (59)" --
+  # a dimension mismatch that names neither missing values nor the column.
+  set.seed(1)
+  n <- 60
+  d <- data.frame(x1 = stats::rnorm(n), x2 = stats::rnorm(n))
+  d$y <- 2 * d$x1 - d$x2 + stats::rnorm(n, sd = 0.3)
+  d$x1[3] <- NA
+
+  for (method in c("ridge", "lasso", "elastic_net")) {
+    model <- suppressWarnings(suppressMessages(
+      tl_model(d, y ~ x1 + x2, method = method)
+    ))
+    expect_s3_class(model, paste0("tidylearn_", method))
+    # The same rows lm() keeps, so the family behaves consistently
+    expect_equal(model$fit$nobs, 59L, info = method)
+  }
+
+  # lm() is the reference for what "drop the incomplete row" means here
+  linear <- suppressWarnings(tl_model(d, y ~ x1 + x2, method = "linear"))
+  expect_equal(unname(stats::nobs(linear$fit)), 59L)
+})
+
+test_that("a missing predictor does not break glmnet classification", {
+  di <- droplevels(iris[iris$Species != "setosa", ])
+  di$Sepal.Length[2] <- NA
+
+  for (method in c("ridge", "lasso")) {
+    model <- suppressWarnings(suppressMessages(
+      tl_model(di, Species ~ ., method = method)
+    ))
+    expect_s3_class(model, paste0("tidylearn_", method))
+  }
+})

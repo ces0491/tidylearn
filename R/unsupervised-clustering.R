@@ -35,6 +35,8 @@ tidy_kmeans <- function(data, k, cols = NULL, nstart = 25, iter_max = 100,
     data_selected <- data %>% dplyr::select(where(is.numeric))
   }
 
+  tl_check_complete_numeric(data_selected, "k-means")
+
   # Perform k-means
   km_model <- stats::kmeans(data_selected, centers = k, nstart = nstart,
                             iter.max = iter_max, algorithm = algorithm)
@@ -324,6 +326,9 @@ tidy_clara <- function(data, k, metric = "euclidean",
 calc_wss <- function(data, max_k = 10, nstart = 25) {
 
   data_numeric <- data %>% dplyr::select(where(is.numeric))
+  # Check before the loop: purrr wraps whatever kmeans() throws into
+  # "In index: 2. Caused by error in `do_one()`", which buries it further.
+  tl_check_complete_numeric(data_numeric, "The within-cluster sum of squares")
 
   wss_values <- purrr::map_dbl(1:max_k, function(k) {
     if (k == 1) {

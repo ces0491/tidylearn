@@ -34,8 +34,8 @@ Each element is read by its type and length:
 \code{min} and \code{max}}
 \item{two whole numbers}{integer range, e.g.
 \code{c(10, 20)} draws from 10:20}
-\item{three or more whole numbers}{a discrete set, sampled from
-as given}
+\item{three or more numbers}{a discrete set, sampled from as
+given, whether or not they are whole}
 \item{two other numbers}{uniform draw between them, e.g.
 \code{c(0.01, 0.1)}}
 \item{character or factor}{categorical, sampled from as given}

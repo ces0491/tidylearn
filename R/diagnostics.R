@@ -63,8 +63,13 @@ tl_influence_measures <- function(model, threshold_cook = NULL,
   # Extract fitted model
   fit <- model$fit
 
-  # Data dimensions
-  n <- nrow(model$data)
+  # Data dimensions. Count the rows the fit actually used, not the rows it
+  # was handed: lm() drops incomplete cases, so one missing predictor left
+  # every influence measure an observation shorter than model$data and the
+  # data frame below failed with "arguments imply differing number of
+  # rows: 60, 59".
+  fitted_rows <- tl_fitted_rows(model)
+  n <- length(fitted_rows)
   p <- length(coef(fit)) - 1  # Number of predictors (excluding intercept)
 
   # Set default thresholds if not provided
@@ -87,8 +92,10 @@ tl_influence_measures <- function(model, threshold_cook = NULL,
   stud_resid <- rstudent(fit)
 
   # Create data frame
+  # Number the observations by their row in the data, so a dropped row
+  # does not silently shift every later observation's label.
   influence_df <- data.frame(
-    observation = 1:n,
+    observation = fitted_rows,
     cooks_distance = cooks_d,
     leverage = leverage,
     dffits = dffits_val,
@@ -457,9 +464,10 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
     )
   }
 
-  # Extract fitted model and data
+  # Extract fitted model and data. Align the data to the rows the fit
+  # used, for the same reason as tl_influence_measures() above.
   fit <- model$fit
-  data <- model$data
+  data <- model$data[tl_fitted_rows(model), , drop = FALSE]
 
   # Get residuals
   residuals <- residuals(fit)

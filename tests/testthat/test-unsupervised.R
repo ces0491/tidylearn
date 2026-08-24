@@ -405,3 +405,71 @@ test_that("the gap statistic says why it cannot run from a distance alone", {
     optimal_hclust_k(hc, method = "silhouette", max_k = 4)$optimal_k, "double"
   )
 })
+
+# ---- missing values at the entry point -------------------------------
+
+# Missing values are the most ordinary thing that can be wrong with a data
+# set, and these routines rejected them from inside C code: kmeans() gave
+# "NA/NaN/Inf in foreign function call (arg 1)", and anything looping over
+# k with purrr wrapped that again into "In index: 2. Caused by error in
+# `do_one()`". Neither names the column, the problem, or a way forward.
+
+test_that("NA-intolerant entry points name the columns and a way forward", {
+  na_data <- iris[, 1:4]
+  na_data[1, 1] <- NA
+  na_data[5, 3] <- NA
+  na_data[9, 3] <- NA
+
+  guarded <- list(
+    tidy_kmeans = function(d) tidy_kmeans(d, k = 3),
+    tidy_pca = function(d) tidy_pca(d),
+    calc_wss = function(d) calc_wss(d, max_k = 3),
+    optimal_clusters = function(d) optimal_clusters(d, max_k = 3),
+    tidy_silhouette_analysis = function(d) {
+      tidy_silhouette_analysis(d, max_k = 3)
+    },
+    tidy_gap_stat = function(d) tidy_gap_stat(d, max_k = 3)
+  )
+
+  for (nm in names(guarded)) {
+    message_seen <- tryCatch(
+      suppressWarnings(suppressMessages(guarded[[nm]](na_data))),
+      error = function(e) conditionMessage(e)
+    )
+    expect_true(is.character(message_seen), info = nm)
+    expect_match(message_seen, "missing or infinite values", info = nm)
+    # Naming the columns is the point; a bare refusal would not help
+    expect_match(message_seen, "Sepal.Length", info = nm)
+    expect_match(message_seen, "Petal.Length", info = nm)
+    # And it must not leak the machinery it used to
+    expect_false(grepl("do_one|foreign function", message_seen), info = nm)
+  }
+})
+
+test_that("the check catches infinities and an empty numeric selection", {
+  infinite <- iris[, 1:4]
+  infinite$Sepal.Width[2] <- Inf
+  expect_error(tidy_kmeans(infinite, k = 3), "missing or infinite values")
+
+  expect_error(
+    tidy_kmeans(data.frame(a = letters[1:5]), k = 2),
+    "needs at least one numeric column"
+  )
+})
+
+test_that("methods that accept missing values are left alone", {
+  # pam(), clara(), dist() and daisy() handle NA themselves. Guarding them
+  # would remove working behaviour rather than improve a message.
+  na_data <- iris[, 1:4]
+  na_data[1, 1] <- NA
+
+  expect_s3_class(suppressWarnings(tidy_pam(na_data, k = 3)), "tidy_pam")
+  expect_s3_class(suppressWarnings(tidy_clara(na_data, k = 3)), "tidy_clara")
+  expect_s3_class(suppressWarnings(tidy_hclust(na_data)), "tidy_hclust")
+})
+
+test_that("clean data is unaffected by the check", {
+  expect_s3_class(tidy_kmeans(iris[, 1:4], k = 3), "tidy_kmeans")
+  expect_s3_class(tidy_pca(iris[, 1:4]), "tidy_pca")
+  expect_equal(nrow(calc_wss(iris[, 1:4], max_k = 3)), 3L)
+})

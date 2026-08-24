@@ -110,9 +110,6 @@ tl_fit_regularized <- function(data, formula,
   # Parse the formula
   response_var <- all.vars(formula)[1]
 
-  # Extract response (y) and predictors matrices
-  y <- data[[response_var]]
-
   # Create model matrix for predictors
   # Remove intercept as glmnet adds it by default
   model_frame <- stats::model.frame(formula, data = data)
@@ -120,6 +117,15 @@ tl_fit_regularized <- function(data, formula,
   x_mat <- stats::model.matrix(
     design_terms, model_frame
   )[, -1, drop = FALSE]
+
+  # Take the response from the model frame rather than from `data`.
+  # model.frame() applies na.omit, so one missing predictor drops that row
+  # from x_mat while data[[response_var]] still holds every row -- and
+  # glmnet then reports "number of observations in y (60) not equal to the
+  # number of rows of x (59)", which names neither missing values nor the
+  # column responsible. lm(), rpart(), nnet() and svm() all drop the row
+  # and carry on; this now does the same.
+  y <- stats::model.response(model_frame)
 
   # Retain the terms and factor levels so prediction can rebuild an
   # identically-coded design matrix on new data
