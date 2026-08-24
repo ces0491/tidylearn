@@ -304,3 +304,56 @@ test_that("factor response is treated as classification regardless of levels", {
   model <- tl_model(data, y ~ x1, method = "logistic")
   expect_true(model$spec$is_classification)
 })
+
+# ---- diagnostics when the fit dropped an incomplete row --------------
+
+test_that("diagnostics survive a missing predictor value", {
+  # lm() drops incomplete cases, so residuals(), fitted() and every
+  # influence measure came back one observation shorter than model$data.
+  # Combining them failed with "arguments imply differing number of rows:
+  # 60, 59", which describes nothing the caller did.
+  set.seed(1)
+  n <- 60
+  d <- data.frame(x = stats::rnorm(n))
+  d$y <- 2 * d$x + stats::rnorm(n, sd = 0.3)
+  d$x[3] <- NA
+
+  model <- suppressWarnings(tl_model(d, y ~ x, method = "linear"))
+
+  expect_no_error(
+    suppressWarnings(tl_check_assumptions(model, verbose = FALSE))
+  )
+  influence <- suppressWarnings(tl_influence_measures(model))
+  expect_s3_class(influence, "data.frame")
+  expect_equal(nrow(influence), 59L)
+})
+
+test_that("influence numbers observations by their row in the data", {
+  # With 1:n the labels silently shifted: every observation after a
+  # dropped row was attributed to its neighbour.
+  set.seed(1)
+  n <- 60
+  d <- data.frame(x = stats::rnorm(n))
+  d$y <- 2 * d$x + stats::rnorm(n, sd = 0.3)
+  d$x[3] <- NA
+
+  model <- suppressWarnings(tl_model(d, y ~ x, method = "linear"))
+  influence <- suppressWarnings(tl_influence_measures(model))
+
+  # Row 3 was dropped, so it must be absent -- and the numbering must
+  # still reach 60 rather than stopping at 59
+  expect_false(3 %in% influence$observation)
+  expect_equal(max(influence$observation), 60L)
+  expect_equal(head(influence$observation, 4), c(1L, 2L, 4L, 5L))
+})
+
+test_that("complete data is unaffected by the alignment", {
+  set.seed(1)
+  n <- 40
+  d <- data.frame(x = stats::rnorm(n))
+  d$y <- 2 * d$x + stats::rnorm(n, sd = 0.3)
+
+  influence <- tl_influence_measures(tl_model(d, y ~ x, method = "linear"))
+  expect_equal(nrow(influence), n)
+  expect_equal(influence$observation, seq_len(n))
+})

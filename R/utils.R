@@ -125,6 +125,26 @@ tl_local_seed <- function(seed, envir = parent.frame()) {
   invisible(TRUE)
 }
 
+#' Which rows of the training data the fit actually used
+#'
+#' \code{lm()} and friends drop incomplete cases, so \code{residuals()},
+#' \code{fitted()} and every influence measure are shorter than
+#' \code{model$data} whenever a predictor was missing. Anything combining
+#' the two then fails with "arguments imply differing number of rows".
+#'
+#' @param model A fitted tidylearn model
+#' @return Integer row indices into \code{model$data}
+#' @keywords internal
+#' @noRd
+tl_fitted_rows <- function(model) {
+  kept <- seq_len(nrow(model$data))
+  omitted <- stats::na.action(model$fit)
+  if (is.null(omitted)) {
+    return(kept)
+  }
+  kept[-as.integer(omitted)]
+}
+
 #' Refuse data an algorithm cannot fit, naming what is wrong with it
 #'
 #' Several of the routines tidylearn wraps reject missing values from deep

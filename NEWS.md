@@ -283,7 +283,19 @@ earlier should be recomputed.
   nothing, and `evaluation$best_metric` is checked against
   `evaluation$metrics`.
 
-### Clustering, distance and plots
+### Diagnostics
+
+* `tl_check_assumptions()`, `tl_influence_measures()` and
+  `tl_diagnostic_dashboard()` no longer fail when a predictor has a
+  missing value. `lm()` drops incomplete cases, so `residuals()`,
+  `fitted()` and every influence measure came back shorter than
+  `model$data`, and combining them raised "arguments imply differing
+  number of rows: 60, 59" — which describes nothing the caller did.
+
+* `tl_influence_measures()` numbers observations by their row in the
+  training data. It used `1:n`, so after a dropped row every observation
+  was attributed to its neighbour: with row 3 missing, what the table
+  called observation 3 was row 4, and so on to the end.
 
 * `optimal_hclust_k(method = "gap")` never ran. `cluster::clusGap()`
   requires its clustering function to return a list with a `cluster`
