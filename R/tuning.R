@@ -53,6 +53,7 @@ tl_tune_grid <- function(data, formula, method,
                          maximize = NULL,
                          verbose = TRUE, ...) {
   # Input validation
+  formula <- tl_as_formula(formula)
   if (!is.list(param_grid)) {
     stop("param_grid must be a named list", call. = FALSE)
   }
@@ -427,6 +428,8 @@ tl_tune_random <- function(data, formula, method,
                            maximize = NULL,
                            verbose = TRUE,
                            seed = NULL, ...) {
+  formula <- tl_as_formula(formula)
+
   # Seed this call without rewriting the caller's random stream
   tl_local_seed(seed)
 

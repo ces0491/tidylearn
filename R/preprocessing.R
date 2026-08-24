@@ -42,6 +42,10 @@ tl_prepare_data <- function(data, formula = NULL,
                             remove_correlated = FALSE,
                             correlation_cutoff = 0.95) {
 
+  if (!is.null(formula)) {
+    formula <- tl_as_formula(formula)
+  }
+
   processed_data <- data
   preprocessing_steps <- list()
 

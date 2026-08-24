@@ -18,23 +18,17 @@ knitr::opts_chunk$set(
 
 ## Introduction
 
-`tidylearn` provides a **unified tidyverse-compatible interface** to R's machine
-learning ecosystem. It wraps proven packages like glmnet, randomForest, xgboost,
-e1071, cluster, and dbscan - you get the reliability of established
-implementations with the convenience of a consistent, tidy API.
+Every machine learning package in R has its own API and its own output
+format. tidylearn puts one signature over 20 of them: `tl_model()` picks the
+underlying package from the `method` you name, and whatever comes back is a
+tibble or a ggplot2 object.
 
-**What tidylearn does:**
+The algorithms are untouched. glmnet, randomForest, xgboost, e1071, cluster
+and dbscan do the fitting, and `model$fit` hands you the object they
+returned, so nothing here closes off the package underneath.
 
-- Provides one consistent interface (`tl_model()`) to 20 ML algorithms
-- Returns tidy tibbles instead of varied output formats
-- Offers unified ggplot2-based visualization across all methods
-- Enables pipe-friendly workflows
-
-**What tidylearn is NOT:**
-
-- A reimplementation of ML algorithms (uses established packages under the hood)
-- A replacement for the underlying packages (you can access the raw model via
-  `model$fit`)
+This vignette covers the shape of a workflow end to end. The articles listed
+at the bottom go deeper on each step.
 
 ## Installation
 
@@ -246,6 +240,25 @@ class(model_forest$fit)  # This is the randomForest object
 # randomForest::varImpPlot(model_forest$fit) # nolint
 ```
 
+## The Whole Workflow
+
+Split, fit, predict, score — the four steps this vignette covered, in the
+order they run:
+
+```{r}
+# Quick example combining everything
+data_split <- tl_split(iris, prop = 0.7, stratify = "Species", seed = 42)
+
+# Random forests are scale-invariant, so no scaling is needed here. When a
+# method does need scaled inputs, the same transformation has to be applied
+# to the test set -- see the Supervised Learning vignette.
+model_final <- tl_model(data_split$train, Species ~ ., method = "forest")
+test_preds <- predict(model_final, new_data = data_split$test)
+
+accuracy <- mean(test_preds$.pred == data_split$test$Species)
+cat("Test accuracy:", round(accuracy * 100, 1), "%\n")
+```
+
 ## Next Steps
 
 - `vignette("data-ingestion")` — reading from files, databases and cloud
@@ -264,33 +277,3 @@ class(model_forest$fit)  # This is the randomForest object
   steps
 - `vignette("compute-backends")` — when a fit is too slow or too large for
   this machine: GPU routing, cost estimates, and the cloud safety model
-
-## Summary
-
-tidylearn is a **wrapper package** that provides:
-
-- **Unified Interface**: One function (`tl_model()`) that dispatches to proven
-  packages like glmnet, randomForest, xgboost, e1071, and others
-- **Transparency**: Access raw model objects via `model$fit` for package-specific
-  functionality
-- **Tidy Output**: All results are tibbles for easy manipulation with dplyr and
-  ggplot2
-- **Consistent Visualization**: Unified ggplot2-based plots regardless of model
-  type
-
-The underlying algorithms are unchanged - tidylearn simply makes them easier to
-use together.
-
-```{r}
-# Quick example combining everything
-data_split <- tl_split(iris, prop = 0.7, stratify = "Species", seed = 42)
-
-# Random forests are scale-invariant, so no scaling is needed here. When a
-# method does need scaled inputs, the same transformation has to be applied
-# to the test set -- see the Supervised Learning vignette.
-model_final <- tl_model(data_split$train, Species ~ ., method = "forest")
-test_preds <- predict(model_final, new_data = data_split$test)
-
-accuracy <- mean(test_preds$.pred == data_split$test$Species)
-cat("Test accuracy:", round(accuracy * 100, 1), "%\n")
-```

@@ -158,11 +158,10 @@ c(silhouette = attr(opt$silhouette, "optimal_k"),
   gap = opt$gap$recommended_k)
 ```
 
-The three criteria disagree, which is normal and worth saying plainly: the
-elbow is a judgement call, silhouette favours well-separated compact clusters,
-and the gap statistic compares against a null of no structure. Silhouette says
-2 here because *versicolor* and *virginica* overlap; the botanical answer is
-3.
+The three criteria disagree, which is normal. The elbow is a judgement call,
+silhouette favours well-separated compact clusters, and the gap statistic
+compares against a null of no structure. Silhouette says 2 here because
+*versicolor* and *virginica* overlap; the botanical answer is 3.
 
 ```{r}
 plot_elbow(opt$wss, suggested_k = 3)
@@ -429,8 +428,8 @@ names(compare_distances(iris[, 1:4]))
 plot_distance_heatmap(dist_mat)
 ```
 
-Block structure on the diagonal is what a real cluster looks like in a
-distance matrix.
+Look for block structure on the diagonal — contiguous runs of small
+distances are what a cluster looks like here.
 
 ## A Worked Sequence
 

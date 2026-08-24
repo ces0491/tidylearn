@@ -397,7 +397,20 @@ tl_read_bigquery <- function(project, query, dataset = NULL, ...) {
 tl_read_s3 <- function(source, format = NULL, region = NULL, ...) {
   tl_check_packages("paws.storage")
 
-  # Parse s3:// URI
+  # Parse s3:// URI. Guard the length first: strsplit(character(0), ...)
+  # is an empty list, so [[1]] was "subscript out of bounds" rather than
+  # the Invalid S3 URI message every other malformed input produces.
+  if (!is.character(source) && !is.numeric(source)) {
+    stop("'source' must be an S3 URI string, e.g. s3://bucket/key.csv; got ",
+         paste(class(source), collapse = "/"), ".",
+         call. = FALSE)
+  }
+  if (length(source) != 1L) {
+    stop("'source' must be a single S3 URI, e.g. s3://bucket/key.csv; got ",
+         "length ", length(source), ".",
+         call. = FALSE)
+  }
+
   s3_path <- sub("^s3://", "", source)
   parts <- strsplit(s3_path, "/", fixed = TRUE)[[1]]
 
