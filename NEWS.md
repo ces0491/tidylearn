@@ -223,6 +223,27 @@ earlier should be recomputed.
 
 ### Ranking, splitting and tuning
 
+* `tl_tune_random()` rejects a parameter range written backwards.
+  `c(0.1, 0.001)` instead of `c(0.001, 0.1)` was sampled with
+  `runif(1, 0.1, 0.001)`, which is `NaN` — and R only warns — so every
+  iteration drew `NaN`, models were fitted with `cp = NaN`, and
+  `best_params` was reported as `NaN` without anything failing. Equal
+  bounds and a non-positive lower bound on a log-uniform range are
+  refused for the same reason.
+
+* `tl_tune_random()` accepts a discrete set of numbers that are not whole.
+  Only whole numbers reached the discrete branch, so
+  `list(cp = c(0.001, 0.01, 0.1))` — the natural way to write candidate
+  values for a parameter that is never an integer — was rejected as an
+  "Unsupported parameter space definition", while `tl_tune_grid()` took
+  the same vector without complaint.
+
+* `tl_tune_grid()` and `tl_tune_random()` name a metric they cannot
+  produce. Asking for `"accuracy"` on a regression task, or for a metric
+  that does not exist, failed with "replacement has length zero" from the
+  assignment that came up empty. The error now says which metric was
+  asked for and lists what the task does produce.
+
 * `tl_tune_deep(learning_rates = )` searched over a value that changed
   nothing. It passed `optimizer = optimizer_adam(learning_rate = )` into
   `tl_fit_deep()`, which has no such formal, so the argument fell into

@@ -164,7 +164,14 @@ tl_tune_grid <- function(data, formula, method,
         fold_model, valid_fold, metrics = metric
       )
 
-      # Store metric value
+      # Store metric value. A metric the evaluation did not produce --
+      # a classification metric on a regression task, or a name that is
+      # not a metric at all -- leaves a zero-length right-hand side, and
+      # the assignment failed with "replacement has length zero", which
+      # says nothing about the metric that was asked for.
+      tl_check_metric_available(
+        metric, eval_metrics, fold_model, valid_fold
+      )
       fold_metrics[j] <- eval_metrics$value[
         eval_metrics$metric == metric
       ]
@@ -263,6 +270,114 @@ tl_tune_grid <- function(data, formula, method,
   final_model
 }
 
+#' Refuse a metric the evaluation cannot produce
+#'
+#' @param metric The requested metric name
+#' @param eval_metrics The tibble returned by \code{tl_evaluate()}
+#' @return `TRUE`, invisibly, when the metric is present
+#' @keywords internal
+#' @noRd
+tl_check_metric_available <- function(metric, eval_metrics,
+                                      model = NULL, new_data = NULL) {
+  if (metric %in% eval_metrics$metric) {
+    return(invisible(TRUE))
+  }
+
+  # tl_evaluate() filters to the metrics it was asked for, so an
+  # unrecognised name leaves nothing behind to list. Ask again without
+  # the filter, on this error path only, to find out what this task
+  # actually produces.
+  available <- eval_metrics$metric
+  if (length(available) == 0 && !is.null(model)) {
+    available <- tryCatch(
+      suppressWarnings(suppressMessages(
+        tl_evaluate(model, new_data = new_data)$metric
+      )),
+      error = function(e) character()
+    )
+  }
+
+  stop(
+    "Metric \"", metric, "\" was not produced for this task",
+    if (length(available)) {
+      paste0(". Available: ", paste0("\"", available, "\"", collapse = ", "))
+    } else {
+      ""
+    },
+    ". Classification metrics are not computed for a numeric response, ",
+    "nor regression metrics for a factor one.",
+    call. = FALSE
+  )
+}
+
+#' Refuse a parameter range that runs the wrong way
+#'
+#' A continuous range is sampled with \code{runif(1, min, max)} and a
+#' log-uniform one with \code{exp(runif(1, log(min), log(max)))}. Both
+#' return \code{NaN} when \code{min > max}, and R gives only a warning,
+#' so \code{c(0.1, 0.001)} instead of \code{c(0.001, 0.1)} produced a
+#' full grid of NaN parameters, fitted models with them, and reported
+#' \code{best_params} of NaN -- without failing anywhere.
+#'
+#' Integer ranges are unaffected: \code{500:100} is a valid descending
+#' sequence and \code{sample()} draws from it happily.
+#'
+#' @param param_space The space passed to \code{tl_tune_random()}
+#' @return `TRUE`, invisibly, when every range is usable
+#' @keywords internal
+#' @noRd
+tl_check_param_space <- function(param_space) {
+  for (param_name in names(param_space)) {
+    param_def <- param_space[[param_name]]
+    if (is.function(param_def)) {
+      next
+    }
+
+    is_log_spec <- length(param_def) == 3 &&
+      identical(as.character(param_def[3]), "log") &&
+      !anyNA(suppressWarnings(as.numeric(param_def[1:2])))
+
+    bounds <- if (is_log_spec) {
+      as.numeric(param_def[1:2])
+    } else if (is.numeric(param_def) && length(param_def) == 2 &&
+                 !all(param_def == floor(param_def))) {
+      param_def
+    } else {
+      next
+    }
+
+    if (!all(is.finite(bounds))) {
+      stop(
+        "param_space$", param_name,
+        " has a non-finite bound: c(", paste(bounds, collapse = ", "), ").",
+        call. = FALSE
+      )
+    }
+
+    if (bounds[1] >= bounds[2]) {
+      stop(
+        "param_space$", param_name, " runs from ", bounds[1], " to ",
+        bounds[2], ", but a range is c(min, max). Sampling it would give ",
+        "NaN for every iteration. Write it as c(", bounds[2], ", ",
+        bounds[1], ")",
+        if (is_log_spec) ", \"log\")" else ")", ".",
+        call. = FALSE
+      )
+    }
+
+    if (is_log_spec && bounds[1] <= 0) {
+      stop(
+        "param_space$", param_name,
+        " is log-uniform, so both bounds must be positive, but the lower ",
+        "bound is ", bounds[1], ".",
+        call. = FALSE
+      )
+    }
+  }
+
+  invisible(TRUE)
+}
+
 #' Tune hyperparameters using random search
 #'
 #' @param data A data frame containing the training
@@ -277,8 +392,8 @@ tl_tune_grid <- function(data, formula, method,
 #'       \code{min} and \code{max}}
 #'     \item{two whole numbers}{integer range, e.g.
 #'       \code{c(10, 20)} draws from 10:20}
-#'     \item{three or more whole numbers}{a discrete set, sampled from
-#'       as given}
+#'     \item{three or more numbers}{a discrete set, sampled from as
+#'       given, whether or not they are whole}
 #'     \item{two other numbers}{uniform draw between them, e.g.
 #'       \code{c(0.01, 0.1)}}
 #'     \item{character or factor}{categorical, sampled from as given}
@@ -322,6 +437,8 @@ tl_tune_random <- function(data, formula, method,
       call. = FALSE
     )
   }
+
+  tl_check_param_space(param_space)
 
   # Determine if classification or regression
   response_var <- all.vars(formula)[1]
@@ -402,6 +519,14 @@ tl_tune_random <- function(data, formula, method,
         params[[param_name]] <- runif(
           1, param_def[1], param_def[2]
         )
+      } else if (is.numeric(param_def) && length(param_def) >= 3) {
+        # Discrete set of any numbers, e.g. c(0.001, 0.01, 0.1). Only
+        # whole numbers reached the discrete branch above, so the natural
+        # way to write a set of candidate cp or alpha values -- the
+        # parameters that are never integers -- was rejected as an
+        # "Unsupported parameter space definition", while tl_tune_grid()
+        # took the same vector without complaint.
+        params[[param_name]] <- sample(param_def, 1)
       } else if (is.character(param_def) ||
                    is.factor(param_def)) {
         # Categorical parameter
@@ -488,7 +613,14 @@ tl_tune_random <- function(data, formula, method,
         fold_model, valid_fold, metrics = metric
       )
 
-      # Store metric value
+      # Store metric value. A metric the evaluation did not produce --
+      # a classification metric on a regression task, or a name that is
+      # not a metric at all -- leaves a zero-length right-hand side, and
+      # the assignment failed with "replacement has length zero", which
+      # says nothing about the metric that was asked for.
+      tl_check_metric_available(
+        metric, eval_metrics, fold_model, valid_fold
+      )
       fold_metrics[j] <- eval_metrics$value[
         eval_metrics$metric == metric
       ]
