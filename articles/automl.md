@@ -69,7 +69,7 @@ result$task
 result$metric
 #> [1] "accuracy"
 round(as.numeric(result$runtime, units = "secs"), 1)
-#> [1] 1
+#> [1] 1.1
 ```
 
 Regression is the same call with a numeric response — `task = "auto"`
@@ -307,7 +307,7 @@ automl <- tl_auto_ml(split$train, Species ~ ., time_budget = 30, cv_folds = 3)
 
 test_preds <- predict(automl$best_model, new_data = split$test)
 mean(test_preds$.pred == split$test$Species)
-#> [1] 0.9333333
+#> [1] 0.9111111
 ```
 
 Any model on the leaderboard can be pulled out by name:
@@ -338,7 +338,7 @@ data.frame(model = available, test_accuracy = round(scores, 3),
 #> 5 clustered_forest         0.911
 #> 6 advanced_xgboost         0.911
 #> 7         pca_tree         0.889
-#> 8       pca_forest         0.844
+#> 8       pca_forest         0.867
 ```
 
 Comparing the leaderboard against held-out accuracy is worth doing: the
@@ -362,7 +362,7 @@ data.frame(
 )
 #>                 approach test_accuracy
 #> 1 forest, chosen by hand         0.933
-#> 2            AutoML best         0.933
+#> 2            AutoML best         0.911
 ```
 
 On iris a random forest is already the right answer, so the search does
@@ -387,7 +387,7 @@ automl_processed <- tl_auto_ml(processed$data, Species ~ .,
                                time_budget = 30, cv_folds = 3)
 
 automl_processed$leaderboard$model[1]
-#> [1] "baseline_tree"
+#> [1] "clustered_tree"
 ```
 
 [`tl_pipeline()`](https://tidylearn.sheetsolved.com/reference/tl_pipeline.md)

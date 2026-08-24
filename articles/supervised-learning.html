@@ -358,7 +358,7 @@ against class labels, and computes whichever metrics you ask for:</p>
 <span><span class="co"># RMSE</span></span>
 <span><span class="va">rmse_rf</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="op">(</span><span class="va">preds_rf</span><span class="op">$</span><span class="va">.pred</span> <span class="op">-</span> <span class="va">split_reg</span><span class="op">$</span><span class="va">test</span><span class="op">$</span><span class="va">mpg</span><span class="op">)</span><span class="op">^</span><span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Random Forest RMSE:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">rmse_rf</span>, <span class="fl">2</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Random Forest RMSE: 1.97</span></span></code></pre></div>
+<span><span class="co">#&gt; Random Forest RMSE: 1.92</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
@@ -458,7 +458,7 @@ complexity.</p>
 <span><span class="va">results</span> <span class="op">&lt;-</span> <span class="va">results</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/arrange.html" class="external-link">arrange</a></span><span class="op">(</span><span class="va">RMSE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">results</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    Model     RMSE</span></span>
-<span><span class="co">#&gt; 1 forest 2.021532</span></span>
+<span><span class="co">#&gt; 1 forest 2.012343</span></span>
 <span><span class="co">#&gt; 2 linear 2.281450</span></span>
 <span><span class="co">#&gt; 3   tree 4.095888</span></span></code></pre></div>
 </div>

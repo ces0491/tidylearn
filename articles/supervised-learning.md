@@ -323,7 +323,7 @@ preds_rf <- predict(model_rf_reg, new_data = split_reg$test)
 # RMSE
 rmse_rf <- sqrt(mean((preds_rf$.pred - split_reg$test$mpg)^2))
 cat("Random Forest RMSE:", round(rmse_rf, 2), "\n")
-#> Random Forest RMSE: 1.97
+#> Random Forest RMSE: 1.92
 ```
 
 ## Regularized Regression
@@ -428,7 +428,7 @@ for (model_name in names(models)) {
 results <- results %>% arrange(RMSE)
 print(results)
 #>    Model     RMSE
-#> 1 forest 2.021532
+#> 1 forest 2.012343
 #> 2 linear 2.281450
 #> 3   tree 4.095888
 ```

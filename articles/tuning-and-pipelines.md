@@ -343,10 +343,10 @@ print(run)
 #> 
 #> Results
 #> =======
-#> Best model: forest 
+#> Best model: tree 
 #> Performance:
-#>   tree: accuracy = 0.9619
-#>   forest: accuracy = 0.9714 (best)
+#>   tree: accuracy = 0.9714 (best)
+#>   forest: accuracy = 0.9714
 ```
 
 [`tl_get_best_model()`](https://tidylearn.sheetsolved.com/reference/tl_get_best_model.md)
@@ -356,7 +356,7 @@ returns the model that won on `best_metric`:
 
 best <- tl_get_best_model(run)
 best$spec$method
-#> [1] "forest"
+#> [1] "tree"
 ```
 
 ### Predicting through the pipeline
@@ -384,7 +384,7 @@ head(preds)
 ``` r
 
 mean(preds$.pred == split$test$Species)
-#> [1] 0.9555556
+#> [1] 0.9333333
 ```
 
 Omit `model_name` to predict with the best model.
@@ -450,7 +450,7 @@ final_run <- tl_run_pipeline(final, verbose = FALSE)
 final_preds <- tl_predict_pipeline(final_run, new_data = split$test)
 
 mean(final_preds$.pred == split$test$Species)
-#> [1] 0.9555556
+#> [1] 0.9333333
 ```
 
 ## Cost

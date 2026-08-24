@@ -7,7 +7,7 @@ and configured (`pip install kaggle`).
 ## Usage
 
 ``` r
-tl_read_kaggle(source, file = NULL, dest = tempdir(), type = "dataset", ...)
+tl_read_kaggle(source, file = NULL, dest = NULL, type = "dataset", ...)
 ```
 
 ## Arguments
@@ -23,7 +23,9 @@ tl_read_kaggle(source, file = NULL, dest = tempdir(), type = "dataset", ...)
 
 - dest:
 
-  Directory to download files to. Default is a temporary directory.
+  Directory to download files to. The default is a fresh per-dataset
+  directory under [`tempdir()`](https://rdrr.io/r/base/tempfile.html);
+  supply a path to keep the download.
 
 - type:
 

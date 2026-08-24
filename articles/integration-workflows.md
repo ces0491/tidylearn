@@ -187,7 +187,7 @@ preds_with_cluster <- predict(model_with_cluster, new_data = test_clustered)
 acc_with_cluster <- mean(preds_with_cluster$.pred == split_comp$test$Species)
 
 cat("Without cluster features:", round(acc_no_cluster * 100, 1), "%\n")
-#> Without cluster features: 93.3 %
+#> Without cluster features: 95.6 %
 cat("With cluster features:", round(acc_with_cluster * 100, 1), "%\n")
 #> With cluster features: 93.3 %
 ```
@@ -412,7 +412,7 @@ workflow_preds <- predict(workflow_model, new_data = test_pca)
 workflow_accuracy <- mean(workflow_preds$.pred == workflow_split$test$Species)
 
 cat("Complete Workflow Accuracy:", round(workflow_accuracy * 100, 1), "%\n")
-#> Complete Workflow Accuracy: 88.9 %
+#> Complete Workflow Accuracy: 91.1 %
 ```
 
 ## Practical Example: Credit Risk Assessment
@@ -465,7 +465,7 @@ preds_credit <- predict(model_credit, new_data = test_credit)
 accuracy_credit <- mean(preds_credit$.pred == credit_split$test$default)
 
 cat("Credit Risk Model Accuracy:", round(accuracy_credit * 100, 1), "%\n")
-#> Credit Risk Model Accuracy: 98.7 %
+#> Credit Risk Model Accuracy: 100 %
 ```
 
 ## What Each Combination Buys You

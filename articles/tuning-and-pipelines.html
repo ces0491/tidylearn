@@ -373,16 +373,16 @@ nothing.</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Results</span></span>
 <span><span class="co">#&gt; =======</span></span>
-<span><span class="co">#&gt; Best model: forest </span></span>
+<span><span class="co">#&gt; Best model: tree </span></span>
 <span><span class="co">#&gt; Performance:</span></span>
-<span><span class="co">#&gt;   tree: accuracy = 0.9619</span></span>
-<span><span class="co">#&gt;   forest: accuracy = 0.9714 (best)</span></span></code></pre></div>
+<span><span class="co">#&gt;   tree: accuracy = 0.9714 (best)</span></span>
+<span><span class="co">#&gt;   forest: accuracy = 0.9714</span></span></code></pre></div>
 <p><code><a href="../reference/tl_get_best_model.html">tl_get_best_model()</a></code> returns the model that won on
 <code>best_metric</code>:</p>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">best</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_get_best_model.html">tl_get_best_model</a></span><span class="op">(</span><span class="va">run</span><span class="op">)</span></span>
 <span><span class="va">best</span><span class="op">$</span><span class="va">spec</span><span class="op">$</span><span class="va">method</span></span>
-<span><span class="co">#&gt; [1] "forest"</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] "tree"</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="predicting-through-the-pipeline">Predicting through the pipeline<a class="anchor" aria-label="anchor" href="#predicting-through-the-pipeline"></a>
@@ -405,7 +405,7 @@ rather than recomputing them from the new rows.</p>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> setosa</span></span></code></pre></div>
 <div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">preds</span><span class="op">$</span><span class="va">.pred</span> <span class="op">==</span> <span class="va">split</span><span class="op">$</span><span class="va">test</span><span class="op">$</span><span class="va">Species</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 0.9555556</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 0.9333333</span></span></code></pre></div>
 <p>Omit <code>model_name</code> to predict with the best model.</p>
 </div>
 <div class="section level3">
@@ -462,7 +462,7 @@ preprocessing that produced them.</p>
 <span><span class="va">final_preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_predict_pipeline.html">tl_predict_pipeline</a></span><span class="op">(</span><span class="va">final_run</span>, new_data <span class="op">=</span> <span class="va">split</span><span class="op">$</span><span class="va">test</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">final_preds</span><span class="op">$</span><span class="va">.pred</span> <span class="op">==</span> <span class="va">split</span><span class="op">$</span><span class="va">test</span><span class="op">$</span><span class="va">Species</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 0.9555556</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 0.9333333</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="cost">Cost<a class="anchor" aria-label="anchor" href="#cost"></a>

@@ -246,7 +246,7 @@ group structure directly gets a column that encodes it.</p>
 <span><span class="va">acc_with_cluster</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">preds_with_cluster</span><span class="op">$</span><span class="va">.pred</span> <span class="op">==</span> <span class="va">split_comp</span><span class="op">$</span><span class="va">test</span><span class="op">$</span><span class="va">Species</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Without cluster features:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">acc_no_cluster</span> <span class="op">*</span> <span class="fl">100</span>, <span class="fl">1</span><span class="op">)</span>, <span class="st">"%\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Without cluster features: 93.3 %</span></span>
+<span><span class="co">#&gt; Without cluster features: 95.6 %</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"With cluster features:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">acc_with_cluster</span> <span class="op">*</span> <span class="fl">100</span>, <span class="fl">1</span><span class="op">)</span>, <span class="st">"%\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; With cluster features: 93.3 %</span></span></code></pre></div>
 </div>
@@ -454,7 +454,7 @@ propagation.</p>
 <span><span class="va">workflow_accuracy</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">workflow_preds</span><span class="op">$</span><span class="va">.pred</span> <span class="op">==</span> <span class="va">workflow_split</span><span class="op">$</span><span class="va">test</span><span class="op">$</span><span class="va">Species</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Complete Workflow Accuracy:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">workflow_accuracy</span> <span class="op">*</span> <span class="fl">100</span>, <span class="fl">1</span><span class="op">)</span>, <span class="st">"%\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Complete Workflow Accuracy: 88.9 %</span></span></code></pre></div>
+<span><span class="co">#&gt; Complete Workflow Accuracy: 91.1 %</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="practical-example-credit-risk-assessment">Practical Example: Credit Risk Assessment<a class="anchor" aria-label="anchor" href="#practical-example-credit-risk-assessment"></a>
@@ -503,7 +503,7 @@ propagation.</p>
 <span><span class="va">accuracy_credit</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">preds_credit</span><span class="op">$</span><span class="va">.pred</span> <span class="op">==</span> <span class="va">credit_split</span><span class="op">$</span><span class="va">test</span><span class="op">$</span><span class="va">default</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Credit Risk Model Accuracy:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">accuracy_credit</span> <span class="op">*</span> <span class="fl">100</span>, <span class="fl">1</span><span class="op">)</span>, <span class="st">"%\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Credit Risk Model Accuracy: 98.7 %</span></span></code></pre></div>
+<span><span class="co">#&gt; Credit Risk Model Accuracy: 100 %</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="what-each-combination-buys-you">What Each Combination Buys You<a class="anchor" aria-label="anchor" href="#what-each-combination-buys-you"></a>

@@ -145,12 +145,12 @@ tl_table_coefficients(model_lasso)
 
 | Lasso Coefficients |  |  |
 |----|----|----|
-| lambda = 1.536 (1se) |  |  |
+| lambda = 1.399 (1se) |  |  |
 | Term | Coefficient | \|Coefficient\| |
-| (Intercept) | 33.4721 | 33.4721 |
-| wt | −2.2863 | 2.2863 |
-| cyl | −0.8339 | 0.8339 |
-| hp | −0.0059 | 0.0059 |
+| (Intercept) | 33.9411 | 33.9411 |
+| wt | −2.3645 | 2.3645 |
+| cyl | −0.8434 | 0.8434 |
+| hp | −0.0070 | 0.0070 |
 | disp | 0.0000 | 0.0000 |
 | drat | 0.0000 | 0.0000 |
 | qsec | 0.0000 | 0.0000 |
@@ -186,9 +186,9 @@ tl_table_importance(model_clf)
 | Top 4 features                                                 |            |
 | Feature                                                        | Importance |
 | Petal.Length                                                   | 100.00     |
-| Petal.Width                                                    | 93.33      |
-| Sepal.Length                                                   | 27.43      |
-| Sepal.Width                                                    | 10.52      |
+| Petal.Width                                                    | 88.23      |
+| Sepal.Length                                                   | 29.63      |
+| Sepal.Width                                                    | 15.77      |
 | tidylearn \| forest (classification) \| Species ~ . \| n = 105 |            |
 
 ### PCA Variance Explained
@@ -244,9 +244,9 @@ tl_table_clusters(km)
 |----|----|----|----|----|----|
 | kmeans \| 3 clusters |  |  |  |  |  |
 | Cluster | Size | Sepal.Length | Sepal.Width | Petal.Length | Petal.Width |
-| 1 | 50 | 5.01 | 3.43 | 1.46 | 0.25 |
-| 2 | 38 | 6.85 | 3.07 | 5.74 | 2.07 |
-| 3 | 62 | 5.90 | 2.75 | 4.39 | 1.43 |
+| 1 | 62 | 5.90 | 2.75 | 4.39 | 1.43 |
+| 2 | 50 | 5.01 | 3.43 | 1.46 | 0.25 |
+| 3 | 38 | 6.85 | 3.07 | 5.74 | 2.07 |
 | tidylearn \| kmeans \| n = 150 |  |  |  |  |  |
 
 ### Model Comparison
@@ -333,9 +333,9 @@ tl_table_importance(model, top_n = 4)
 | Top 4 features                                                 |            |
 | Feature                                                        | Importance |
 | Petal.Length                                                   | 100.00     |
-| Petal.Width                                                    | 99.13      |
-| Sepal.Length                                                   | 32.47      |
-| Sepal.Width                                                    | 13.13      |
+| Petal.Width                                                    | 87.13      |
+| Sepal.Length                                                   | 26.63      |
+| Sepal.Width                                                    | 9.82       |
 | tidylearn \| forest (classification) \| Species ~ . \| n = 105 |            |
 
 Swap `method = "forest"` for `method = "tree"` or `method = "svm"` and

@@ -15,6 +15,7 @@ tl_fit_deep(
   epochs = 30,
   batch_size = 32,
   validation_split = 0.2,
+  learning_rate = NULL,
   verbose = 0,
   ...,
   compute = "cpu"
@@ -57,7 +58,12 @@ tl_fit_deep(
 
 - validation_split:
 
-  Proportion of data for validation (default: 0.2)
+  Proportion of data for validation
+
+- learning_rate:
+
+  Optimizer learning rate. NULL (default) leaves keras's own adam
+  default in place. (default: 0.2)
 
 - verbose:
 

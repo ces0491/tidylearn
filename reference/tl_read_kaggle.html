@@ -51,7 +51,7 @@ configured (<code>pip install kaggle</code>).</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">tl_read_kaggle</span><span class="op">(</span><span class="va">source</span>, file <span class="op">=</span> <span class="cn">NULL</span>, dest <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, type <span class="op">=</span> <span class="st">"dataset"</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">tl_read_kaggle</span><span class="op">(</span><span class="va">source</span>, file <span class="op">=</span> <span class="cn">NULL</span>, dest <span class="op">=</span> <span class="cn">NULL</span>, type <span class="op">=</span> <span class="st">"dataset"</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -69,7 +69,9 @@ the dataset contains exactly one file, it is read automatically.</p></dd>
 
 
 <dt id="arg-dest">dest<a class="anchor" aria-label="anchor" href="#arg-dest"></a></dt>
-<dd><p>Directory to download files to. Default is a temporary directory.</p></dd>
+<dd><p>Directory to download files to. The default is a fresh
+per-dataset directory under <code><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir()</a></code>; supply a path to keep
+the download.</p></dd>
 
 
 <dt id="arg-type">type<a class="anchor" aria-label="anchor" href="#arg-type"></a></dt>

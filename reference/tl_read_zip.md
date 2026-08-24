@@ -25,7 +25,9 @@ tl_read_zip(path, file = NULL, format = NULL, .quiet = FALSE, ...)
 
 - format:
 
-  Optional format override for the file(s) inside the archive.
+  Optional format override for the file(s) inside the archive. When the
+  archive holds more than one kind of data file, this selects the
+  members of that format rather than forcing it onto all of them.
 
 - .quiet:
 

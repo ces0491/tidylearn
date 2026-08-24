@@ -126,7 +126,7 @@ obtained.</p>
 <span><span class="va">result</span><span class="op">$</span><span class="va">metric</span></span>
 <span><span class="co">#&gt; [1] "accuracy"</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">runtime</span>, units <span class="op">=</span> <span class="st">"secs"</span><span class="op">)</span>, <span class="fl">1</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 1</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 1.1</span></span></code></pre></div>
 <p>Regression is the same call with a numeric response —
 <code>task = "auto"</code> reads it off the data:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
@@ -366,7 +366,7 @@ accepts <code>rmse</code>, <code>mse</code>, <code>mae</code>,
 <span></span>
 <span><span class="va">test_preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">automl</span><span class="op">$</span><span class="va">best_model</span>, new_data <span class="op">=</span> <span class="va">split</span><span class="op">$</span><span class="va">test</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">test_preds</span><span class="op">$</span><span class="va">.pred</span> <span class="op">==</span> <span class="va">split</span><span class="op">$</span><span class="va">test</span><span class="op">$</span><span class="va">Species</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 0.9333333</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 0.9111111</span></span></code></pre></div>
 <p>Any model on the leaderboard can be pulled out by name:</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">available</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">automl</span><span class="op">$</span><span class="va">models</span><span class="op">)</span></span>
@@ -390,7 +390,7 @@ accepts <code>rmse</code>, <code>mse</code>, <code>mae</code>,
 <span><span class="co">#&gt; 5 clustered_forest         0.911</span></span>
 <span><span class="co">#&gt; 6 advanced_xgboost         0.911</span></span>
 <span><span class="co">#&gt; 7         pca_tree         0.889</span></span>
-<span><span class="co">#&gt; 8       pca_forest         0.844</span></span></code></pre></div>
+<span><span class="co">#&gt; 8       pca_forest         0.867</span></span></code></pre></div>
 <p>Comparing the leaderboard against held-out accuracy is worth doing:
 the model that won the search is not always the one that generalises,
 and with a dataset this small the difference between the top few is
@@ -413,7 +413,7 @@ noise.</p>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt;                 approach test_accuracy</span></span>
 <span><span class="co">#&gt; 1 forest, chosen by hand         0.933</span></span>
-<span><span class="co">#&gt; 2            AutoML best         0.933</span></span></code></pre></div>
+<span><span class="co">#&gt; 2            AutoML best         0.911</span></span></code></pre></div>
 <p>On iris a random forest is already the right answer, so the search
 does not improve on it. That is the expected result on an easy,
 well-understood dataset — AutoML earns its cost when you do not already
@@ -435,7 +435,7 @@ apply the same transformation to any data you later predict on:</p>
 <span>                               time_budget <span class="op">=</span> <span class="fl">30</span>, cv_folds <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">automl_processed</span><span class="op">$</span><span class="va">leaderboard</span><span class="op">$</span><span class="va">model</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span></span>
-<span><span class="co">#&gt; [1] "baseline_tree"</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] "clustered_tree"</span></span></code></pre></div>
 <p><code><a href="../reference/tl_pipeline.html">tl_pipeline()</a></code> handles that bookkeeping properly — see
 <code><a href="../articles/tuning-and-pipelines.html">vignette("tuning-and-pipelines")</a></code>.</p>
 </div>

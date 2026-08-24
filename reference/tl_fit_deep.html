@@ -55,6 +55,7 @@
 <span>  epochs <span class="op">=</span> <span class="fl">30</span>,</span>
 <span>  batch_size <span class="op">=</span> <span class="fl">32</span>,</span>
 <span>  validation_split <span class="op">=</span> <span class="fl">0.2</span>,</span>
+<span>  learning_rate <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  <span class="va">...</span>,</span>
 <span>  compute <span class="op">=</span> <span class="st">"cpu"</span></span>
@@ -101,7 +102,12 @@ classification problem</p></dd>
 
 
 <dt id="arg-validation-split">validation_split<a class="anchor" aria-label="anchor" href="#arg-validation-split"></a></dt>
-<dd><p>Proportion of data for validation
+<dd><p>Proportion of data for validation</p></dd>
+
+
+<dt id="arg-learning-rate">learning_rate<a class="anchor" aria-label="anchor" href="#arg-learning-rate"></a></dt>
+<dd><p>Optimizer learning rate. NULL (default) leaves
+keras's own adam default in place.
 (default: 0.2)</p></dd>
 
 
