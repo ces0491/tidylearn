@@ -82,6 +82,19 @@ earlier should be recomputed.
   with an intercept — the check could only ever report SATISFIED. It is
   now a RESET-style test on powers of the fitted values.
 
+### Fitting
+
+* `"ridge"`, `"lasso"` and `"elastic_net"` no longer fail when a predictor
+  has a missing value. The response was read from `data` while the design
+  matrix came from `model.frame()`, which applies `na.omit` — so a single
+  missing predictor left `y` one row longer than `x`, and glmnet reported
+  "number of observations in y (60) not equal to the number of rows of x
+  (59)". That names neither missing values nor the column responsible, and
+  reads as though the caller had passed mismatched inputs. The response is
+  now taken from the same model frame that builds the design matrix, so
+  these methods drop the incomplete row and carry on, as `lm()`,
+  `rpart()`, `nnet()` and `svm()` already did.
+
 ### Prediction
 
 * Classification now reduces the response to the classes it contains. A
