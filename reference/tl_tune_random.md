@@ -51,9 +51,10 @@ tl_tune_random(
 
   :   integer range, e.g. `c(10, 20)` draws from 10:20
 
-  three or more whole numbers
+  three or more numbers
 
-  :   a discrete set, sampled from as given
+  :   a discrete set, sampled from as given, whether or not they are
+      whole
 
   two other numbers
 

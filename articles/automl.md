@@ -69,7 +69,7 @@ result$task
 result$metric
 #> [1] "accuracy"
 round(as.numeric(result$runtime, units = "secs"), 1)
-#> [1] 1.1
+#> [1] 1
 ```
 
 Regression is the same call with a numeric response — `task = "auto"`

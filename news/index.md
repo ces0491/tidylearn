@@ -66,6 +66,23 @@ earlier should be recomputed.
 
 #### Metrics and evaluation
 
+- [`tl_cv()`](https://tidylearn.sheetsolved.com/reference/tl_cv.md)
+  explains a metric that no fold could compute rather than leaving a
+  bare `NaN` in the summary. `folds = nrow(data)` is leave-one-out, so
+  every test fold holds one observation and `rsq` — which needs
+  variation in the truth — is undefined;
+  [`mean()`](https://rdrr.io/r/base/mean.html) over nothing then
+  reported `NaN`, which reads as a malfunction rather than as a property
+  of the request. `rmse` and `mae` are defined for a single observation
+  and are unaffected.
+
+- [`tl_cv()`](https://tidylearn.sheetsolved.com/reference/tl_cv.md) no
+  longer repeats
+  [`tl_model()`](https://tidylearn.sheetsolved.com/reference/tl_model.md)’s
+  notes once per fold. The note that a numeric response with few
+  distinct values is being treated as regression is about the data, not
+  the fold, and appeared k times.
+
 - [`tl_calc_classification_metrics()`](https://tidylearn.sheetsolved.com/reference/tl_calc_classification_metrics.md)
   computed precision, recall, sensitivity, specificity and F1 for the
   **wrong class**. The `yardstick` calls omitted `event_level`, so they
@@ -91,6 +108,22 @@ earlier should be recomputed.
   zero for any OLS fit with an intercept — the check could only ever
   report SATISFIED. It is now a RESET-style test on powers of the fitted
   values.
+
+#### Fitting
+
+- `"ridge"`, `"lasso"` and `"elastic_net"` no longer fail when a
+  predictor has a missing value. The response was read from `data` while
+  the design matrix came from
+  [`model.frame()`](https://rdrr.io/r/stats/model.frame.html), which
+  applies `na.omit` — so a single missing predictor left `y` one row
+  longer than `x`, and glmnet reported “number of observations in y (60)
+  not equal to the number of rows of x (59)”. That names neither missing
+  values nor the column responsible, and reads as though the caller had
+  passed mismatched inputs. The response is now taken from the same
+  model frame that builds the design matrix, so these methods drop the
+  incomplete row and carry on, as
+  [`lm()`](https://rdrr.io/r/stats/lm.html), `rpart()`, `nnet()` and
+  `svm()` already did.
 
 #### Prediction
 
@@ -231,6 +264,32 @@ earlier should be recomputed.
 
 #### Ranking, splitting and tuning
 
+- [`tl_tune_random()`](https://tidylearn.sheetsolved.com/reference/tl_tune_random.md)
+  rejects a parameter range written backwards. `c(0.1, 0.001)` instead
+  of `c(0.001, 0.1)` was sampled with `runif(1, 0.1, 0.001)`, which is
+  `NaN` — and R only warns — so every iteration drew `NaN`, models were
+  fitted with `cp = NaN`, and `best_params` was reported as `NaN`
+  without anything failing. Equal bounds and a non-positive lower bound
+  on a log-uniform range are refused for the same reason.
+
+- [`tl_tune_random()`](https://tidylearn.sheetsolved.com/reference/tl_tune_random.md)
+  accepts a discrete set of numbers that are not whole. Only whole
+  numbers reached the discrete branch, so
+  `list(cp = c(0.001, 0.01, 0.1))` — the natural way to write candidate
+  values for a parameter that is never an integer — was rejected as an
+  “Unsupported parameter space definition”, while
+  [`tl_tune_grid()`](https://tidylearn.sheetsolved.com/reference/tl_tune_grid.md)
+  took the same vector without complaint.
+
+- [`tl_tune_grid()`](https://tidylearn.sheetsolved.com/reference/tl_tune_grid.md)
+  and
+  [`tl_tune_random()`](https://tidylearn.sheetsolved.com/reference/tl_tune_random.md)
+  name a metric they cannot produce. Asking for `"accuracy"` on a
+  regression task, or for a metric that does not exist, failed with
+  “replacement has length zero” from the assignment that came up empty.
+  The error now says which metric was asked for and lists what the task
+  does produce.
+
 - `tl_tune_deep(learning_rates = )` searched over a value that changed
   nothing. It passed `optimizer = optimizer_adam(learning_rate = )` into
   [`tl_fit_deep()`](https://tidylearn.sheetsolved.com/reference/tl_fit_deep.md),
@@ -282,7 +341,25 @@ earlier should be recomputed.
   rather than a step that silently does nothing, and
   `evaluation$best_metric` is checked against `evaluation$metrics`.
 
-#### Clustering, distance and plots
+#### Diagnostics
+
+- [`tl_check_assumptions()`](https://tidylearn.sheetsolved.com/reference/tl_check_assumptions.md),
+  [`tl_influence_measures()`](https://tidylearn.sheetsolved.com/reference/tl_influence_measures.md)
+  and
+  [`tl_diagnostic_dashboard()`](https://tidylearn.sheetsolved.com/reference/tl_diagnostic_dashboard.md)
+  no longer fail when a predictor has a missing value.
+  [`lm()`](https://rdrr.io/r/stats/lm.html) drops incomplete cases, so
+  [`residuals()`](https://rdrr.io/r/stats/residuals.html),
+  [`fitted()`](https://rdrr.io/r/stats/fitted.values.html) and every
+  influence measure came back shorter than `model$data`, and combining
+  them raised “arguments imply differing number of rows: 60, 59” — which
+  describes nothing the caller did.
+
+- [`tl_influence_measures()`](https://tidylearn.sheetsolved.com/reference/tl_influence_measures.md)
+  numbers observations by their row in the training data. It used `1:n`,
+  so after a dropped row every observation was attributed to its
+  neighbour: with row 3 missing, what the table called observation 3 was
+  row 4, and so on to the end.
 
 - `optimal_hclust_k(method = "gap")` never ran.
   [`cluster::clusGap()`](https://rdrr.io/pkg/cluster/man/clusGap.html)
@@ -411,6 +488,36 @@ earlier should be recomputed.
   data file, `format` now selects the members of that format.
 
 #### Errors instead of misleading results
+
+- Unsupervised routines that cannot use missing values now say so,
+  naming the columns and how many values are affected.
+  [`tidy_kmeans()`](https://tidylearn.sheetsolved.com/reference/tidy_kmeans.md)
+  and
+  [`tidy_gap_stat()`](https://tidylearn.sheetsolved.com/reference/tidy_gap_stat.md)
+  previously surfaced
+  [`stats::kmeans()`](https://rdrr.io/r/stats/kmeans.html)’s “NA/NaN/Inf
+  in foreign function call (arg 1)”,
+  [`tidy_pca()`](https://tidylearn.sheetsolved.com/reference/tidy_pca.md)
+  gave [`prcomp()`](https://rdrr.io/r/stats/prcomp.html)’s “infinite or
+  missing values in ‘x’”, and
+  [`calc_wss()`](https://tidylearn.sheetsolved.com/reference/calc_wss.md),
+  [`optimal_clusters()`](https://tidylearn.sheetsolved.com/reference/optimal_clusters.md)
+  and
+  [`tidy_silhouette_analysis()`](https://tidylearn.sheetsolved.com/reference/tidy_silhouette_analysis.md)
+  loop over k with `purrr`, which wrapped those again into “In index: 2.
+  Caused by error in `do_one()`”. None of them named the column, the
+  problem, or a way forward. Missing values are the most ordinary thing
+  that can be wrong with a data set.
+
+  The message points at `"pam"` and `"clara"`, which accept missing
+  values. Those, along with
+  [`tidy_dist()`](https://tidylearn.sheetsolved.com/reference/tidy_dist.md),
+  [`tidy_gower()`](https://tidylearn.sheetsolved.com/reference/tidy_gower.md),
+  [`tidy_mds()`](https://tidylearn.sheetsolved.com/reference/tidy_mds.md)
+  and
+  [`tidy_hclust()`](https://tidylearn.sheetsolved.com/reference/tidy_hclust.md),
+  are unchanged — they handle missing values themselves, and guarding
+  them would remove working behaviour rather than improve a message.
 
 - [`tl_split()`](https://tidylearn.sheetsolved.com/reference/tl_split.md)
   and
