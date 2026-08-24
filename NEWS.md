@@ -198,6 +198,22 @@ earlier should be recomputed.
 
 ### Ranking, splitting and tuning
 
+* `tl_tune_deep(learning_rates = )` searched over a value that changed
+  nothing. It passed `optimizer = optimizer_adam(learning_rate = )` into
+  `tl_fit_deep()`, which has no such formal, so the argument fell into
+  `...` and was forwarded to `keras::fit()` — by which point the model is
+  compiled, and `compile()` is what sets the optimizer. Every point on the
+  grid therefore trained at the same rate, and `best_learning_rate` was
+  whichever happened to score highest on noise. `tl_fit_deep()` gains a
+  `learning_rate` argument that reaches `compile()`, and the final refit
+  on the winning configuration uses it too.
+
+* `tl_tune_deep()` reports when no configuration could be fitted. Each fit
+  is wrapped individually, so a bad argument forwarded through `...` left
+  every `val_loss` as `NA`; `which.min()` then returned `integer(0)` and
+  the function failed with "attempt to select less than one element in
+  get1index", which describes nothing.
+
 * `tl_auto_ml(metric = "mape")` returned the model with the **highest**
   error as the best one — `mape` was missing from the ascending-sort
   list. Unrecognised metrics now error rather than assume a direction.
@@ -222,6 +238,20 @@ earlier should be recomputed.
   `evaluation$metrics`.
 
 ### Clustering, distance and plots
+
+* `optimal_hclust_k(method = "gap")` never ran. `cluster::clusGap()`
+  requires its clustering function to return a list with a `cluster`
+  element and `cutree()` returns a bare integer vector, so every call
+  failed with "$ operator is invalid for atomic vectors". Two further
+  faults sat behind that one and could not show themselves while it
+  errored on the first call: the refit used `stats::dist()`, whose default
+  is Euclidean, so a model built with any other distance was scored
+  against clusterings it would never produce; and a model built from a
+  `dist` object has no observations to resample, which surfaced as "no
+  applicable method for 'select' applied to an object of class NULL"
+  rather than as an explanation. All three are fixed, and the last is now
+  an error that says to refit from the data or use `"silhouette"`, which
+  works from distances alone.
 
 * `tidy_dbscan()` converted a `dist` input with `as.matrix()` and passed
   it as coordinates, clustering each observation's vector of distances
@@ -284,7 +314,53 @@ earlier should be recomputed.
   documentation now says that `slopes$slope_se` describes the fit to the
   prediction grid rather than the uncertainty of the marginal effect.
 
+### Data ingestion
+
+* `tl_read_kaggle()` no longer lets a dataset slug reach the shell as
+  written. The slug was interpolated into `system2()`, which applies
+  `shQuote()` to the command and leaves the arguments alone, and
+  `tl_parse_kaggle_url()` matched `[^/]+/[^/]+$` — which admits `;`, `|`,
+  backticks and `$(`. The URL parser is also skipped entirely when the
+  caller passes a bare string, so the slug was not necessarily anything
+  Kaggle produced. A pasted dataset link was the vector. Slugs and file
+  names are now validated against what Kaggle identifiers actually are,
+  before interpolation and before the CLI is looked for, and
+  caller-derived values are quoted — which also fixes a destination path
+  containing spaces.
+
+* `tl_read_kaggle(file = NULL)` downloaded into a shared `tempdir()` and
+  returned the newest matching data file, so a file left by an earlier
+  call could be handed back as the requested dataset. Each download now
+  gets its own directory, emptied first.
+
+* `tl_read_kaggle(type = "competition")` returned no data. Competition
+  downloads arrive zipped and that endpoint has no `--unzip` flag, so the
+  search for a data file found none. Archives are unpacked first, and the
+  search recurses.
+
+* `tl_read_zip(format = )` forced one format onto every member. A zip
+  holding a CSV and a JSON read the JSON as CSV and row-bound the result,
+  producing a frame with a column named after the JSON's first line and no
+  error at all. When the archive holds more than one kind of data file,
+  `format` now selects the members of that format.
+
 ### Errors instead of misleading results
+
+* `tl_split()` and `tl_tune_random()` no longer rewrite the session's
+  random stream. Both called `set.seed()` when given a `seed`, so a
+  function seeded for its own reproducibility was also deciding what every
+  later `sample()` or `rnorm()` in the caller's script returned — two
+  scripts differing only in whether they passed `seed` diverged everywhere
+  downstream. The stream is restored on exit; the seed still does its own
+  job.
+
+* `tidy_pca(method = "princomp")` produced loadings that could not be
+  used. `princomp()` returns a `"loadings"` object rather than a plain
+  matrix, and `tibble::as_tibble()` read that as a single long vector — 16
+  values against 4 row names for a four-variable PCA — so
+  `get_pca_loadings()` failed with "Can't recycle `..1` (size 16) to match
+  `..3` (size 4)". The loadings now match `prcomp()`'s, up to the sign
+  convention.
 
 * The method and the response now have to agree. `"linear"` and
   `"polynomial"` need a numeric response and `"logistic"` needs exactly two
@@ -411,6 +487,11 @@ earlier should be recomputed.
   user-supplied endpoint URL.
 
 ## Internal
+
+* Removed four internal helpers with no callers: `create_obs_ids()`,
+  `extract_response()`, `get_numeric_cols()` and `validate_data()`. They had
+  survived two reviews on the grounds that they looked like intentional
+  utilities.
 
 * `.github/workflows/pkgdown.yaml` builds on pull requests without deploying,
   so a dangling article name fails a PR check rather than the first push to

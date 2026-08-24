@@ -279,3 +279,79 @@ test_that("neural network tuning runs for every response type", {
   expect_true(tuned$best_decay %in% c(0, 0.1))
   expect_equal(nrow(tuned$tuning_results), 4)
 })
+
+# ---- deep learning: the learning rate has to reach the optimizer -----
+
+test_that("tl_fit_deep(learning_rate=) sets the optimizer's learning rate", {
+  skip_on_cran()
+  skip_if_not_installed("keras")
+  skip_if_not_installed("tensorflow")
+  usable <- tryCatch({
+    keras::keras_model_sequential()
+    TRUE
+  }, error = function(e) FALSE)
+  skip_if_not(usable, "No TensorFlow backend available")
+
+  # tl_tune_deep() passed optimizer = optimizer_adam(learning_rate = lr)
+  # into tl_fit_deep(), which has no such formal, so it landed in ... and
+  # went to keras::fit(). The model is already compiled by then, and
+  # compile() is what sets the optimizer -- so the whole learning_rates
+  # grid searched over a value that never changed anything.
+  set.seed(1)
+  d <- data.frame(x1 = stats::rnorm(60), x2 = stats::rnorm(60))
+  d$y <- 2 * d$x1 - d$x2 + stats::rnorm(60, sd = 0.3)
+
+  rate_of <- function(lr) {
+    fit <- suppressWarnings(suppressMessages(
+      tl_fit_deep(d, y ~ x1 + x2, is_classification = FALSE,
+                  hidden_layers = c(4), epochs = 1, verbose = 0,
+                  learning_rate = lr)
+    ))
+    as.numeric(keras::k_get_value(fit$model$optimizer$learning_rate))
+  }
+
+  expect_equal(rate_of(0.5), 0.5, tolerance = 1e-6)
+  expect_equal(rate_of(0.01), 0.01, tolerance = 1e-6)
+
+  # Left alone, keras keeps its own default rather than being forced
+  expect_true(is.finite(rate_of(NULL)))
+})
+
+test_that("tl_tune_deep actually searches over the learning rate", {
+  skip_on_cran()
+  skip_if_not_installed("keras")
+  skip_if_not_installed("tensorflow")
+  usable <- tryCatch({
+    keras::keras_model_sequential()
+    TRUE
+  }, error = function(e) FALSE)
+  skip_if_not(usable, "No TensorFlow backend available")
+
+  set.seed(1)
+  d <- data.frame(x1 = stats::rnorm(80), x2 = stats::rnorm(80))
+  d$y <- 2 * d$x1 - d$x2 + stats::rnorm(80, sd = 0.3)
+
+  tuned <- suppressWarnings(suppressMessages(tl_tune_deep(
+    d, y ~ x1 + x2,
+    hidden_layers_options = list(c(4)),
+    learning_rates = c(0.5, 0.0001),
+    batch_sizes = c(16),
+    epochs = 3
+  )))
+
+  scored <- tuned$tuning_results$val_loss
+  expect_equal(length(scored), 2L)
+  expect_true(all(is.finite(scored)))
+
+  # Two very different rates over the same data and architecture cannot
+  # score identically unless the rate is being ignored, which is exactly
+  # what happened when it was routed to fit() instead of compile().
+  expect_false(isTRUE(all.equal(scored[1], scored[2])))
+
+  # And the winner has to reach the model that gets returned -- the final
+  # refit routed it through optimizer = too.
+  final_rate <- as.numeric(
+    keras::k_get_value(tuned$model$model$optimizer$learning_rate)
+  )
+  expect_equal(final_rate, tuned$best_learning_rate, tolerance = 1e-6)
+})

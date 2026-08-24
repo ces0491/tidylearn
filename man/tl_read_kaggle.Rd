@@ -4,7 +4,7 @@
 \alias{tl_read_kaggle}
 \title{Read from Kaggle}
 \usage{
-tl_read_kaggle(source, file = NULL, dest = tempdir(), type = "dataset", ...)
+tl_read_kaggle(source, file = NULL, dest = NULL, type = "dataset", ...)
 }
 \arguments{
 \item{source}{A Kaggle dataset slug (e.g., \code{"user/dataset-name"}) or a
@@ -13,7 +13,9 @@ Kaggle URL.}
 \item{file}{The specific file to read from the dataset. If \code{NULL} and
 the dataset contains exactly one file, it is read automatically.}
 
-\item{dest}{Directory to download files to. Default is a temporary directory.}
+\item{dest}{Directory to download files to. The default is a fresh
+per-dataset directory under \code{tempdir()}; supply a path to keep
+the download.}
 
 \item{type}{Either \code{"dataset"} (default) or \code{"competition"}.}
 

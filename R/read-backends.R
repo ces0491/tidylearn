@@ -563,7 +563,9 @@ tl_read_github <- function(source, path = NULL, ref = "main", ...) {
 #'   Kaggle URL.
 #' @param file The specific file to read from the dataset. If \code{NULL} and
 #'   the dataset contains exactly one file, it is read automatically.
-#' @param dest Directory to download files to. Default is a temporary directory.
+#' @param dest Directory to download files to. The default is a fresh
+#'   per-dataset directory under \code{tempdir()}; supply a path to keep
+#'   the download.
 #' @param type Either \code{"dataset"} (default) or \code{"competition"}.
 #' @param ... Additional arguments passed to the format-specific reader.
 #'
@@ -576,23 +578,50 @@ tl_read_github <- function(source, path = NULL, ref = "main", ...) {
 #' }
 #'
 #' @export
-tl_read_kaggle <- function(source, file = NULL, dest = tempdir(),
+tl_read_kaggle <- function(source, file = NULL, dest = NULL,
                            type = "dataset", ...) {
-  # Check Kaggle CLI is installed
-  tl_check_kaggle_cli()
-
   # Parse Kaggle URL to slug if needed
   if (grepl("kaggle\\.com", source)) {
     source <- tl_parse_kaggle_url(source)
   }
 
-  # Download the dataset
+  # Validate before anything is interpolated into a command line, and
+  # before looking for the CLI: a malformed slug is the caller's mistake
+  # whether or not the tool is installed, and saying so is more use than
+  # reporting a missing dependency. The slug arrives from a pasted URL or
+  # straight from the caller -- the URL branch above is skipped entirely
+  # for a bare string -- and system2() applies shQuote() to the command
+  # but not to the arguments, so a slug is pasted into the shell line as
+  # written.
+  source <- tl_check_kaggle_slug(source, type)
+  if (!is.null(file)) {
+    file <- tl_check_kaggle_filename(file)
+  }
+
+  # Check Kaggle CLI is installed
+  tl_check_kaggle_cli()
+
+  # Download into a directory of our own unless the caller named one.
+  # Sharing tempdir() across calls meant list.files() below could match
+  # a data file left by an earlier download and return it as this
+  # dataset -- the wrong data, with no indication anything was amiss.
+  if (is.null(dest)) {
+    dest <- file.path(tempdir(), paste0("tl_kaggle_", tl_slug_key(source)))
+    unlink(dest, recursive = TRUE, force = TRUE)
+    dir.create(dest, recursive = TRUE, showWarnings = FALSE)
+  }
+
+  # Download the dataset. Quote the caller-derived values: a slug is
+  # already restricted to safe characters by the checks above, but a
+  # destination path may legitimately contain spaces.
   if (type == "competition") {
-    args <- c("competitions", "download", "-c", source, "-p", dest)
-    if (!is.null(file)) args <- c(args, "-f", file)
+    args <- c("competitions", "download", "-c", shQuote(source),
+              "-p", shQuote(dest))
+    if (!is.null(file)) args <- c(args, "-f", shQuote(file))
   } else {
-    args <- c("datasets", "download", "-d", source, "-p", dest, "--unzip")
-    if (!is.null(file)) args <- c(args, "-f", file)
+    args <- c("datasets", "download", "-d", shQuote(source),
+              "-p", shQuote(dest), "--unzip")
+    if (!is.null(file)) args <- c(args, "-f", shQuote(file))
   }
 
   result <- tryCatch(
@@ -608,6 +637,11 @@ tl_read_kaggle <- function(source, file = NULL, dest = tempdir(),
          call. = FALSE)
   }
 
+  # Competition downloads arrive as a zip. The dataset endpoint takes
+  # --unzip; the competition endpoint has no such flag, so unpack here or
+  # the search below finds no data file at all.
+  tl_unzip_kaggle_archives(dest)
+
   # Find the downloaded file
   if (!is.null(file)) {
     downloaded <- file.path(dest, file)
@@ -615,7 +649,9 @@ tl_read_kaggle <- function(source, file = NULL, dest = tempdir(),
     # Find files in dest that match common data formats
     data_exts <- c("csv", "tsv", "json", "parquet", "xlsx", "xls")
     pattern <- paste0("\\.(", paste(data_exts, collapse = "|"), ")$")
-    candidates <- list.files(dest, pattern = pattern, full.names = TRUE)
+    candidates <- list.files(
+      dest, pattern = pattern, full.names = TRUE, recursive = TRUE
+    )
     candidates <- candidates[order(file.mtime(candidates), decreasing = TRUE)]
 
     if (length(candidates) == 0) {
@@ -654,6 +690,124 @@ tl_read_kaggle <- function(source, file = NULL, dest = tempdir(),
 }
 
 # ---- Internal helpers ----
+
+#' Refuse a Kaggle slug that is not one
+#'
+#' The slug reaches \code{system2()}, which applies \code{shQuote()} to the
+#' command and leaves the arguments as written, so whatever is in the slug
+#' is pasted into a shell command line. A pasted dataset URL is the vector,
+#' and \code{tl_read_kaggle()} skips URL parsing entirely when the caller
+#' passes a bare string, so the slug is not necessarily anything Kaggle
+#' produced. Kaggle's own identifiers are letters, digits, hyphens,
+#' underscores and dots, so accept exactly that and nothing else.
+#'
+#' @param slug The dataset slug or competition name
+#' @param type \code{"dataset"} (owner/name) or \code{"competition"} (name)
+#' @return The slug, unchanged, when it is well formed
+#' @keywords internal
+#' @noRd
+tl_check_kaggle_slug <- function(slug, type = "dataset") {
+  if (!is.character(slug) || length(slug) != 1L || is.na(slug)) {
+    stop("Kaggle source must be a single string.", call. = FALSE)
+  }
+
+  segment <- "[A-Za-z0-9][A-Za-z0-9._-]*"
+  pattern <- if (identical(type, "competition")) {
+    paste0("^", segment, "$")
+  } else {
+    paste0("^", segment, "/", segment, "$")
+  }
+
+  if (!grepl(pattern, slug)) {
+    is_competition <- identical(type, "competition")
+    noun <- if (is_competition) "competition name" else "dataset slug"
+    shape <- if (is_competition) {
+      "a name like \"titanic\""
+    } else {
+      "\"owner/dataset-name\""
+    }
+    stop(
+      "'", slug, "' is not a valid Kaggle ", noun,
+      ". Expected ", shape,
+      ", using only letters, digits, dots, hyphens and underscores.",
+      call. = FALSE
+    )
+  }
+
+  slug
+}
+
+#' Refuse a Kaggle file name that could reach the shell or escape the
+#' download directory
+#'
+#' The name is both interpolated into the CLI call and pasted onto
+#' \code{dest} with \code{file.path()}, so it has to be a plain relative
+#' path with no parent-directory steps.
+#'
+#' @param file The requested file name
+#' @return The file name, unchanged, when it is safe
+#' @keywords internal
+#' @noRd
+tl_check_kaggle_filename <- function(file) {
+  if (!is.character(file) || length(file) != 1L || is.na(file)) {
+    stop("Kaggle 'file' must be a single string.", call. = FALSE)
+  }
+
+  if (grepl("^([A-Za-z]:|[\\\\/])", file) ||
+        any(strsplit(file, "[\\\\/]")[[1]] == "..")) {
+    stop(
+      "Kaggle 'file' must be a relative path inside the dataset, but got '",
+      file, "'.",
+      call. = FALSE
+    )
+  }
+
+  if (!grepl("^[A-Za-z0-9._/-]+$", file)) {
+    stop(
+      "Kaggle 'file' may contain only letters, digits, dots, hyphens, ",
+      "underscores and '/', but got '", file, "'.",
+      call. = FALSE
+    )
+  }
+
+  file
+}
+
+#' A filesystem-safe key for a slug, to name its download directory
+#'
+#' @param slug A validated Kaggle slug
+#' @return The slug with its separator replaced
+#' @keywords internal
+#' @noRd
+tl_slug_key <- function(slug) {
+  gsub("[^A-Za-z0-9._-]", "_", slug)
+}
+
+#' Unpack any zip archives the Kaggle CLI left behind
+#'
+#' @param dest The download directory
+#' @return `TRUE`, invisibly
+#' @keywords internal
+#' @noRd
+tl_unzip_kaggle_archives <- function(dest) {
+  archives <- list.files(
+    dest, pattern = "\\.zip$", full.names = TRUE, ignore.case = TRUE
+  )
+  for (archive in archives) {
+    tryCatch(
+      utils::unzip(archive, exdir = dest),
+      warning = function(w) {
+        warning("Could not unpack '", basename(archive), "': ",
+                conditionMessage(w), call. = FALSE)
+      },
+      error = function(e) {
+        warning("Could not unpack '", basename(archive), "': ",
+                conditionMessage(e), call. = FALSE)
+      }
+    )
+  }
+  invisible(TRUE)
+}
 
 #' Check that the Kaggle CLI is installed
 #' @keywords internal

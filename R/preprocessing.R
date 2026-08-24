@@ -327,9 +327,8 @@ scale_features <- function(data, numeric_cols, method = "standardize") {
 #' test <- split_data$test
 #' }
 tl_split <- function(data, prop = 0.8, stratify = NULL, seed = NULL) {
-  if (!is.null(seed)) {
-    set.seed(seed)
-  }
+  # Seed this call without rewriting the caller's random stream
+  tl_local_seed(seed)
 
   n <- nrow(data)
 

@@ -254,12 +254,37 @@ optimal_hclust_k <- function(hclust_obj, method = "silhouette", max_k = 10) {
     )
 
   } else if (method == "gap") {
-    # Use gap statistic
+    # clusGap() resamples the observations, so it needs them. A model
+    # built straight from a dist object never kept any.
+    if (is.null(hclust_obj$data)) {
+      stop(
+        "The gap statistic needs the observations, but this model was ",
+        "fitted from a distance matrix and did not keep them. Refit with ",
+        "tidy_hclust(data) to use method = \"gap\", or use ",
+        "method = \"silhouette\", which works from the distances alone.",
+        call. = FALSE
+      )
+    }
+
+    # Read the model's own settings once. The refit below used
+    # stats::dist()'s Euclidean default, so a model built with any other
+    # distance was evaluated against clusterings it would never produce
+    # -- a fault that could not show itself while the branch errored on
+    # its first call.
+    linkage <- hclust_obj$method
+    distance <- hclust_obj$distance_method %||% "euclidean"
+
     gap_result <- tidy_gap_stat(
       hclust_obj$data,
+      # clusGap() requires FUN to return a list with a `cluster` element.
+      # cutree() returns a bare integer vector, so every call died with
+      # "$ operator is invalid for atomic vectors".
       FUN_cluster = function(data, k) {
-        hc_temp <- stats::hclust(stats::dist(data), method = hclust_obj$method)
-        stats::cutree(hc_temp, k = k)
+        hc_temp <- stats::hclust(
+          tidy_dist(as.data.frame(data), method = distance),
+          method = linkage
+        )
+        list(cluster = stats::cutree(hc_temp, k = k))
       },
       max_k = max_k
     )

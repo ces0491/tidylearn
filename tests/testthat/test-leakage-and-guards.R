@@ -260,3 +260,53 @@ test_that("connection strings are redacted before they can be printed", {
     )
   )
 })
+
+# ---- RNG hygiene -----------------------------------------------------
+
+# set.seed() rewrites the session stream. A function taking a `seed` for
+# its own reproducibility was also deciding what every later sample() or
+# rnorm() in the caller's script returned, so two scripts differing only
+# in whether they passed `seed` diverged everywhere downstream.
+
+test_that("a seeded helper leaves the caller's random stream alone", {
+  seeded_calls <- list(
+    tl_split = function() tl_split(iris, prop = 0.7, seed = 1),
+    tl_tune_random = function() {
+      suppressWarnings(suppressMessages(tl_tune_random(
+        iris[1:40, ], Sepal.Length ~ ., method = "tree",
+        param_space = list(cp = c(0.001, 0.1)), n_iter = 2, seed = 1
+      )))
+    }
+  )
+
+  for (nm in names(seeded_calls)) {
+    set.seed(999)
+    before <- get(".Random.seed", envir = globalenv())
+    invisible(seeded_calls[[nm]]())
+    after <- get(".Random.seed", envir = globalenv())
+    expect_identical(before, after, info = nm)
+  }
+})
+
+test_that("the caller's next draw does not depend on the seed we were given", {
+  set.seed(7)
+  invisible(tl_split(iris, prop = 0.7, seed = 1))
+  with_seed_one <- runif(1)
+
+  set.seed(7)
+  invisible(tl_split(iris, prop = 0.7, seed = 2))
+  with_seed_two <- runif(1)
+
+  expect_equal(with_seed_one, with_seed_two)
+})
+
+test_that("preserving the stream did not break the seed's own job", {
+  expect_equal(
+    tl_split(iris, prop = 0.7, seed = 42)$train,
+    tl_split(iris, prop = 0.7, seed = 42)$train
+  )
+  expect_false(isTRUE(all.equal(
+    tl_split(iris, prop = 0.7, seed = 42)$train,
+    tl_split(iris, prop = 0.7, seed = 43)$train
+  )))
+})
