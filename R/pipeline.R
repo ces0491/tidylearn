@@ -66,11 +66,62 @@ merge_evaluation_spec <- function(evaluation, is_classification) {
     )
   }
 
+  # An empty metric set renders the message below as a bare full stop,
+  # and leaves nothing for best_metric to name
+  if (length(evaluation$metrics) == 0) {
+    stop(
+      "evaluation$metrics is empty. Name at least one of: ",
+      paste(defaults$metrics, collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
+  # An unrecognised metric is not computed, so every score comes back NA
+  # and the run warns about the symptom -- "all values NA" -- rather than
+  # the cause. tl_tune_grid() names a missing metric; match it.
+  known <- tl_known_metrics(is_classification)
+  unknown_metric <- setdiff(evaluation$metrics, known)
+  if (length(unknown_metric) > 0) {
+    stop(
+      "Unknown ", if (is_classification) "classification" else "regression",
+      " metric(s): ", paste0("\"", unknown_metric, "\"", collapse = ", "),
+      ". Available: ", paste(known, collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
   if (!evaluation$best_metric %in% evaluation$metrics) {
     stop(
       "evaluation$best_metric (\"", evaluation$best_metric,
       "\") must be one of evaluation$metrics: ",
       paste(evaluation$metrics, collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
+  # Unchecked, these surfaced as rsample errors naming `v`, which is not
+  # an argument of anything the caller wrote
+  folds <- evaluation$cv_folds
+  if (!is.numeric(folds) || length(folds) != 1L || is.na(folds) ||
+        folds != round(folds) || folds < 2) {
+    stop(
+      "evaluation$cv_folds must be a single whole number of at least 2; ",
+      "got ", paste(format(folds), collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
+  # Left unchecked these reached rsample and base R as "result would be
+  # too long a vector" (0), a ROCR complaint about class counts (1), and
+  # "cannot take a sample larger than the population" (> 1)
+  prop <- evaluation$train_prop
+  if (!is.numeric(prop) || length(prop) != 1L || is.na(prop) ||
+        prop <= 0 || prop >= 1) {
+    stop(
+      "evaluation$train_prop must be a single number strictly between 0 ",
+      "and 1; got ", paste(format(prop), collapse = ", "),
+      ". It is the share of rows used for training, so both sides of the ",
+      "split have to be non-empty.",
       call. = FALSE
     )
   }
@@ -157,6 +208,8 @@ tl_pipeline <- function(data, formula,
                         preprocessing = NULL,
                         models = NULL,
                         evaluation = NULL, ...) {
+  formula <- tl_as_formula(formula)
+
   # Fill in whichever preprocessing steps the caller left unnamed. A
   # partial list used to reach `if (preprocessing$standardize)` as NULL
   # and fail with "argument is of length zero" inside tl_run_pipeline(),
@@ -359,6 +412,30 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
   models <- pipeline$models
   evaluation <- pipeline$evaluation
 
+  # An intercept-only formula leaves the design matrix with no columns to
+  # preprocess, which surfaced as "result would be too long a vector"
+  response_var <- all.vars(formula)[1]
+  predictors <- setdiff(all.vars(formula), response_var)
+  if (length(predictors) == 0) {
+    stop(
+      "The formula names no predictors. A pipeline preprocesses and scores ",
+      "predictors, so it needs at least one; got ", deparse(formula), ".",
+      call. = FALSE
+    )
+  }
+
+  # Cross-validation cannot make more folds than there are rows, and the
+  # rsample message for it names `v` rather than cv_folds
+  if (identical(evaluation$validation, "cv") &&
+        evaluation$cv_folds > nrow(data)) {
+    stop(
+      "evaluation$cv_folds is ", evaluation$cv_folds, " but the data has ",
+      nrow(data), " row", if (nrow(data) == 1) "" else "s",
+      ". Cross-validation needs at least one row per fold.",
+      call. = FALSE
+    )
+  }
+
   # Without names the training loop below silently does nothing, leaving
   # an empty leaderboard and an unhelpful downstream error
   if (length(models) == 0 || is.null(names(models)) ||
@@ -368,6 +445,59 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
       "list(linear = list(method = \"linear\")).",
       call. = FALSE
     )
+  }
+
+  # The loop below indexes models[[model_name]], which resolves to the
+  # first match. A repeated name therefore fitted one spec twice and
+  # dropped the other without saying so.
+  repeated <- unique(names(models)[duplicated(names(models))])
+  if (length(repeated) > 0) {
+    stop(
+      "`models` has repeated name(s): ",
+      paste0("'", repeated, "'", collapse = ", "),
+      ". Each model needs its own name -- results are keyed by it, so a ",
+      "repeat would discard every spec but the first.",
+      call. = FALSE
+    )
+  }
+
+  # A malformed spec otherwise surfaced as a base R internal further in:
+  # "missing value where TRUE/FALSE needed" for a spec with no method,
+  # "$ operator is invalid for atomic vectors" for a spec that is not a
+  # list, neither of them naming the model responsible.
+  for (model_name in names(models)) {
+    spec <- models[[model_name]]
+    if (!is.list(spec)) {
+      stop(
+        "Model '", model_name, "' must be a list of settings, e.g. ",
+        "list(method = \"tree\"); got ", paste(class(spec), collapse = "/"),
+        ".",
+        call. = FALSE
+      )
+    }
+    if (is.null(spec$method)) {
+      stop(
+        "Model '", model_name, "' has no 'method'. Every entry in `models` ",
+        "needs one, e.g. list(method = \"tree\").",
+        call. = FALSE
+      )
+    }
+    if (!is.character(spec$method) || length(spec$method) != 1L) {
+      stop(
+        "Model '", model_name, "': 'method' must be a single method name; ",
+        "got ", paste(class(spec$method), collapse = "/"), " of length ",
+        length(spec$method), ".",
+        call. = FALSE
+      )
+    }
+    if (!spec$method %in% tl_supervised_methods()) {
+      stop(
+        "Model '", model_name, "': \"", spec$method, "\" is not a supervised ",
+        "method. A pipeline fits a response, so it takes one of: ",
+        paste(tl_supervised_methods(), collapse = ", "), ".",
+        call. = FALSE
+      )
+    }
   }
 
   # Apply preprocessing

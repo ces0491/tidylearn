@@ -395,3 +395,142 @@ resolve_color_by <- function(color_by, data, arg = "color_by") {
     call. = FALSE
   )
 }
+
+#' Coerce a model specification to a formula
+#'
+#' \code{tl_model()} has always accepted a character specification and
+#' coerced it with \code{as.formula()}, but that coercion lives inside
+#' \code{tl_model_supervised()}. Every caller that reads
+#' \code{all.vars(formula)[1]} before delegating -- \code{tl_pipeline()},
+#' \code{tl_prepare_data()}, \code{tl_auto_ml()}, the tuners -- ran that
+#' extraction against the raw argument, and \code{all.vars("y ~ x")} is
+#' \code{character(0)}. The response name came back \code{NA}, so
+#' \code{data[[NA]]} was \code{NULL} and a classification problem was
+#' silently treated as regression.
+#'
+#' Normalising at the entry point instead means the coercion happens once,
+#' before anything inspects the formula.
+#'
+#' @param formula A formula, or a string that parses as one.
+#' @param arg The argument name to use in the error message.
+#' @return A formula.
+#' @keywords internal
+#' @noRd
+tl_as_formula <- function(formula, arg = "formula") {
+  if (inherits(formula, "formula")) {
+    return(formula)
+  }
+
+  if (is.character(formula) && length(formula) == 1L && !is.na(formula)) {
+    coerced <- tryCatch(
+      stats::as.formula(formula),
+      error = function(e) NULL
+    )
+    if (!is.null(coerced)) {
+      return(coerced)
+    }
+    stop(
+      "'", arg, "' is the string \"", formula,
+      "\", which does not parse as a formula.",
+      call. = FALSE
+    )
+  }
+
+  stop(
+    "'", arg, "' must be a formula such as y ~ x, or a string that parses ",
+    "as one; got ", paste(class(formula), collapse = "/"),
+    if (length(formula) != 1L) paste0(" of length ", length(formula)) else "",
+    ".",
+    call. = FALSE
+  )
+}
+
+#' Refuse a classification fit whose predictors carry no information
+#'
+#' randomForest's classification path does not terminate when every
+#' predictor has zero variance: it keeps drawing \code{mtry} candidates
+#' looking for a split that cannot exist. The loop is C-level, so it
+#' ignores interrupts -- the session has to be killed. Regression is
+#' unaffected, and so is the case where only some predictors are
+#' constant, which is why the check is this narrow.
+#'
+#' @param data The model frame, response included.
+#' @param formula The model formula.
+#' @param method The method name, for the message.
+#' @return Invisibly \code{TRUE}; called for the error.
+#' @keywords internal
+#' @noRd
+tl_check_predictor_variance <- function(data, formula, method) {
+  predictors <- setdiff(all.vars(formula), all.vars(formula)[1])
+  if (identical(predictors, ".") || length(predictors) == 0L) {
+    predictors <- setdiff(names(data), all.vars(formula)[1])
+  }
+  predictors <- intersect(predictors, names(data))
+  if (length(predictors) == 0L) {
+    return(invisible(TRUE))
+  }
+
+  constant <- vapply(
+    data[predictors],
+    function(column) length(unique(column[!is.na(column)])) <= 1L,
+    logical(1)
+  )
+
+  if (all(constant)) {
+    stop(
+      "Method \"", method, "\" cannot fit a classification model when every ",
+      "predictor is constant. Affected columns: ",
+      paste0("'", predictors, "'", collapse = ", "),
+      ". There is no split to find, and randomForest does not stop looking ",
+      "for one.",
+      call. = FALSE
+    )
+  }
+
+  invisible(TRUE)
+}
+
+#' The methods tl_model() dispatches on
+#'
+#' Kept in one place so that callers which need to validate a method name
+#' -- tl_pipeline(), for one -- cannot drift from what tl_model() will
+#' actually accept.
+#'
+#' @return A character vector of method names.
+#' @keywords internal
+#' @noRd
+tl_supervised_methods <- function() {
+  c(
+    "linear", "polynomial", "logistic", "tree",
+    "forest", "boost", "ridge", "lasso",
+    "elastic_net", "svm", "nn", "deep", "xgboost"
+  )
+}
+
+#' @rdname tl_supervised_methods
+#' @keywords internal
+#' @noRd
+tl_unsupervised_methods <- function() {
+  c("pca", "mds", "kmeans", "pam", "clara", "hclust", "dbscan")
+}
+
+#' The metric names tl_evaluate() can compute
+#'
+#' Matches the branches in \code{tl_calc_classification_metrics()} and
+#' \code{tl_calculate_regression_metrics()} and the list documented on
+#' \code{tl_evaluate()}. A name outside this set is not computed, so the
+#' score comes back NA and the caller reports the symptom rather than the
+#' cause -- which is what this lets callers refuse up front.
+#'
+#' @param is_classification Whether the task is classification.
+#' @return A character vector of metric names.
+#' @keywords internal
+#' @noRd
+tl_known_metrics <- function(is_classification) {
+  if (is_classification) {
+    c("accuracy", "precision", "recall", "sensitivity",
+      "specificity", "f1", "auc", "pr_auc")
+  } else {
+    c("rmse", "mse", "mae", "mape", "rsq")
+  }
+}

@@ -93,6 +93,7 @@ tl_cluster_levels <- function(cluster_model) {
 tl_auto_ml <- function(data, formula, task = "auto",
                        use_reduction = TRUE, use_clustering = TRUE,
                        time_budget = 300, cv_folds = 5, metric = NULL) {
+  formula <- tl_as_formula(formula)
   start_time <- Sys.time()
 
   # Helper: remaining seconds in the budget

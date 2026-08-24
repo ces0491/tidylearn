@@ -112,16 +112,15 @@ tl_model <- function(data, formula = NULL, method = "linear", ...,
     stop("'data' must be a data frame", call. = FALSE)
   }
 
+  # Normalise once here so every downstream reader of all.vars() sees a
+  # formula. Unsupervised methods are called without one.
+  if (!is.null(formula)) {
+    formula <- tl_as_formula(formula)
+  }
+
   # Define supervised and unsupervised methods
-  supervised_methods <- c(
-    "linear", "polynomial", "logistic", "tree",
-    "forest", "boost", "ridge", "lasso",
-    "elastic_net", "svm", "nn", "deep", "xgboost"
-  )
-  unsupervised_methods <- c(
-    "pca", "mds", "kmeans", "pam",
-    "clara", "hclust", "dbscan"
-  )
+  supervised_methods <- tl_supervised_methods()
+  unsupervised_methods <- tl_unsupervised_methods()
 
   # Determine paradigm
   is_supervised <- method %in% supervised_methods
@@ -524,6 +523,24 @@ tl_check_method_response <- function(method, y, response_var,
         quoted(c("linear", "polynomial", tl_dual_task_suggestions())),
         ". If they encode classes, convert '", response_var,
         "' to a factor first -- though logistic still handles only two.",
+        call. = FALSE
+      )
+    }
+  }
+
+  # A response with one class gives every classification method something
+  # it cannot fit, but only logistic said so plainly. The rest reported
+  # whatever their backend hit first: rpart "number of rows of matrices
+  # must match (see arg 2)", glmnet "non-conformable arguments", e1071
+  # "Model is empty!", xgboost a complaint about num_class. None of them
+  # named the response or the cause.
+  if (is_classification && method != "logistic") {
+    present <- levels(tl_normalise_response(y))
+    if (length(present) == 1L) {
+      stop(
+        "Method \"", method, "\" needs a response with at least two ",
+        "classes, but '", response_var, "' has only one (",
+        quoted(present), "). There is nothing to discriminate.",
         call. = FALSE
       )
     }

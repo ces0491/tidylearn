@@ -109,6 +109,12 @@ tl_fit_forest <- function(data, formula, is_classification = FALSE,
   # Check if randomForest is installed
   tl_check_packages("randomForest")
 
+  # randomForest's classification path hangs rather than erroring when no
+  # predictor can produce a split, and the loop is uninterruptible
+  if (is_classification) {
+    tl_check_predictor_variance(data, formula, "forest")
+  }
+
   # Set default mtry if not provided
   if (is.null(mtry)) {
     if (is_classification) {

@@ -457,6 +457,7 @@ tl_evaluate <- function(object, new_data = NULL, metrics = NULL, ...) {
 #' @export
 tl_cv <- function(data, formula, method, folds = 5, metrics = NULL,
                   transform = NULL, ...) {
+  formula <- tl_as_formula(formula)
   n <- nrow(data)
   if (folds < 2 || folds > n) {
     stop("'folds' must be between 2 and nrow(data) (", n, "). Got: ", folds,

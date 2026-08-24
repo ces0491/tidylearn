@@ -325,9 +325,9 @@ mean(final_preds$.pred == split$test$Species)
 
 Tuning multiplies fits. A grid of *g* combinations at *k* folds is *g × k*
 fits, plus one more to build the final model. The tree grid at the top of this
-vignette is 6 combinations × 3 folds = 19 fits of a method that takes
-milliseconds. The same grid on `method = "xgboost"` with 1000 rounds is the
-same 19 fits of something much slower.
+vignette is 6 combinations × 3 folds = 18 fits, 19 with the final model, of
+a method that takes milliseconds. The same grid on `method = "xgboost"` with
+1000 rounds is the same 19 fits of something much slower.
 
 Two levers, in the order worth pulling:
 
