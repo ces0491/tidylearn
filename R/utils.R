@@ -125,6 +125,68 @@ tl_local_seed <- function(seed, envir = parent.frame()) {
   invisible(TRUE)
 }
 
+#' Refuse data an algorithm cannot fit, naming what is wrong with it
+#'
+#' Several of the routines tidylearn wraps reject missing values from deep
+#' inside C code, and the message that surfaces names neither the column
+#' nor the problem: \code{stats::kmeans()} reports "NA/NaN/Inf in foreign
+#' function call (arg 1)", and anything looping over k with \pkg{purrr}
+#' wraps that again into "In index: 2. Caused by error in `do_one()`".
+#' Missing values are the most ordinary thing that can be wrong with a
+#' data set, so say so plainly and say where.
+#'
+#' Not every method needs this. \code{pam()}, \code{clara()},
+#' \code{dist()} and \code{daisy()} handle missing values themselves and
+#' are left alone.
+#'
+#' @param data A numeric data frame or matrix, already column-selected
+#' @param what What is being fitted, for the message (e.g. "k-means")
+#' @param tolerates Methods to suggest instead, or NULL for none
+#' @return `TRUE`, invisibly, when the data is usable
+#' @keywords internal
+#' @noRd
+tl_check_complete_numeric <- function(data, what,
+                                      tolerates = c("pam", "clara")) {
+  as_frame <- as.data.frame(data)
+  if (ncol(as_frame) == 0L) {
+    stop(
+      what, " needs at least one numeric column, but none were found.",
+      call. = FALSE
+    )
+  }
+
+  bad <- vapply(
+    as_frame,
+    function(column) sum(!is.finite(as.numeric(column))),
+    numeric(1)
+  )
+  offending <- bad[bad > 0]
+
+  if (length(offending) == 0L) {
+    return(invisible(TRUE))
+  }
+
+  named <- paste0(
+    "'", names(offending), "' (", offending, ")",
+    collapse = ", "
+  )
+  suggestion <- if (length(tolerates)) {
+    paste0(
+      " Impute or drop them first, or use ",
+      paste0("method = \"", tolerates, "\"", collapse = " or "),
+      ", which accept missing values."
+    )
+  } else {
+    " Impute or drop them first."
+  }
+
+  stop(
+    what, " cannot use missing or infinite values. Affected columns, with ",
+    "counts: ", named, ".", suggestion,
+    call. = FALSE
+  )
+}
+
 #' Normalise a classification response
 #'
 #' Subsetting a data frame keeps every factor level, so

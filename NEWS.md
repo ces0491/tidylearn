@@ -346,6 +346,22 @@ earlier should be recomputed.
 
 ### Errors instead of misleading results
 
+* Unsupervised routines that cannot use missing values now say so, naming
+  the columns and how many values are affected. `tidy_kmeans()` and
+  `tidy_gap_stat()` previously surfaced `stats::kmeans()`'s "NA/NaN/Inf in
+  foreign function call (arg 1)", `tidy_pca()` gave `prcomp()`'s "infinite
+  or missing values in 'x'", and `calc_wss()`, `optimal_clusters()` and
+  `tidy_silhouette_analysis()` loop over k with `purrr`, which wrapped
+  those again into "In index: 2. Caused by error in `do_one()`". None of
+  them named the column, the problem, or a way forward. Missing values are
+  the most ordinary thing that can be wrong with a data set.
+
+  The message points at `"pam"` and `"clara"`, which accept missing values.
+  Those, along with `tidy_dist()`, `tidy_gower()`, `tidy_mds()` and
+  `tidy_hclust()`, are unchanged — they handle missing values themselves,
+  and guarding them would remove working behaviour rather than improve a
+  message.
+
 * `tl_split()` and `tl_tune_random()` no longer rewrite the session's
   random stream. Both called `set.seed()` when given a `seed`, so a
   function seeded for its own reproducibility was also deciding what every

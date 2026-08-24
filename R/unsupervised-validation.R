@@ -85,6 +85,7 @@ tidy_silhouette_analysis <- function(data, max_k = 10, method = "kmeans",
                                      linkage_method = "average") {
 
   data_numeric <- data %>% dplyr::select(where(is.numeric))
+  tl_check_complete_numeric(data_numeric, "Silhouette analysis")
   dist_mat <- stats::dist(data_numeric, method = dist_method)
 
   # Compute silhouette for k = 2 to max_k
@@ -225,6 +226,7 @@ tidy_gap_stat <- function(data, FUN_cluster = NULL,  # nolint
                           nstart = 25) {
 
   data_numeric <- data %>% dplyr::select(where(is.numeric))
+  tl_check_complete_numeric(data_numeric, "The gap statistic")
 
   # Use cluster::clusGap
   if (is.null(FUN_cluster)) {
