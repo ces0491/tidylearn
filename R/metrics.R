@@ -470,6 +470,7 @@ tl_cv <- function(data, formula, method, folds = 5, metrics = NULL,
   fold_id <- rep(seq_len(folds), length.out = n)
 
   cv_results <- list()
+  test_sizes <- integer(folds)
 
   for (i in 1:folds) {
     # Create fold indices
@@ -493,13 +494,19 @@ tl_cv <- function(data, formula, method, folds = 5, metrics = NULL,
       fold_formula <- fitted_transform$formula %||% formula
     }
 
-    # Train model
-    model <- tl_model(train_data, fold_formula, method = method, ...)
+    # Train model. tl_model() notes things about the response -- that a
+    # numeric column with few distinct values is being treated as
+    # regression, say -- which is worth saying once and not once per
+    # fold. The caller asked for cross-validation, not for k fits.
+    model <- suppressMessages(
+      tl_model(train_data, fold_formula, method = method, ...)
+    )
 
     # Evaluate
     eval_result <- tl_evaluate(model, new_data = test_data, metrics = metrics)
 
     cv_results[[i]] <- eval_result
+    test_sizes[i] <- nrow(test_data)
   }
 
   # Combine results
@@ -513,6 +520,32 @@ tl_cv <- function(data, formula, method, folds = 5, metrics = NULL,
       sd = stats::sd(value, na.rm = TRUE),
       .groups = "drop"
     )
+
+  # A metric that is NA in every fold reaches the summary as NaN, from
+  # mean() over nothing. That is arithmetically right and reads as a
+  # malfunction: rsq needs variation in the truth, so it is undefined
+  # whenever a fold holds one observation -- which is exactly what
+  # folds = nrow(data) asks for. Say so once rather than leave a bare NaN.
+  undefined <- summary_results$metric[!is.finite(summary_results$mean)]
+  if (length(undefined) > 0) {
+    fold_sizes <- test_sizes
+    message(
+      "Note: ", paste(undefined, collapse = ", "),
+      " could not be computed for any fold, so ",
+      if (length(undefined) == 1) "it is" else "they are",
+      " reported as NA. ",
+      if (min(fold_sizes) <= 1) {
+        paste0(
+          "The smallest fold holds ", min(fold_sizes),
+          if (min(fold_sizes) == 1) " observation" else " observations",
+          ", and metrics needing variation within a fold -- rsq among ",
+          "them -- are undefined there. Use fewer folds."
+        )
+      } else {
+        "Check that the requested metrics suit this task."
+      }
+    )
+  }
 
   list(
     folds = cv_results,

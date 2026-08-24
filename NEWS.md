@@ -60,6 +60,18 @@ earlier should be recomputed.
 
 ### Metrics and evaluation
 
+* `tl_cv()` explains a metric that no fold could compute rather than
+  leaving a bare `NaN` in the summary. `folds = nrow(data)` is
+  leave-one-out, so every test fold holds one observation and `rsq` —
+  which needs variation in the truth — is undefined; `mean()` over nothing
+  then reported `NaN`, which reads as a malfunction rather than as a
+  property of the request. `rmse` and `mae` are defined for a single
+  observation and are unaffected.
+
+* `tl_cv()` no longer repeats `tl_model()`'s notes once per fold. The note
+  that a numeric response with few distinct values is being treated as
+  regression is about the data, not the fold, and appeared k times.
+
 * `tl_calc_classification_metrics()` computed precision, recall,
   sensitivity, specificity and F1 for the **wrong class**. The
   `yardstick` calls omitted `event_level`, so they defaulted to the first
