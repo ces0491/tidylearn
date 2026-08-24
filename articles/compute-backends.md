@@ -27,7 +27,7 @@ tl_check_gpu()
 
 [`tl_check_gpu()`](https://tidylearn.sheetsolved.com/reference/tl_check_gpu.md)
 parses `nvidia-smi` and checks which GPU-capable backends are installed.
-It is deliberately cheap: it does not load Python, import TensorFlow, or
+It is cheap by design: it does not load Python, import TensorFlow, or
 fit anything. It returns an object with a
 [`print()`](https://rdrr.io/r/base/print.html) method describing the
 CUDA driver, the devices found, and which of xgboost, keras, tensorflow
@@ -35,12 +35,12 @@ and torch are installed.
 
 ## Only two methods have a GPU path
 
-This surprises people, so it is worth being blunt about it. Of the
-thirteen supervised methods, only `"xgboost"` and `"deep"` have an
-upstream GPU implementation. The other eleven — linear and logistic
-regression, ridge, LASSO, elastic net, decision trees, random forests,
-gradient boosting, SVM, neural networks — wrap packages that have no
-CUDA path at all. Asking for a GPU gets you a warning and a CPU fit:
+Of the thirteen supervised methods, only `"xgboost"` and `"deep"` have
+an upstream GPU implementation. The other eleven — linear, polynomial
+and logistic regression, ridge, LASSO, elastic net, decision trees,
+random forests, gradient boosting, SVM and neural networks — wrap
+packages that have no CUDA path at all. Asking for a GPU gets you a
+warning and a CPU fit:
 
 ``` r
 
@@ -54,8 +54,8 @@ model <- tl_model(data, y ~ ., method = "forest", compute = "gpu")
 model <- tl_model(data, y ~ ., method = "xgboost", compute = "auto")
 ```
 
-For those eleven methods the useful question is not “GPU or CPU” but
-“does this fit in memory, and how many cores can I throw at it”.
+For those eleven methods the question to ask is whether the job fits in
+memory, and how many cores you can throw at it.
 
 ## Estimating before you commit
 
@@ -95,19 +95,18 @@ advice
 #>   - Cloud integration is not yet configured in tidylearn. Estimates shown so users can see the tier's shape; actual submission is not yet supported.
 ```
 
-The advisor covers all thirteen supervised methods and treats cloud as a
-*memory headroom* tier rather than a GPU tier. That matters: it will
-recommend cloud for a CPU-only method such as random forest or SVM when
-the job is RAM-infeasible locally, which is the common case for large
-data. On a small dataset like `iris` it will tell you to stay local,
-because you should.
+The advisor covers all thirteen supervised methods, and treats cloud as
+a *memory headroom* tier. It will recommend cloud for a CPU-only method
+such as random forest or SVM when the job is RAM-infeasible locally,
+which is the common case for large data. On a small dataset like `iris`
+it will tell you to stay local.
 
-Estimates are order-of-magnitude, not quotes. Runtime constants are
-calibrated per method, and Modal pricing is approximate as of early
-2026. Treat the output as a decision aid, not a bill.
+Estimates are order-of-magnitude. Runtime constants are calibrated per
+method, and Modal pricing is approximate as of early 2026. Treat the
+output as a decision aid.
 
-Unsupervised methods are not modelled. Calling the advisor on one is an
-error rather than a guess.
+Unsupervised methods are not modelled. Calling the advisor on one
+errors.
 
 ## Cloud compute
 
@@ -140,8 +139,8 @@ tl_cloud_consent(FALSE)
 The session lock is held in memory only. It is never written to disk and
 does not survive an R restart. There is also no interactive prompt
 anywhere in the cloud path, so `Rscript`, CI and knitted documents
-behave exactly like an interactive session — a prompt that cannot be
-answered in batch is worse than useless.
+behave exactly like an interactive session. A prompt that cannot be
+answered in batch would block them.
 
 Per call, the equivalent is `confirm_upload = TRUE`.
 
@@ -161,8 +160,8 @@ An environment variable rather than an R option, deliberately: a shared
 of this check is that a destination should not appear silently.
 
 Before anything is sent, the URL must parse, use `https`, and resolve to
-a host on the allowlist. Anything else is an error rather than a
-warning. The default allowlist is Modal’s own domains:
+a host on the allowlist. Anything else errors. The default allowlist is
+Modal’s own domains:
 
 ``` r
 
@@ -187,32 +186,30 @@ subdomains. `fits.example.com` does not admit `example.com`,
 names such as `"com"` are refused outright, since they would open an
 entire top-level domain.
 
-### Cost is bounded, not just estimated
-
-This is the part worth reading carefully, because the obvious mental
-model is wrong.
+### Bounding the cost
 
 A job submitted to Modal runs there to completion whatever your R
-session does next. Pressing Ctrl-C, closing the IDE, a crashed session,
-a closed laptop — none of them stop it. The session was polling for a
-result; it was never what kept the work alive. A job you thought you had
-abandoned keeps billing until it finishes or something kills it.
+session does next. Pressing Ctrl-C, closing the IDE, a crashed session
+and a closed laptop all leave it running, because the session was only
+polling for a result. A job you thought you had abandoned keeps billing
+until it finishes or something kills it.
 
-That has an awkward consequence: no amount of care in the R client can
-guarantee anything, because a killed session runs no cleanup handlers.
-So the controls are layered by what survives:
+No amount of care in the R client can guarantee anything against that,
+because a killed session runs no cleanup handlers. So the controls are
+layered by what survives:
 
 **What holds even if your session dies.** Every submission sets an
-explicit timeout — never Modal’s inherited default, never none — derived
-from the estimate with headroom and capped well below Modal’s 24-hour
-maximum. The worker runs with retries disabled, because Modal applies
-timeouts per attempt and three retries would bill four full timeouts for
-one hung job. And you should set a spend budget on your Modal workspace,
-which is the only true hard cap and is not tidylearn’s to set.
+explicit timeout, derived from the estimate with headroom and capped
+well below Modal’s 24-hour maximum. Modal’s inherited default is never
+used and neither is no timeout at all. The worker runs with retries
+disabled, because Modal applies timeouts per attempt and three retries
+would bill four full timeouts for one hung job. You should also set a
+spend budget on your Modal workspace, which is the only true hard cap
+and is not tidylearn’s to set.
 
-**What is best-effort.** The pre-flight gates, the job registry, cancel
-on interrupt. These catch the ordinary cases and are worth having, but
-they are the second line, not the first.
+**What is best-effort.** The pre-flight gates, the job registry and
+cancel-on-interrupt catch the ordinary cases, and none of them survive a
+killed session.
 
 Before a fit, the figure you are asked to accept is the **worst case** —
 the timeout at the tier’s rate — rather than the estimate:
@@ -239,8 +236,7 @@ tl_cloud_jobs()
 ```
 
 A job leaves that list when its result is collected or it is cancelled.
-The list cannot outlive the session — but the timeout can, which is
-precisely why the timeout is the control that matters.
+The list itself does not outlive the session; the timeout does.
 
 ### The contract is written down
 

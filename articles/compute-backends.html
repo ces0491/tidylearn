@@ -97,8 +97,8 @@ might not.</li>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/tl_check_gpu.html">tl_check_gpu</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p><code><a href="../reference/tl_check_gpu.html">tl_check_gpu()</a></code> parses <code>nvidia-smi</code> and checks
-which GPU-capable backends are installed. It is deliberately cheap: it
-does not load Python, import TensorFlow, or fit anything. It returns an
+which GPU-capable backends are installed. It is cheap by design: it does
+not load Python, import TensorFlow, or fit anything. It returns an
 object with a <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> method describing the CUDA driver,
 the devices found, and which of xgboost, keras, tensorflow and torch are
 installed.</p>
@@ -106,13 +106,12 @@ installed.</p>
 <div class="section level2">
 <h2 id="only-two-methods-have-a-gpu-path">Only two methods have a GPU path<a class="anchor" aria-label="anchor" href="#only-two-methods-have-a-gpu-path"></a>
 </h2>
-<p>This surprises people, so it is worth being blunt about it. Of the
-thirteen supervised methods, only <code>"xgboost"</code> and
+<p>Of the thirteen supervised methods, only <code>"xgboost"</code> and
 <code>"deep"</code> have an upstream GPU implementation. The other
-eleven — linear and logistic regression, ridge, LASSO, elastic net,
-decision trees, random forests, gradient boosting, SVM, neural networks
-— wrap packages that have no CUDA path at all. Asking for a GPU gets you
-a warning and a CPU fit:</p>
+eleven — linear, polynomial and logistic regression, ridge, LASSO,
+elastic net, decision trees, random forests, gradient boosting, SVM and
+neural networks — wrap packages that have no CUDA path at all. Asking
+for a GPU gets you a warning and a CPU fit:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Routed to CUDA when a capable backend is present</span></span>
 <span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_model.html">tl_model</a></span><span class="op">(</span><span class="va">data</span>, <span class="va">y</span> <span class="op">~</span> <span class="va">.</span>, method <span class="op">=</span> <span class="st">"xgboost"</span>, compute <span class="op">=</span> <span class="st">"gpu"</span><span class="op">)</span></span>
@@ -122,8 +121,8 @@ a warning and a CPU fit:</p>
 <span></span>
 <span><span class="co"># Let tidylearn decide per call</span></span>
 <span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_model.html">tl_model</a></span><span class="op">(</span><span class="va">data</span>, <span class="va">y</span> <span class="op">~</span> <span class="va">.</span>, method <span class="op">=</span> <span class="st">"xgboost"</span>, compute <span class="op">=</span> <span class="st">"auto"</span><span class="op">)</span></span></code></pre></div>
-<p>For those eleven methods the useful question is not “GPU or CPU” but
-“does this fit in memory, and how many cores can I throw at it”.</p>
+<p>For those eleven methods the question to ask is whether the job fits
+in memory, and how many cores you can throw at it.</p>
 </div>
 <div class="section level2">
 <h2 id="estimating-before-you-commit">Estimating before you commit<a class="anchor" aria-label="anchor" href="#estimating-before-you-commit"></a>
@@ -157,17 +156,16 @@ package installed:</p>
 <span><span class="co">#&gt; Notes:</span></span>
 <span><span class="co">#&gt;   - Method 'xgboost' could use GPU, but no GPU-capable backend was detected. See ?tl_check_gpu.</span></span>
 <span><span class="co">#&gt;   - Cloud integration is not yet configured in tidylearn. Estimates shown so users can see the tier's shape; actual submission is not yet supported.</span></span></code></pre></div>
-<p>The advisor covers all thirteen supervised methods and treats cloud
-as a <em>memory headroom</em> tier rather than a GPU tier. That matters:
-it will recommend cloud for a CPU-only method such as random forest or
-SVM when the job is RAM-infeasible locally, which is the common case for
-large data. On a small dataset like <code>iris</code> it will tell you
-to stay local, because you should.</p>
-<p>Estimates are order-of-magnitude, not quotes. Runtime constants are
-calibrated per method, and Modal pricing is approximate as of early
-2026. Treat the output as a decision aid, not a bill.</p>
-<p>Unsupervised methods are not modelled. Calling the advisor on one is
-an error rather than a guess.</p>
+<p>The advisor covers all thirteen supervised methods, and treats cloud
+as a <em>memory headroom</em> tier. It will recommend cloud for a
+CPU-only method such as random forest or SVM when the job is
+RAM-infeasible locally, which is the common case for large data. On a
+small dataset like <code>iris</code> it will tell you to stay local.</p>
+<p>Estimates are order-of-magnitude. Runtime constants are calibrated
+per method, and Modal pricing is approximate as of early 2026. Treat the
+output as a decision aid.</p>
+<p>Unsupervised methods are not modelled. Calling the advisor on one
+errors.</p>
 </div>
 <div class="section level2">
 <h2 id="cloud-compute">Cloud compute<a class="anchor" aria-label="anchor" href="#cloud-compute"></a>
@@ -197,8 +195,8 @@ session:</p>
 <p>The session lock is held in memory only. It is never written to disk
 and does not survive an R restart. There is also no interactive prompt
 anywhere in the cloud path, so <code>Rscript</code>, CI and knitted
-documents behave exactly like an interactive session — a prompt that
-cannot be answered in batch is worse than useless.</p>
+documents behave exactly like an interactive session. A prompt that
+cannot be answered in batch would block them.</p>
 <p>Per call, the equivalent is <code>confirm_upload = TRUE</code>.</p>
 </div>
 <div class="section level3">
@@ -214,8 +212,8 @@ shared <code>.Rprofile</code> can set an option without you noticing,
 and the whole point of this check is that a destination should not
 appear silently.</p>
 <p>Before anything is sent, the URL must parse, use <code>https</code>,
-and resolve to a host on the allowlist. Anything else is an error rather
-than a warning. The default allowlist is Modal’s own domains:</p>
+and resolve to a host on the allowlist. Anything else errors. The
+default allowlist is Modal’s own domains:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/tl_cloud_allowed_hosts.html">tl_cloud_allowed_hosts</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "modal.run" "modal.com"</span></span></code></pre></div>
@@ -234,29 +232,27 @@ subdomains. <code>fits.example.com</code> does not admit
 top-level domain.</p>
 </div>
 <div class="section level3">
-<h3 id="cost-is-bounded-not-just-estimated">Cost is bounded, not just estimated<a class="anchor" aria-label="anchor" href="#cost-is-bounded-not-just-estimated"></a>
+<h3 id="bounding-the-cost">Bounding the cost<a class="anchor" aria-label="anchor" href="#bounding-the-cost"></a>
 </h3>
-<p>This is the part worth reading carefully, because the obvious mental
-model is wrong.</p>
 <p>A job submitted to Modal runs there to completion whatever your R
-session does next. Pressing Ctrl-C, closing the IDE, a crashed session,
-a closed laptop — none of them stop it. The session was polling for a
-result; it was never what kept the work alive. A job you thought you had
-abandoned keeps billing until it finishes or something kills it.</p>
-<p>That has an awkward consequence: no amount of care in the R client
-can guarantee anything, because a killed session runs no cleanup
-handlers. So the controls are layered by what survives:</p>
+session does next. Pressing Ctrl-C, closing the IDE, a crashed session
+and a closed laptop all leave it running, because the session was only
+polling for a result. A job you thought you had abandoned keeps billing
+until it finishes or something kills it.</p>
+<p>No amount of care in the R client can guarantee anything against
+that, because a killed session runs no cleanup handlers. So the controls
+are layered by what survives:</p>
 <p><strong>What holds even if your session dies.</strong> Every
-submission sets an explicit timeout — never Modal’s inherited default,
-never none — derived from the estimate with headroom and capped well
-below Modal’s 24-hour maximum. The worker runs with retries disabled,
-because Modal applies timeouts per attempt and three retries would bill
-four full timeouts for one hung job. And you should set a spend budget
-on your Modal workspace, which is the only true hard cap and is not
-tidylearn’s to set.</p>
+submission sets an explicit timeout, derived from the estimate with
+headroom and capped well below Modal’s 24-hour maximum. Modal’s
+inherited default is never used and neither is no timeout at all. The
+worker runs with retries disabled, because Modal applies timeouts per
+attempt and three retries would bill four full timeouts for one hung
+job. You should also set a spend budget on your Modal workspace, which
+is the only true hard cap and is not tidylearn’s to set.</p>
 <p><strong>What is best-effort.</strong> The pre-flight gates, the job
-registry, cancel on interrupt. These catch the ordinary cases and are
-worth having, but they are the second line, not the first.</p>
+registry and cancel-on-interrupt catch the ordinary cases, and none of
+them survive a killed session.</p>
 <p>Before a fit, the figure you are asked to accept is the <strong>worst
 case</strong> — the timeout at the tier’s rate — rather than the
 estimate:</p>
@@ -274,8 +270,8 @@ submitting that would bill the full timeout and return nothing.</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># ℹ 5 variables: call_id &lt;chr&gt;, method &lt;chr&gt;, submitted_at &lt;dttm&gt;,</span></span></span>
 <span><span class="co">#&gt; <span style="color: #949494;">#   timeout_seconds &lt;int&gt;, worst_case_cost &lt;dbl&gt;</span></span></span></code></pre></div>
 <p>A job leaves that list when its result is collected or it is
-cancelled. The list cannot outlive the session — but the timeout can,
-which is precisely why the timeout is the control that matters.</p>
+cancelled. The list itself does not outlive the session; the timeout
+does.</p>
 </div>
 <div class="section level3">
 <h3 id="the-contract-is-written-down">The contract is written down<a class="anchor" aria-label="anchor" href="#the-contract-is-written-down"></a>

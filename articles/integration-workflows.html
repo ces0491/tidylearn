@@ -87,19 +87,25 @@
 <div class="section level2">
 <h2 id="introduction">Introduction<a class="anchor" aria-label="anchor" href="#introduction"></a>
 </h2>
-<p>This vignette covers the functions that combine supervised and
-unsupervised learning into multi-step workflows.</p>
-<p><strong>Important:</strong> These integration functions orchestrate
-the wrapped packages (stats, glmnet, randomForest, cluster, etc.) rather
-than implementing new algorithms. tidylearn provides the workflow
-coordination, while the underlying packages do the computational work.
-Access raw model objects via <code>model$fit</code>.</p>
+<p>Five functions put an unsupervised step in front of a supervised one:
+reduce the features, add cluster membership as a feature, propagate
+labels you do not have, handle outliers explicitly, or fit one model per
+cluster.</p>
+<p>They coordinate the wrapped packages rather than implementing
+anything new, so <code>model$fit</code> still reaches the underlying
+object.</p>
+<p>One rule governs all five, and it is the thing that goes wrong most
+often: the unsupervised step is fitted on training data and must then be
+<em>applied</em> to the test set, never refitted on it. Every example
+below carries the transformation across explicitly, because refitting
+leaks the test set into the model.</p>
 </div>
 <div class="section level2">
 <h2 id="dimensionality-reduction-as-preprocessing">Dimensionality Reduction as Preprocessing<a class="anchor" aria-label="anchor" href="#dimensionality-reduction-as-preprocessing"></a>
 </h2>
-<p>Use PCA or MDS to reduce feature space before supervised
-learning.</p>
+<p>PCA or MDS collapses correlated predictors into fewer components
+before the supervised fit. That costs some information and buys a
+smaller, less collinear feature space.</p>
 <div class="section level3">
 <h3 id="basic-usage">Basic Usage<a class="anchor" aria-label="anchor" href="#basic-usage"></a>
 </h3>
@@ -189,7 +195,9 @@ learning.</p>
 <h2 id="cluster-based-feature-engineering">Cluster-Based Feature Engineering<a class="anchor" aria-label="anchor" href="#cluster-based-feature-engineering"></a>
 </h2>
 <p>Add cluster assignments as a feature, so a model that cannot express
-group structure directly gets a column that encodes it.</p>
+group structure directly gets a column that encodes it. The cluster
+model is kept on the result as a <code>"cluster_model"</code> attribute,
+which is what you need to assign test rows to the same clusters.</p>
 <div class="section level3">
 <h3 id="adding-cluster-features">Adding Cluster Features<a class="anchor" aria-label="anchor" href="#adding-cluster-features"></a>
 </h3>
@@ -254,19 +262,22 @@ group structure directly gets a column that encodes it.</p>
 <div class="section level2">
 <h2 id="semi-supervised-learning">Semi-Supervised Learning<a class="anchor" aria-label="anchor" href="#semi-supervised-learning"></a>
 </h2>
-<p>Train models with limited labels using cluster-based label
-propagation.</p>
+<p>When labels are expensive and unlabelled rows are plentiful, cluster
+the full dataset and give each cluster the majority label of whatever
+labelled rows fall in it. The propagated labels are guesses, and the fit
+is only as good as the assumption that clusters line up with
+classes.</p>
 <div class="section level3">
 <h3 id="training-with-limited-labels">Training with Limited Labels<a class="anchor" aria-label="anchor" href="#training-with-limited-labels"></a>
 </h3>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Use only 10% of labels</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span>
-<span><span class="va">labeled_indices</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">iris</span><span class="op">)</span>, size <span class="op">=</span> <span class="fl">15</span><span class="op">)</span>  <span class="co"># Only 15 out of 150 labeled!</span></span>
+<span><span class="va">labeled_indices</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">iris</span><span class="op">)</span>, size <span class="op">=</span> <span class="fl">15</span><span class="op">)</span>  <span class="co"># 15 of 150 labelled</span></span>
 <span></span>
-<span><span class="co"># Train semi-supervised model. supervised_method defaults to "logistic",</span></span>
-<span><span class="co"># which is binary only -- iris has three species, so name a multiclass</span></span>
-<span><span class="co"># method explicitly.</span></span>
+<span><span class="co"># supervised_method defaults to "tree". Named here because a forest is</span></span>
+<span><span class="co"># the better fit for propagated labels: the propagation step introduces</span></span>
+<span><span class="co"># noise, and averaging over trees absorbs more of it than one tree does.</span></span>
 <span><span class="va">model_semi</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_semisupervised.html">tl_semisupervised</a></span><span class="op">(</span><span class="va">iris</span>, <span class="va">Species</span> <span class="op">~</span> <span class="va">.</span>,</span>
 <span>                                labeled_indices <span class="op">=</span> <span class="va">labeled_indices</span>,</span>
 <span>                                cluster_method <span class="op">=</span> <span class="st">"kmeans"</span>,</span>
@@ -325,7 +336,10 @@ propagation.</p>
 <div class="section level2">
 <h2 id="anomaly-aware-modeling">Anomaly-Aware Modeling<a class="anchor" aria-label="anchor" href="#anomaly-aware-modeling"></a>
 </h2>
-<p>Detect and handle outliers before supervised learning.</p>
+<p><code><a href="../reference/tl_anomaly_aware.html">tl_anomaly_aware()</a></code> runs outlier detection first and then
+does one of two things with what it finds: <code>action = "flag"</code>
+adds an indicator column and keeps the rows,
+<code>action = "remove"</code> drops them.</p>
 <div class="section level3">
 <h3 id="flagging-anomalies">Flagging Anomalies<a class="anchor" aria-label="anchor" href="#flagging-anomalies"></a>
 </h3>
@@ -357,7 +371,10 @@ propagation.</p>
 <div class="section level2">
 <h2 id="stratified-models">Stratified Models<a class="anchor" aria-label="anchor" href="#stratified-models"></a>
 </h2>
-<p>Create cluster-specific models for heterogeneous data.</p>
+<p>One model per cluster, for data where the relationship differs
+between groups. It reads more easily than a single model carrying many
+interaction terms, and it needs enough rows in every cluster for each
+fit to be estimable.</p>
 <div class="section level3">
 <h3 id="training-stratified-models">Training Stratified Models<a class="anchor" aria-label="anchor" href="#training-stratified-models"></a>
 </h3>
@@ -530,77 +547,52 @@ needs enough observations in every cluster to be estimable.</li>
 </ul>
 </div>
 <div class="section level2">
-<h2 id="best-practices">Best Practices<a class="anchor" aria-label="anchor" href="#best-practices"></a>
+<h2 id="function-reference">Function Reference<a class="anchor" aria-label="anchor" href="#function-reference"></a>
 </h2>
-<ol style="list-style-type: decimal">
-<li>
-<strong>Always transform test data</strong> using the same
-unsupervised models as training data</li>
-<li>
-<strong>Experiment with different combinations</strong> to find the
-best approach</li>
-<li>
-<strong>Use semi-supervised learning</strong> when labels are
-expensive to obtain</li>
-<li>
-<strong>Consider stratified models</strong> for heterogeneous
-datasets</li>
-<li>
-<strong>Validate performance</strong> on held-out test data</li>
-</ol>
+<table class="table">
+<thead><tr class="header">
+<th>Function</th>
+<th>Puts this in front of the supervised fit</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code><a href="../reference/tl_reduce_dimensions.html">tl_reduce_dimensions()</a></code></td>
+<td>PCA or MDS</td>
+</tr>
+<tr class="even">
+<td><code><a href="../reference/tl_add_cluster_features.html">tl_add_cluster_features()</a></code></td>
+<td>Cluster membership as a column</td>
+</tr>
+<tr class="odd">
+<td><code><a href="../reference/tl_semisupervised.html">tl_semisupervised()</a></code></td>
+<td>Label propagation from clusters</td>
+</tr>
+<tr class="even">
+<td><code><a href="../reference/tl_anomaly_aware.html">tl_anomaly_aware()</a></code></td>
+<td>Outlier detection, flagged or removed</td>
+</tr>
+<tr class="odd">
+<td><code><a href="../reference/tl_stratified_models.html">tl_stratified_models()</a></code></td>
+<td>One model per cluster</td>
+</tr>
+</tbody>
+</table>
 </div>
 <div class="section level2">
-<h2 id="summary">Summary<a class="anchor" aria-label="anchor" href="#summary"></a>
+<h2 id="where-to-go-next">Where to Go Next<a class="anchor" aria-label="anchor" href="#where-to-go-next"></a>
 </h2>
-<p>tidylearn’s integration functions combine supervised and unsupervised
-learning:</p>
 <ul>
 <li>
-<strong><code><a href="../reference/tl_reduce_dimensions.html">tl_reduce_dimensions()</a></code></strong>: Use PCA/MDS as
-preprocessing</li>
+<code><a href="../articles/unsupervised-learning.html">vignette("unsupervised-learning")</a></code> — the clustering and
+ordination steps above, driven directly</li>
 <li>
-<strong><code><a href="../reference/tl_add_cluster_features.html">tl_add_cluster_features()</a></code></strong>: Engineer
-features from clusters</li>
+<code><a href="../articles/tuning-and-pipelines.html">vignette("tuning-and-pipelines")</a></code> —
+<code><a href="../reference/tl_pipeline.html">tl_pipeline()</a></code> does the train-then-replay bookkeeping for
+you</li>
 <li>
-<strong><code><a href="../reference/tl_semisupervised.html">tl_semisupervised()</a></code></strong>: Train with
-limited labels</li>
-<li>
-<strong><code><a href="../reference/tl_anomaly_aware.html">tl_anomaly_aware()</a></code></strong>: Handle outliers
-intelligently</li>
-<li>
-<strong><code><a href="../reference/tl_stratified_models.html">tl_stratified_models()</a></code></strong>: Create
-cluster-specific models</li>
+<code><a href="../articles/automl.html">vignette("automl")</a></code> — <code><a href="../reference/tl_auto_ml.html">tl_auto_ml()</a></code> applies
+the PCA and clustering variants automatically</li>
 </ul>
-<p>These functions orchestrate the underlying packages (stats, cluster,
-glmnet, randomForest, etc.) to enable multi-step workflows with a
-consistent interface.</p>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Final integrated example</span></span>
-<span><span class="va">final_data</span> <span class="op">&lt;-</span> <span class="va">iris</span></span>
-<span><span class="va">final_split</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_split.html">tl_split</a></span><span class="op">(</span></span>
-<span>  <span class="va">final_data</span>, prop <span class="op">=</span> <span class="fl">0.7</span>, stratify <span class="op">=</span> <span class="st">"Species"</span>, seed <span class="op">=</span> <span class="fl">999</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Combine PCA + clustering</span></span>
-<span><span class="va">final_reduced</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_reduce_dimensions.html">tl_reduce_dimensions</a></span><span class="op">(</span><span class="va">final_split</span><span class="op">$</span><span class="va">train</span>,</span>
-<span>                                      response <span class="op">=</span> <span class="st">"Species"</span>,</span>
-<span>                                      method <span class="op">=</span> <span class="st">"pca"</span>,</span>
-<span>                                      n_components <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span>
-<span><span class="va">final_clustered</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_add_cluster_features.html">tl_add_cluster_features</a></span><span class="op">(</span><span class="va">final_reduced</span><span class="op">$</span><span class="va">data</span>,</span>
-<span>                                           response <span class="op">=</span> <span class="st">"Species"</span>,</span>
-<span>                                           method <span class="op">=</span> <span class="st">"kmeans"</span>,</span>
-<span>                                           k <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span>
-<span><span class="va">final_model</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_model.html">tl_model</a></span><span class="op">(</span><span class="va">final_clustered</span>, <span class="va">Species</span> <span class="op">~</span> <span class="va">.</span>, method <span class="op">=</span> <span class="st">"forest"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">final_model</span><span class="op">)</span></span>
-<span><span class="co">#&gt; tidylearn Model</span></span>
-<span><span class="co">#&gt; ===============</span></span>
-<span><span class="co">#&gt; Paradigm: supervised </span></span>
-<span><span class="co">#&gt; Method: forest </span></span>
-<span><span class="co">#&gt; Task: Classification </span></span>
-<span><span class="co">#&gt; Formula: Species ~ . </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Training observations: 105</span></span></code></pre></div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

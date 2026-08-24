@@ -16,10 +16,9 @@ library(dplyr)
 
 ## Introduction
 
-This vignette demonstrates supervised learning capabilities in
-tidylearn. All methods shown here wrap established R packages - the
-algorithms are unchanged, tidylearn simply provides a consistent
-interface and tidy output.
+Classification and regression across the eleven supervised methods, and
+the one piece of bookkeeping that catches people out — replaying
+training preprocessing on the test set.
 
 **Wrapped packages include:**
 
@@ -541,7 +540,7 @@ model_imputed <- tl_model(processed_missing$data, mpg ~ ., method = "linear")
 ## Best Practices
 
 1.  **Split before training.** A metric computed on the rows the model
-    was fitted to measures memorisation, not performance.
+    was fitted to tells you how well it memorised them.
 2.  **Stratify classification splits** so both sets carry the same class
     proportions as the source data.
 3.  **Scale inputs for methods that need it** – regularised regression,
@@ -554,19 +553,7 @@ model_imputed <- tl_model(processed_missing$data, mpg ~ ., method = "linear")
 6.  **Match the metric to the task** – accuracy, F1 or AUC for
     classification; RMSE or MAE for regression.
 
-## Summary
-
-tidylearn provides a unified interface for supervised learning:
-
-- **Classification**: Logistic regression, decision trees, random
-  forests, SVM, etc.
-- **Regression**: Linear, polynomial, random forests, regularized
-  methods
-- **Preprocessing**: Integrated data preparation tools
-- **Consistent API**: Same function
-  ([`tl_model()`](https://tidylearn.sheetsolved.com/reference/tl_model.md))
-  for all methods
-- **Tidy Output**: Easy-to-use predictions and model objects
+## Replaying Preprocessing on the Test Set
 
 ``` r
 

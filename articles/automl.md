@@ -195,9 +195,8 @@ wrapped packages execute C-level code that R cannot safely interrupt.
 Wall-clock time can therefore overshoot by the duration of whichever
 model started last.
 
-The budget controls how much gets tried. Rather than quote a table of
-predictions, here is the actual relationship on this data and this
-machine:
+The budget controls how much gets tried. The relationship on this data
+and this machine:
 
 ``` r
 
@@ -225,8 +224,7 @@ do.call(rbind, sweep)
 
 iris is 150 rows, so everything here is quick and the budget is barely
 touched. On data where a single forest fit takes ten seconds the same
-numbers look very different — which is the point of running the sweep on
-your own data rather than trusting a table.
+numbers look very different, so run the sweep on your own data.
 
 Two things are worth knowing regardless of size:
 

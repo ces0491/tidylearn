@@ -282,8 +282,9 @@ survives.</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="op">!</span><span class="va">keep</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 4</span></span></code></pre></div>
-<p>If dropping a handful of rows moves a coefficient materially, the
-coefficient is a statement about those rows.</p>
+<p>If dropping a handful of rows moves a coefficient materially, that
+coefficient describes those rows rather than the population you
+sampled.</p>
 </div>
 </div>
 <div class="section level2">
@@ -436,8 +437,8 @@ says what it does at different levels of the moderator.</p>
 <span><span class="co">#&gt; Q75     180.0      Q75 -3.203958 4.635819e-16</span></span>
 <span><span class="co">#&gt; Q100    335.0     Q100  1.112505 2.313524e-16</span></span></code></pre></div>
 <p>The slope of <code>mpg</code> on <code>wt</code> weakens as
-<code>hp</code> rises: weight costs less economy in a car that was never
-economical.</p>
+<code>hp</code> rises — extra weight costs less fuel economy in a
+high-powered car, which already had little to lose.</p>
 <p><code>slope_se</code> describes the straight line fitted to the
 prediction grid rather than the sampling uncertainty of the marginal
 effect — for a linear model the grid is exactly linear, so it is near

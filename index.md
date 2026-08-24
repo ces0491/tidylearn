@@ -9,8 +9,8 @@ status](https://www.r-pkg.org/badges/version/tidylearn)](https://cran.r-project.
 MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![pkgdown](https://github.com/ces0491/tidylearn/actions/workflows/pkgdown.yaml/badge.svg)](https://tidylearn.sheetsolved.com)
 
-Full documentation, including every function reference page and all ten
-articles: **<https://tidylearn.sheetsolved.com>**
+Full documentation, including every function reference page and all
+eleven articles: **<https://tidylearn.sheetsolved.com>**
 
 ## Overview
 
@@ -276,10 +276,10 @@ cloud tiers before you commit to a long fit:
 tl_compute_advisor("xgboost", data, y ~ ., hyperparams = list(nrounds = 5000))
 ```
 
-Estimates are order-of-magnitude, not quotes. The advisor covers all 13
-supervised methods, and it treats cloud as a “does not fit on my
-machine” tier rather than a GPU-only one - it will recommend cloud for a
-CPU-only method like random forest if the job is RAM-infeasible locally.
+Estimates are order-of-magnitude. The advisor covers all 13 supervised
+methods, and it treats cloud as a “does not fit on my machine” tier, so
+it will recommend cloud for a CPU-only method like random forest if the
+job is RAM-infeasible locally.
 
 ### Cloud compute
 
@@ -300,7 +300,7 @@ tl_cloud_consent()
 tl_cloud_consent(FALSE)   # revoke
 
 # The endpoint comes from an environment variable, and must be https on
-# a Modal host. A typo or a wrong host is an error, not a warning
+# a Modal host. A typo or a wrong host errors
 Sys.setenv(TIDYLEARN_MODAL_ENDPOINT = "https://you--tidylearn-fit.modal.run")
 
 # Modal customers on a custom domain can add it, per session
@@ -313,16 +313,16 @@ tl_cloud_allowed_hosts()
 A job submitted to Modal runs to completion there whatever your R
 session does afterwards. Ctrl-C, a closed IDE, a crashed session and a
 closed laptop all leave it running and billing, because the session was
-only polling for a result - it was never what kept the work alive.
+only polling for a result.
 
-So the bound on spend cannot be something tidylearn does in R. Every
-submission carries an explicit timeout, derived from the estimate with
-headroom and capped well below Modal’s 24-hour maximum, and the worker
-runs with retries off so a hung job cannot bill several timeouts over.
+The bound on spend therefore cannot live in R. Every submission carries
+an explicit timeout, derived from the estimate with headroom and capped
+well below Modal’s 24-hour maximum, and the worker runs with retries off
+so a hung job cannot bill several timeouts over.
 
 What you are asked to accept before a fit is the **worst case** - the
-timeout at the tier’s rate - not the estimate, because the estimate is
-order-of-magnitude and the timeout is what actually binds:
+timeout at the tier’s rate. The estimate is order-of-magnitude, and the
+timeout is what actually binds:
 
 ``` r
 
@@ -336,8 +336,7 @@ tl_cloud_jobs()
 ```
 
 Set a spend budget on your Modal workspace as well. That is the only
-true hard cap, and it is not tidylearn’s to set - if a job escapes every
-check here, the workspace budget is what stops it.
+true hard cap, and it is not tidylearn’s to set.
 
 The full contract - what cloud compute will and will not do, with an
 audit checklist - ships with the package:
@@ -393,21 +392,12 @@ tl_table_comparison(model1, model2, model3,
 
 ## Philosophy
 
-tidylearn is built on these principles:
-
-1.  **Transparency**: The underlying packages do the real work.
-    tidylearn makes them easier to use together without hiding what’s
-    happening.
-
-2.  **Consistency**: One interface, tidy output, unified visualization -
-    across all methods.
-
-3.  **Accessibility**: Focus on your analysis, not on learning different
-    package APIs.
-
-4.  **Interoperability**: Results are tibbles and ggplot2 objects, so
-    they work with dplyr and the rest of the tidyverse without
-    conversion.
+The underlying packages do the real work, and tidylearn does not hide
+what they are doing — every method documents the function it calls, and
+`$fit` hands you the object that function returned. What tidylearn adds
+is one signature across all 20 methods, and output that is already a
+tibble or a ggplot2 object, so results move into dplyr and the rest of
+the tidyverse without conversion.
 
 ## Documentation
 

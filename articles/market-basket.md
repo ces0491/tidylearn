@@ -608,8 +608,8 @@ visualize_rules(rules, method = "scatter", top_n = 200)
 ![](market-basket_files/figure-html/unnamed-chunk-20-1.png)
 
 Support on one axis against confidence on the other, coloured by lift,
-is the standard first look: the interesting rules are the ones pushed
-away from the crowd.
+is the standard first look. Rules sitting well away from the main cloud
+are the ones to read.
 
 ``` r
 

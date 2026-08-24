@@ -2,11 +2,14 @@
 
 ## Overview
 
-tidylearn is designed so that analysis results flow directly into
-reports. Every model produces tidy tibbles, ggplot2 visualisations, and
-— with the `tl_table_*()` functions — formatted `gt` tables, all with a
-consistent interface. This vignette walks through the reporting tools
-available.
+Two families turn a fitted model into something publishable.
+[`plot()`](https://rdrr.io/r/graphics/plot.default.html) and the
+`tl_plot_*()` functions return ggplot2 objects;
+[`tl_table()`](https://tidylearn.sheetsolved.com/reference/tl_table.md)
+and the `tl_table_*()` functions return `gt` tables. Both dispatch on
+model type, so the same call covers a forest and a lasso fit, and both
+hand back an object you can keep editing rather than printed output you
+cannot.
 
 ``` r
 
@@ -16,14 +19,11 @@ library(ggplot2)
 library(gt)
 ```
 
-------------------------------------------------------------------------
-
 ## Plots
 
-tidylearn’s [`plot()`](https://rdrr.io/r/graphics/plot.default.html)
-method dispatches to the right visualisation for each model type. All
-plots are ggplot2 objects — themeable, composable, and convertible to
-plotly.
+[`plot()`](https://rdrr.io/r/graphics/plot.default.html) picks the
+visualisation from the model type, and `type` narrows it further where a
+model supports more than one view.
 
 ### Regression
 
@@ -85,16 +85,11 @@ tl_plot_regularization_cv(model_lasso)
 
 ![](reporting_files/figure-html/plot-lasso-2.png)
 
-------------------------------------------------------------------------
-
 ## Tables
 
-The
 [`tl_table()`](https://tidylearn.sheetsolved.com/reference/tl_table.md)
-family mirrors the plot interface but produces formatted `gt` tables
-instead. Like [`plot()`](https://rdrr.io/r/graphics/plot.default.html),
-[`tl_table()`](https://tidylearn.sheetsolved.com/reference/tl_table.md)
-dispatches based on model type and a `type` parameter:
+mirrors the plot interface, dispatching on model type and an optional
+`type`:
 
 ``` r
 
@@ -273,12 +268,11 @@ tl_table_comparison(
 | Accuracy            | 0.9111 | 0.9333        | 0.8889        |
 | tidylearn \| n = 45 |        |               |               |
 
-------------------------------------------------------------------------
-
 ## Interactive Reporting with plotly
 
-Because all plot functions return ggplot2 objects, converting to
-interactive plotly charts is a one-liner:
+Every plot function returns a ggplot2 object, so
+[`ggplotly()`](https://rdrr.io/pkg/plotly/man/ggplotly.html) takes any
+of them without special handling:
 
 ``` r
 
@@ -289,13 +283,10 @@ ggplotly(tidy_pca_biplot(pca, label_obs = TRUE))
 ggplotly(tl_plot_regularization_path(model_lasso))
 ```
 
-------------------------------------------------------------------------
-
 ## Putting It Together
 
-A typical reporting workflow combines plots and tables for the same
-model. Because the interface is consistent, the same pattern works
-regardless of the algorithm:
+Fit, score, look, drill in — the four calls that make up most reporting
+sections:
 
 ``` r
 

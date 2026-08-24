@@ -264,9 +264,8 @@ like. If you see both, raise the budget or lower
 starts it runs to completion, because the wrapped packages execute
 C-level code that R cannot safely interrupt. Wall-clock time can
 therefore overshoot by the duration of whichever model started last.</p>
-<p>The budget controls how much gets tried. Rather than quote a table of
-predictions, here is the actual relationship on this data and this
-machine:</p>
+<p>The budget controls how much gets tried. The relationship on this
+data and this machine:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">budgets</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">5</span>, <span class="fl">10</span>, <span class="fl">30</span><span class="op">)</span></span>
 <span></span>
@@ -290,8 +289,7 @@ machine:</p>
 <span><span class="co">#&gt; 4     30     0.9      8         8 clustered_forest</span></span></code></pre></div>
 <p>iris is 150 rows, so everything here is quick and the budget is
 barely touched. On data where a single forest fit takes ten seconds the
-same numbers look very different — which is the point of running the
-sweep on your own data rather than trusting a table.</p>
+same numbers look very different, so run the sweep on your own data.</p>
 <p>Two things are worth knowing regardless of size:</p>
 <ul>
 <li>The forest baseline and every advanced model are only attempted when

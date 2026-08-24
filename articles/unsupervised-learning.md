@@ -237,11 +237,11 @@ c(silhouette = attr(opt$silhouette, "optimal_k"),
 #>          2          6
 ```
 
-The three criteria disagree, which is normal and worth saying plainly:
-the elbow is a judgement call, silhouette favours well-separated compact
-clusters, and the gap statistic compares against a null of no structure.
-Silhouette says 2 here because *versicolor* and *virginica* overlap; the
-botanical answer is 3.
+The three criteria disagree, which is normal. The elbow is a judgement
+call, silhouette favours well-separated compact clusters, and the gap
+statistic compares against a null of no structure. Silhouette says 2
+here because *versicolor* and *virginica* overlap; the botanical answer
+is 3.
 
 ``` r
 
@@ -689,8 +689,8 @@ plot_distance_heatmap(dist_mat)
 
 ![](unsupervised-learning_files/figure-html/unnamed-chunk-49-1.png)
 
-Block structure on the diagonal is what a real cluster looks like in a
-distance matrix.
+Look for block structure on the diagonal — contiguous runs of small
+distances are what a cluster looks like here.
 
 ## A Worked Sequence
 

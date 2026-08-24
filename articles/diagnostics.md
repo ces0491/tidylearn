@@ -244,8 +244,8 @@ sum(!keep)
 #> [1] 4
 ```
 
-If dropping a handful of rows moves a coefficient materially, the
-coefficient is a statement about those rows.
+If dropping a handful of rows moves a coefficient materially, that
+coefficient describes those rows rather than the population you sampled.
 
 ## Outliers in the Data
 
@@ -424,8 +424,9 @@ effects$slopes
 #> Q100    335.0     Q100  1.112505 2.313524e-16
 ```
 
-The slope of `mpg` on `wt` weakens as `hp` rises: weight costs less
-economy in a car that was never economical.
+The slope of `mpg` on `wt` weakens as `hp` rises — extra weight costs
+less fuel economy in a high-powered car, which already had little to
+lose.
 
 `slope_se` describes the straight line fitted to the prediction grid
 rather than the sampling uncertainty of the marginal effect — for a

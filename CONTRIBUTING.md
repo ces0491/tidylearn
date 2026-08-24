@@ -17,17 +17,17 @@ Packages (2e),
 §21.2](https://r-pkgs.org/lifecycle.html#sec-lifecycle-version):
 
 - **Released versions** on CRAN use three components: `X.Y.Z`
-  (e.g. `0.3.0`).
+  (e.g. `0.4.0`).
 - **Development versions** — the state of the package between CRAN
   releases — append a fourth component of `.9000` to the last released
   version.
 
-So if CRAN currently has `0.3.0`, the `main` branch will read
-`Version: 0.3.0.9000` for the entire time we’re working toward the next
+So CRAN currently has `0.4.0`, and the `main` branch reads
+`Version: 0.4.0.9000` for the entire time we are working toward the next
 release. The `.9000` suffix is a signal that says “this is a dev build,
 not a CRAN release.” When the maintainer is ready to submit the next
-release to CRAN, the version is bumped to `0.3.1` (dropping `.9000`),
-submitted, and then immediately bumped back to `0.3.1.9000` on `main`
+release to CRAN, the version is bumped to `0.5.0` (dropping `.9000`),
+submitted, and then immediately bumped back to `0.5.0.9000` on `main`
 for the next dev cycle.
 
 You’ll sometimes see `.9001`, `.9002`, etc. used to mark meaningful dev
@@ -40,7 +40,7 @@ If your change is user-visible (new feature, bug fix, API change), add a
 bullet under the current dev-version heading in `NEWS.md` — for example:
 
 ``` markdown
-# tidylearn 0.3.0.9000
+# tidylearn 0.4.0.9000
 
 * Your change here.
 ```

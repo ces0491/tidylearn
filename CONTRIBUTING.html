@@ -49,16 +49,16 @@
 <h2 id="how-versioning-works-here">How versioning works here<a class="anchor" aria-label="anchor" href="#how-versioning-works-here"></a></h2>
 <p>tidylearn follows the standard R package convention described in <a href="https://r-pkgs.org/lifecycle.html#sec-lifecycle-version" class="external-link">R Packages (2e), §21.2</a>:</p>
 <ul><li>
-<strong>Released versions</strong> on CRAN use three components: <code>X.Y.Z</code> (e.g. <code>0.3.0</code>).</li>
+<strong>Released versions</strong> on CRAN use three components: <code>X.Y.Z</code> (e.g. <code>0.4.0</code>).</li>
 <li>
 <strong>Development versions</strong> — the state of the package between CRAN releases — append a fourth component of <code>.9000</code> to the last released version.</li>
-</ul><p>So if CRAN currently has <code>0.3.0</code>, the <code>main</code> branch will read <code>Version: 0.3.0.9000</code> for the entire time we’re working toward the next release. The <code>.9000</code> suffix is a signal that says “this is a dev build, not a CRAN release.” When the maintainer is ready to submit the next release to CRAN, the version is bumped to <code>0.3.1</code> (dropping <code>.9000</code>), submitted, and then immediately bumped back to <code>0.3.1.9000</code> on <code>main</code> for the next dev cycle.</p>
+</ul><p>So CRAN currently has <code>0.4.0</code>, and the <code>main</code> branch reads <code>Version: 0.4.0.9000</code> for the entire time we are working toward the next release. The <code>.9000</code> suffix is a signal that says “this is a dev build, not a CRAN release.” When the maintainer is ready to submit the next release to CRAN, the version is bumped to <code>0.5.0</code> (dropping <code>.9000</code>), submitted, and then immediately bumped back to <code>0.5.0.9000</code> on <code>main</code> for the next dev cycle.</p>
 <p>You’ll sometimes see <code>.9001</code>, <code>.9002</code>, etc. used to mark meaningful dev milestones, but <code>.9000</code> alone is the default and is fine for all ordinary PRs.</p>
 </div>
 <div class="section level2">
 <h2 id="newsmd">NEWS.md<a class="anchor" aria-label="anchor" href="#newsmd"></a></h2>
 <p>If your change is user-visible (new feature, bug fix, API change), add a bullet under the current dev-version heading in <code>NEWS.md</code> — for example:</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu"># tidylearn 0.3.0.9000</span></span>
+<div class="sourceCode" id="cb1"><pre class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu"># tidylearn 0.4.0.9000</span></span>
 <span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
 <span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="ss">* </span>Your change here.</span></code></pre></div>
 <p>If there isn’t yet a dev-version heading at the top of the file, you can add one; the maintainer will reconcile it at release time.</p>

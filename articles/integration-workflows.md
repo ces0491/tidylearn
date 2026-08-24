@@ -17,18 +17,25 @@ library(ggplot2)
 
 ## Introduction
 
-This vignette covers the functions that combine supervised and
-unsupervised learning into multi-step workflows.
+Five functions put an unsupervised step in front of a supervised one:
+reduce the features, add cluster membership as a feature, propagate
+labels you do not have, handle outliers explicitly, or fit one model per
+cluster.
 
-**Important:** These integration functions orchestrate the wrapped
-packages (stats, glmnet, randomForest, cluster, etc.) rather than
-implementing new algorithms. tidylearn provides the workflow
-coordination, while the underlying packages do the computational work.
-Access raw model objects via `model$fit`.
+They coordinate the wrapped packages rather than implementing anything
+new, so `model$fit` still reaches the underlying object.
+
+One rule governs all five, and it is the thing that goes wrong most
+often: the unsupervised step is fitted on training data and must then be
+*applied* to the test set, never refitted on it. Every example below
+carries the transformation across explicitly, because refitting leaks
+the test set into the model.
 
 ## Dimensionality Reduction as Preprocessing
 
-Use PCA or MDS to reduce feature space before supervised learning.
+PCA or MDS collapses correlated predictors into fewer components before
+the supervised fit. That costs some information and buys a smaller, less
+collinear feature space.
 
 ### Basic Usage
 
@@ -125,7 +132,9 @@ cat("Feature reduction:",
 ## Cluster-Based Feature Engineering
 
 Add cluster assignments as a feature, so a model that cannot express
-group structure directly gets a column that encodes it.
+group structure directly gets a column that encodes it. The cluster
+model is kept on the result as a `"cluster_model"` attribute, which is
+what you need to assign test rows to the same clusters.
 
 ### Adding Cluster Features
 
@@ -194,7 +203,10 @@ cat("With cluster features:", round(acc_with_cluster * 100, 1), "%\n")
 
 ## Semi-Supervised Learning
 
-Train models with limited labels using cluster-based label propagation.
+When labels are expensive and unlabelled rows are plentiful, cluster the
+full dataset and give each cluster the majority label of whatever
+labelled rows fall in it. The propagated labels are guesses, and the fit
+is only as good as the assumption that clusters line up with classes.
 
 ### Training with Limited Labels
 
@@ -202,11 +214,11 @@ Train models with limited labels using cluster-based label propagation.
 
 # Use only 10% of labels
 set.seed(123)
-labeled_indices <- sample(nrow(iris), size = 15)  # Only 15 out of 150 labeled!
+labeled_indices <- sample(nrow(iris), size = 15)  # 15 of 150 labelled
 
-# Train semi-supervised model. supervised_method defaults to "logistic",
-# which is binary only -- iris has three species, so name a multiclass
-# method explicitly.
+# supervised_method defaults to "tree". Named here because a forest is
+# the better fit for propagated labels: the propagation step introduces
+# noise, and averaging over trees absorbs more of it than one tree does.
 model_semi <- tl_semisupervised(iris, Species ~ .,
                                 labeled_indices = labeled_indices,
                                 cluster_method = "kmeans",
@@ -271,7 +283,10 @@ cat("Semi-supervised (15 labels + propagation):",
 
 ## Anomaly-Aware Modeling
 
-Detect and handle outliers before supervised learning.
+[`tl_anomaly_aware()`](https://tidylearn.sheetsolved.com/reference/tl_anomaly_aware.md)
+runs outlier detection first and then does one of two things with what
+it finds: `action = "flag"` adds an indicator column and keeps the rows,
+`action = "remove"` drops them.
 
 ### Flagging Anomalies
 
@@ -304,7 +319,10 @@ cat("Anomalies removed:", model_anomaly_remove$anomalies_removed, "\n")
 
 ## Stratified Models
 
-Create cluster-specific models for heterogeneous data.
+One model per cluster, for data where the relationship differs between
+groups. It reads more easily than a single model carrying many
+interaction terms, and it needs enough rows in every cluster for each
+fit to be estimable.
 
 ### Training Stratified Models
 
@@ -484,61 +502,25 @@ cat("Credit Risk Model Accuracy:", round(accuracy_credit * 100, 1), "%\n")
   easily than a single model with many interaction terms, and needs
   enough observations in every cluster to be estimable.
 
-## Best Practices
+## Function Reference
 
-1.  **Always transform test data** using the same unsupervised models as
-    training data
-2.  **Experiment with different combinations** to find the best approach
-3.  **Use semi-supervised learning** when labels are expensive to obtain
-4.  **Consider stratified models** for heterogeneous datasets
-5.  **Validate performance** on held-out test data
+| Function | Puts this in front of the supervised fit |
+|----|----|
+| [`tl_reduce_dimensions()`](https://tidylearn.sheetsolved.com/reference/tl_reduce_dimensions.md) | PCA or MDS |
+| [`tl_add_cluster_features()`](https://tidylearn.sheetsolved.com/reference/tl_add_cluster_features.md) | Cluster membership as a column |
+| [`tl_semisupervised()`](https://tidylearn.sheetsolved.com/reference/tl_semisupervised.md) | Label propagation from clusters |
+| [`tl_anomaly_aware()`](https://tidylearn.sheetsolved.com/reference/tl_anomaly_aware.md) | Outlier detection, flagged or removed |
+| [`tl_stratified_models()`](https://tidylearn.sheetsolved.com/reference/tl_stratified_models.md) | One model per cluster |
 
-## Summary
+## Where to Go Next
 
-tidylearn’s integration functions combine supervised and unsupervised
-learning:
-
-- **[`tl_reduce_dimensions()`](https://tidylearn.sheetsolved.com/reference/tl_reduce_dimensions.md)**:
-  Use PCA/MDS as preprocessing
-- **[`tl_add_cluster_features()`](https://tidylearn.sheetsolved.com/reference/tl_add_cluster_features.md)**:
-  Engineer features from clusters
-- **[`tl_semisupervised()`](https://tidylearn.sheetsolved.com/reference/tl_semisupervised.md)**:
-  Train with limited labels
-- **[`tl_anomaly_aware()`](https://tidylearn.sheetsolved.com/reference/tl_anomaly_aware.md)**:
-  Handle outliers intelligently
-- **[`tl_stratified_models()`](https://tidylearn.sheetsolved.com/reference/tl_stratified_models.md)**:
-  Create cluster-specific models
-
-These functions orchestrate the underlying packages (stats, cluster,
-glmnet, randomForest, etc.) to enable multi-step workflows with a
-consistent interface.
-
-``` r
-
-# Final integrated example
-final_data <- iris
-final_split <- tl_split(
-  final_data, prop = 0.7, stratify = "Species", seed = 999
-)
-
-# Combine PCA + clustering
-final_reduced <- tl_reduce_dimensions(final_split$train,
-                                      response = "Species",
-                                      method = "pca",
-                                      n_components = 3)
-final_clustered <- tl_add_cluster_features(final_reduced$data,
-                                           response = "Species",
-                                           method = "kmeans",
-                                           k = 3)
-final_model <- tl_model(final_clustered, Species ~ ., method = "forest")
-
-print(final_model)
-#> tidylearn Model
-#> ===============
-#> Paradigm: supervised 
-#> Method: forest 
-#> Task: Classification 
-#> Formula: Species ~ . 
-#> 
-#> Training observations: 105
-```
+- [`vignette("unsupervised-learning")`](https://tidylearn.sheetsolved.com/articles/unsupervised-learning.md)
+  — the clustering and ordination steps above, driven directly
+- [`vignette("tuning-and-pipelines")`](https://tidylearn.sheetsolved.com/articles/tuning-and-pipelines.md)
+  —
+  [`tl_pipeline()`](https://tidylearn.sheetsolved.com/reference/tl_pipeline.md)
+  does the train-then-replay bookkeeping for you
+- [`vignette("automl")`](https://tidylearn.sheetsolved.com/articles/automl.md)
+  —
+  [`tl_auto_ml()`](https://tidylearn.sheetsolved.com/reference/tl_auto_ml.md)
+  applies the PCA and clustering variants automatically

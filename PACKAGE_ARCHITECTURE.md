@@ -1,45 +1,19 @@
 # tidylearn Package Architecture
 
-## Design Philosophy
+This document is the map of the source tree: which file holds what, and
+why the modules are cut where they are. What the package is for is in
+the README’s
+[Overview](https://tidylearn.sheetsolved.com/README.html#overview), and
+the reasoning behind the design is in its
+[Philosophy](https://tidylearn.sheetsolved.com/README.html#philosophy) —
+restating either here would give the project two versions to keep in
+step.
 
-tidylearn is a **wrapper package** that provides a unified
-tidyverse-compatible interface to R’s machine learning ecosystem. It
-wraps established packages like glmnet, randomForest, xgboost, e1071,
-cluster, and dbscan - you get the reliability of established
-implementations with the convenience of a consistent, tidy API.
-
-**What tidylearn does:**
-
-- Reads data from diverse sources
-  ([`tl_read()`](https://tidylearn.sheetsolved.com/reference/tl_read.md))
-  — files, databases, cloud, APIs
-- Provides one consistent interface
-  ([`tl_model()`](https://tidylearn.sheetsolved.com/reference/tl_model.md))
-  to 20 ML algorithms (13 supervised, 7 unsupervised)
-- Returns tidy tibbles instead of varied output formats
-- Offers unified ggplot2-based visualization and formatted `gt` tables
-- Enables pipe-friendly workflows with `%>%`
-- Orchestrates complex workflows combining multiple techniques
-
-**What tidylearn is NOT:**
-
-- A reimplementation of ML algorithms (uses established packages under
-  the hood)
-- A replacement for the underlying packages (access raw models via
-  `model$fit`)
-
-### Core Principles
-
-1.  **Transparency**: The underlying packages do the real work.
-    tidylearn makes them easier to use together without hiding what’s
-    happening.
-2.  **Consistency**: One interface, tidy output, unified visualization -
-    across all methods.
-3.  **Accessibility**: Focus on your analysis, not on learning different
-    package APIs.
-4.  **Interoperability**: Results are tibbles and ggplot2 objects, so
-    they work with dplyr and the rest of the tidyverse without
-    conversion.
+tidylearn implements no algorithms. Each module wraps an established
+package, so the module boundaries follow the packages rather than the
+statistics — which is why `supervised-trees.R` covers rpart,
+randomForest and gbm together, and why regularisation gets a file of its
+own.
 
 ## Wrapped Packages
 
@@ -149,14 +123,16 @@ Functions that coordinate multiple wrapped packages:
 - **[`tl_auto_ml()`](https://tidylearn.sheetsolved.com/reference/tl_auto_ml.md)**:
   Automated ML that tries multiple approaches
 - **[`tl_explore()`](https://tidylearn.sheetsolved.com/reference/tl_explore.md)**:
-  Comprehensive unsupervised EDA
+  Unsupervised EDA — PCA, cluster count, clustering and a distance
+  summary in one call
 - **[`tl_transfer_learning()`](https://tidylearn.sheetsolved.com/reference/tl_transfer_learning.md)**:
   Unsupervised pre-training with supervised fine-tuning
 
 #### `preprocessing.R` - Unified Data Preparation
 
 - **[`tl_prepare_data()`](https://tidylearn.sheetsolved.com/reference/tl_prepare_data.md)**:
-  Comprehensive preprocessing
+  Imputation, scaling and encoding, with the parameters kept so the
+  transformation can be replayed
 - **[`tl_split()`](https://tidylearn.sheetsolved.com/reference/tl_split.md)**:
   Train-test splitting with stratification
 
@@ -392,6 +368,6 @@ best_model <- result$best_model
 
 ## Acknowledgments
 
-tidylearn is a wrapper. The algorithms are implemented in stats, glmnet,
-randomForest, xgboost, gbm, e1071, nnet, rpart, cluster, dbscan, MASS,
-smacof, and keras/tensorflow.
+Credited in the
+[README](https://tidylearn.sheetsolved.com/README.html#acknowledgments),
+which names each package and what it implements.

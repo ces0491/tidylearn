@@ -40,32 +40,8 @@
 
 <div id="tidylearn-package-architecture" class="section level1">
 
-<div class="section level2">
-<h2 id="design-philosophy">Design Philosophy<a class="anchor" aria-label="anchor" href="#design-philosophy"></a></h2>
-<p>tidylearn is a <strong>wrapper package</strong> that provides a unified tidyverse-compatible interface to R’s machine learning ecosystem. It wraps established packages like glmnet, randomForest, xgboost, e1071, cluster, and dbscan - you get the reliability of established implementations with the convenience of a consistent, tidy API.</p>
-<p><strong>What tidylearn does:</strong></p>
-<ul><li>Reads data from diverse sources (<code><a href="reference/tl_read.html">tl_read()</a></code>) — files, databases, cloud, APIs</li>
-<li>Provides one consistent interface (<code><a href="reference/tl_model.html">tl_model()</a></code>) to 20 ML algorithms (13 supervised, 7 unsupervised)</li>
-<li>Returns tidy tibbles instead of varied output formats</li>
-<li>Offers unified ggplot2-based visualization and formatted <code>gt</code> tables</li>
-<li>Enables pipe-friendly workflows with <code>%&gt;%</code>
-</li>
-<li>Orchestrates complex workflows combining multiple techniques</li>
-</ul><p><strong>What tidylearn is NOT:</strong></p>
-<ul><li>A reimplementation of ML algorithms (uses established packages under the hood)</li>
-<li>A replacement for the underlying packages (access raw models via <code>model$fit</code>)</li>
-</ul><div class="section level3">
-<h3 id="core-principles">Core Principles<a class="anchor" aria-label="anchor" href="#core-principles"></a></h3>
-<ol style="list-style-type: decimal"><li>
-<strong>Transparency</strong>: The underlying packages do the real work. tidylearn makes them easier to use together without hiding what’s happening.</li>
-<li>
-<strong>Consistency</strong>: One interface, tidy output, unified visualization - across all methods.</li>
-<li>
-<strong>Accessibility</strong>: Focus on your analysis, not on learning different package APIs.</li>
-<li>
-<strong>Interoperability</strong>: Results are tibbles and ggplot2 objects, so they work with dplyr and the rest of the tidyverse without conversion.</li>
-</ol></div>
-</div>
+<p>This document is the map of the source tree: which file holds what, and why the modules are cut where they are. What the package is for is in the README’s <a href="README.html#overview">Overview</a>, and the reasoning behind the design is in its <a href="README.html#philosophy">Philosophy</a> — restating either here would give the project two versions to keep in step.</p>
+<p>tidylearn implements no algorithms. Each module wraps an established package, so the module boundaries follow the packages rather than the statistics — which is why <code>supervised-trees.R</code> covers rpart, randomForest and gbm together, and why regularisation gets a file of its own.</p>
 <div class="section level2">
 <h2 id="wrapped-packages">Wrapped Packages<a class="anchor" aria-label="anchor" href="#wrapped-packages"></a></h2>
 <p>The method-to-package mapping is maintained in one place, the <a href="README.html#wrapped-packages">README</a>, and repeated in <code><a href="articles/getting-started.html">vignette("getting-started")</a></code>. Three copies of the same table drift; this document links to it rather than adding a fourth.</p>
@@ -159,7 +135,7 @@
 <ul><li>
 <strong><code><a href="reference/tl_auto_ml.html">tl_auto_ml()</a></code></strong>: Automated ML that tries multiple approaches</li>
 <li>
-<strong><code><a href="reference/tl_explore.html">tl_explore()</a></code></strong>: Comprehensive unsupervised EDA</li>
+<strong><code><a href="reference/tl_explore.html">tl_explore()</a></code></strong>: Unsupervised EDA — PCA, cluster count, clustering and a distance summary in one call</li>
 <li>
 <strong><code><a href="reference/tl_transfer_learning.html">tl_transfer_learning()</a></code></strong>: Unsupervised pre-training with supervised fine-tuning</li>
 </ul></div>
@@ -167,7 +143,7 @@
 <h4 id="preprocessingr---unified-data-preparation">
 <code>preprocessing.R</code> - Unified Data Preparation<a class="anchor" aria-label="anchor" href="#preprocessingr---unified-data-preparation"></a></h4>
 <ul><li>
-<strong><code><a href="reference/tl_prepare_data.html">tl_prepare_data()</a></code></strong>: Comprehensive preprocessing</li>
+<strong><code><a href="reference/tl_prepare_data.html">tl_prepare_data()</a></code></strong>: Imputation, scaling and encoding, with the parameters kept so the transformation can be replayed</li>
 <li>
 <strong><code><a href="reference/tl_split.html">tl_split()</a></code></strong>: Train-test splitting with stratification</li>
 </ul></div>
@@ -396,7 +372,7 @@
 </div>
 <div class="section level2">
 <h2 id="acknowledgments">Acknowledgments<a class="anchor" aria-label="anchor" href="#acknowledgments"></a></h2>
-<p>tidylearn is a wrapper. The algorithms are implemented in stats, glmnet, randomForest, xgboost, gbm, e1071, nnet, rpart, cluster, dbscan, MASS, smacof, and keras/tensorflow.</p>
+<p>Credited in the <a href="README.html#acknowledgments">README</a>, which names each package and what it implements.</p>
 </div>
 </div>
 

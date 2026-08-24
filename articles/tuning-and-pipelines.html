@@ -470,9 +470,9 @@ preprocessing that produced them.</p>
 <p>Tuning multiplies fits. A grid of <em>g</em> combinations at
 <em>k</em> folds is <em>g × k</em> fits, plus one more to build the
 final model. The tree grid at the top of this vignette is 6 combinations
-× 3 folds = 19 fits of a method that takes milliseconds. The same grid
-on <code>method = "xgboost"</code> with 1000 rounds is the same 19 fits
-of something much slower.</p>
+× 3 folds = 18 fits, 19 with the final model, of a method that takes
+milliseconds. The same grid on <code>method = "xgboost"</code> with 1000
+rounds is the same 19 fits of something much slower.</p>
 <p>Two levers, in the order worth pulling:</p>
 <ol style="list-style-type: decimal">
 <li>

@@ -64,6 +64,91 @@ Development version.
 Several of these changed reported numbers. Results produced by 0.4.0 and
 earlier should be recomputed.
 
+#### Degenerate inputs
+
+- `tl_model(method = "forest")` hung indefinitely on a classification
+  response whose predictors were all constant. randomForest’s
+  classification path keeps drawing `mtry` candidates looking for a
+  split that cannot exist, and the loop is C-level, so it ignored
+  interrupts and the session had to be killed. It was reachable through
+  [`tl_pipeline()`](https://tidylearn.sheetsolved.com/reference/tl_pipeline.md),
+  whose default candidates include a forest, and through
+  [`tl_auto_ml()`](https://tidylearn.sheetsolved.com/reference/tl_auto_ml.md),
+  whose baselines do. Now refused before the call, naming the columns.
+  Regression is unaffected and still fits, as does a frame where only
+  some predictors are constant.
+
+- A character specification such as `"Species ~ ."` was read as a
+  regression problem by every entry point except
+  [`tl_model()`](https://tidylearn.sheetsolved.com/reference/tl_model.md).
+  `tl_model_supervised()` coerces with
+  [`as.formula()`](https://rdrr.io/r/stats/formula.html), but that
+  happens after
+  [`tl_pipeline()`](https://tidylearn.sheetsolved.com/reference/tl_pipeline.md),
+  [`tl_prepare_data()`](https://tidylearn.sheetsolved.com/reference/tl_prepare_data.md),
+  [`tl_cv()`](https://tidylearn.sheetsolved.com/reference/tl_cv.md),
+  [`tl_auto_ml()`](https://tidylearn.sheetsolved.com/reference/tl_auto_ml.md)
+  and the two tuners have already called `all.vars(formula)[1]` – and
+  [`all.vars()`](https://rdrr.io/r/base/allnames.html) on a string is
+  `character(0)`, so the response name came back `NA` and `data[[NA]]`
+  was `NULL`. `tl_auto_ml(iris, "Species ~ .")` announced “task:
+  regression” and returned an unranked leaderboard;
+  [`tl_pipeline()`](https://tidylearn.sheetsolved.com/reference/tl_pipeline.md)
+  scored a classification tree with `rmse` and returned a pipeline whose
+  every metric was `NA`, warning only that the values were missing.
+  Coercion now happens at each entry point, before anything reads the
+  formula, and an argument that is neither a formula nor a string that
+  parses as one is refused by name.
+
+- A repeated name in `tl_pipeline(models = ...)` silently discarded a
+  model. The training loop indexes `models[[model_name]]`, which
+  resolves to the first match, so `list(a = tree, a = forest)` fitted
+  the tree twice and never fitted the forest. Repeated names are now
+  refused, next to the existing guard for unnamed ones.
+
+- Malformed entries in `models` reported base R internals that named
+  neither the model nor the mistake: a spec with no `method` gave
+  “missing value where TRUE/FALSE needed”, a spec that was not a list
+  gave “\$ operator is invalid for atomic vectors”, a two-element
+  `method` gave “‘length = 2’ in coercion to ‘logical(1)’”, and an
+  unsupervised method gave “undefined columns selected”. Each is now
+  checked before the run starts and names the offending model.
+
+- `evaluation$cv_folds` and `evaluation$train_prop` were unvalidated.
+  `train_prop = 0` reached base R as “result would be too long a
+  vector”, `train_prop = 1` surfaced as a ROCR complaint about class
+  counts, and `train_prop = 1.5` as “cannot take a sample larger than
+  the population”; bad fold counts arrived as rsample errors naming `v`,
+  which is not an argument of anything the caller wrote. Both are now
+  checked against their own names, and more folds than rows is reported
+  as such.
+
+- An unrecognised name in `evaluation$metrics` was accepted, computed
+  nothing, and left the run warning that all values were `NA` – the
+  symptom rather than the cause. Unknown metrics are now refused with
+  the list of available ones, matching what
+  [`tl_tune_grid()`](https://tidylearn.sheetsolved.com/reference/tl_tune_grid.md)
+  already did. An empty metric set is refused too; it previously
+  rendered the `best_metric` error as a bare full stop.
+
+- An intercept-only formula (`y ~ 1`) reached
+  [`tl_run_pipeline()`](https://tidylearn.sheetsolved.com/reference/tl_run_pipeline.md)
+  and failed with “result would be too long a vector”. A pipeline
+  preprocesses and scores predictors, so it now says it needs at least
+  one.
+
+- A single-class response was named plainly only by logistic regression.
+  Every other classification method reported whatever its backend hit
+  first: rpart “number of rows of matrices must match (see arg 2)”,
+  glmnet “non-conformable arguments”, e1071 “Model is empty!”, xgboost a
+  complaint about `num_class`. All thirteen now give the same message,
+  naming the response and the class it holds.
+
+- [`tl_read_s3()`](https://tidylearn.sheetsolved.com/reference/tl_read_s3.md)
+  raised “subscript out of bounds” for a zero-length or multi-element
+  `source`, the one malformed input that missed its own “Invalid S3 URI”
+  message.
+
 #### Metrics and evaluation
 
 - [`tl_cv()`](https://tidylearn.sheetsolved.com/reference/tl_cv.md)
@@ -644,6 +729,31 @@ earlier should be recomputed.
   `tests/testthat/test-examples.R`, so it cannot drift again unnoticed.
 
 ### Documentation
+
+- Corrected five factual errors across the docs: the README claimed ten
+  articles where there are eleven; `compute-backends` said eleven
+  CPU-only methods and then listed ten, omitting `"polynomial"`;
+  `integration-workflows` still documented
+  [`tl_semisupervised()`](https://tidylearn.sheetsolved.com/reference/tl_semisupervised.md)
+  as defaulting to `supervised_method = "logistic"` after it changed to
+  `"tree"`; `tuning-and-pipelines` wrote 6 x 3 = 19 fits; and
+  `CONTRIBUTING.md` gave its versioning worked example against 0.3.0,
+  telling contributors to open a NEWS heading a release out of date.
+
+- Rewrote `integration-workflows` and `reporting`, which had drifted
+  from the register of the other nine articles. Their generic “Best
+  Practices” and “Summary” sections are gone, each function now gets a
+  sentence on what it buys you and what it costs, and the
+  train-then-replay rule that governs all five integration functions is
+  stated once up front rather than only in code comments.
+
+- Removed duplicated prose. The overview blurb, the “what tidylearn is /
+  is NOT” bullets and the principles list each existed verbatim in two
+  or three of README, `getting-started` and `PACKAGE_ARCHITECTURE.md`;
+  `PACKAGE_ARCHITECTURE.md` now links to the README for all three, the
+  way it already did for the method-to-package table. `getting-started`
+  and `supervised-learning` no longer close with a summary restating
+  their own introductions.
 
 - New vignette `compute-backends`: how `compute = "auto"` routes a fit,
   what the advisor estimates a cloud tier would cost, and the safety

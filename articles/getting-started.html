@@ -75,26 +75,17 @@
 <div class="section level2">
 <h2 id="introduction">Introduction<a class="anchor" aria-label="anchor" href="#introduction"></a>
 </h2>
-<p><code>tidylearn</code> provides a <strong>unified
-tidyverse-compatible interface</strong> to R’s machine learning
-ecosystem. It wraps proven packages like glmnet, randomForest, xgboost,
-e1071, cluster, and dbscan - you get the reliability of established
-implementations with the convenience of a consistent, tidy API.</p>
-<p><strong>What tidylearn does:</strong></p>
-<ul>
-<li>Provides one consistent interface (<code><a href="../reference/tl_model.html">tl_model()</a></code>) to 20 ML
-algorithms</li>
-<li>Returns tidy tibbles instead of varied output formats</li>
-<li>Offers unified ggplot2-based visualization across all methods</li>
-<li>Enables pipe-friendly workflows</li>
-</ul>
-<p><strong>What tidylearn is NOT:</strong></p>
-<ul>
-<li>A reimplementation of ML algorithms (uses established packages under
-the hood)</li>
-<li>A replacement for the underlying packages (you can access the raw
-model via <code>model$fit</code>)</li>
-</ul>
+<p>Every machine learning package in R has its own API and its own
+output format. tidylearn puts one signature over 20 of them:
+<code><a href="../reference/tl_model.html">tl_model()</a></code> picks the underlying package from the
+<code>method</code> you name, and whatever comes back is a tibble or a
+ggplot2 object.</p>
+<p>The algorithms are untouched. glmnet, randomForest, xgboost, e1071,
+cluster and dbscan do the fitting, and <code>model$fit</code> hands you
+the object they returned, so nothing here closes off the package
+underneath.</p>
+<p>This vignette covers the shape of a workflow end to end. The articles
+listed at the bottom go deeper on each step.</p>
 </div>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
@@ -499,6 +490,25 @@ via <code>$fit</code>:</p>
 </div>
 </div>
 <div class="section level2">
+<h2 id="the-whole-workflow">The Whole Workflow<a class="anchor" aria-label="anchor" href="#the-whole-workflow"></a>
+</h2>
+<p>Split, fit, predict, score — the four steps this vignette covered, in
+the order they run:</p>
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Quick example combining everything</span></span>
+<span><span class="va">data_split</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_split.html">tl_split</a></span><span class="op">(</span><span class="va">iris</span>, prop <span class="op">=</span> <span class="fl">0.7</span>, stratify <span class="op">=</span> <span class="st">"Species"</span>, seed <span class="op">=</span> <span class="fl">42</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Random forests are scale-invariant, so no scaling is needed here. When a</span></span>
+<span><span class="co"># method does need scaled inputs, the same transformation has to be applied</span></span>
+<span><span class="co"># to the test set -- see the Supervised Learning vignette.</span></span>
+<span><span class="va">model_final</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_model.html">tl_model</a></span><span class="op">(</span><span class="va">data_split</span><span class="op">$</span><span class="va">train</span>, <span class="va">Species</span> <span class="op">~</span> <span class="va">.</span>, method <span class="op">=</span> <span class="st">"forest"</span><span class="op">)</span></span>
+<span><span class="va">test_preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">model_final</span>, new_data <span class="op">=</span> <span class="va">data_split</span><span class="op">$</span><span class="va">test</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">accuracy</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">test_preds</span><span class="op">$</span><span class="va">.pred</span> <span class="op">==</span> <span class="va">data_split</span><span class="op">$</span><span class="va">test</span><span class="op">$</span><span class="va">Species</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Test accuracy:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">accuracy</span> <span class="op">*</span> <span class="fl">100</span>, <span class="fl">1</span><span class="op">)</span>, <span class="st">"%\n"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Test accuracy: 93.3 %</span></span></code></pre></div>
+</div>
+<div class="section level2">
 <h2 id="next-steps">Next Steps<a class="anchor" aria-label="anchor" href="#next-steps"></a>
 </h2>
 <ul>
@@ -533,41 +543,6 @@ supervised and unsupervised steps</li>
 or too large for this machine: GPU routing, cost estimates, and the
 cloud safety model</li>
 </ul>
-</div>
-<div class="section level2">
-<h2 id="summary">Summary<a class="anchor" aria-label="anchor" href="#summary"></a>
-</h2>
-<p>tidylearn is a <strong>wrapper package</strong> that provides:</p>
-<ul>
-<li>
-<strong>Unified Interface</strong>: One function
-(<code><a href="../reference/tl_model.html">tl_model()</a></code>) that dispatches to proven packages like
-glmnet, randomForest, xgboost, e1071, and others</li>
-<li>
-<strong>Transparency</strong>: Access raw model objects via
-<code>model$fit</code> for package-specific functionality</li>
-<li>
-<strong>Tidy Output</strong>: All results are tibbles for easy
-manipulation with dplyr and ggplot2</li>
-<li>
-<strong>Consistent Visualization</strong>: Unified ggplot2-based
-plots regardless of model type</li>
-</ul>
-<p>The underlying algorithms are unchanged - tidylearn simply makes them
-easier to use together.</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Quick example combining everything</span></span>
-<span><span class="va">data_split</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_split.html">tl_split</a></span><span class="op">(</span><span class="va">iris</span>, prop <span class="op">=</span> <span class="fl">0.7</span>, stratify <span class="op">=</span> <span class="st">"Species"</span>, seed <span class="op">=</span> <span class="fl">42</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Random forests are scale-invariant, so no scaling is needed here. When a</span></span>
-<span><span class="co"># method does need scaled inputs, the same transformation has to be applied</span></span>
-<span><span class="co"># to the test set -- see the Supervised Learning vignette.</span></span>
-<span><span class="va">model_final</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_model.html">tl_model</a></span><span class="op">(</span><span class="va">data_split</span><span class="op">$</span><span class="va">train</span>, <span class="va">Species</span> <span class="op">~</span> <span class="va">.</span>, method <span class="op">=</span> <span class="st">"forest"</span><span class="op">)</span></span>
-<span><span class="va">test_preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">model_final</span>, new_data <span class="op">=</span> <span class="va">data_split</span><span class="op">$</span><span class="va">test</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">accuracy</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">test_preds</span><span class="op">$</span><span class="va">.pred</span> <span class="op">==</span> <span class="va">data_split</span><span class="op">$</span><span class="va">test</span><span class="op">$</span><span class="va">Species</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Test accuracy:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">accuracy</span> <span class="op">*</span> <span class="fl">100</span>, <span class="fl">1</span><span class="op">)</span>, <span class="st">"%\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Test accuracy: 93.3 %</span></span></code></pre></div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

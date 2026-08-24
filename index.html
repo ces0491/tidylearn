@@ -73,7 +73,7 @@
 </div>
 <p>Machine Learning for Tidynauts</p>
 <p><a href="https://cran.r-project.org/package=tidylearn" class="external-link"><img src="https://www.r-pkg.org/badges/version/tidylearn" alt="CRAN status"></a> <a href="https://github.com/ces0491/tidylearn/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/ces0491/tidylearn/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a> <a href="https://opensource.org/licenses/MIT" class="external-link"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a> <a href="https://tidylearn.sheetsolved.com"><img src="https://github.com/ces0491/tidylearn/actions/workflows/pkgdown.yaml/badge.svg" alt="pkgdown"></a></p>
-<p>Full documentation, including every function reference page and all ten articles: <strong><a href="https://tidylearn.sheetsolved.com" class="uri">https://tidylearn.sheetsolved.com</a></strong></p>
+<p>Full documentation, including every function reference page and all eleven articles: <strong><a href="https://tidylearn.sheetsolved.com" class="uri">https://tidylearn.sheetsolved.com</a></strong></p>
 <div class="section level2">
 <h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
 </h2>
@@ -405,7 +405,7 @@
 <p><code><a href="reference/tl_compute_advisor.html">tl_compute_advisor()</a></code> estimates runtime, peak memory and cost across local CPU, local GPU and cloud tiers before you commit to a long fit:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/tl_compute_advisor.html">tl_compute_advisor</a></span><span class="op">(</span><span class="st">"xgboost"</span>, <span class="va">data</span>, <span class="va">y</span> <span class="op">~</span> <span class="va">.</span>, hyperparams <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>nrounds <span class="op">=</span> <span class="fl">5000</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p>Estimates are order-of-magnitude, not quotes. The advisor covers all 13 supervised methods, and it treats cloud as a “does not fit on my machine” tier rather than a GPU-only one - it will recommend cloud for a CPU-only method like random forest if the job is RAM-infeasible locally.</p>
+<p>Estimates are order-of-magnitude. The advisor covers all 13 supervised methods, and it treats cloud as a “does not fit on my machine” tier, so it will recommend cloud for a CPU-only method like random forest if the job is RAM-infeasible locally.</p>
 <div class="section level3">
 <h3 id="cloud-compute">Cloud compute<a class="anchor" aria-label="anchor" href="#cloud-compute"></a>
 </h3>
@@ -418,7 +418,7 @@
 <span><span class="fu"><a href="reference/tl_cloud_consent.html">tl_cloud_consent</a></span><span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span>   <span class="co"># revoke</span></span>
 <span></span>
 <span><span class="co"># The endpoint comes from an environment variable, and must be https on</span></span>
-<span><span class="co"># a Modal host. A typo or a wrong host is an error, not a warning</span></span>
+<span><span class="co"># a Modal host. A typo or a wrong host errors</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Sys.setenv.html" class="external-link">Sys.setenv</a></span><span class="op">(</span>TIDYLEARN_MODAL_ENDPOINT <span class="op">=</span> <span class="st">"https://you--tidylearn-fit.modal.run"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Modal customers on a custom domain can add it, per session</span></span>
@@ -428,9 +428,9 @@
 <div class="section level3">
 <h3 id="cost-controls">Cost controls<a class="anchor" aria-label="anchor" href="#cost-controls"></a>
 </h3>
-<p>A job submitted to Modal runs to completion there whatever your R session does afterwards. Ctrl-C, a closed IDE, a crashed session and a closed laptop all leave it running and billing, because the session was only polling for a result - it was never what kept the work alive.</p>
-<p>So the bound on spend cannot be something tidylearn does in R. Every submission carries an explicit timeout, derived from the estimate with headroom and capped well below Modal’s 24-hour maximum, and the worker runs with retries off so a hung job cannot bill several timeouts over.</p>
-<p>What you are asked to accept before a fit is the <strong>worst case</strong> - the timeout at the tier’s rate - not the estimate, because the estimate is order-of-magnitude and the timeout is what actually binds:</p>
+<p>A job submitted to Modal runs to completion there whatever your R session does afterwards. Ctrl-C, a closed IDE, a crashed session and a closed laptop all leave it running and billing, because the session was only polling for a result.</p>
+<p>The bound on spend therefore cannot live in R. Every submission carries an explicit timeout, derived from the estimate with headroom and capped well below Modal’s 24-hour maximum, and the worker runs with retries off so a hung job cannot bill several timeouts over.</p>
+<p>What you are asked to accept before a fit is the <strong>worst case</strong> - the timeout at the tier’s rate. The estimate is order-of-magnitude, and the timeout is what actually binds:</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Refused before anything is uploaded if the worst case exceeds max_cost,</span></span>
 <span><span class="co"># or if the estimate is so large the job would be killed before finishing</span></span>
@@ -439,7 +439,7 @@
 <span></span>
 <span><span class="co"># Anything currently running, so no job is invisible</span></span>
 <span><span class="fu"><a href="reference/tl_cloud_jobs.html">tl_cloud_jobs</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p>Set a spend budget on your Modal workspace as well. That is the only true hard cap, and it is not tidylearn’s to set - if a job escapes every check here, the workspace budget is what stops it.</p>
+<p>Set a spend budget on your Modal workspace as well. That is the only true hard cap, and it is not tidylearn’s to set.</p>
 <p>The full contract - what cloud compute will and will not do, with an audit checklist - ships with the package:</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/file.show.html" class="external-link">file.show</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"security/threat-model.md"</span>, package <span class="op">=</span> <span class="st">"tidylearn"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
@@ -486,13 +486,7 @@
 <div class="section level2">
 <h2 id="philosophy">Philosophy<a class="anchor" aria-label="anchor" href="#philosophy"></a>
 </h2>
-<p>tidylearn is built on these principles:</p>
-<ol style="list-style-type: decimal">
-<li><p><strong>Transparency</strong>: The underlying packages do the real work. tidylearn makes them easier to use together without hiding what’s happening.</p></li>
-<li><p><strong>Consistency</strong>: One interface, tidy output, unified visualization - across all methods.</p></li>
-<li><p><strong>Accessibility</strong>: Focus on your analysis, not on learning different package APIs.</p></li>
-<li><p><strong>Interoperability</strong>: Results are tibbles and ggplot2 objects, so they work with dplyr and the rest of the tidyverse without conversion.</p></li>
-</ol>
+<p>The underlying packages do the real work, and tidylearn does not hide what they are doing — every method documents the function it calls, and <code>$fit</code> hands you the object that function returned. What tidylearn adds is one signature across all 20 methods, and output that is already a tibble or a ggplot2 object, so results move into dplyr and the rest of the tidyverse without conversion.</p>
 </div>
 <div class="section level2">
 <h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>

@@ -86,10 +86,9 @@
 <div class="section level2">
 <h2 id="introduction">Introduction<a class="anchor" aria-label="anchor" href="#introduction"></a>
 </h2>
-<p>This vignette demonstrates supervised learning capabilities in
-tidylearn. All methods shown here wrap established R packages - the
-algorithms are unchanged, tidylearn simply provides a consistent
-interface and tidy output.</p>
+<p>Classification and regression across the eleven supervised methods,
+and the one piece of bookkeeping that catches people out — replaying
+training preprocessing on the test set.</p>
 <p><strong>Wrapped packages include:</strong></p>
 <ul>
 <li>stats (<code><a href="https://rdrr.io/r/stats/lm.html" class="external-link">lm()</a></code>, <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code>) for linear and
@@ -570,8 +569,7 @@ complexity.</p>
 <ol style="list-style-type: decimal">
 <li>
 <strong>Split before training.</strong> A metric computed on the
-rows the model was fitted to measures memorisation, not
-performance.</li>
+rows the model was fitted to tells you how well it memorised them.</li>
 <li>
 <strong>Stratify classification splits</strong> so both sets carry
 the same class proportions as the source data.</li>
@@ -592,26 +590,8 @@ for classification; RMSE or MAE for regression.</li>
 </ol>
 </div>
 <div class="section level2">
-<h2 id="summary">Summary<a class="anchor" aria-label="anchor" href="#summary"></a>
+<h2 id="replaying-preprocessing-on-the-test-set">Replaying Preprocessing on the Test Set<a class="anchor" aria-label="anchor" href="#replaying-preprocessing-on-the-test-set"></a>
 </h2>
-<p>tidylearn provides a unified interface for supervised learning:</p>
-<ul>
-<li>
-<strong>Classification</strong>: Logistic regression, decision
-trees, random forests, SVM, etc.</li>
-<li>
-<strong>Regression</strong>: Linear, polynomial, random forests,
-regularized methods</li>
-<li>
-<strong>Preprocessing</strong>: Integrated data preparation
-tools</li>
-<li>
-<strong>Consistent API</strong>: Same function
-(<code><a href="../reference/tl_model.html">tl_model()</a></code>) for all methods</li>
-<li>
-<strong>Tidy Output</strong>: Easy-to-use predictions and model
-objects</li>
-</ul>
 <div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Complete workflow example</span></span>
 <span><span class="va">final_split</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_split.html">tl_split</a></span><span class="op">(</span><span class="va">iris</span>, prop <span class="op">=</span> <span class="fl">0.7</span>, stratify <span class="op">=</span> <span class="st">"Species"</span>, seed <span class="op">=</span> <span class="fl">42</span><span class="op">)</span></span>

@@ -250,12 +250,11 @@ criteria at once.</p>
 <span>  gap <span class="op">=</span> <span class="va">opt</span><span class="op">$</span><span class="va">gap</span><span class="op">$</span><span class="va">recommended_k</span><span class="op">)</span></span>
 <span><span class="co">#&gt; silhouette        gap </span></span>
 <span><span class="co">#&gt;          2          6</span></span></code></pre></div>
-<p>The three criteria disagree, which is normal and worth saying
-plainly: the elbow is a judgement call, silhouette favours
-well-separated compact clusters, and the gap statistic compares against
-a null of no structure. Silhouette says 2 here because
-<em>versicolor</em> and <em>virginica</em> overlap; the botanical answer
-is 3.</p>
+<p>The three criteria disagree, which is normal. The elbow is a
+judgement call, silhouette favours well-separated compact clusters, and
+the gap statistic compares against a null of no structure. Silhouette
+says 2 here because <em>versicolor</em> and <em>virginica</em> overlap;
+the botanical answer is 3.</p>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_elbow.html">plot_elbow</a></span><span class="op">(</span><span class="va">opt</span><span class="op">$</span><span class="va">wss</span>, suggested_k <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></code></pre></div>
 <p><img src="unsupervised-learning_files/figure-html/unnamed-chunk-16-1.png" class="r-plt" alt="" width="672"></p>
@@ -582,8 +581,8 @@ it:</p>
 <div class="sourceCode" id="cb49"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_distance_heatmap.html">plot_distance_heatmap</a></span><span class="op">(</span><span class="va">dist_mat</span><span class="op">)</span></span></code></pre></div>
 <p><img src="unsupervised-learning_files/figure-html/unnamed-chunk-49-1.png" class="r-plt" alt="" width="672"></p>
-<p>Block structure on the diagonal is what a real cluster looks like in
-a distance matrix.</p>
+<p>Look for block structure on the diagonal — contiguous runs of small
+distances are what a cluster looks like here.</p>
 </div>
 <div class="section level2">
 <h2 id="a-worked-sequence">A Worked Sequence<a class="anchor" aria-label="anchor" href="#a-worked-sequence"></a>
