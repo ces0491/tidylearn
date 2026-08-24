@@ -488,6 +488,11 @@ earlier should be recomputed.
 
 ## Internal
 
+* Removed four internal helpers with no callers: `create_obs_ids()`,
+  `extract_response()`, `get_numeric_cols()` and `validate_data()`. They had
+  survived two reviews on the grounds that they looked like intentional
+  utilities.
+
 * `.github/workflows/pkgdown.yaml` builds on pull requests without deploying,
   so a dangling article name fails a PR check rather than the first push to
   main, and deploys with `clean: true` so removed pages leave the live site.
