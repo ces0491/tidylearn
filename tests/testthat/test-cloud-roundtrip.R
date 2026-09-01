@@ -73,7 +73,7 @@ for (method_name in names(roundtrip_methods)) {
     pkg <- roundtrip_methods[[method]]
 
     test_that(paste0("'", method, "' models survive a serialise round trip"), {
-      skip_if_not_installed(pkg)
+      testthat::skip_if_not_installed(pkg)
 
       fx <- roundtrip_fixture(method)
       model <- tl_model(fx$train, fx$formula, method = method)
@@ -106,14 +106,14 @@ for (method_name in names(roundtrip_methods)) {
 # These tests need a working TensorFlow backend, which CI does not provide.
 # They run wherever one is installed and skip everywhere else.
 skip_if_no_tensorflow <- function() {
-  skip_if_not_installed("keras")
-  skip_if_not_installed("tensorflow")
+  testthat::skip_if_not_installed("keras")
+  testthat::skip_if_not_installed("tensorflow")
   ok <- tryCatch(
     !is.null(tensorflow::tf_version()),
     error = function(e) FALSE
   )
   if (!isTRUE(ok)) {
-    skip("No TensorFlow backend available")
+    testthat::skip("No TensorFlow backend available")
   }
 }
 
@@ -153,7 +153,7 @@ test_that("'deep' round-trips via keras's own serialiser", {
 })
 
 test_that("xgboost serialises its booster into the byte stream", {
-  skip_if_not_installed("xgboost")
+  testthat::skip_if_not_installed("xgboost")
 
   # An xgb.Booster holds an external pointer. It round-trips only because
   # xgboost embeds the booster in the serialised stream; without that the

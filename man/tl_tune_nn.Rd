@@ -39,3 +39,17 @@ parameter combinations and their cross-validated errors).
 \description{
 Tune a neural network model
 }
+\examples{
+\donttest{
+tuned <- tl_tune_nn(iris, Species ~ .,
+  is_classification = TRUE,
+  sizes = c(2, 5), decays = c(0, 0.01), folds = 3)
+
+tuned$best_size
+tuned$best_decay
+tuned$tuning_results
+
+# The grid this searched, drawn as a heatmap
+tl_plot_nn_tuning(tuned)
+}
+}

@@ -259,6 +259,9 @@ tl_gpu_capable_methods <- function(gpu_check = NULL) {
 #' @param ... Unused.
 #' @return The input `x`, invisibly.
 #' @export
+#' @examples
+#' # Reports no GPU rather than failing on a machine without one
+#' print(tl_check_gpu())
 print.tidylearn_gpu_check <- function(x, ...) {
   cat("<tidylearn GPU detection>\n")
   cat(

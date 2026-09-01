@@ -891,6 +891,21 @@ tl_get_best_model <- function(pipeline) {
 #'   highlighted.
 #' @importFrom ggplot2 ggplot aes geom_col facet_wrap labs theme_minimal
 #' @export
+#' @examples
+#' \donttest{
+#' pipe <- tl_pipeline(iris, Species ~ .,
+#'   models = list(
+#'     tree = list(method = "tree"),
+#'     forest = list(method = "forest", ntree = 100)
+#'   ),
+#'   evaluation = list(validation = "cv", cv_folds = 3))
+#' pipe <- tl_run_pipeline(pipe, verbose = FALSE)
+#'
+#' tl_compare_pipeline_models(pipe)
+#'
+#' # Restrict the comparison to one metric
+#' tl_compare_pipeline_models(pipe, metrics = "accuracy")
+#' }
 tl_compare_pipeline_models <- function(pipeline, metrics = NULL) {
   # Check if pipeline has results
   if (is.null(pipeline$results)) {
@@ -1009,6 +1024,25 @@ tl_compare_pipeline_models <- function(pipeline, metrics = NULL) {
 #'   predictions from the selected (or best) pipeline model, after
 #'   applying the same preprocessing steps used during training.
 #' @export
+#' @examples
+#' \donttest{
+#' train <- iris[c(1:40, 51:90, 101:140), ]
+#' test <- iris[c(41:50, 91:100, 141:150), ]
+#'
+#' pipe <- tl_pipeline(train, Species ~ .,
+#'   models = list(
+#'     tree = list(method = "tree"),
+#'     forest = list(method = "forest", ntree = 100)
+#'   ),
+#'   evaluation = list(validation = "cv", cv_folds = 3))
+#' pipe <- tl_run_pipeline(pipe, verbose = FALSE)
+#'
+#' # The best model, with the preprocessing learned on the training rows
+#' tl_predict_pipeline(pipe, test)
+#'
+#' # Or a named candidate instead of the winner
+#' tl_predict_pipeline(pipe, test, model_name = "tree")
+#' }
 tl_predict_pipeline <- function(pipeline,
                                 new_data,
                                 type = "response",

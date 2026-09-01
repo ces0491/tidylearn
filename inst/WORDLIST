@@ -59,6 +59,7 @@ gof
 Gower
 gower
 greyed
+hardcoded
 Hartigan
 Hastie
 hclust
@@ -124,6 +125,7 @@ nn
 nnet
 nonmetric
 normalised
+nrounds
 onnx
 optimisation
 optimises
@@ -168,6 +170,7 @@ RPostgres
 rsample
 rsq
 RSQLite
+runnable
 Sammon
 sammon
 Sammon's

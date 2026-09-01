@@ -325,6 +325,14 @@ tl_plot_model_comparison <- function(
 #'   (if NULL, plots all metrics)
 #' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @export
+#' @examples
+#' \donttest{
+#' cv <- tl_cv(mtcars, mpg ~ wt + hp, method = "linear", folds = 5)
+#' tl_plot_cv_results(cv)
+#'
+#' # One metric rather than every one the folds scored
+#' tl_plot_cv_results(cv, metrics = "rmse")
+#' }
 tl_plot_cv_results <- function(cv_results, metrics = NULL) {
   # tl_cv() returns $folds (a list of per-fold tibbles, with no fold
   # column) and a $summary keyed on `mean`. Reading $fold_metrics and

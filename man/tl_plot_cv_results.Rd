@@ -18,3 +18,12 @@ A \code{\link[ggplot2]{ggplot}} object.
 \description{
 Plot cross-validation results
 }
+\examples{
+\donttest{
+cv <- tl_cv(mtcars, mpg ~ wt + hp, method = "linear", folds = 5)
+tl_plot_cv_results(cv)
+
+# One metric rather than every one the folds scored
+tl_plot_cv_results(cv, metrics = "rmse")
+}
+}

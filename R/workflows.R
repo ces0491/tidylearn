@@ -588,6 +588,17 @@ create_leaderboard <- function(results, metric, task, eval_kinds = NULL) {
 #' @param ... Additional arguments (ignored)
 #' @return The input object \code{x}, returned invisibly.
 #' @export
+#' @examples
+#' \donttest{
+#' result <- tl_auto_ml(iris, Species ~ .,
+#'   time_budget = 10,
+#'   use_reduction = FALSE,
+#'   use_clustering = FALSE,
+#'   cv_folds = 2)
+#'
+#' # The leaderboard, the winner and the metric it was ranked on
+#' print(result)
+#' }
 print.tidylearn_automl <- function(x, ...) {
   cat("tidylearn Auto ML Results\n")
   cat("=========================\n")

@@ -17,3 +17,15 @@ The input object \code{x}, returned invisibly.
 \description{
 Print auto ML results
 }
+\examples{
+\donttest{
+result <- tl_auto_ml(iris, Species ~ .,
+  time_budget = 10,
+  use_reduction = FALSE,
+  use_clustering = FALSE,
+  cv_folds = 2)
+
+# The leaderboard, the winner and the metric it was ranked on
+print(result)
+}
+}

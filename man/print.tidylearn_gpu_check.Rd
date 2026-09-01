@@ -17,3 +17,7 @@ The input \code{x}, invisibly.
 \description{
 Print method for \code{tidylearn_gpu_check} objects
 }
+\examples{
+# Reports no GPU rather than failing on a machine without one
+print(tl_check_gpu())
+}

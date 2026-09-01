@@ -350,6 +350,19 @@ earlier should be recomputed.
 
 ### Ranking, splitting and tuning
 
+* `tl_tune_xgboost()` could not complete a run. It read `best_iteration`
+  from the top level of the `xgb.cv()` result, which is where xgboost kept
+  it before 3.0 and not where it has been since, so every parameter set
+  scored `NULL`, `which.min()` over those scores returned `integer(0)`,
+  and the call died on "attempt to select less than one element in
+  get1index" — on the documented default call, for any input. Both
+  locations are now read. Separately, `nrounds` was hardcoded at 1000
+  inside the function while `...` was forwarded to the same call, so
+  passing the one argument an xgboost tuner obviously takes gave "formal
+  argument \"nrounds\" matched by multiple actual arguments". It is a
+  named argument now, documented as the ceiling early stopping works
+  within. The function had no test; it has one now.
+
 * `tl_tune_random()` rejects a parameter range written backwards.
   `c(0.1, 0.001)` instead of `c(0.001, 0.1)` was sampled with
   `runif(1, 0.1, 0.001)`, which is `NaN` — and R only warns — so every
@@ -639,6 +652,22 @@ earlier should be recomputed.
   cannot drift again unnoticed.
 
 ## Documentation
+
+* Every exported function now carries a runnable example. Thirteen had
+  none: `tl_predict_pipeline()`, `tl_compare_pipeline_models()`,
+  `tl_plot_cv_results()`, `tl_interaction_effects()`,
+  `tl_plot_interaction()`, `tl_tune_nn()`, `tl_plot_nn_tuning()`,
+  `tl_tune_xgboost()`, `tl_plot_xgboost_tree()`,
+  `tl_plot_xgboost_shap_dependence()` and the three `print` methods.
+  Writing them is what surfaced the `tl_tune_xgboost()` defects above.
+
+* `tl_plot_nn_tuning()` documented the wrong input and the wrong plot. It
+  takes the list `tl_tune_nn()` returns rather than a fitted model — the
+  error message said so, the `@param` did not — and it draws a heatmap of
+  the size-by-decay grid, not the training history its title claimed.
+
+* `DiagrammeR` is now declared in Suggests. `tl_plot_xgboost_tree()`
+  cannot render without it, reaching it through `xgboost::xgb.plot.tree()`.
 
 * Corrected five factual errors across the docs: the README claimed ten
   articles where there are eleven; `compute-backends` said eleven CPU-only

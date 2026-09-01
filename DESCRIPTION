@@ -55,6 +55,7 @@ Suggests:
     bigrquery,
     car,
     DBI,
+    DiagrammeR,
     DT,
     GGally,
     ggforce,
