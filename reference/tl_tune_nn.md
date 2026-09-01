@@ -52,3 +52,28 @@ A list with elements `model` (the best fitted `nnet` model), `best_size`
 (optimal hidden-layer size), `best_decay` (optimal weight decay), and
 `tuning_results` (a data frame of all parameter combinations and their
 cross-validated errors).
+
+## Examples
+
+``` r
+# \donttest{
+tuned <- tl_tune_nn(iris, Species ~ .,
+  is_classification = TRUE,
+  sizes = c(2, 5), decays = c(0, 0.01), folds = 3)
+
+tuned$best_size
+#> [1] 5
+tuned$best_decay
+#> [1] 0
+tuned$tuning_results
+#>   size decay      error
+#> 1    2  0.00 0.04666667
+#> 2    5  0.00 0.03333333
+#> 3    2  0.01 0.04000000
+#> 4    5  0.01 0.04000000
+
+# The grid this searched, drawn as a heatmap
+tl_plot_nn_tuning(tuned)
+
+# }
+```

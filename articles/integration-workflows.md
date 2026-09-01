@@ -23,7 +23,10 @@ labels you do not have, handle outliers explicitly, or fit one model per
 cluster.
 
 They coordinate the wrapped packages rather than implementing anything
-new, so `model$fit` still reaches the underlying object.
+new. Each step is an ordinary
+[`tl_model()`](https://tidylearn.sheetsolved.com/reference/tl_model.md)
+object, so `$fit` still reaches what the underlying package returned —
+`$fit$model` for the unsupervised step.
 
 One rule governs all five, and it is the thing that goes wrong most
 often: the unsupervised step is fitted on training data and must then be

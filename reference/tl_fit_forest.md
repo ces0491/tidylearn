@@ -36,7 +36,11 @@ tl_fit_forest(
 
 - mtry:
 
-  Number of variables randomly sampled at each split
+  Number of variables randomly sampled at each split. Left to
+  [`randomForest::randomForest()`](https://rdrr.io/pkg/randomForest/man/randomForest.html)
+  when `NULL`, which uses `floor(sqrt(p))` for classification and
+  `max(floor(p / 3), 1)` for regression over the `p` columns of the
+  design matrix.
 
 - importance:
 

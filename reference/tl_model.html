@@ -11,7 +11,7 @@ to the appropriate underlying package based on the method."><meta property="og:i
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -102,7 +102,8 @@ with a warning.</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A <code>tidylearn_model</code> object (S3) containing the fitted model
-(<code>$fit</code>), model specification (<code>$spec</code>), and training data
+(<code>$fit</code>, or <code>$fit$model</code> for an unsupervised method),
+model specification (<code>$spec</code>), and training data
 (<code>$data</code>). The object also inherits from a method-specific class
 (e.g., <code>tidylearn_linear</code>) and a paradigm class
 (<code>tidylearn_supervised</code> or <code>tidylearn_unsupervised</code>).</p>
@@ -114,7 +115,10 @@ kmeans, hclust), glmnet, randomForest, xgboost, gbm,
 e1071, nnet, rpart, cluster, and dbscan. The underlying
 algorithms are unchanged - this function provides a
 consistent interface and returns tidy output.</p>
-<p>Access the raw model object from the underlying package via <code>model$fit</code>.</p>
+<p>For a supervised method, <code>model$fit</code> is the object the wrapped
+function returned. An unsupervised method returns tidied components as
+well, so the wrapped object sits at <code>model$fit$model</code> and
+<code>model$fit</code> is the list holding both.</p>
 <p>For classification, the response is reduced to the classes it
 actually contains: subsetting a data frame keeps every factor level,
 and a level no row uses would otherwise be reported as a class, given
@@ -130,7 +134,7 @@ the problem is binary. The fit is unaffected.</p>
 <span class="r-in"><span><span class="va">model</span><span class="op">$</span><span class="va">fit</span>  <span class="co"># Access the raw randomForest object</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Call:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  randomForest(formula = formula, data = data, ntree = ntree, mtry = mtry,      importance = importance) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  randomForest(formula = Species ~ ., data = data, ntree = 500,      importance = TRUE) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                Type of random forest: classification</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                      Number of trees: 500</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> No. of variables tried at each split: 2</span>
@@ -156,42 +160,7 @@ the problem is binary. The fit is unaffected.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># PCA -&gt; wraps stats::prcomp()</span></span></span>
 <span class="r-in"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu">tl_model</span><span class="op">(</span><span class="va">iris</span>, <span class="op">~</span> <span class="va">.</span>, method <span class="op">=</span> <span class="st">"pca"</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">model</span><span class="op">$</span><span class="va">fit</span>  <span class="co"># Access the raw prcomp object</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $scores</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 150 × 5</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    .obs_id   PC1     PC2     PC3      PC4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span> 1       -<span style="color: #BB0000;">2.26</span> -<span style="color: #BB0000;">0.478</span>   0.127   0.024<span style="text-decoration: underline;">1</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span> 2       -<span style="color: #BB0000;">2.07</span>  0.672   0.234   0.103  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span> 3       -<span style="color: #BB0000;">2.36</span>  0.341  -<span style="color: #BB0000;">0.044</span><span style="color: #BB0000; text-decoration: underline;">1</span>  0.028<span style="text-decoration: underline;">3</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span> 4       -<span style="color: #BB0000;">2.29</span>  0.595  -<span style="color: #BB0000;">0.091</span><span style="color: #BB0000; text-decoration: underline;">0</span> -<span style="color: #BB0000;">0.065</span><span style="color: #BB0000; text-decoration: underline;">7</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span> 5       -<span style="color: #BB0000;">2.38</span> -<span style="color: #BB0000;">0.645</span>  -<span style="color: #BB0000;">0.015</span><span style="color: #BB0000; text-decoration: underline;">7</span> -<span style="color: #BB0000;">0.035</span><span style="color: #BB0000; text-decoration: underline;">8</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span> 6       -<span style="color: #BB0000;">2.07</span> -<span style="color: #BB0000;">1.48</span>   -<span style="color: #BB0000;">0.026</span><span style="color: #BB0000; text-decoration: underline;">9</span>  0.006<span style="text-decoration: underline;">59</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span> 7       -<span style="color: #BB0000;">2.44</span> -<span style="color: #BB0000;">0.047</span><span style="color: #BB0000; text-decoration: underline;">5</span> -<span style="color: #BB0000;">0.334</span>  -<span style="color: #BB0000;">0.036</span><span style="color: #BB0000; text-decoration: underline;">7</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span> 8       -<span style="color: #BB0000;">2.23</span> -<span style="color: #BB0000;">0.222</span>   0.088<span style="text-decoration: underline;">4</span> -<span style="color: #BB0000;">0.024</span><span style="color: #BB0000; text-decoration: underline;">5</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span> 9       -<span style="color: #BB0000;">2.33</span>  1.11   -<span style="color: #BB0000;">0.145</span>  -<span style="color: #BB0000;">0.026</span><span style="color: #BB0000; text-decoration: underline;">8</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span> 10      -<span style="color: #BB0000;">2.18</span>  0.467   0.253  -<span style="color: #BB0000;">0.039</span><span style="color: #BB0000; text-decoration: underline;">8</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 140 more rows</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $loadings</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 4 × 5</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   variable        PC1     PC2    PC3    PC4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> Sepal.Length  0.521 -<span style="color: #BB0000;">0.377</span>   0.720  0.261</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> Sepal.Width  -<span style="color: #BB0000;">0.269</span> -<span style="color: #BB0000;">0.923</span>  -<span style="color: #BB0000;">0.244</span> -<span style="color: #BB0000;">0.124</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span> Petal.Length  0.580 -<span style="color: #BB0000;">0.024</span><span style="color: #BB0000; text-decoration: underline;">5</span> -<span style="color: #BB0000;">0.142</span> -<span style="color: #BB0000;">0.801</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span> Petal.Width   0.565 -<span style="color: #BB0000;">0.066</span><span style="color: #BB0000; text-decoration: underline;">9</span> -<span style="color: #BB0000;">0.634</span>  0.524</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $variance_explained</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 4 × 5</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   component  sdev variance prop_variance cum_variance</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>        <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> PC1       1.71    2.92         0.730          0.730</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> PC2       0.956   0.914        0.229          0.958</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span> PC3       0.383   0.147        0.036<span style="text-decoration: underline;">7</span>         0.995</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span> PC4       0.144   0.020<span style="text-decoration: underline;">7</span>       0.005<span style="text-decoration: underline;">18</span>        1    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $model</span>
+<span class="r-in"><span><span class="va">model</span><span class="op">$</span><span class="va">fit</span><span class="op">$</span><span class="va">model</span>  <span class="co"># The raw prcomp object, alongside tidied components</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Standard deviations (1, .., p=4):</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] 1.7083611 0.9560494 0.3830886 0.1439265</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
@@ -201,77 +170,33 @@ the problem is binary. The fit is unaffected.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Sepal.Width  -0.2693474 -0.92329566 -0.2443818 -0.1235096</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Petal.Length  0.5804131 -0.02449161 -0.1421264 -0.8014492</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Petal.Width   0.5648565 -0.06694199 -0.6342727  0.5235971</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $settings</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $settings$scale</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $settings$center</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $settings$method</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "prcomp"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Clustering -&gt; wraps stats::kmeans()</span></span></span>
 <span class="r-in"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu">tl_model</span><span class="op">(</span><span class="va">iris</span>, method <span class="op">=</span> <span class="st">"kmeans"</span>, k <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">model</span><span class="op">$</span><span class="va">fit</span>  <span class="co"># Access the raw kmeans object</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $clusters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 150 × 2</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    .obs_id cluster</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;int&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span> 1             2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span> 2             2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span> 3             2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span> 4             2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span> 5             2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span> 6             2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span> 7             2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span> 8             2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span> 9             2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span> 10            2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 140 more rows</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $centers</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 3 × 5</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   cluster Sepal.Length Sepal.Width Petal.Length Petal.Width</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>        <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>        <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span>       1         5.90        2.75         4.39       1.43 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span>       2         5.01        3.43         1.46       0.246</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span>       3         6.85        3.07         5.74       2.07 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $metrics</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 1 × 6</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       k tot_withinss betweenss tot_ss  iter converged</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>        <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;lgl&gt;</span>    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span>     3         78.9      603.   681.     2 TRUE     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $model</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> K-means clustering with 3 clusters of sizes 62, 50, 38</span>
+<span class="r-in"><span><span class="va">model</span><span class="op">$</span><span class="va">fit</span><span class="op">$</span><span class="va">model</span>  <span class="co"># The raw kmeans object</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> K-means clustering with 3 clusters of sizes 50, 62, 38</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Cluster means:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Sepal.Length Sepal.Width Petal.Length Petal.Width</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1     5.901613    2.748387     4.393548    1.433871</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2     5.006000    3.428000     1.462000    0.246000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1     5.006000    3.428000     1.462000    0.246000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2     5.901613    2.748387     4.393548    1.433871</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 3     6.850000    3.073684     5.742105    2.071053</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Clustering vector:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   [1] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [38] 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 3 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [75] 1 1 1 3 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 3 1 3 3 3 3 1 3 3 3 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [112] 3 3 1 1 3 3 3 3 1 3 1 3 1 3 3 1 1 3 3 3 3 3 1 3 3 3 3 1 3 3 3 1 3 3 3 1 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [149] 3 1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   [1] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [38] 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 3 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [75] 2 2 2 3 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 3 2 3 3 3 3 2 3 3 3 3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [112] 3 3 2 2 3 3 3 3 2 3 2 3 2 3 3 2 2 3 3 3 3 3 2 3 3 3 3 2 3 3 3 2 3 3 3 2 3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [149] 3 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Within cluster sum of squares by cluster:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 39.82097 15.15100 23.87947</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 15.15100 39.82097 23.87947</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  (between_SS / total_SS =  88.4 %)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Available components:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] "cluster"      "centers"      "totss"        "withinss"     "tot.withinss"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [6] "betweenss"    "size"         "iter"         "ifault"      </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

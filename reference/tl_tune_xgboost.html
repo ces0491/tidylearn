@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -51,6 +51,7 @@
 <span>  is_classification <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  param_grid <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  cv_folds <span class="op">=</span> <span class="fl">5</span>,</span>
+<span>  nrounds <span class="op">=</span> <span class="fl">1000</span>,</span>
 <span>  early_stopping_rounds <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  <span class="va">...</span></span>
@@ -82,6 +83,12 @@ classification problem</p></dd>
 <dd><p>Number of cross-validation folds (default: 5)</p></dd>
 
 
+<dt id="arg-nrounds">nrounds<a class="anchor" aria-label="anchor" href="#arg-nrounds"></a></dt>
+<dd><p>Upper bound on boosting rounds per parameter set
+(default: 1000). Early stopping normally halts well short of it, so
+this is a ceiling rather than a target; lower it to cap the search.</p></dd>
+
+
 <dt id="arg-early-stopping-rounds">early_stopping_rounds<a class="anchor" aria-label="anchor" href="#arg-early-stopping-rounds"></a></dt>
 <dd><p>Early stopping rounds (default: 10)</p></dd>
 
@@ -91,7 +98,7 @@ classification problem</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments</p></dd>
+<dd><p>Additional arguments passed to <code><a href="https://rdrr.io/pkg/xgboost/man/xgb.cv.html" class="external-link">xgboost::xgb.cv()</a></code></p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -103,6 +110,35 @@ output), <code>best_params</code>, <code>best_iteration</code>, <code>best_score
 <code>minimize</code>.</p>
     </div>
 
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
+<span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"xgboost"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
+<span class="r-in"><span>  <span class="co"># The default grid is 216 combinations; name a smaller one to see it</span></span></span>
+<span class="r-in"><span>  <span class="co"># run, and cap nrounds so early stopping has less ground to cover</span></span></span>
+<span class="r-in"><span>  <span class="va">tuned</span> <span class="op">&lt;-</span> <span class="fu">tl_tune_xgboost</span><span class="op">(</span><span class="va">iris</span>, <span class="va">Species</span> <span class="op">~</span> <span class="va">.</span>,</span></span>
+<span class="r-in"><span>    is_classification <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
+<span class="r-in"><span>    param_grid <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>max_depth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">4</span><span class="op">)</span>, eta <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.1</span>, <span class="fl">0.3</span><span class="op">)</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    cv_folds <span class="op">=</span> <span class="fl">3</span>, nrounds <span class="op">=</span> <span class="fl">50</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span>  <span class="va">results</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">tuned</span>, <span class="st">"tuning_results"</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="va">results</span><span class="op">$</span><span class="va">best_params</span></span></span>
+<span class="r-in"><span>  <span class="va">results</span><span class="op">$</span><span class="va">best_iteration</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span>  <span class="co"># tuned is an ordinary model, refit on all rows at those settings</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">tuned</span>, <span class="va">iris</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="op">]</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 5 × 1</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .pred </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> setosa</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> setosa</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span> setosa</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span> setosa</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">5</span> setosa</span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
+</code></pre></div>
+    </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
 

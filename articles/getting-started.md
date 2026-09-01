@@ -10,7 +10,9 @@ comes back is a tibble or a ggplot2 object.
 
 The algorithms are untouched. glmnet, randomForest, xgboost, e1071,
 cluster and dbscan do the fitting, and `model$fit` hands you the object
-they returned, so nothing here closes off the package underneath.
+they returned — `model$fit$model` for an unsupervised method, whose
+`$fit` is the list of tidied components — so nothing here closes off the
+package underneath.
 
 This vignette covers the shape of a workflow end to end. The articles
 listed at the bottom go deeper on each step.
@@ -349,8 +351,7 @@ tidylearn provides a unified interface to these established R packages:
 
 ### Accessing the Underlying Model
 
-You always have access to the raw model from the underlying package via
-`$fit`:
+The raw model from the underlying package is reachable through `$fit`:
 
 ``` r
 
@@ -361,6 +362,19 @@ class(model_forest$fit)  # This is the randomForest object
 
 # Use package-specific functions if needed
 # randomForest::varImpPlot(model_forest$fit) # nolint
+```
+
+An unsupervised method returns tidied components as well, so its `$fit`
+is the list holding them and the wrapped object sits at `$fit$model`:
+
+``` r
+
+model_pca <- tl_model(iris, ~ ., method = "pca")
+names(model_pca$fit)
+#> [1] "scores"             "loadings"           "variance_explained"
+#> [4] "model"              "settings"
+class(model_pca$fit$model)  # This is the prcomp object
+#> [1] "prcomp"
 ```
 
 ## The Whole Workflow

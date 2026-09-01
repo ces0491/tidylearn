@@ -22,3 +22,17 @@ tl_plot_cv_results(cv_results, metrics = NULL)
 
 A [`ggplot`](https://ggplot2.tidyverse.org/reference/ggplot.html)
 object.
+
+## Examples
+
+``` r
+# \donttest{
+cv <- tl_cv(mtcars, mpg ~ wt + hp, method = "linear", folds = 5)
+tl_plot_cv_results(cv)
+
+
+# One metric rather than every one the folds scored
+tl_plot_cv_results(cv, metrics = "rmse")
+
+# }
+```

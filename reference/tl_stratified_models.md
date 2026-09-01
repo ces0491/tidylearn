@@ -70,7 +70,7 @@ A list with class `"tidylearn_stratified"` containing:
 # \donttest{
 models <- tl_stratified_models(mtcars, mpg ~ ., cluster_method = "kmeans",
                                 k = 3, supervised_method = "linear")
-#> Note: Response 'mpg' has 6 unique numeric values. Treating as regression. Convert to factor for classification.
 #> Note: Response 'mpg' has 8 unique numeric values. Treating as regression. Convert to factor for classification.
+#> Note: Response 'mpg' has 6 unique numeric values. Treating as regression. Convert to factor for classification.
 # }
 ```

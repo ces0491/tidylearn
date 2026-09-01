@@ -91,7 +91,9 @@ All backend packages are suggested dependencies, checked at call time.
   [`summary()`](https://rdrr.io/r/base/summary.html),
   [`predict()`](https://rdrr.io/r/stats/predict.html),
   [`plot()`](https://rdrr.io/r/graphics/plot.default.html)
-- Raw model accessible via `$fit` slot
+- Raw model accessible via the `$fit` slot for a supervised method, and
+  `$fit$model` for an unsupervised one, which keeps its tidied
+  components alongside it
 
 ``` r
 
@@ -100,7 +102,8 @@ supervised <- tl_model(iris, Species ~ ., method = "forest")
 supervised$fit  # Access randomForest::randomForest() result
 
 unsupervised <- tl_model(iris[,1:4], method = "kmeans", k = 3)
-unsupervised$fit  # Access stats::kmeans() result
+unsupervised$fit$model  # Access stats::kmeans() result
+names(unsupervised$fit)  # clusters, centers, metrics, model
 ```
 
 #### `integration.R` - Workflow Orchestration

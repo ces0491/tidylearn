@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -92,8 +92,9 @@ reduce the features, add cluster membership as a feature, propagate
 labels you do not have, handle outliers explicitly, or fit one model per
 cluster.</p>
 <p>They coordinate the wrapped packages rather than implementing
-anything new, so <code>model$fit</code> still reaches the underlying
-object.</p>
+anything new. Each step is an ordinary <code><a href="../reference/tl_model.html">tl_model()</a></code> object,
+so <code>$fit</code> still reaches what the underlying package returned
+— <code>$fit$model</code> for the unsupervised step.</p>
 <p>One rule governs all five, and it is the thing that goes wrong most
 often: the unsupervised step is fitted on training data and must then be
 <em>applied</em> to the test set, never refitted on it. Every example

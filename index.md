@@ -38,7 +38,8 @@ consistent, tidy API.
 - A reimplementation of ML algorithms (uses established packages under
   the hood)
 - A replacement for the underlying packages (you can access the raw
-  model via `model$fit`)
+  model via `model$fit`, or `model$fit$model` for an unsupervised
+  method)
 
 ## Why tidylearn?
 
@@ -394,10 +395,11 @@ tl_table_comparison(model1, model2, model3,
 
 The underlying packages do the real work, and tidylearn does not hide
 what they are doing — every method documents the function it calls, and
-`$fit` hands you the object that function returned. What tidylearn adds
-is one signature across all 20 methods, and output that is already a
-tibble or a ggplot2 object, so results move into dplyr and the rest of
-the tidyverse without conversion.
+a supervised model’s `$fit` is the object that function returned (an
+unsupervised one keeps it at `$fit$model`, next to the tidied
+components). What tidylearn adds is one signature across all 20 methods,
+and output that is already a tibble or a ggplot2 object, so results move
+into dplyr and the rest of the tidyverse without conversion.
 
 ## Documentation
 

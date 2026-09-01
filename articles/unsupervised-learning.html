@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -105,8 +105,9 @@ than a fitted object you have to take apart, and each has a matching
 <span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">km</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "clusters" "centers"  "metrics"  "sizes"    "model"</span></span></code></pre></div>
 <p>Both wrap <code><a href="https://rdrr.io/r/stats/kmeans.html" class="external-link">stats::kmeans()</a></code>; the algorithms are unchanged.
-Reach the raw object through <code>model$fit</code> or
-<code>km$model</code>.</p>
+Reach the raw object through <code>model$fit$model</code> or
+<code>km$model</code> — an unsupervised <code>$fit</code> is the list of
+tidied components, with the wrapped object among them.</p>
 <p><strong>Wrapped packages:</strong></p>
 <ul>
 <li>stats (<code><a href="https://rdrr.io/r/stats/prcomp.html" class="external-link">prcomp()</a></code>, <code><a href="https://rdrr.io/r/stats/kmeans.html" class="external-link">kmeans()</a></code>,

@@ -41,8 +41,9 @@ names(km)
 ```
 
 Both wrap [`stats::kmeans()`](https://rdrr.io/r/stats/kmeans.html); the
-algorithms are unchanged. Reach the raw object through `model$fit` or
-`km$model`.
+algorithms are unchanged. Reach the raw object through `model$fit$model`
+or `km$model` — an unsupervised `$fit` is the list of tidied components,
+with the wrapped object among them.
 
 **Wrapped packages:**
 

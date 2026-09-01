@@ -72,8 +72,8 @@ cv$summary
 #> # A tibble: 3 × 3
 #>   metric  mean    sd
 #>   <chr>  <dbl> <dbl>
-#> 1 mae    2.09  0.779
-#> 2 rmse   2.63  0.927
-#> 3 rsq    0.737 0.214
+#> 1 mae    2.18  0.774
+#> 2 rmse   2.72  1.06 
+#> 3 rsq    0.654 0.334
 # }
 ```

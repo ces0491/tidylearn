@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -66,6 +66,24 @@
     <p>The input <code>x</code>, invisibly.</p>
     </div>
 
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Reports no GPU rather than failing on a machine without one</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="fu"><a href="tl_check_gpu.html">tl_check_gpu</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;tidylearn GPU detection&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Any GPU:        no</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> CUDA driver:    absent</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Backends:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   xgboost     CPU only</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   tensorflow  CPU only</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   keras       CPU only</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   torch       not installed</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Notes:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   - No NVIDIA CUDA driver detected. All GPU paths fall back to CPU.</span>
+</code></pre></div>
+    </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
 

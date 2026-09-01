@@ -43,7 +43,9 @@ tl_fit_svm(
 
 - gamma:
 
-  Gamma parameter for kernels (default: 1/ncol(data))
+  Gamma parameter for kernels. Left to
+  [`e1071::svm()`](https://rdrr.io/pkg/e1071/man/svm.html) when `NULL`,
+  which uses 1 divided by the number of columns in the design matrix.
 
 - degree:
 

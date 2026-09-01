@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -105,14 +105,15 @@
 <li>Automatic routing to supervised/unsupervised implementations</li>
 <li>Unified S3 methods: <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code>, <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>, <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code>, <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code>
 </li>
-<li>Raw model accessible via <code>$fit</code> slot</li>
+<li>Raw model accessible via the <code>$fit</code> slot for a supervised method, and <code>$fit$model</code> for an unsupervised one, which keeps its tidied components alongside it</li>
 </ul><div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Same interface, different underlying packages</span></span>
 <span><span class="va">supervised</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/tl_model.html">tl_model</a></span><span class="op">(</span><span class="va">iris</span>, <span class="va">Species</span> <span class="op">~</span> <span class="va">.</span>, method <span class="op">=</span> <span class="st">"forest"</span><span class="op">)</span></span>
 <span><span class="va">supervised</span><span class="op">$</span><span class="va">fit</span>  <span class="co"># Access randomForest::randomForest() result</span></span>
 <span></span>
 <span><span class="va">unsupervised</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/tl_model.html">tl_model</a></span><span class="op">(</span><span class="va">iris</span><span class="op">[</span>,<span class="fl">1</span><span class="op">:</span><span class="fl">4</span><span class="op">]</span>, method <span class="op">=</span> <span class="st">"kmeans"</span>, k <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span>
-<span><span class="va">unsupervised</span><span class="op">$</span><span class="va">fit</span>  <span class="co"># Access stats::kmeans() result</span></span></code></pre></div>
+<span><span class="va">unsupervised</span><span class="op">$</span><span class="va">fit</span><span class="op">$</span><span class="va">model</span>  <span class="co"># Access stats::kmeans() result</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">unsupervised</span><span class="op">$</span><span class="va">fit</span><span class="op">)</span>  <span class="co"># clusters, centers, metrics, model</span></span></code></pre></div>
 </div>
 <div class="section level4">
 <h4 id="integrationr---workflow-orchestration">

@@ -33,7 +33,7 @@
 
     <a class="navbar-brand me-2" href="index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -91,7 +91,7 @@
 <p><strong>What tidylearn is NOT:</strong></p>
 <ul>
 <li>A reimplementation of ML algorithms (uses established packages under the hood)</li>
-<li>A replacement for the underlying packages (you can access the raw model via <code>model$fit</code>)</li>
+<li>A replacement for the underlying packages (you can access the raw model via <code>model$fit</code>, or <code>model$fit$model</code> for an unsupervised method)</li>
 </ul>
 </div>
 <div class="section level2">
@@ -486,7 +486,7 @@
 <div class="section level2">
 <h2 id="philosophy">Philosophy<a class="anchor" aria-label="anchor" href="#philosophy"></a>
 </h2>
-<p>The underlying packages do the real work, and tidylearn does not hide what they are doing — every method documents the function it calls, and <code>$fit</code> hands you the object that function returned. What tidylearn adds is one signature across all 20 methods, and output that is already a tibble or a ggplot2 object, so results move into dplyr and the rest of the tidyverse without conversion.</p>
+<p>The underlying packages do the real work, and tidylearn does not hide what they are doing — every method documents the function it calls, and a supervised model’s <code>$fit</code> is the object that function returned (an unsupervised one keeps it at <code>$fit$model</code>, next to the tidied components). What tidylearn adds is one signature across all 20 methods, and output that is already a tibble or a ggplot2 object, so results move into dplyr and the rest of the tidyverse without conversion.</p>
 </div>
 <div class="section level2">
 <h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>

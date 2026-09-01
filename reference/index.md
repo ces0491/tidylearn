@@ -269,7 +269,7 @@ them.
 - [`tl_plot_nn_architecture()`](https://tidylearn.sheetsolved.com/reference/tl_plot_nn_architecture.md)
   : Plot neural network architecture
 - [`tl_plot_nn_tuning()`](https://tidylearn.sheetsolved.com/reference/tl_plot_nn_tuning.md)
-  : Plot neural network training history
+  : Plot a neural network tuning grid
 - [`tl_plot_partial_dependence()`](https://tidylearn.sheetsolved.com/reference/tl_plot_partial_dependence.md)
   : Plot partial dependence for tree-based models
 - [`tl_plot_regularization_cv()`](https://tidylearn.sheetsolved.com/reference/tl_plot_regularization_cv.md)

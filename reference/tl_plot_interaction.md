@@ -50,3 +50,20 @@ tl_plot_interaction(
 
 A [`ggplot`](https://ggplot2.tidyverse.org/reference/ggplot.html)
 object.
+
+## Examples
+
+``` r
+# \donttest{
+model <- tl_model(mtcars, mpg ~ wt * hp, method = "linear")
+
+# var2 is drawn as a set of lines across the range of var1
+tl_plot_interaction(model, var1 = "wt", var2 = "hp")
+
+
+# Coarser grid, no ribbon
+tl_plot_interaction(model, var1 = "wt", var2 = "hp",
+  n_points = 20, confidence = FALSE)
+
+# }
+```

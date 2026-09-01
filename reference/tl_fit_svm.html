@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -86,8 +86,9 @@ classification problem</p></dd>
 
 
 <dt id="arg-gamma">gamma<a class="anchor" aria-label="anchor" href="#arg-gamma"></a></dt>
-<dd><p>Gamma parameter for kernels
-(default: 1/ncol(data))</p></dd>
+<dd><p>Gamma parameter for kernels. Left to <code><a href="https://rdrr.io/pkg/e1071/man/svm.html" class="external-link">e1071::svm()</a></code>
+when <code>NULL</code>, which uses 1 divided by the number of columns in
+the design matrix.</p></dd>
 
 
 <dt id="arg-degree">degree<a class="anchor" aria-label="anchor" href="#arg-degree"></a></dt>
