@@ -1,5 +1,31 @@
 # tidylearn 0.5.0
 
+## Resubmission
+
+This is a resubmission. The previous submission failed the incoming
+pre-test on Debian with:
+
+    Running R code in 'testthat.R' had CPU time 3.8 times elapsed time
+
+xgboost parallelises with OpenMP and took every core on the check
+machine. `tests/testthat.R` now sets `OMP_NUM_THREADS` and
+`OMP_THREAD_LIMIT` to 2 before the package is loaded, which caps the
+ratio wherever the check runs. The package's own default is unchanged,
+so users still get every core. One xgboost tuning test also dropped a
+case the test above it already covered.
+
+Measured on a 16-core machine, an xgboost fit uncapped runs at a CPU to
+elapsed ratio of 3.2; the same fit with the cap in place runs at 1.8.
+
+Also in this version, unrelated to the pre-test: the `Description` field
+said raw model objects are reached via `$fit` for every method. That is
+true for a supervised method; an unsupervised one returns tidied
+components as well, so its wrapped object is at `$fit$model`. The rest of
+the documentation was corrected before the first submission and this
+field was missed.
+
+## About this release
+
 This is a minor release of a package already on CRAN (0.4.0). It adds the
 security and serialisation groundwork for cloud compute, and fixes a large
 group of defects found in a systematic bug hunt across the package — most of
