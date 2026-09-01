@@ -11,8 +11,8 @@ consistent function signatures and tidy tibble output. Results flow into
 unified 'ggplot2'-based visualization and optional formatted 'gt' tables
 via the tl_table() family. The underlying algorithms are unchanged;
 'tidylearn' simply makes them easier to use together. Access raw model
-objects via the \$fit slot for package-specific functionality. Methods
-include random forests Breiman (2001)
+objects via the \$fit slot for a supervised method, or \$fit\$model for
+an unsupervised one. Methods include random forests Breiman (2001)
 [doi:10.1023/A:1010933404324](https://doi.org/10.1023/A%3A1010933404324)
 , LASSO regression Tibshirani (1996)
 [doi:10.1111/j.2517-6161.1996.tb02080.x](https://doi.org/10.1111/j.2517-6161.1996.tb02080.x)
