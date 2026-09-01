@@ -74,6 +74,10 @@ well, so its wrapped object is at `model$fit$model`.
 ## Test environments
 
 * local: Windows 11 x64, R 4.5.2
+* win-builder: R-release (4.6.1, 2026-06-24 ucrt) -- Status: OK
+* win-builder: R-devel (2026-08-31 r90457 ucrt) -- Status: OK
+* GitHub Actions: ubuntu-latest (R-release and R-devel), macos-latest and
+  windows-latest (R-release) -- all OK
 
 ## Notes for the reviewer
 
