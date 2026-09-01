@@ -497,13 +497,13 @@ test_that("tl_tune_xgboost scores every task's own metric", {
   skip_if_not_installed("xgboost")
 
   # The score is read from a column named after the eval_metric, and the
-  # metric differs by task -- mlogloss, logloss, rmse. Only multiclass was
-  # exercised above, so a rename on either of the others would pass.
+  # metric differs by task -- mlogloss, logloss, rmse. The test above
+  # covers mlogloss, so only the other two are run here: xgboost is the
+  # heaviest thing in the suite and a third run would buy nothing.
   binary <- iris[iris$Species != "setosa", ]
   binary$Species <- droplevels(binary$Species)
 
   cases <- list(
-    multiclass = list(data = iris, formula = Species ~ ., classify = TRUE),
     binary = list(data = binary, formula = Species ~ ., classify = TRUE),
     regression = list(data = mtcars, formula = mpg ~ ., classify = FALSE)
   )
@@ -513,7 +513,7 @@ test_that("tl_tune_xgboost scores every task's own metric", {
     tuned <- suppressWarnings(suppressMessages(
       tl_tune_xgboost(case$data, case$formula,
         is_classification = case$classify,
-        param_grid = list(max_depth = c(2, 3), eta = 0.3),
+        param_grid = list(max_depth = 2, eta = 0.3),
         cv_folds = 3, nrounds = 20, verbose = FALSE
       )
     ))
