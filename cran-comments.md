@@ -2,25 +2,37 @@
 
 ## Resubmission
 
-This is a resubmission. The previous submission failed the incoming
-pre-test on Debian with:
+This is a second resubmission. Both previous attempts failed the incoming
+pre-test on Debian with a CPU-to-elapsed ratio over the 2.5 limit: 3.8,
+then 3.1.
 
-    Running R code in 'testthat.R' had CPU time 3.8 times elapsed time
+The first attempt at a fix was wrong, and this explains why, because the
+3.8 to 3.1 change made it look partly effective when it did nothing at
+all. It set OMP_NUM_THREADS from inside tests/testthat.R. libgomp reads
+that variable once, when it loads, and R has already loaded it through
+the BLAS before that script runs -- so Sys.setenv() arrives too late and
+is ignored. The difference between the two runs was ordinary variation.
 
-xgboost parallelises with OpenMP and took every core on the check
-machine. `tests/testthat.R` now sets `OMP_NUM_THREADS` and
-`OMP_THREAD_LIMIT` to 2 before the package is loaded, which caps the
-ratio wherever the check runs. The package's own default is unchanged,
-so users still get every core. One xgboost tuning test also dropped a
-case the test above it already covered.
+The cap is now applied through the runtime API, which changes the thread
+pool rather than the variable it was built from, so load order does not
+matter. tests/testthat.R calls RhpcBLASctl::blas_set_num_threads(2) and
+RhpcBLASctl::omp_set_num_threads(2), guarded by requireNamespace(), and
+RhpcBLASctl is added to Suggests.
 
-Measured on a 16-core machine, an xgboost fit uncapped runs at a CPU to
-elapsed ratio of 3.2; the same fit with the cap in place runs at 1.8.
+Measured on 16 cores under Linux with an OpenBLAS pthread build, which
+is the configuration that produced the NOTE:
 
-Also in this version, unrelated to the pre-test: the `Description` field
-said raw model objects are reached via `$fit` for every method. That is
+    an xgboost fit    no cap 15.8   Sys.setenv 15.8   runtime API 1.97
+    a matrix product  no cap 14.8   Sys.setenv 15.3   runtime API 1.94
+    the whole suite   no cap 14.5                     runtime API 0.93
+
+The whole-suite figures are 4563s CPU against 315s elapsed before, and
+14s against 15s after.
+
+Also in this version, unrelated to the pre-test: the Description field
+said raw model objects are reached via $fit for every method. That is
 true for a supervised method; an unsupervised one returns tidied
-components as well, so its wrapped object is at `$fit$model`. The rest of
+components as well, so its wrapped object is at $fit$model. The rest of
 the documentation was corrected before the first submission and this
 field was missed.
 
