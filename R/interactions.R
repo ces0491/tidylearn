@@ -126,6 +126,17 @@ tl_test_interactions <- function(data, formula, var1 = NULL, var2 = NULL,
 #' @param ... Additional arguments to pass to predict()
 #' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @export
+#' @examples
+#' \donttest{
+#' model <- tl_model(mtcars, mpg ~ wt * hp, method = "linear")
+#'
+#' # var2 is drawn as a set of lines across the range of var1
+#' tl_plot_interaction(model, var1 = "wt", var2 = "hp")
+#'
+#' # Coarser grid, no ribbon
+#' tl_plot_interaction(model, var1 = "wt", var2 = "hp",
+#'   n_points = 20, confidence = FALSE)
+#' }
 tl_plot_interaction <- function(model, var1, var2,
                                 n_points = 100,
                                 fixed_values = NULL,
@@ -410,6 +421,19 @@ tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
 #'   precise estimate. Use \code{summary(model$fit)} for inference on the
 #'   interaction coefficient itself.
 #' @export
+#' @examples
+#' \donttest{
+#' model <- tl_model(mtcars, mpg ~ wt * hp, method = "linear")
+#'
+#' # How the effect of weight changes across horsepower
+#' effects <- tl_interaction_effects(model, var = "wt", by_var = "hp")
+#' head(effects$effects)
+#' effects$slopes
+#'
+#' # slopes$slope_se describes the fitted grid, not the sampling
+#' # uncertainty of the marginal effect -- for that, read the coefficient
+#' summary(model$fit)$coefficients["wt:hp", ]
+#' }
 tl_interaction_effects <- function(model, var, by_var,
                                    at_values = NULL,
                                    intervals = TRUE) {

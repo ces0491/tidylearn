@@ -2,12 +2,14 @@
 % Please edit documentation in R/supervised-neural-networks.R
 \name{tl_plot_nn_tuning}
 \alias{tl_plot_nn_tuning}
-\title{Plot neural network training history}
+\title{Plot a neural network tuning grid}
 \usage{
 tl_plot_nn_tuning(model, ...)
 }
 \arguments{
-\item{model}{A tidylearn neural network model object}
+\item{model}{The list returned by \code{\link{tl_tune_nn}}, not a fitted
+model — the grid it draws lives in that list's
+\code{$tuning_results}. Anything without that element is refused.}
 
 \item{...}{Additional arguments}
 }
@@ -15,5 +17,15 @@ tl_plot_nn_tuning(model, ...)
 A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
-Plot neural network training history
+Draws the size-by-decay grid as a heatmap of cross-validated error.
+}
+\examples{
+\donttest{
+tuned <- tl_tune_nn(iris, Species ~ .,
+  is_classification = TRUE,
+  sizes = c(2, 5), decays = c(0, 0.01), folds = 3)
+
+# The tuning result itself, not tuned$model
+tl_plot_nn_tuning(tuned)
+}
 }

@@ -450,3 +450,104 @@ test_that("a metric the task cannot produce is named, not a length error", {
     expect_false(grepl("replacement has length zero", msg), info = bad)
   }
 })
+
+test_that("tl_tune_xgboost runs, and takes nrounds without colliding", {
+  skip_if_not_installed("xgboost")
+
+  # This function had no test at all, and two defects between it and any
+  # result. It hardcoded nrounds = 1000 while forwarding `...` to the same
+  # xgb.cv() call, so passing the one argument an xgboost tuner obviously
+  # takes gave "formal argument \"nrounds\" matched by multiple actual
+  # arguments" -- and on the default path, where nothing collided, it
+  # still died on "attempt to select less than one element in get1index".
+  grid <- list(max_depth = c(2, 3), eta = 0.3)
+
+  tuned <- suppressWarnings(suppressMessages(
+    tl_tune_xgboost(iris, Species ~ .,
+      is_classification = TRUE, param_grid = grid,
+      cv_folds = 3, nrounds = 20, verbose = FALSE
+    )
+  ))
+  expect_s3_class(tuned, "tidylearn_model")
+
+  results <- attr(tuned, "tuning_results")
+  expect_length(results$results, nrow(expand.grid(grid)))
+
+  # The iteration has to be a real index into the evaluation log, not the
+  # NULL that xgboost >= 3.0 returns from the pre-3.0 location
+  expect_true(is.finite(results$best_iteration))
+  expect_gte(results$best_iteration, 1)
+  expect_true(is.finite(results$best_score))
+  expect_true(results$best_params$max_depth %in% grid$max_depth)
+
+  # And the default nrounds path, which never collided and failed anyway
+  expect_s3_class(
+    suppressWarnings(suppressMessages(
+      tl_tune_xgboost(iris, Species ~ .,
+        is_classification = TRUE,
+        param_grid = list(max_depth = 2, eta = 0.3),
+        cv_folds = 3, verbose = FALSE
+      )
+    )),
+    "tidylearn_model"
+  )
+})
+
+test_that("tl_tune_xgboost scores every task's own metric", {
+  skip_if_not_installed("xgboost")
+
+  # The score is read from a column named after the eval_metric, and the
+  # metric differs by task -- mlogloss, logloss, rmse. Only multiclass was
+  # exercised above, so a rename on either of the others would pass.
+  binary <- iris[iris$Species != "setosa", ]
+  binary$Species <- droplevels(binary$Species)
+
+  cases <- list(
+    multiclass = list(data = iris, formula = Species ~ ., classify = TRUE),
+    binary = list(data = binary, formula = Species ~ ., classify = TRUE),
+    regression = list(data = mtcars, formula = mpg ~ ., classify = FALSE)
+  )
+
+  for (name in names(cases)) {
+    case <- cases[[name]]
+    tuned <- suppressWarnings(suppressMessages(
+      tl_tune_xgboost(case$data, case$formula,
+        is_classification = case$classify,
+        param_grid = list(max_depth = c(2, 3), eta = 0.3),
+        cv_folds = 3, nrounds = 20, verbose = FALSE
+      )
+    ))
+    results <- attr(tuned, "tuning_results")
+
+    # A NULL score is the failure mode: it collapses which.min() to
+    # integer(0) rather than producing a wrong number
+    expect_true(is.finite(results$best_score), info = name)
+    expect_true(is.finite(results$best_iteration), info = name)
+    expect_gte(results$best_iteration, 1)
+    expect_lte(results$best_iteration, 20)
+  }
+})
+
+test_that("tl_xgb_best_iteration reads either xgboost layout", {
+  log <- data.frame(
+    iter = 1:20,
+    test_mlogloss_mean = seq(1, 0.2, length.out = 20)
+  )
+
+  # Where xgboost >= 3.0 puts it
+  expect_equal(
+    tl_xgb_best_iteration(list(
+      early_stop = list(best_iteration = 14L), evaluation_log = log
+    )),
+    14L
+  )
+
+  # Where xgboost < 3.0 put it
+  expect_equal(
+    tl_xgb_best_iteration(list(best_iteration = 7L, evaluation_log = log)),
+    7L
+  )
+
+  # Neither, because early stopping was off and the run went the distance
+  expect_equal(tl_xgb_best_iteration(list(evaluation_log = log)), 20L)
+})

@@ -198,7 +198,7 @@ for (method in regression_methods) {
 # and glmnet refused to fit, gbm and nnet failed at predict or evaluate,
 # rpart returned a probability column for the absent class, and
 # tl_event_level_args() read the declared count and so let yardstick score
-# the first level as positive -- reopening the metric bug 0.4.0.9000 fixed.
+# the first level as positive -- reopening the metric bug 0.5.0 fixed.
 #
 # The model itself was never in question: glm() and friends drop the empty
 # level internally, so the fit was always identical to the dropped frame's.

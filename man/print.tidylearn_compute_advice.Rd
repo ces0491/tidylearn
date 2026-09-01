@@ -17,3 +17,8 @@ The input \code{x}, invisibly.
 \description{
 Print method for \code{tidylearn_compute_advice} objects
 }
+\examples{
+# Runtime, peak memory and cost per tier, before committing to a fit
+advice <- tl_compute_advisor("forest", data = iris, formula = Species ~ .)
+print(advice)
+}

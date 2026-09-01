@@ -35,3 +35,17 @@ interaction coefficient itself.
 \description{
 Calculate partial effects based on a model with interactions
 }
+\examples{
+\donttest{
+model <- tl_model(mtcars, mpg ~ wt * hp, method = "linear")
+
+# How the effect of weight changes across horsepower
+effects <- tl_interaction_effects(model, var = "wt", by_var = "hp")
+head(effects$effects)
+effects$slopes
+
+# slopes$slope_se describes the fitted grid, not the sampling
+# uncertainty of the marginal effect -- for that, read the coefficient
+summary(model$fit)$coefficients["wt:hp", ]
+}
+}

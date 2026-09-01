@@ -1,6 +1,6 @@
 Package: tidylearn
 Title: A Unified Tidy Interface to R's Machine Learning Ecosystem
-Version: 0.4.0.9000
+Version: 0.5.0
 Authors@R:
     person("Cesaire", "Tobias", email = "cesaire@sheetsolved.com", role = c("aut", "cre"))
 Description: Provides a unified tidyverse-compatible interface to R's machine
@@ -55,6 +55,7 @@ Suggests:
     bigrquery,
     car,
     DBI,
+    DiagrammeR,
     DT,
     GGally,
     ggforce,
@@ -76,7 +77,6 @@ Suggests:
     RPostgres,
     rpart.plot,
     RSQLite,
-    scales,
     shiny,
     shinydashboard,
     tensorflow,

@@ -400,7 +400,7 @@ tl_read_s3 <- function(source, format = NULL, region = NULL, ...) {
   # Parse s3:// URI. Guard the length first: strsplit(character(0), ...)
   # is an empty list, so [[1]] was "subscript out of bounds" rather than
   # the Invalid S3 URI message every other malformed input produces.
-  if (!is.character(source) && !is.numeric(source)) {
+  if (!is.character(source)) {
     stop("'source' must be an S3 URI string, e.g. s3://bucket/key.csv; got ",
          paste(class(source), collapse = "/"), ".",
          call. = FALSE)

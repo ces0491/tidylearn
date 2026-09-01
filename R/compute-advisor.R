@@ -599,6 +599,10 @@ is_finite_num <- function(x) {
 #' @param ... Unused.
 #' @return The input `x`, invisibly.
 #' @export
+#' @examples
+#' # Runtime, peak memory and cost per tier, before committing to a fit
+#' advice <- tl_compute_advisor("forest", data = iris, formula = Species ~ .)
+#' print(advice)
 print.tidylearn_compute_advice <- function(x, ...) {
   cat("<tidylearn compute advice>\n")
   cat(

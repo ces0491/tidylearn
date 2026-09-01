@@ -35,7 +35,7 @@ test_that("a plain model round-trips through the cloud helpers", {
 })
 
 test_that("xgboost round-trips without a separate payload", {
-  skip_if_not_installed("xgboost")
+  testthat::skip_if_not_installed("xgboost")
 
   model <- tl_model(mtcars, mpg ~ wt + hp, method = "xgboost")
   reference <- predict(model, new_data = mtcars[1:5, ])
@@ -73,14 +73,14 @@ test_that("tl_model_has_keras is false for pure-R models", {
 # ---- 'deep' needs a TensorFlow backend, which CI does not provide ----
 
 skip_if_no_tensorflow <- function() {
-  skip_if_not_installed("keras")
-  skip_if_not_installed("tensorflow")
+  testthat::skip_if_not_installed("keras")
+  testthat::skip_if_not_installed("tensorflow")
   ok <- tryCatch(
     !is.null(tensorflow::tf_version()),
     error = function(e) FALSE
   )
   if (!isTRUE(ok)) {
-    skip("No TensorFlow backend available")
+    testthat::skip("No TensorFlow backend available")
   }
 }
 

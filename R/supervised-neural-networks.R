@@ -221,6 +221,19 @@ tl_plot_nn_architecture <- function(model, ...) {
 #'   (optimal weight decay), and \code{tuning_results} (a data frame of all
 #'   parameter combinations and their cross-validated errors).
 #' @export
+#' @examples
+#' \donttest{
+#' tuned <- tl_tune_nn(iris, Species ~ .,
+#'   is_classification = TRUE,
+#'   sizes = c(2, 5), decays = c(0, 0.01), folds = 3)
+#'
+#' tuned$best_size
+#' tuned$best_decay
+#' tuned$tuning_results
+#'
+#' # The grid this searched, drawn as a heatmap
+#' tl_plot_nn_tuning(tuned)
+#' }
 tl_tune_nn <- function(data, formula, is_classification = FALSE,
                        sizes = c(1, 2, 5, 10), decays = c(0, 0.001, 0.01, 0.1),
                        folds = 5, ...) {
@@ -333,13 +346,26 @@ tl_tune_nn <- function(data, formula, is_classification = FALSE,
   )
 }
 
-#' Plot neural network training history
+#' Plot a neural network tuning grid
 #'
-#' @param model A tidylearn neural network model object
+#' Draws the size-by-decay grid as a heatmap of cross-validated error.
+#'
+#' @param model The list returned by \code{\link{tl_tune_nn}}, not a fitted
+#'   model — the grid it draws lives in that list's
+#'   \code{$tuning_results}. Anything without that element is refused.
 #' @param ... Additional arguments
 #' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @importFrom ggplot2 ggplot aes geom_line labs theme_minimal
 #' @export
+#' @examples
+#' \donttest{
+#' tuned <- tl_tune_nn(iris, Species ~ .,
+#'   is_classification = TRUE,
+#'   sizes = c(2, 5), decays = c(0, 0.01), folds = 3)
+#'
+#' # The tuning result itself, not tuned$model
+#' tl_plot_nn_tuning(tuned)
+#' }
 tl_plot_nn_tuning <- function(model, ...) {
   if (!is.list(model) || !"tuning_results" %in% names(model)) {
     stop("This function requires the output from tl_tune_nn()", call. = FALSE)

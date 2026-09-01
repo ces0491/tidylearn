@@ -31,6 +31,15 @@ jobs:
       group: pkgdown-${{ github.event_name != 'pull_request' || github.run_id }}
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      # The site needs every Suggests package, which reaches graphlayouts
+      # through arulesViz and ggraph. When Posit Package Manager has no
+      # binary for it yet, pak falls back to source and refuses, because
+      # LinkingTo dependencies are left out of the plan for binaries and
+      # graphlayouts needs RcppArmadillo to compile. This puts them back,
+      # which is what pak's own error message asks for. R-CMD-check does
+      # not need it: it resolves the same tree but has not had to build
+      # graphlayouts from source.
+      PKG_INCLUDE_LINKINGTO: true
     permissions:
       contents: write
     steps:

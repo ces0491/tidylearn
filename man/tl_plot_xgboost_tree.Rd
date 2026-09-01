@@ -20,3 +20,14 @@ tree diagram rendered via the \pkg{DiagrammeR} package.
 \description{
 Plot XGBoost tree visualization
 }
+\examples{
+\donttest{
+if (requireNamespace("xgboost", quietly = TRUE) &&
+    requireNamespace("DiagrammeR", quietly = TRUE)) {
+  model <- tl_model(iris, Species ~ ., method = "xgboost", nrounds = 10)
+
+  # tree_index is zero-based, so this is the first tree
+  tl_plot_xgboost_tree(model, tree_index = 0)
+}
+}
+}

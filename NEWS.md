@@ -1,6 +1,4 @@
-# tidylearn 0.4.0.9000
-
-Development version.
+# tidylearn 0.5.0
 
 ## New Features
 
@@ -68,7 +66,9 @@ earlier should be recomputed.
   whose default candidates include a forest, and through `tl_auto_ml()`,
   whose baselines do. Now refused before the call, naming the columns.
   Regression is unaffected and still fits, as does a frame where only some
-  predictors are constant.
+  predictors are constant. The predictor set is read through `terms()`, so
+  a `.` is expanded against the data and an exclusion such as `y ~ . - id`
+  is honoured.
 
 * A character specification such as `"Species ~ ."` was read as a
   regression problem by every entry point except `tl_model()`.
@@ -104,14 +104,40 @@ earlier should be recomputed.
   `train_prop = 1.5` as "cannot take a sample larger than the
   population"; bad fold counts arrived as rsample errors naming `v`, which
   is not an argument of anything the caller wrote. Both are now checked
-  against their own names, and more folds than rows is reported as such.
+  against their own names, and both are checked again against the row
+  count when the pipeline runs: more folds than rows is reported as such,
+  and so is a `train_prop` that is in range but rounds to an empty side on
+  a small frame. `evaluation$validation` and `evaluation$best_metric` were
+  in the same position one step earlier -- set to `NULL` they were dropped
+  from the list and reached `%in%` as "argument is of length zero" -- and
+  are now reported by name too.
 
 * An unrecognised name in `evaluation$metrics` was accepted, computed
   nothing, and left the run warning that all values were `NA` -- the
   symptom rather than the cause. Unknown metrics are now refused with the
   list of available ones, matching what `tl_tune_grid()` already did. An
   empty metric set is refused too; it previously rendered the
-  `best_metric` error as a bare full stop.
+  `best_metric` error as a bare full stop. The list is judged against the
+  task the pipeline will actually fit, `tl_model()`'s logistic rule
+  included: `method = "logistic"` on a 0/1 integer response fits a
+  classification model and each fold reports classification metrics, so
+  `accuracy` and `auc` are accepted there.
+
+* A numeric response with both logistic and any other supervised method
+  among the candidates gave one run two tasks. The leaderboard holds one
+  set of metrics, so whichever way they were chosen the other models
+  scored `NA` and dropped out of the comparison silently -- `logistic`
+  plus `linear` on a 0/1 column ranked logistic at 0.6998 and reported
+  nothing at all for linear. The mixture is now refused where the models
+  are read, naming the methods on each side. A factor response is
+  unaffected: there is one task there, and mixing methods is the ordinary
+  case.
+
+* A response that is not a column of `data` -- a typo in the formula --
+  read as `NULL` in `tl_pipeline()`, which set regression defaults and
+  failed several steps later inside rpart with "object 'Speces' not
+  found". It is now refused where the formula is read, listing the columns
+  that are there.
 
 * An intercept-only formula (`y ~ 1`) reached `tl_run_pipeline()` and
   failed with "result would be too long a vector". A pipeline preprocesses
@@ -121,8 +147,39 @@ earlier should be recomputed.
   Every other classification method reported whatever its backend hit
   first: rpart "number of rows of matrices must match (see arg 2)", glmnet
   "non-conformable arguments", e1071 "Model is empty!", xgboost a
-  complaint about `num_class`. All thirteen now give the same message,
-  naming the response and the class it holds.
+  complaint about `num_class`. Ten of the thirteen supervised methods now
+  give the same message, naming the response and the class it holds.
+  `linear` and `polynomial` keep the numeric-response message they already
+  had, which now says the response holds a single class rather than
+  offering classification methods that would refuse it in turn, and
+  logistic regression keeps its own wording.
+
+* `method = "forest"` and `method = "svm"` derived their defaults from
+  the number of columns in the frame rather than the number of predictors
+  in the formula, so an explicit formula over a wider frame got the wrong
+  one. `mpg ~ wt + hp` on `mtcars` asked randomForest for `mtry = 3` of 2
+  predictors, which it reset with a warning, and asked e1071 for a kernel
+  width of 1/10 instead of 1/2, with nothing said at all.
+  `Species ~ Sepal.Length + Sepal.Width` on `iris` asked for `mtry = 2` of
+  2, also in silence -- every predictor sampled at every split, which is
+  bagging rather than a random forest. Neither default is computed now:
+  where the caller and the tuner leave the argument unset, it is left
+  unset, and the wrapped package applies the same default it documents.
+  A `y ~ .` formula is unaffected, which is why this survived. The 0.3.0
+  entry below took the response column out of the SVM count; what
+  remained was every other column in the frame. Leaving an argument out
+  takes `do.call()`, which evaluates before it builds the call, so the
+  `match.call()` these backends run recorded the training frame as a
+  literal: `print(model$fit)` spilled every row, and on a 960-row frame
+  the stored call alone was 159 Kb of a 1.5 Mb forest. The `data`
+  argument is put back to a symbol after the fit.
+
+* The `$fit` slot was documented as the wrapped object throughout. That
+  holds for a supervised method; an unsupervised one returns tidied
+  components as well, so its `$fit` is the list holding them and the
+  wrapped object is at `$fit$model`. Corrected in `tl_model()`, the
+  README, the architecture notes, and the getting-started, unsupervised
+  and integration vignettes.
 
 * `tl_read_s3()` raised "subscript out of bounds" for a zero-length or
   multi-element `source`, the one malformed input that missed its own
@@ -292,6 +349,19 @@ earlier should be recomputed.
   to `tl_cv()`.
 
 ### Ranking, splitting and tuning
+
+* `tl_tune_xgboost()` could not complete a run. It read `best_iteration`
+  from the top level of the `xgb.cv()` result, which is where xgboost kept
+  it before 3.0 and not where it has been since, so every parameter set
+  scored `NULL`, `which.min()` over those scores returned `integer(0)`,
+  and the call died on "attempt to select less than one element in
+  get1index" — on the documented default call, for any input. Both
+  locations are now read. Separately, `nrounds` was hardcoded at 1000
+  inside the function while `...` was forwarded to the same call, so
+  passing the one argument an xgboost tuner obviously takes gave "formal
+  argument \"nrounds\" matched by multiple actual arguments". It is a
+  named argument now, documented as the ceiling early stopping works
+  within. The function had no test; it has one now.
 
 * `tl_tune_random()` rejects a parameter range written backwards.
   `c(0.1, 0.001)` instead of `c(0.001, 0.1)` was sampled with
@@ -582,6 +652,22 @@ earlier should be recomputed.
   cannot drift again unnoticed.
 
 ## Documentation
+
+* Every exported function now carries a runnable example. Thirteen had
+  none: `tl_predict_pipeline()`, `tl_compare_pipeline_models()`,
+  `tl_plot_cv_results()`, `tl_interaction_effects()`,
+  `tl_plot_interaction()`, `tl_tune_nn()`, `tl_plot_nn_tuning()`,
+  `tl_tune_xgboost()`, `tl_plot_xgboost_tree()`,
+  `tl_plot_xgboost_shap_dependence()` and the three `print` methods.
+  Writing them is what surfaced the `tl_tune_xgboost()` defects above.
+
+* `tl_plot_nn_tuning()` documented the wrong input and the wrong plot. It
+  takes the list `tl_tune_nn()` returns rather than a fitted model — the
+  error message said so, the `@param` did not — and it draws a heatmap of
+  the size-by-decay grid, not the training history its title claimed.
+
+* `DiagrammeR` is now declared in Suggests. `tl_plot_xgboost_tree()`
+  cannot render without it, reaching it through `xgboost::xgb.plot.tree()`.
 
 * Corrected five factual errors across the docs: the README claimed ten
   articles where there are eleven; `compute-backends` said eleven CPU-only

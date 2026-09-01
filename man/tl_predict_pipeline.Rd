@@ -31,3 +31,23 @@ applying the same preprocessing steps used during training.
 \description{
 Make predictions using a pipeline
 }
+\examples{
+\donttest{
+train <- iris[c(1:40, 51:90, 101:140), ]
+test <- iris[c(41:50, 91:100, 141:150), ]
+
+pipe <- tl_pipeline(train, Species ~ .,
+  models = list(
+    tree = list(method = "tree"),
+    forest = list(method = "forest", ntree = 100)
+  ),
+  evaluation = list(validation = "cv", cv_folds = 3))
+pipe <- tl_run_pipeline(pipe, verbose = FALSE)
+
+# The best model, with the preprocessing learned on the training rows
+tl_predict_pipeline(pipe, test)
+
+# Or a named candidate instead of the winner
+tl_predict_pipeline(pipe, test, model_name = "tree")
+}
+}

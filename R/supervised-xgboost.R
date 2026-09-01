@@ -367,6 +367,16 @@ tl_plot_xgboost_importance <- function(model, top_n = 10,
 #' @return The return value of \code{\link[xgboost]{xgb.plot.tree}}, a
 #'   tree diagram rendered via the \pkg{DiagrammeR} package.
 #' @export
+#' @examples
+#' \donttest{
+#' if (requireNamespace("xgboost", quietly = TRUE) &&
+#'     requireNamespace("DiagrammeR", quietly = TRUE)) {
+#'   model <- tl_model(iris, Species ~ ., method = "xgboost", nrounds = 10)
+#'
+#'   # tree_index is zero-based, so this is the first tree
+#'   tl_plot_xgboost_tree(model, tree_index = 0)
+#' }
+#' }
 tl_plot_xgboost_tree <- function(model, tree_index = 0, ...) {
   # Check if model is an XGBoost model
   if (!inherits(model, "tidylearn_model") || model$spec$method != "xgboost") {
@@ -380,6 +390,35 @@ tl_plot_xgboost_tree <- function(model, tree_index = 0, ...) {
   xgboost::xgb.plot.tree(model = xgb_model, tree_index = tree_index, ...)
 }
 
+#' The iteration an xgb.cv() run settled on
+#'
+#' xgboost 3.0 moved \code{best_iteration} out of the top level of the
+#' \code{xgb.cv()} result and into \code{$early_stop}. Reading only the old
+#' location returned \code{NULL} against every installed xgboost from 3.0
+#' on, so each parameter set scored \code{NULL}, \code{which.min()} over
+#' the collected scores returned \code{integer(0)}, and the tuner died on
+#' "attempt to select less than one element in get1index" -- for every
+#' input, including the documented default call.
+#'
+#' Both locations are read so the package works either side of that
+#' change. Where neither carries one -- early stopping switched off, so
+#' the run went the full distance -- the last iteration is the answer.
+#'
+#' @param cv_result The value of \code{xgboost::xgb.cv()}.
+#' @return A single integer iteration index.
+#' @keywords internal
+#' @noRd
+tl_xgb_best_iteration <- function(cv_result) {
+  it <- cv_result$early_stop$best_iteration
+  if (length(it) != 1L) {
+    it <- cv_result$best_iteration
+  }
+  if (length(it) != 1L || is.na(it) || it < 1) {
+    it <- nrow(cv_result$evaluation_log)
+  }
+  as.integer(it)
+}
+
 #' Tune XGBoost hyperparameters
 #'
 #' @param data A data frame containing the training data
@@ -388,17 +427,39 @@ tl_plot_xgboost_tree <- function(model, tree_index = 0, ...) {
 #'   classification problem
 #' @param param_grid Named list of parameter values to try
 #' @param cv_folds Number of cross-validation folds (default: 5)
+#' @param nrounds Upper bound on boosting rounds per parameter set
+#'   (default: 1000). Early stopping normally halts well short of it, so
+#'   this is a ceiling rather than a target; lower it to cap the search.
 #' @param early_stopping_rounds Early stopping rounds (default: 10)
 #' @param verbose Logical indicating whether to print progress (default: TRUE)
-#' @param ... Additional arguments
+#' @param ... Additional arguments passed to \code{xgboost::xgb.cv()}
 #' @return A \code{tidylearn_model} object (the refit on full data using the
 #'   best hyperparameters) with an attribute \code{"tuning_results"} containing
 #'   a list with elements \code{param_grid}, \code{results} (per-combination CV
 #'   output), \code{best_params}, \code{best_iteration}, \code{best_score}, and
 #'   \code{minimize}.
 #' @export
+#' @examples
+#' \donttest{
+#' if (requireNamespace("xgboost", quietly = TRUE)) {
+#'   # The default grid is 216 combinations; name a smaller one to see it
+#'   # run, and cap nrounds so early stopping has less ground to cover
+#'   tuned <- tl_tune_xgboost(iris, Species ~ .,
+#'     is_classification = TRUE,
+#'     param_grid = list(max_depth = c(2, 4), eta = c(0.1, 0.3)),
+#'     cv_folds = 3, nrounds = 50, verbose = FALSE)
+#'
+#'   results <- attr(tuned, "tuning_results")
+#'   results$best_params
+#'   results$best_iteration
+#'
+#'   # tuned is an ordinary model, refit on all rows at those settings
+#'   predict(tuned, iris[1:5, ])
+#' }
+#' }
 tl_tune_xgboost <- function(data, formula, is_classification = FALSE,
                             param_grid = NULL, cv_folds = 5,
+                            nrounds = 1000,
                             early_stopping_rounds = 10,
                             verbose = TRUE, ...) {
   # Check if xgboost is installed
@@ -488,10 +549,15 @@ tl_tune_xgboost <- function(data, formula, is_classification = FALSE,
     }
 
     # Run cross-validation
+    # nrounds was hardcoded here while `...` went to the same call, so a
+    # caller who passed the one argument an xgboost tuner obviously takes
+    # got "formal argument \"nrounds\" matched by multiple actual
+    # arguments". It is a named argument now, defaulting to the same high
+    # ceiling that early stopping is expected to cut short.
     cv_result <- xgboost::xgb.cv(
       params = params,
       data = dtrain,
-      nrounds = 1000,  # Set high, will be limited by early stopping
+      nrounds = nrounds,
       nfold = cv_folds,
       early_stopping_rounds = early_stopping_rounds,
       verbose = ifelse(verbose, 1, 0),
@@ -499,7 +565,7 @@ tl_tune_xgboost <- function(data, formula, is_classification = FALSE,
     )
 
     # Extract best iteration and performance
-    best_iteration <- cv_result$best_iteration
+    best_iteration <- tl_xgb_best_iteration(cv_result)
     metric_col <- paste0("test_", eval_metric, "_mean")
     best_score <- cv_result$evaluation_log[
       best_iteration,
@@ -821,6 +887,19 @@ tl_plot_xgboost_shap_summary <- function(model,
 #' @importFrom ggplot2 ggplot aes geom_point
 #'   geom_smooth scale_color_gradient labs theme_minimal
 #' @export
+#' @examples
+#' \donttest{
+#' if (requireNamespace("xgboost", quietly = TRUE)) {
+#'   model <- tl_model(iris, Species ~ ., method = "xgboost", nrounds = 10)
+#'
+#'   tl_plot_xgboost_shap_dependence(model, feature = "Petal.Length")
+#'
+#'   # Colour the points by a second feature to read the interaction
+#'   tl_plot_xgboost_shap_dependence(model,
+#'     feature = "Petal.Length",
+#'     interaction_feature = "Petal.Width")
+#' }
+#' }
 tl_plot_xgboost_shap_dependence <- function( # nolint: object_length_linter.
     model, feature,
     interaction_feature = NULL,

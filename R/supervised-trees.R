@@ -99,7 +99,11 @@ tl_predict_tree <- function(model, new_data, type = "response", ...) {
 #' @param is_classification Logical indicating if this is a
 #'   classification problem
 #' @param ntree Number of trees to grow (default: 500)
-#' @param mtry Number of variables randomly sampled at each split
+#' @param mtry Number of variables randomly sampled at each split. Left
+#'   to \code{randomForest::randomForest()} when \code{NULL}, which uses
+#'   \code{floor(sqrt(p))} for classification and
+#'   \code{max(floor(p / 3), 1)} for regression over the \code{p}
+#'   columns of the design matrix.
 #' @param importance Whether to compute variable importance (default: TRUE)
 #' @param ... Additional arguments to pass to randomForest()
 #' @return A fitted random forest model
@@ -115,28 +119,27 @@ tl_fit_forest <- function(data, formula, is_classification = FALSE,
     tl_check_predictor_variance(data, formula, "forest")
   }
 
-  # Set default mtry if not provided
-  if (is.null(mtry)) {
-    if (is_classification) {
-      # For classification, default is sqrt(p)
-      mtry <- floor(sqrt(ncol(data) - 1))
-    } else {
-      # For regression, default is p/3
-      mtry <- max(floor((ncol(data) - 1) / 3), 1)
-    }
-  }
-
-  # Fit the random forest model
-  forest_model <- randomForest::randomForest(
+  # No default mtry. randomForest's own is floor(sqrt(p)) for
+  # classification and max(floor(p / 3), 1) for regression, over the p
+  # columns of the design matrix. Recomputing those here from
+  # ncol(data) - 1 counted every column in the frame rather than the
+  # formula's predictors, so `mpg ~ wt + hp` on mtcars asked for 3 of 2
+  # and randomForest warned that it had reset the value -- and
+  # `Species ~ Sepal.Length + Sepal.Width` on iris asked for 2 of 2,
+  # which it accepted in silence, sampling every predictor at every
+  # split. That is bagging, not a random forest.
+  args <- list(
     formula = formula,
     data = data,
     ntree = ntree,
-    mtry = mtry,
     importance = importance,
     ...
   )
+  if (!is.null(mtry)) {
+    args$mtry <- mtry
+  }
 
-  forest_model
+  tl_restore_call_data(do.call(randomForest::randomForest, args))
 }
 
 #' Predict using a random forest model

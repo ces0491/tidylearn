@@ -24,7 +24,11 @@ classification problem}
 
 \item{ntree}{Number of trees to grow (default: 500)}
 
-\item{mtry}{Number of variables randomly sampled at each split}
+\item{mtry}{Number of variables randomly sampled at each split. Left
+to \code{randomForest::randomForest()} when \code{NULL}, which uses
+\code{floor(sqrt(p))} for classification and
+\code{max(floor(p / 3), 1)} for regression over the \code{p}
+columns of the design matrix.}
 
 \item{importance}{Whether to compute variable importance (default: TRUE)}
 

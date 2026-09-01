@@ -10,6 +10,7 @@ tl_tune_xgboost(
   is_classification = FALSE,
   param_grid = NULL,
   cv_folds = 5,
+  nrounds = 1000,
   early_stopping_rounds = 10,
   verbose = TRUE,
   ...
@@ -27,11 +28,15 @@ classification problem}
 
 \item{cv_folds}{Number of cross-validation folds (default: 5)}
 
+\item{nrounds}{Upper bound on boosting rounds per parameter set
+(default: 1000). Early stopping normally halts well short of it, so
+this is a ceiling rather than a target; lower it to cap the search.}
+
 \item{early_stopping_rounds}{Early stopping rounds (default: 10)}
 
 \item{verbose}{Logical indicating whether to print progress (default: TRUE)}
 
-\item{...}{Additional arguments}
+\item{...}{Additional arguments passed to \code{xgboost::xgb.cv()}}
 }
 \value{
 A \code{tidylearn_model} object (the refit on full data using the
@@ -42,4 +47,23 @@ output), \code{best_params}, \code{best_iteration}, \code{best_score}, and
 }
 \description{
 Tune XGBoost hyperparameters
+}
+\examples{
+\donttest{
+if (requireNamespace("xgboost", quietly = TRUE)) {
+  # The default grid is 216 combinations; name a smaller one to see it
+  # run, and cap nrounds so early stopping has less ground to cover
+  tuned <- tl_tune_xgboost(iris, Species ~ .,
+    is_classification = TRUE,
+    param_grid = list(max_depth = c(2, 4), eta = c(0.1, 0.3)),
+    cv_folds = 3, nrounds = 50, verbose = FALSE)
+
+  results <- attr(tuned, "tuning_results")
+  results$best_params
+  results$best_iteration
+
+  # tuned is an ordinary model, refit on all rows at those settings
+  predict(tuned, iris[1:5, ])
+}
+}
 }

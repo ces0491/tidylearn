@@ -58,10 +58,15 @@ merge_evaluation_spec <- function(evaluation, is_classification) {
 
   evaluation <- utils::modifyList(defaults, evaluation)
 
-  if (!evaluation$validation %in% c("cv", "split")) {
+  # modifyList() drops an element set to NULL, so a caller who writes
+  # validation = NULL leaves nothing here and `%in%` returns logical(0),
+  # which `if` refuses with "argument is of length zero"
+  if (!is.character(evaluation$validation) ||
+        length(evaluation$validation) != 1L ||
+        !evaluation$validation %in% c("cv", "split")) {
     stop(
-      "evaluation$validation must be \"cv\" or \"split\"; got \"",
-      evaluation$validation, "\".",
+      "evaluation$validation must be \"cv\" or \"split\"; got ",
+      tl_describe_value(evaluation$validation), ".",
       call. = FALSE
     )
   }
@@ -90,10 +95,12 @@ merge_evaluation_spec <- function(evaluation, is_classification) {
     )
   }
 
-  if (!evaluation$best_metric %in% evaluation$metrics) {
+  if (!is.character(evaluation$best_metric) ||
+        length(evaluation$best_metric) != 1L ||
+        !evaluation$best_metric %in% evaluation$metrics) {
     stop(
-      "evaluation$best_metric (\"", evaluation$best_metric,
-      "\") must be one of evaluation$metrics: ",
+      "evaluation$best_metric (", tl_describe_value(evaluation$best_metric),
+      ") must be one of evaluation$metrics: ",
       paste(evaluation$metrics, collapse = ", "), ".",
       call. = FALSE
     )
@@ -120,8 +127,9 @@ merge_evaluation_spec <- function(evaluation, is_classification) {
     stop(
       "evaluation$train_prop must be a single number strictly between 0 ",
       "and 1; got ", paste(format(prop), collapse = ", "),
-      ". It is the share of rows used for training, so both sides of the ",
-      "split have to be non-empty.",
+      ". It is the share of rows used for training. Whether that leaves ",
+      "both sides of the split non-empty also depends on the row count, ",
+      "which tl_run_pipeline() checks.",
       call. = FALSE
     )
   }
@@ -216,13 +224,24 @@ tl_pipeline <- function(data, formula,
   # long after the mistake was made.
   preprocessing <- merge_preprocessing_spec(preprocessing)
 
+  # A response that is not a column of `data` used to reach the default
+  # models and the evaluation spec as NULL, which reads as regression.
+  # The pipeline then failed inside rpart with "object 'Speces' not
+  # found", naming a typo but not where it was made.
+  response_var <- all.vars(formula)[1]
+  if (!response_var %in% names(data)) {
+    stop(
+      "The formula's response, '", response_var,
+      "', is not a column of `data`. Available: ",
+      paste(names(data), collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+  y <- data[[response_var]]
+  is_classification <- is.factor(y) || is.character(y)
+
   # Create default models if not provided
   if (is.null(models)) {
-    # Determine if classification or regression
-    response_var <- all.vars(formula)[1]
-    y <- data[[response_var]]
-    is_classification <- is.factor(y) || is.character(y)
-
     if (is_classification) {
       # Logistic is binary-only and errors on a three-level response, so
       # offering it as a default candidate would fail the whole pipeline
@@ -246,12 +265,43 @@ tl_pipeline <- function(data, formula,
   }
 
   # Fill in whichever evaluation settings the caller left unnamed, for
-  # the same reason as the preprocessing spec above
-  response_var <- all.vars(formula)[1]
+  # the same reason as the preprocessing spec above.
+  #
+  # The task has to be settled the way tl_model_supervised() settles it,
+  # logistic override included: logistic on a 0/1 integer response is a
+  # classification fit whatever the column is stored as, and each fold
+  # model reports it as one. Deciding from the column alone called that
+  # pipeline regression and refused the accuracy and auc it goes on to
+  # compute.
+  #
+  # Every other supervised method reads the task off the column as it
+  # stands, so a numeric response that puts logistic next to any of them
+  # gives one run two tasks. A leaderboard carries one set of metrics,
+  # whichever way it is chosen the other candidates score NA, and they
+  # then drop out of the comparison without a word -- so the mixture is
+  # refused here rather than half-scored later.
+  spec_methods <- tl_spec_methods(models)
+  named <- !is.na(spec_methods)
+  forces_factor <- named & spec_methods == "logistic"
+  others <- named & !forces_factor
+  if (!is_classification && any(forces_factor) && any(others)) {
+    stop(
+      "'", response_var, "' is numeric, and `models` puts logistic ",
+      "regression alongside ",
+      paste(unique(spec_methods[others]), collapse = ", "),
+      ". Logistic coerces the response to a factor and is scored as ",
+      "classification, while the rest take the column as it stands and ",
+      "are scored as regression. One leaderboard cannot hold both, so ",
+      "whichever metrics were chosen the other models would score NA. ",
+      "Run these as two pipelines, or make '", response_var,
+      "' a factor and drop the regression methods.",
+      call. = FALSE
+    )
+  }
+
   evaluation <- merge_evaluation_spec(
     evaluation,
-    is_classification = is.factor(data[[response_var]]) ||
-      is.character(data[[response_var]])
+    is_classification = is_classification || any(forces_factor)
   )
 
   # Create pipeline object
@@ -436,6 +486,26 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
     )
   }
 
+  # A train_prop strictly between 0 and 1 still rounds to an empty side
+  # on a small frame, and the two failures look nothing alike: an empty
+  # training set is "result would be too long a vector", while an empty
+  # test set scores nothing and the run finishes with a leaderboard of
+  # NAs and a warning about the NAs rather than the split.
+  if (identical(evaluation$validation, "split")) {
+    n_train <- round(evaluation$train_prop * nrow(data))
+    if (n_train < 1 || n_train >= nrow(data)) {
+      stop(
+        "evaluation$train_prop of ", evaluation$train_prop, " over ",
+        nrow(data), " row", if (nrow(data) == 1) "" else "s",
+        " puts ", n_train, " row", if (n_train == 1) "" else "s",
+        " in the training set and ", nrow(data) - n_train, " in the test ",
+        "set. Both sides have to be non-empty, so this needs a train_prop ",
+        "nearer 0.5 or more rows.",
+        call. = FALSE
+      )
+    }
+  }
+
   # Without names the training loop below silently does nothing, leaving
   # an empty leaderboard and an unhelpful downstream error
   if (length(models) == 0 || is.null(names(models)) ||
@@ -541,7 +611,6 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
     cv_splits <- rsample::vfold_cv(data, v = cv_folds)
   } else if (evaluation$validation == "split") {
     train_prop <- evaluation$train_prop
-    if (is.null(train_prop)) train_prop <- 0.8
 
     if (verbose) {
       message("Setting up train/test split (", train_prop * 100, "% / ",
@@ -822,6 +891,21 @@ tl_get_best_model <- function(pipeline) {
 #'   highlighted.
 #' @importFrom ggplot2 ggplot aes geom_col facet_wrap labs theme_minimal
 #' @export
+#' @examples
+#' \donttest{
+#' pipe <- tl_pipeline(iris, Species ~ .,
+#'   models = list(
+#'     tree = list(method = "tree"),
+#'     forest = list(method = "forest", ntree = 100)
+#'   ),
+#'   evaluation = list(validation = "cv", cv_folds = 3))
+#' pipe <- tl_run_pipeline(pipe, verbose = FALSE)
+#'
+#' tl_compare_pipeline_models(pipe)
+#'
+#' # Restrict the comparison to one metric
+#' tl_compare_pipeline_models(pipe, metrics = "accuracy")
+#' }
 tl_compare_pipeline_models <- function(pipeline, metrics = NULL) {
   # Check if pipeline has results
   if (is.null(pipeline$results)) {
@@ -940,6 +1024,25 @@ tl_compare_pipeline_models <- function(pipeline, metrics = NULL) {
 #'   predictions from the selected (or best) pipeline model, after
 #'   applying the same preprocessing steps used during training.
 #' @export
+#' @examples
+#' \donttest{
+#' train <- iris[c(1:40, 51:90, 101:140), ]
+#' test <- iris[c(41:50, 91:100, 141:150), ]
+#'
+#' pipe <- tl_pipeline(train, Species ~ .,
+#'   models = list(
+#'     tree = list(method = "tree"),
+#'     forest = list(method = "forest", ntree = 100)
+#'   ),
+#'   evaluation = list(validation = "cv", cv_folds = 3))
+#' pipe <- tl_run_pipeline(pipe, verbose = FALSE)
+#'
+#' # The best model, with the preprocessing learned on the training rows
+#' tl_predict_pipeline(pipe, test)
+#'
+#' # Or a named candidate instead of the winner
+#' tl_predict_pipeline(pipe, test, model_name = "tree")
+#' }
 tl_predict_pipeline <- function(pipeline,
                                 new_data,
                                 type = "response",
