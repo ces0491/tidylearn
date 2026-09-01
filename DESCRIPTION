@@ -71,6 +71,7 @@ Suggests:
     NeuralNetTools,
     paws.storage,
     readr,
+    RhpcBLASctl,
     readxl,
     RMariaDB,
     rmarkdown,
