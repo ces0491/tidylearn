@@ -454,6 +454,13 @@ tl_as_formula <- function(formula, arg = "formula") {
 #' unaffected, and so is the case where only some predictors are
 #' constant, which is why the check is this narrow.
 #'
+#' The predictor set has to come from \code{terms()}. Reading
+#' \code{all.vars()} off the raw formula gets \code{y ~ . - id} wrong in
+#' both directions: the \code{.} is not a column, so the set collapses to
+#' the one column the caller excluded. That refuses a fittable model when
+#' the excluded column is constant, and lets the hang through when it is
+#' the excluded column that varies.
+#'
 #' @param data The model frame, response included.
 #' @param formula The model formula.
 #' @param method The method name, for the message.
@@ -461,10 +468,13 @@ tl_as_formula <- function(formula, arg = "formula") {
 #' @keywords internal
 #' @noRd
 tl_check_predictor_variance <- function(data, formula, method) {
-  predictors <- setdiff(all.vars(formula), all.vars(formula)[1])
-  if (identical(predictors, ".") || length(predictors) == 0L) {
-    predictors <- setdiff(names(data), all.vars(formula)[1])
-  }
+  predictors <- tryCatch(
+    {
+      labels <- attr(stats::terms(formula, data = data), "term.labels")
+      unique(unlist(lapply(labels, function(l) all.vars(str2lang(l)))))
+    },
+    error = function(e) setdiff(all.vars(formula), all.vars(formula)[1])
+  )
   predictors <- intersect(predictors, names(data))
   if (length(predictors) == 0L) {
     return(invisible(TRUE))
@@ -517,7 +527,7 @@ tl_unsupervised_methods <- function() {
 #' The metric names tl_evaluate() can compute
 #'
 #' Matches the branches in \code{tl_calc_classification_metrics()} and
-#' \code{tl_calculate_regression_metrics()} and the list documented on
+#' \code{tl_calc_regression_metrics()} and the list documented on
 #' \code{tl_evaluate()}. A name outside this set is not computed, so the
 #' score comes back NA and the caller reports the symptom rather than the
 #' cause -- which is what this lets callers refuse up front.
@@ -533,4 +543,79 @@ tl_known_metrics <- function(is_classification) {
   } else {
     c("rmse", "mse", "mae", "mape", "rsq")
   }
+}
+
+#' Describe a value for an error message
+#'
+#' A setting can be absent as well as wrong. \code{modifyList()} drops an
+#' element set to \code{NULL}, so "got NULL" and "got a character vector
+#' of length 2" both need saying, and neither survives being pasted into
+#' a message as a bare value.
+#'
+#' @param x The value to describe.
+#' @return A single string.
+#' @keywords internal
+#' @noRd
+tl_describe_value <- function(x) {
+  if (is.null(x)) {
+    return("NULL")
+  }
+  if (length(x) != 1L) {
+    return(paste0(
+      paste(class(x), collapse = "/"), " of length ", length(x)
+    ))
+  }
+  if (is.character(x)) {
+    return(paste0("\"", x, "\""))
+  }
+  paste(format(x), collapse = ", ")
+}
+
+#' The method each entry of a pipeline spec names
+#'
+#' @param models A pipeline's \code{models} list, possibly malformed --
+#'   \code{tl_run_pipeline()} is where a bad spec is reported, so this
+#'   only reads what it safely can.
+#' @return A character vector as long as \code{models}, \code{NA} where an
+#'   entry does not name a single method.
+#' @keywords internal
+#' @noRd
+tl_spec_methods <- function(models) {
+  if (!is.list(models) || length(models) == 0L) {
+    return(character(0))
+  }
+  vapply(
+    models,
+    function(spec) {
+      if (is.list(spec) && is.character(spec$method) &&
+            length(spec$method) == 1L) {
+        spec$method
+      } else {
+        NA_character_
+      }
+    },
+    character(1)
+  )
+}
+
+#' Put the `data` symbol back into a fitted model's stored call
+#'
+#' \code{do.call()} evaluates its arguments before it builds the call, so
+#' the \code{match.call()} the wrapped function runs records the whole
+#' training frame as a literal. \code{print()} on the fitted object then
+#' spills every row, and on a 960-row frame the call alone was 159 Kb of
+#' a 1.5 Mb forest -- a second copy of data the model already carries.
+#' Calling the function directly is not the remedy: leaving an argument
+#' out is what lets the wrapped package apply the default it documents,
+#' and only \code{do.call()} can leave one out.
+#'
+#' @param fit A fitted model that stores its call as \code{$call}.
+#' @return \code{fit}, with \code{call$data} back to the symbol.
+#' @keywords internal
+#' @noRd
+tl_restore_call_data <- function(fit) {
+  if (!is.null(fit$call) && is.call(fit$call) && !is.null(fit$call$data)) {
+    fit$call$data <- quote(data)
+  }
+  fit
 }

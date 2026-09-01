@@ -7,7 +7,9 @@
 #'   and dbscan. The underlying algorithms are unchanged -
 #'   tidylearn wraps them with consistent function signatures,
 #'   tidy tibble output, and unified ggplot2-based
-#'   visualization. Access raw model objects via model$fit.
+#'   visualization. Supervised models keep the wrapped object at
+#'   model$fit; unsupervised ones put it at model$fit$model,
+#'   alongside the tidied components.
 #' @importFrom magrittr %>%
 #' @importFrom rlang .data .env
 #' @importFrom dplyr filter select mutate group_by summarize arrange
@@ -47,7 +49,10 @@ NULL
 #' algorithms are unchanged - this function provides a
 #' consistent interface and returns tidy output.
 #'
-#' Access the raw model object from the underlying package via \code{model$fit}.
+#' For a supervised method, \code{model$fit} is the object the wrapped
+#' function returned. An unsupervised method returns tidied components as
+#' well, so the wrapped object sits at \code{model$fit$model} and
+#' \code{model$fit} is the list holding both.
 #'
 #' For classification, the response is reduced to the classes it
 #' actually contains: subsetting a data frame keeps every factor level,
@@ -82,7 +87,8 @@ NULL
 #'   with a warning.
 #' @param ... Additional arguments passed to the underlying model function
 #' @return A \code{tidylearn_model} object (S3) containing the fitted model
-#'   (\code{$fit}), model specification (\code{$spec}), and training data
+#'   (\code{$fit}, or \code{$fit$model} for an unsupervised method),
+#'   model specification (\code{$spec}), and training data
 #'   (\code{$data}). The object also inherits from a method-specific class
 #'   (e.g., \code{tidylearn_linear}) and a paradigm class
 #'   (\code{tidylearn_supervised} or \code{tidylearn_unsupervised}).
@@ -99,11 +105,11 @@ NULL
 #'
 #' # PCA -> wraps stats::prcomp()
 #' model <- tl_model(iris, ~ ., method = "pca")
-#' model$fit  # Access the raw prcomp object
+#' model$fit$model  # The raw prcomp object, alongside tidied components
 #'
 #' # Clustering -> wraps stats::kmeans()
 #' model <- tl_model(iris, method = "kmeans", k = 3)
-#' model$fit  # Access the raw kmeans object
+#' model$fit$model  # The raw kmeans object
 #' }
 tl_model <- function(data, formula = NULL, method = "linear", ...,
                      compute = "cpu") {
@@ -497,10 +503,26 @@ tl_check_method_response <- function(method, y, response_var,
     } else {
       tl_dual_task_suggestions()
     }
+    kind <- if (is.factor(y)) "factor" else "character vector"
+
+    # A single-class response is not a task any method can take. The
+    # equally-spaced-codes argument does not apply to one class, and the
+    # usual "refit with one of these" tail would send the caller round a
+    # loop of methods that each refuse it in turn.
+    if (n_classes == 1) {
+      stop(
+        "Method \"", method, "\" fits a numeric response, but '",
+        response_var, "' is a ", kind, " holding a single class (",
+        quoted(levels(tl_normalise_response(y))),
+        "). It is not a regression target, and no classification method ",
+        "will fit it either -- there is nothing to discriminate.",
+        call. = FALSE
+      )
+    }
+
     stop(
       "Method \"", method, "\" fits a numeric response, but '",
-      response_var, "' is a ",
-      if (is.factor(y)) "factor" else "character vector",
+      response_var, "' is a ", kind,
       " with ", n_classes, " classes. lm() estimates from the underlying ",
       "integer codes, so the classes would be treated as equally spaced ",
       "points on a scale and the predictions would be numbers between ",

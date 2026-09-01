@@ -30,8 +30,9 @@ classification problem}
 
 \item{cost}{Cost parameter (default: 1)}
 
-\item{gamma}{Gamma parameter for kernels
-(default: 1/ncol(data))}
+\item{gamma}{Gamma parameter for kernels. Left to \code{e1071::svm()}
+when \code{NULL}, which uses 1 divided by the number of columns in
+the design matrix.}
 
 \item{degree}{Degree for polynomial kernel (default: 3)}
 

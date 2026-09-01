@@ -59,7 +59,9 @@ All backend packages are suggested dependencies, checked at call time.
 - **`tl_model()`**: Single entry point that dispatches to underlying packages
 - Automatic routing to supervised/unsupervised implementations
 - Unified S3 methods: `print()`, `summary()`, `predict()`, `plot()`
-- Raw model accessible via `$fit` slot
+- Raw model accessible via the `$fit` slot for a supervised method, and
+  `$fit$model` for an unsupervised one, which keeps its tidied components
+  alongside it
 
 ```r
 # Same interface, different underlying packages
@@ -67,7 +69,8 @@ supervised <- tl_model(iris, Species ~ ., method = "forest")
 supervised$fit  # Access randomForest::randomForest() result
 
 unsupervised <- tl_model(iris[,1:4], method = "kmeans", k = 3)
-unsupervised$fit  # Access stats::kmeans() result
+unsupervised$fit$model  # Access stats::kmeans() result
+names(unsupervised$fit)  # clusters, centers, metrics, model
 ```
 
 #### `integration.R` - Workflow Orchestration

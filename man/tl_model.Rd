@@ -40,7 +40,8 @@ with a warning.}
 }
 \value{
 A \code{tidylearn_model} object (S3) containing the fitted model
-(\code{$fit}), model specification (\code{$spec}), and training data
+(\code{$fit}, or \code{$fit$model} for an unsupervised method),
+model specification (\code{$spec}), and training data
 (\code{$data}). The object also inherits from a method-specific class
 (e.g., \code{tidylearn_linear}) and a paradigm class
 (\code{tidylearn_supervised} or \code{tidylearn_unsupervised}).
@@ -57,7 +58,10 @@ e1071, nnet, rpart, cluster, and dbscan. The underlying
 algorithms are unchanged - this function provides a
 consistent interface and returns tidy output.
 
-Access the raw model object from the underlying package via \code{model$fit}.
+For a supervised method, \code{model$fit} is the object the wrapped
+function returned. An unsupervised method returns tidied components as
+well, so the wrapped object sits at \code{model$fit$model} and
+\code{model$fit} is the list holding both.
 
 For classification, the response is reduced to the classes it
 actually contains: subsetting a data frame keeps every factor level,
@@ -77,10 +81,10 @@ model$fit  # Access the raw lm object
 
 # PCA -> wraps stats::prcomp()
 model <- tl_model(iris, ~ ., method = "pca")
-model$fit  # Access the raw prcomp object
+model$fit$model  # The raw prcomp object, alongside tidied components
 
 # Clustering -> wraps stats::kmeans()
 model <- tl_model(iris, method = "kmeans", k = 3)
-model$fit  # Access the raw kmeans object
+model$fit$model  # The raw kmeans object
 }
 }

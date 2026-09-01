@@ -743,10 +743,7 @@ test_that("tl_read_zip reads single file from archive", {
   write.csv(iris, csv_path, row.names = FALSE)
 
   # Create zip - use full path for the file inside
-  old_wd <- getwd()
-  setwd(dir)
-  utils::zip(zip_path, "data.csv")
-  setwd(old_wd)
+  withr::with_dir(dir, utils::zip(zip_path, "data.csv"))
 
   result <- tl_read_zip(zip_path, .quiet = TRUE)
   expect_s3_class(result, "tidylearn_data")
@@ -763,10 +760,7 @@ test_that("tl_read_zip reads specific file from archive", {
   write.csv(iris, file.path(dir, "iris.csv"), row.names = FALSE)
   write.csv(mtcars, file.path(dir, "mtcars.csv"), row.names = FALSE)
 
-  old_wd <- getwd()
-  setwd(dir)
-  utils::zip(zip_path, c("iris.csv", "mtcars.csv"))
-  setwd(old_wd)
+  withr::with_dir(dir, utils::zip(zip_path, c("iris.csv", "mtcars.csv")))
 
   result <- tl_read_zip(zip_path, file = "mtcars.csv", .quiet = TRUE)
   expect_s3_class(result, "tidylearn_data")
@@ -782,10 +776,7 @@ test_that("tl_read_zip row-binds multiple files", {
   write.csv(iris[1:50, ], file.path(dir, "part1.csv"), row.names = FALSE)
   write.csv(iris[51:100, ], file.path(dir, "part2.csv"), row.names = FALSE)
 
-  old_wd <- getwd()
-  setwd(dir)
-  utils::zip(zip_path, c("part1.csv", "part2.csv"))
-  setwd(old_wd)
+  withr::with_dir(dir, utils::zip(zip_path, c("part1.csv", "part2.csv")))
 
   result <- tl_read_zip(zip_path, .quiet = TRUE)
   expect_s3_class(result, "tidylearn_data")
@@ -801,10 +792,7 @@ test_that("tl_read_zip errors on missing file in archive", {
 
   write.csv(iris, file.path(dir, "data.csv"), row.names = FALSE)
 
-  old_wd <- getwd()
-  setwd(dir)
-  utils::zip(zip_path, "data.csv")
-  setwd(old_wd)
+  withr::with_dir(dir, utils::zip(zip_path, "data.csv"))
 
   expect_error(
     tl_read_zip(zip_path, file = "nonexistent.csv", .quiet = TRUE),
@@ -820,10 +808,7 @@ test_that("tl_read dispatches to tl_read_zip for .zip files", {
 
   write.csv(iris, file.path(dir, "data.csv"), row.names = FALSE)
 
-  old_wd <- getwd()
-  setwd(dir)
-  utils::zip(zip_path, "data.csv")
-  setwd(old_wd)
+  withr::with_dir(dir, utils::zip(zip_path, "data.csv"))
 
   result <- tl_read(zip_path, .quiet = TRUE)
   expect_s3_class(result, "tidylearn_data")

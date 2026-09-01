@@ -17,8 +17,9 @@ NULL
 #' @param kernel Kernel function
 #'   ("linear", "polynomial", "radial", "sigmoid")
 #' @param cost Cost parameter (default: 1)
-#' @param gamma Gamma parameter for kernels
-#'   (default: 1/ncol(data))
+#' @param gamma Gamma parameter for kernels. Left to \code{e1071::svm()}
+#'   when \code{NULL}, which uses 1 divided by the number of columns in
+#'   the design matrix.
 #' @param degree Degree for polynomial kernel (default: 3)
 #' @param tune Logical indicating whether to tune
 #'   hyperparameters (default: FALSE)
@@ -37,11 +38,12 @@ tl_fit_svm <- function(data, formula,
   tl_check_packages("e1071")
 
 
-  # Set default gamma if not provided (use predictor count, not total columns)
-  if (is.null(gamma)) {
-    n_predictors <- ncol(data) - 1L
-    gamma <- 1 / max(n_predictors, 1L)
-  }
+  # No default gamma. e1071's own is 1 / ncol(design matrix), which
+  # accounts for the dummy columns a factor predictor expands into.
+  # Deriving one here from ncol(data) - 1 counted every column in the
+  # frame rather than the formula's predictors, so `mpg ~ wt + hp` on
+  # mtcars got a kernel width of 1/10 instead of 1/2, with nothing said.
+  # Below, gamma is passed on only when the caller or the tuner set one.
 
   # Determine SVM type based on problem type
   if (is_classification) {
@@ -103,17 +105,21 @@ tl_fit_svm <- function(data, formula,
   }
 
   # Fit the SVM model
-  svm_model <- e1071::svm(
+  args <- list(
     formula = formula,
     data = data,
     type = svm_type,
     kernel = kernel,
     cost = cost,
-    gamma = gamma,
     degree = degree,
     probability = is_classification,
     ...
   )
+  if (!is.null(gamma)) {
+    args$gamma <- gamma
+  }
+
+  svm_model <- tl_restore_call_data(do.call(e1071::svm, args))
 
   # Store tuning results if available
   if (!is.null(tuning_results)) {
