@@ -71,12 +71,14 @@ with elements `param_grid`, `results` (per-combination CV output),
 ``` r
 # \donttest{
 if (requireNamespace("xgboost", quietly = TRUE)) {
-  # The default grid is 216 combinations; name a smaller one to see it
-  # run, and cap nrounds so early stopping has less ground to cover
+  # The default grid is 216 combinations. Name a smaller one to see it
+  # run, and cap nrounds so early stopping has less ground to cover --
+  # xgboost takes every core it is offered, so a wider grid here costs
+  # more than it shows.
   tuned <- tl_tune_xgboost(iris, Species ~ .,
     is_classification = TRUE,
-    param_grid = list(max_depth = c(2, 4), eta = c(0.1, 0.3)),
-    cv_folds = 3, nrounds = 50, verbose = FALSE)
+    param_grid = list(max_depth = c(2, 4)),
+    cv_folds = 3, nrounds = 20, verbose = FALSE)
 
   results <- attr(tuned, "tuning_results")
   results$best_params

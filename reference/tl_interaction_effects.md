@@ -63,11 +63,11 @@ head(effects$effects)
 #> 6 1.710525 52 31.98539 1.091933 29.84520 34.12558       52       Q0
 effects$slopes
 #>      by_value by_label     slope     slope_se
-#> Q0       52.0       Q0 -6.768521 5.695734e-16
-#> Q25      96.5      Q25 -5.529278 4.387243e-16
-#> Q50     123.0      Q50 -4.791302 6.071491e-16
-#> Q75     180.0      Q75 -3.203958 4.018576e-16
-#> Q100    335.0     Q100  1.112505 4.116338e-16
+#> Q0       52.0       Q0 -6.768521 3.505829e-16
+#> Q25      96.5      Q25 -5.529278 4.039654e-16
+#> Q50     123.0      Q50 -4.791302 3.746703e-16
+#> Q75     180.0      Q75 -3.203958 4.635819e-16
+#> Q100    335.0     Q100  1.112505 2.313524e-16
 
 # slopes$slope_se describes the fitted grid, not the sampling
 # uncertainty of the marginal effect -- for that, read the coefficient

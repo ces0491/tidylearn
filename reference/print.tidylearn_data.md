@@ -30,13 +30,13 @@ The input object `x`, returned invisibly.
 f <- tempfile(fileext = ".csv")
 write.csv(iris, f, row.names = FALSE)
 d <- tl_read(f)
-#> Reading csv data from: /tmp/RtmpUcJe2E/file1e0f7040dbf8.csv
+#> Reading csv data from: /tmp/RtmphwnoXS/file1f1c24ea5840.csv
 #> Returned: 150 rows x 5 columns
 print(d)
 #> -- tidylearn data ---------
-#> Source: /tmp/RtmpUcJe2E/file1e0f7040dbf8.csv 
+#> Source: /tmp/RtmphwnoXS/file1f1c24ea5840.csv 
 #> Format: csv 
-#> Read at: 2026-09-01 18:03:55 
+#> Read at: 2026-09-02 04:41:48 
 #> 
 #> # A tibble: 150 × 5
 #>    Sepal.Length Sepal.Width Petal.Length Petal.Width Species
