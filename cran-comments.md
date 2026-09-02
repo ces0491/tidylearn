@@ -29,6 +29,15 @@ is the configuration that produced the NOTE:
 The whole-suite figures are 4563s CPU against 315s elapsed before, and
 14s against 15s after.
 
+Two further changes since that submission, neither of them flagged by a
+pre-test. The example on tl_tune_xgboost() came to 5.02s elapsed against
+the 5s limit on one local run, having been under it on others, so it now
+searches a smaller grid and runs in 0.9s -- the cap above applies to the
+test process, not the example runner. Trimming it to one parameter
+exposed a bug: expand.grid() of a single parameter is a one-column data
+frame, and subsetting a row of one drops the column name, so the
+parameters reached xgboost unnamed and it stopped. Fixed, with a test.
+
 Also in this version, unrelated to the pre-test: the Description field
 said raw model objects are reached via $fit for every method. That is
 true for a supervised method; an unsupervised one returns tidied
