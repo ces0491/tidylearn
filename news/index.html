@@ -41,6 +41,11 @@
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.5.0.9000" id="tidylearn-0509000">tidylearn 0.5.0.9000<a class="anchor" aria-label="anchor" href="#tidylearn-0509000"></a></h2>
 <p>(Development version.)</p>
+<div class="section level3">
+<h3 id="bug-fixes-0-5-0-9000">Bug Fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-5-0-9000"></a></h3>
+<ul><li>
+<code><a href="../reference/tl_plot_regularization_path.html">tl_plot_regularization_path()</a></code> drew its feature labels on top of the paths they name, in the same colour, so they were unreadable – and two coefficients that end close together printed one label over the other. On <code>mtcars</code> that hid <code>drat</code> behind <code>qsec</code> and clipped <code>am</code> and <code>wt</code> at the panel edge. Labels now sit clear of the leftmost point, spread far enough apart to read, each with a leader line back to its own path.</li>
+</ul></div>
 </div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.5.0" id="tidylearn-050">tidylearn 0.5.0<a class="anchor" aria-label="anchor" href="#tidylearn-050"></a></h2>

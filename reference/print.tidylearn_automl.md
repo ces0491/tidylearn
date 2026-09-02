@@ -42,7 +42,7 @@ result <- tl_auto_ml(iris, Species ~ .,
 #> 
 #> [*] Creating leaderboard...
 #> 
-#> Auto ML complete in 0.03 seconds
+#> Auto ML complete in 0.02 seconds
 #> Best model: baseline_tree
 
 # The leaderboard, the winner and the metric it was ranked on
@@ -51,7 +51,7 @@ print(result)
 #> =========================
 #> Task: classification 
 #> Metric: accuracy 
-#> Runtime: 0.03 seconds
+#> Runtime: 0.02 seconds
 #> Models trained: 1 
 #> 
 #> Leaderboard:

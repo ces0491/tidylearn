@@ -69,7 +69,7 @@ result$task
 result$metric
 #> [1] "accuracy"
 round(as.numeric(result$runtime, units = "secs"), 1)
-#> [1] 1.1
+#> [1] 0.8
 ```
 
 Regression is the same call with a numeric response — `task = "auto"`
@@ -218,8 +218,8 @@ do.call(rbind, sweep)
 #>   budget elapsed models cv_scored             best
 #> 1      2     0.0      1         1    baseline_tree
 #> 2      5     0.0      1         1    baseline_tree
-#> 3     10     0.2      3         3    baseline_tree
-#> 4     30     0.7      8         8 clustered_forest
+#> 3     10     0.1      3         3    baseline_tree
+#> 4     30     0.6      8         8 clustered_forest
 ```
 
 iris is 150 rows, so everything here is quick and the budget is barely
