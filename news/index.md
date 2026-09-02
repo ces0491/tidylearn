@@ -1,5 +1,9 @@
 # Changelog
 
+## tidylearn 0.5.0.9000
+
+(Development version.)
+
 ## tidylearn 0.5.0
 
 ### New Features
@@ -203,8 +207,8 @@ earlier should be recomputed.
   components as well, so its `$fit` is the list holding them and the
   wrapped object is at `$fit$model`. Corrected in
   [`tl_model()`](https://tidylearn.sheetsolved.com/reference/tl_model.md),
-  the README, the architecture notes, and the getting-started,
-  unsupervised and integration vignettes.
+  the `Description` field, the README, the architecture notes, and the
+  getting-started, unsupervised and integration vignettes.
 
 - [`tl_read_s3()`](https://tidylearn.sheetsolved.com/reference/tl_read_s3.md)
   raised “subscript out of bounds” for a zero-length or multi-element

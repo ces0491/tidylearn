@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,6 +38,10 @@
       <small>Source: <a href="https://github.com/ces0491/tidylearn/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.5.0.9000" id="tidylearn-0509000">tidylearn 0.5.0.9000<a class="anchor" aria-label="anchor" href="#tidylearn-0509000"></a></h2>
+<p>(Development version.)</p>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.5.0" id="tidylearn-050">tidylearn 0.5.0<a class="anchor" aria-label="anchor" href="#tidylearn-050"></a></h2>
 <div class="section level3">
@@ -75,7 +79,7 @@
 <li><p>An intercept-only formula (<code>y ~ 1</code>) reached <code><a href="../reference/tl_run_pipeline.html">tl_run_pipeline()</a></code> and failed with “result would be too long a vector”. A pipeline preprocesses and scores predictors, so it now says it needs at least one.</p></li>
 <li><p>A single-class response was named plainly only by logistic regression. Every other classification method reported whatever its backend hit first: rpart “number of rows of matrices must match (see arg 2)”, glmnet “non-conformable arguments”, e1071 “Model is empty!”, xgboost a complaint about <code>num_class</code>. Ten of the thirteen supervised methods now give the same message, naming the response and the class it holds. <code>linear</code> and <code>polynomial</code> keep the numeric-response message they already had, which now says the response holds a single class rather than offering classification methods that would refuse it in turn, and logistic regression keeps its own wording.</p></li>
 <li><p><code>method = "forest"</code> and <code>method = "svm"</code> derived their defaults from the number of columns in the frame rather than the number of predictors in the formula, so an explicit formula over a wider frame got the wrong one. <code>mpg ~ wt + hp</code> on <code>mtcars</code> asked randomForest for <code>mtry = 3</code> of 2 predictors, which it reset with a warning, and asked e1071 for a kernel width of 1/10 instead of 1/2, with nothing said at all. <code>Species ~ Sepal.Length + Sepal.Width</code> on <code>iris</code> asked for <code>mtry = 2</code> of 2, also in silence – every predictor sampled at every split, which is bagging rather than a random forest. Neither default is computed now: where the caller and the tuner leave the argument unset, it is left unset, and the wrapped package applies the same default it documents. A <code>y ~ .</code> formula is unaffected, which is why this survived. The 0.3.0 entry below took the response column out of the SVM count; what remained was every other column in the frame. Leaving an argument out takes <code><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call()</a></code>, which evaluates before it builds the call, so the <code><a href="https://rdrr.io/r/base/match.call.html" class="external-link">match.call()</a></code> these backends run recorded the training frame as a literal: <code>print(model$fit)</code> spilled every row, and on a 960-row frame the stored call alone was 159 Kb of a 1.5 Mb forest. The <code>data</code> argument is put back to a symbol after the fit.</p></li>
-<li><p>The <code>$fit</code> slot was documented as the wrapped object throughout. That holds for a supervised method; an unsupervised one returns tidied components as well, so its <code>$fit</code> is the list holding them and the wrapped object is at <code>$fit$model</code>. Corrected in <code><a href="../reference/tl_model.html">tl_model()</a></code>, the README, the architecture notes, and the getting-started, unsupervised and integration vignettes.</p></li>
+<li><p>The <code>$fit</code> slot was documented as the wrapped object throughout. That holds for a supervised method; an unsupervised one returns tidied components as well, so its <code>$fit</code> is the list holding them and the wrapped object is at <code>$fit$model</code>. Corrected in <code><a href="../reference/tl_model.html">tl_model()</a></code>, the <code>Description</code> field, the README, the architecture notes, and the getting-started, unsupervised and integration vignettes.</p></li>
 <li><p><code><a href="../reference/tl_read_s3.html">tl_read_s3()</a></code> raised “subscript out of bounds” for a zero-length or multi-element <code>source</code>, the one malformed input that missed its own “Invalid S3 URI” message.</p></li>
 </ul></div>
 <div class="section level4">
