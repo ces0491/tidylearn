@@ -277,3 +277,56 @@ test_that("a fitted neural network records a usable formula", {
     deparse(mpg ~ wt + hp)
   )
 })
+
+test_that("tl_spread_labels separates values that would overlap", {
+  # Two coefficients within 0.02 of each other printed one label on top
+  # of the other on the mtcars lasso path
+  y <- c(0.80, 0.82, 2.5, -3.4, -0.1)
+  spread <- tl_spread_labels(y, min_gap = 0.5)
+
+  expect_length(spread, length(y))
+  expect_gte(min(diff(sort(spread))), 0.5 - 1e-9)
+
+  # Order has to survive, or a label lands on the wrong path
+  expect_equal(order(spread), order(y))
+
+  # The block stays where it started rather than drifting upward
+  expect_equal(mean(range(spread)), mean(range(y)))
+
+  # Values already far enough apart are left alone
+  far <- c(0, 5, 10)
+  expect_equal(tl_spread_labels(far, min_gap = 0.5), far)
+
+  # Degenerate inputs: nothing to separate, no gap to enforce
+  expect_equal(tl_spread_labels(3, min_gap = 0.5), 3)
+  expect_equal(tl_spread_labels(y, min_gap = 0), y)
+  expect_equal(tl_spread_labels(c(1, 1, 1), min_gap = NA), c(1, 1, 1))
+})
+
+test_that("tl_plot_regularization_path labels every top feature legibly", {
+  skip_if_not_installed("glmnet")
+
+  set.seed(1)
+  model <- tl_model(mtcars, mpg ~ ., method = "lasso")
+  p <- tl_plot_regularization_path(model, label_n = 5)
+  expect_s3_class(p, "ggplot")
+
+  # The labels used to sit on the lines at the smallest lambda, sharing
+  # their colour and each other's position. They are drawn to the left of
+  # the paths now, spread apart, with a leader line back to each one.
+  # Find the text layer by its geom rather than by position, so adding
+  # a layer to the plot does not silently move the assertion elsewhere
+  geoms <- vapply(p$layers, function(l) class(l$geom)[1], character(1))
+  text_layer <- which(geoms == "GeomText")
+  expect_length(text_layer, 1L)
+
+  built <- ggplot2::layer_data(p, text_layer)
+  expect_equal(nrow(built), 5L)
+
+  line_layer <- which(geoms == "GeomLine")
+  coef_range <- diff(range(ggplot2::layer_data(p, line_layer)$y))
+  expect_gte(min(diff(sort(built$y))), 0.07 * coef_range * 0.99)
+
+  expect_s3_class(tl_plot_regularization_path(model, label_n = 0), "ggplot")
+  expect_s3_class(tl_plot_regularization_path(model, label_n = 1), "ggplot")
+})

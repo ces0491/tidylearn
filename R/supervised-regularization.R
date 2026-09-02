@@ -297,7 +297,10 @@ tl_plot_regularization_path <- function(model,
       linetype = "dashed",
       color = "red"
     ) +
-    ggplot2::scale_x_log10() +
+    # Room on the left for the labels the panel would otherwise clip
+    ggplot2::scale_x_log10(
+      expand = ggplot2::expansion(mult = c(0.16, 0.02))
+    ) +
     ggplot2::scale_alpha_manual(
       values = c(0.3, 1)
     ) +
@@ -318,28 +321,51 @@ tl_plot_regularization_path <- function(model,
     ggplot2::theme_minimal() +
     ggplot2::theme(legend.position = "none")
 
-  # Add feature labels at the right end of the plot
+  # Label each path where it starts, at the smallest lambda -- the left
+  # of a log axis, not the right, which the previous comment here had
+  # backwards along with the `hjust` that followed from it.
   if (label_n > 0) {
-    # Get the rightmost lambda value
-    rightmost_lambda <- min(fit$lambda)
+    smallest_lambda <- min(fit$lambda)
 
-    # Get coefficients at rightmost lambda for top feats
     label_data <- coef_df %>%
       dplyr::filter(
         .data$is_top,
-        .data$lambda == rightmost_lambda
+        .data$lambda == smallest_lambda
       )
 
-    # Add labels
-    p <- p + ggplot2::geom_text(
-      data = label_data,
-      ggplot2::aes(
-        label = feature,
-        x = lambda * 1.1,
-        y = coefficient
-      ),
-      hjust = 0, vjust = 0.5, size = 3
+    # Two coefficients can start arbitrarily close together -- on mtcars
+    # two of the five are within 0.02 -- so the labels printed on top of
+    # each other. Draw them at spread positions and connect each to its
+    # own line, so a moved label still says which path it belongs to.
+    label_data$label_y <- tl_spread_labels(
+      label_data$coefficient,
+      min_gap = 0.07 * diff(range(coef_df$coefficient))
     )
+
+    # Sitting on the lines they were also unreadable, inheriting the same
+    # colour as the path behind them. Put them outside the leftmost point
+    # and give the panel room to hold them.
+    p <- p +
+      ggplot2::geom_segment(
+        data = label_data,
+        ggplot2::aes(
+          x = smallest_lambda * 0.82,
+          xend = smallest_lambda,
+          y = .data$label_y,
+          yend = .data$coefficient
+        ),
+        colour = "grey70", linewidth = 0.3, inherit.aes = FALSE
+      ) +
+      ggplot2::geom_text(
+        data = label_data,
+        ggplot2::aes(
+          label = .data$feature,
+          x = smallest_lambda * 0.78,
+          y = .data$label_y
+        ),
+        hjust = 1, vjust = 0.5, size = 3, colour = "grey25",
+        inherit.aes = FALSE
+      )
   }
 
   p

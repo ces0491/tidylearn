@@ -619,3 +619,36 @@ tl_restore_call_data <- function(fit) {
   }
   fit
 }
+
+#' Push overlapping label positions apart
+#'
+#' Labels on a coefficient path are placed at the value each line ends
+#' on, and two coefficients can be arbitrarily close: on `mtcars` two of
+#' the five sit within 0.02 of each other and print on top of one
+#' another. This walks the values in order and lifts any that are nearer
+#' than \code{min_gap}, then re-centres the block so the labels stay over
+#' the span they started in rather than drifting upward.
+#'
+#' The result is a drawing position, not a value. Callers keep the true
+#' coefficient for the line itself.
+#'
+#' @param y Numeric positions, in any order.
+#' @param min_gap Minimum separation to enforce.
+#' @return \code{y}, adjusted, in the order it was given.
+#' @keywords internal
+#' @noRd
+tl_spread_labels <- function(y, min_gap) {
+  if (length(y) < 2L || !is.finite(min_gap) || min_gap <= 0) {
+    return(y)
+  }
+  ord <- order(y)
+  spread <- y[ord]
+  for (i in seq_along(spread)[-1]) {
+    if (spread[i] - spread[i - 1L] < min_gap) {
+      spread[i] <- spread[i - 1L] + min_gap
+    }
+  }
+  spread <- spread + (mean(range(y)) - mean(range(spread)))
+  y[ord] <- spread
+  y
+}
