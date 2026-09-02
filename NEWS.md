@@ -350,6 +350,14 @@ earlier should be recomputed.
 
 ### Ranking, splitting and tuning
 
+* `tl_tune_xgboost()` also refused a grid naming a single parameter.
+  `expand.grid()` of one parameter is a single-column data frame, and
+  `[i, ]` on one of those drops to a bare vector with the column name
+  gone, so the parameters reached xgboost unnamed and it stopped with
+  "parameter names cannot be empty strings". `tl_tune_grid()` and
+  `tl_tune_random()` had the same slip fixed for 0.4.0; this call site
+  was missed.
+
 * `tl_tune_xgboost()` could not complete a run. It read `best_iteration`
   from the top level of the `xgb.cv()` result, which is where xgboost kept
   it before 3.0 and not where it has been since, so every parameter set

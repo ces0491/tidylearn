@@ -551,3 +551,27 @@ test_that("tl_xgb_best_iteration reads either xgboost layout", {
   # Neither, because early stopping was off and the run went the distance
   expect_equal(tl_xgb_best_iteration(list(evaluation_log = log)), 20L)
 })
+
+test_that("tl_tune_xgboost takes a grid of a single parameter", {
+  skip_if_not_installed("xgboost")
+
+  # expand.grid() of one parameter is a single-column data frame, and
+  # `[i, ]` on one of those drops to a bare vector with the column name
+  # gone. as.list() then produced an unnamed list and xgboost refused the
+  # whole fit: "parameter names cannot be empty strings". Every earlier
+  # test named two parameters, so nothing caught it. tl_tune_grid() and
+  # tl_tune_random() had the same slip fixed for 0.4.0.
+  tuned <- suppressWarnings(suppressMessages(
+    tl_tune_xgboost(iris, Species ~ .,
+      is_classification = TRUE,
+      param_grid = list(max_depth = c(2, 4)),
+      cv_folds = 3, nrounds = 20, verbose = FALSE
+    )
+  ))
+  expect_s3_class(tuned, "tidylearn_model")
+
+  # The name has to survive, or the value reaches xgboost positionally
+  results <- attr(tuned, "tuning_results")
+  expect_true("max_depth" %in% names(results$best_params))
+  expect_true(results$best_params$max_depth %in% c(2, 4))
+})
