@@ -2,6 +2,15 @@
 
 (Development version.)
 
+## Bug Fixes
+
+* `tl_plot_regularization_path()` drew its feature labels on top of the
+  paths they name, in the same colour, so they were unreadable -- and two
+  coefficients that end close together printed one label over the other.
+  On `mtcars` that hid `drat` behind `qsec` and clipped `am` and `wt` at
+  the panel edge. Labels now sit clear of the leftmost point, spread far
+  enough apart to read, each with a leader line back to its own path.
+
 # tidylearn 0.5.0
 
 ## New Features
