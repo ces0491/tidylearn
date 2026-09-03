@@ -123,6 +123,10 @@ predictions <- predict(model, new_data = test_data)
 metrics <- tl_evaluate(model, test_data)
 metrics <- tl_evaluate(model, test_data, metrics = c("rmse", "rsq"))
 
+# Coefficients too, with a confidence interval when you ask for one
+coefs <- tl_coefficients(model)
+coefs <- tl_coefficients(model, conf_int = TRUE, level = 0.9)
+
 # Easy to pipe
 model %>%
   predict(new_data = test_data) %>%
@@ -358,6 +362,10 @@ tl_table_comparison(model1, model2, model3,
                     new_data = test_data,
                     names = c("Linear", "Forest", "XGBoost"))
 ```
+
+`gt` is a suggested dependency, so these need it installed. The numbers
+behind the coefficient table are available without it through
+`tl_coefficients()`.
 
 ## Philosophy
 

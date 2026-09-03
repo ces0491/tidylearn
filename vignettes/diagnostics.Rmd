@@ -283,10 +283,10 @@ fuel economy in a high-powered car, which already had little to lose.
 `slope_se` describes the straight line fitted to the prediction grid rather
 than the sampling uncertainty of the marginal effect — for a linear model the
 grid is exactly linear, so it is near zero by construction. Use
-`summary(model_int$fit)` for inference on the interaction coefficient.
+`tl_coefficients()` for inference on the interaction coefficient itself.
 
 ```{r}
-summary(model_int$fit)$coefficients
+tl_coefficients(model_int, conf_int = TRUE)
 ```
 
 `tl_auto_interactions()` does the search and the refit in one step, returning

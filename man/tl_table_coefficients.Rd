@@ -4,7 +4,15 @@
 \alias{tl_table_coefficients}
 \title{Formatted model coefficients table}
 \usage{
-tl_table_coefficients(model, lambda = "1se", digits = 4, ...)
+tl_table_coefficients(
+  model,
+  lambda = "1se",
+  digits = 4,
+  conf_int = FALSE,
+  level = 0.95,
+  exponentiate = FALSE,
+  ...
+)
 }
 \arguments{
 \item{model}{A tidylearn model object}
@@ -13,6 +21,14 @@ tl_table_coefficients(model, lambda = "1se", digits = 4, ...)
 
 \item{digits}{Number of decimal places (default: 4)}
 
+\item{conf_int}{Whether to add a confidence interval (default:
+\code{FALSE}). Not available for regularised models.}
+
+\item{level}{Confidence level for the interval (default: 0.95)}
+
+\item{exponentiate}{Whether to report odds ratios rather than log odds
+(default: \code{FALSE}). Classification models only.}
+
 \item{...}{Additional arguments (currently unused)}
 }
 \value{
@@ -20,11 +36,17 @@ A \code{\link[gt]{gt}} table object.
 }
 \description{
 Produces a styled gt table of model coefficients. Supports linear,
-polynomial, logistic, ridge, lasso, and elastic net models.
+polynomial, logistic, ridge, lasso, and elastic net models. The numbers
+come from \code{\link{tl_coefficients}}, which returns them as a tibble
+if you would rather format them yourself.
 }
 \examples{
 \donttest{
 model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
 tl_table_coefficients(model)
+tl_table_coefficients(model, conf_int = TRUE)
 }
+}
+\seealso{
+\code{\link{tl_coefficients}} for the underlying tibble.
 }

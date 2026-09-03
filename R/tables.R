@@ -200,89 +200,120 @@ tl_table_metrics <- function(model, new_data = NULL, digits = 4, ...) {
 #' Formatted model coefficients table
 #'
 #' Produces a styled gt table of model coefficients. Supports linear,
-#' polynomial, logistic, ridge, lasso, and elastic net models.
+#' polynomial, logistic, ridge, lasso, and elastic net models. The numbers
+#' come from \code{\link{tl_coefficients}}, which returns them as a tibble
+#' if you would rather format them yourself.
 #'
 #' @param model A tidylearn model object
 #' @param lambda For regularised models: "1se" (default) or "min"
 #' @param digits Number of decimal places (default: 4)
+#' @param conf_int Whether to add a confidence interval (default:
+#'   \code{FALSE}). Not available for regularised models.
+#' @param level Confidence level for the interval (default: 0.95)
+#' @param exponentiate Whether to report odds ratios rather than log odds
+#'   (default: \code{FALSE}). Classification models only.
 #' @param ... Additional arguments (currently unused)
 #' @return A \code{\link[gt]{gt}} table object.
+#' @seealso \code{\link{tl_coefficients}} for the underlying tibble.
 #' @export
 #' @examples
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
 #' tl_table_coefficients(model)
+#' tl_table_coefficients(model, conf_int = TRUE)
 #' }
-tl_table_coefficients <- function(model, lambda = "1se", digits = 4, ...) {
+tl_table_coefficients <- function(model, lambda = "1se", digits = 4,
+                                  conf_int = FALSE, level = 0.95,
+                                  exponentiate = FALSE, ...) {
   tl_check_packages("gt")
 
   method <- model$spec$method
 
-  if (method %in% c("linear", "polynomial", "logistic")) {
-    summ <- summary(model$fit)
-    coef_mat <- summ$coefficients
-    coef_tbl <- tibble::tibble(
-      term = rownames(coef_mat),
-      estimate = coef_mat[, 1],
-      std_error = coef_mat[, 2],
-      statistic = coef_mat[, 3],
-      p_value = coef_mat[, 4]
-    ) %>%
-      dplyr::mutate(significant = ifelse(.data$p_value < 0.05, "*", ""))
+  # Refuses an unsupported method, so the branches below only have to tell
+  # the two coefficient shapes apart.
+  coef_tbl <- tl_coefficients(
+    model,
+    conf_int = conf_int, level = level,
+    exponentiate = exponentiate, lambda = lambda
+  )
 
-    stat_label <- if (method == "logistic") "z value" else "t value"
+  estimate_label <- if (exponentiate) "Odds Ratio" else "Estimate"
+
+  if (method %in% c("linear", "polynomial", "logistic")) {
+    # A rank-deficient fit leaves an unestimable term with no p-value, and
+    # ifelse() carries that NA into the flag column, where it prints as the
+    # word NA in a column whose other values are a star or nothing.
+    coef_tbl <- coef_tbl %>%
+      dplyr::mutate(
+        significant = ifelse(
+          !is.na(.data$p_value) & .data$p_value < 0.05, "*", ""
+        )
+      )
+
+    error_col <- if (exponentiate) "std_error_log" else "std_error"
+    labels <- list(
+      term = "Term",
+      estimate = estimate_label,
+      statistic = if (method == "logistic") "z value" else "t value",
+      p_value = "p",
+      significant = ""
+    )
+    labels[[error_col]] <- if (exponentiate) {
+      "Std. Error (log)"
+    } else {
+      "Std. Error"
+    }
+    if (conf_int) {
+      bound <- paste0(format(level * 100, trim = TRUE), "%")
+      labels$conf_low <- paste("Lower", bound)
+      labels$conf_high <- paste("Upper", bound)
+    }
 
     gt_tbl <- coef_tbl %>%
       gt::gt() %>%
-      gt::cols_label(
-        term = "Term", estimate = "Estimate", std_error = "Std. Error",
-        statistic = stat_label, p_value = "p", significant = ""
-      ) %>%
+      gt::cols_label(!!!labels) %>%
       gt::fmt_number(
-        columns = c("estimate", "std_error", "statistic"),
+        columns = dplyr::any_of(c("estimate", error_col, "conf_low",
+                                  "conf_high", "statistic")),
         decimals = digits
       ) %>%
       gt::fmt_scientific(columns = "p_value", decimals = 2) %>%
       gt::tab_style(
         style = gt::cell_fill(color = "#d4edda"),
-        locations = gt::cells_body(rows = coef_tbl$p_value < 0.05)
+        locations = gt::cells_body(rows = coef_tbl$significant == "*")
       ) %>%
       tl_gt_theme(
         title = paste0(tools::toTitleCase(method), " Model Coefficients"),
+        subtitle = if (conf_int) {
+          paste0("Wald ", bound, " intervals")
+        },
         source_note = tl_model_info(model)
       )
 
-  } else if (method %in% c("ridge", "lasso", "elastic_net")) {
-    fit <- model$fit
+  } else {
+    lambda_val <- coef_tbl$lambda[[1]]
 
-    if (lambda == "1se") {
-      lambda_val <- attr(fit, "lambda_1se")
-    } else if (lambda == "min") {
-      lambda_val <- attr(fit, "lambda_min")
-    } else {
-      lambda_val <- lambda
-    }
-
-    coefs <- as.matrix(stats::coef(fit, s = lambda_val))
-
-    coef_tbl <- tibble::tibble(
-      term = rownames(coefs),
-      estimate = as.vector(coefs)
-    ) %>%
+    # Whether a term survived the penalty is a property of the coefficient
+    # before it moves to the odds scale, where a dropped term reads as 1.
+    dropped <- if (exponentiate) 1 else 0
+    coef_tbl <- coef_tbl %>%
+      dplyr::select(-"lambda") %>%
       dplyr::mutate(abs_estimate = abs(.data$estimate)) %>%
       dplyr::arrange(dplyr::desc(.data$abs_estimate))
 
     gt_tbl <- coef_tbl %>%
       gt::gt() %>%
       gt::cols_label(
-        term = "Term", estimate = "Coefficient", abs_estimate = "|Coefficient|"
+        term = "Term",
+        estimate = if (exponentiate) "Odds Ratio" else "Coefficient",
+        abs_estimate = if (exponentiate) "|Odds Ratio|" else "|Coefficient|"
       ) %>%
       gt::fmt_number(
         columns = c("estimate", "abs_estimate"), decimals = digits
       ) %>%
       gt::tab_style(
         style = gt::cell_text(color = "#999999"),
-        locations = gt::cells_body(rows = coef_tbl$estimate == 0)
+        locations = gt::cells_body(rows = coef_tbl$estimate == dropped)
       ) %>%
       tl_gt_theme(
         title = paste0(tools::toTitleCase(method), " Coefficients"),
@@ -292,13 +323,6 @@ tl_table_coefficients <- function(model, lambda = "1se", digits = 4, ...) {
         ),
         source_note = tl_model_info(model)
       )
-
-  } else {
-    stop(
-      "Coefficient table not available for method '", method,
-      "'. Try type = 'importance' instead.",
-      call. = FALSE
-    )
   }
 
   gt_tbl
