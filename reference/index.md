@@ -55,6 +55,8 @@ object through the `$fit` slot.
   : Data Preprocessing for tidylearn
 - [`tl_evaluate()`](https://tidylearn.sheetsolved.com/reference/tl_evaluate.md)
   : Evaluate a tidylearn model
+- [`tl_coefficients()`](https://tidylearn.sheetsolved.com/reference/tl_coefficients.md)
+  : Model coefficients as a tibble
 - [`tl_cv()`](https://tidylearn.sheetsolved.com/reference/tl_cv.md) :
   Cross-validation for tidylearn models
 - [`tl_compare_cv()`](https://tidylearn.sheetsolved.com/reference/tl_compare_cv.md)
@@ -462,6 +464,8 @@ here when you want the shape of something before the arguments.
   : Cloud endpoint resolution for tidylearn
 - [`tidylearn-cloud-serialize`](https://tidylearn.sheetsolved.com/reference/tidylearn-cloud-serialize.md)
   : Model serialisation for tidylearn cloud compute
+- [`tidylearn-coefficients`](https://tidylearn.sheetsolved.com/reference/tidylearn-coefficients.md)
+  : Coefficient Inference for tidylearn
 - [`tidylearn-core`](https://tidylearn.sheetsolved.com/reference/tidylearn-core.md)
   : tidylearn: A Unified Tidy Interface to R's Machine Learning
   Ecosystem

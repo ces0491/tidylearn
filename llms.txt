@@ -137,6 +137,10 @@ predictions <- predict(model, new_data = test_data)
 metrics <- tl_evaluate(model, test_data)
 metrics <- tl_evaluate(model, test_data, metrics = c("rmse", "rsq"))
 
+# Coefficients too, with a confidence interval when you ask for one
+coefs <- tl_coefficients(model)
+coefs <- tl_coefficients(model, conf_int = TRUE, level = 0.9)
+
 # Easy to pipe
 model %>%
   predict(new_data = test_data) %>%
@@ -391,6 +395,10 @@ tl_table_comparison(model1, model2, model3,
                     names = c("Linear", "Forest", "XGBoost"))
 ```
 
+`gt` is a suggested dependency, so these need it installed. The numbers
+behind the coefficient table are available without it through
+[`tl_coefficients()`](https://tidylearn.sheetsolved.com/reference/tl_coefficients.md).
+
 ## Philosophy
 
 The underlying packages do the real work, and tidylearn does not hide
@@ -535,6 +543,8 @@ object through the `$fit` slot.
   : Data Preprocessing for tidylearn
 - [`tl_evaluate()`](https://tidylearn.sheetsolved.com/reference/tl_evaluate.md)
   : Evaluate a tidylearn model
+- [`tl_coefficients()`](https://tidylearn.sheetsolved.com/reference/tl_coefficients.md)
+  : Model coefficients as a tibble
 - [`tl_cv()`](https://tidylearn.sheetsolved.com/reference/tl_cv.md) :
   Cross-validation for tidylearn models
 - [`tl_compare_cv()`](https://tidylearn.sheetsolved.com/reference/tl_compare_cv.md)
@@ -942,6 +952,8 @@ here when you want the shape of something before the arguments.
   : Cloud endpoint resolution for tidylearn
 - [`tidylearn-cloud-serialize`](https://tidylearn.sheetsolved.com/reference/tidylearn-cloud-serialize.md)
   : Model serialisation for tidylearn cloud compute
+- [`tidylearn-coefficients`](https://tidylearn.sheetsolved.com/reference/tidylearn-coefficients.md)
+  : Coefficient Inference for tidylearn
 - [`tidylearn-core`](https://tidylearn.sheetsolved.com/reference/tidylearn-core.md)
   : tidylearn: A Unified Tidy Interface to R's Machine Learning
   Ecosystem

@@ -67,10 +67,10 @@ tuned$best_decay
 #> [1] 0
 tuned$tuning_results
 #>   size decay      error
-#> 1    2  0.00 0.04666667
-#> 2    5  0.00 0.03333333
-#> 3    2  0.01 0.04000000
-#> 4    5  0.01 0.04000000
+#> 1    2  0.00 0.15333333
+#> 2    5  0.00 0.02000000
+#> 3    2  0.01 0.02000000
+#> 4    5  0.01 0.03333333
 
 # The grid this searched, drawn as a heatmap
 tl_plot_nn_tuning(tuned)

@@ -197,6 +197,10 @@
 <span><span class="va">metrics</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/tl_evaluate.html">tl_evaluate</a></span><span class="op">(</span><span class="va">model</span>, <span class="va">test_data</span><span class="op">)</span></span>
 <span><span class="va">metrics</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/tl_evaluate.html">tl_evaluate</a></span><span class="op">(</span><span class="va">model</span>, <span class="va">test_data</span>, metrics <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"rmse"</span>, <span class="st">"rsq"</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
+<span><span class="co"># Coefficients too, with a confidence interval when you ask for one</span></span>
+<span><span class="va">coefs</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/tl_coefficients.html">tl_coefficients</a></span><span class="op">(</span><span class="va">model</span><span class="op">)</span></span>
+<span><span class="va">coefs</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/tl_coefficients.html">tl_coefficients</a></span><span class="op">(</span><span class="va">model</span>, conf_int <span class="op">=</span> <span class="cn">TRUE</span>, level <span class="op">=</span> <span class="fl">0.9</span><span class="op">)</span></span>
+<span></span>
 <span><span class="co"># Easy to pipe</span></span>
 <span><span class="va">model</span> <span class="op"><a href="reference/pipe.html">%&gt;%</a></span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span>new_data <span class="op">=</span> <span class="va">test_data</span><span class="op">)</span> <span class="op"><a href="reference/pipe.html">%&gt;%</a></span></span>
@@ -482,6 +486,7 @@
 <span><span class="fu"><a href="reference/tl_table_comparison.html">tl_table_comparison</a></span><span class="op">(</span><span class="va">model1</span>, <span class="va">model2</span>, <span class="va">model3</span>,</span>
 <span>                    new_data <span class="op">=</span> <span class="va">test_data</span>,</span>
 <span>                    names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Linear"</span>, <span class="st">"Forest"</span>, <span class="st">"XGBoost"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p><code>gt</code> is a suggested dependency, so these need it installed. The numbers behind the coefficient table are available without it through <code><a href="reference/tl_coefficients.html">tl_coefficients()</a></code>.</p>
 </div>
 <div class="section level2">
 <h2 id="philosophy">Philosophy<a class="anchor" aria-label="anchor" href="#philosophy"></a>

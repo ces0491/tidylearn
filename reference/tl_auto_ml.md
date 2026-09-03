@@ -137,7 +137,7 @@ result <- tl_auto_ml(iris, Species ~ .,
 #> 
 #> [*] Creating leaderboard...
 #> 
-#> Auto ML complete in 0.02 seconds
+#> Auto ML complete in 0.03 seconds
 #> Best model: baseline_tree
 result$leaderboard
 #> # A tibble: 1 × 3

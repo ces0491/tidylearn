@@ -431,17 +431,20 @@ lose.
 `slope_se` describes the straight line fitted to the prediction grid
 rather than the sampling uncertainty of the marginal effect — for a
 linear model the grid is exactly linear, so it is near zero by
-construction. Use `summary(model_int$fit)` for inference on the
-interaction coefficient.
+construction. Use
+[`tl_coefficients()`](https://tidylearn.sheetsolved.com/reference/tl_coefficients.md)
+for inference on the interaction coefficient itself.
 
 ``` r
 
-summary(model_int$fit)$coefficients
-#>                Estimate Std. Error   t value     Pr(>|t|)
-#> (Intercept) 49.80842343 3.60515580 13.815887 5.005761e-14
-#> wt          -8.21662430 1.26970814 -6.471270 5.199287e-07
-#> hp          -0.12010209 0.02469835 -4.862758 4.036243e-05
-#> wt:hp        0.02784815 0.00741958  3.753332 8.108307e-04
+tl_coefficients(model_int, conf_int = TRUE)
+#> # A tibble: 4 × 7
+#>   term        estimate std_error conf_low conf_high statistic  p_value
+#>   <chr>          <dbl>     <dbl>    <dbl>     <dbl>     <dbl>    <dbl>
+#> 1 (Intercept)  49.8      3.61     42.4      57.2        13.8  5.01e-14
+#> 2 wt           -8.22     1.27    -10.8      -5.62       -6.47 5.20e- 7
+#> 3 hp           -0.120    0.0247   -0.171    -0.0695     -4.86 4.04e- 5
+#> 4 wt:hp         0.0278   0.00742   0.0126    0.0430      3.75 8.11e- 4
 ```
 
 [`tl_auto_interactions()`](https://tidylearn.sheetsolved.com/reference/tl_auto_interactions.md)

@@ -130,8 +130,32 @@ tl_table_coefficients(model_reg)
 | hp | −0.0318 | 0.0090 | −3.5187 | 1.45 × 10⁻³ | \* |
 | tidylearn \| linear (regression) \| mpg ~ wt + hp \| n = 32 |  |  |  |  |  |
 
+`conf_int = TRUE` adds a confidence interval, and `level` sets its
+width:
+
+``` r
+
+tl_table_coefficients(model_reg, conf_int = TRUE, level = 0.9)
+```
+
+| Linear Model Coefficients |  |  |  |  |  |  |  |
+|----|----|----|----|----|----|----|----|
+| Wald 90% intervals |  |  |  |  |  |  |  |
+| Term | Estimate | Std. Error | Lower 90% | Upper 90% | t value | p |  |
+| (Intercept) | 37.2273 | 1.5988 | 34.5107 | 39.9438 | 23.2847 | 2.57 × 10⁻²⁰ | \* |
+| wt | −3.8778 | 0.6327 | −4.9529 | −2.8027 | −6.1287 | 1.12 × 10⁻⁶ | \* |
+| hp | −0.0318 | 0.0090 | −0.0471 | −0.0164 | −3.5187 | 1.45 × 10⁻³ | \* |
+| tidylearn \| linear (regression) \| mpg ~ wt + hp \| n = 32 |  |  |  |  |  |  |  |
+
+These are Wald intervals, built from the standard errors in the column
+beside them, so the interval and the p-value in a row always agree about
+whether zero is excluded. For a logistic model, `exponentiate = TRUE`
+reports odds ratios instead of log odds.
+
 For regularised models, coefficients are sorted by magnitude and zero
-coefficients are greyed out:
+coefficients are greyed out. There is no interval to add — glmnet
+reports no standard errors, and `conf_int = TRUE` is an error here
+rather than a column of `NA`:
 
 ``` r
 
@@ -154,6 +178,22 @@ tl_table_coefficients(model_lasso)
 | gear | 0.0000 | 0.0000 |
 | carb | 0.0000 | 0.0000 |
 | tidylearn \| lasso (regression) \| mpg ~ . \| n = 32 |  |  |
+
+The numbers behind these tables come from
+[`tl_coefficients()`](https://tidylearn.sheetsolved.com/reference/tl_coefficients.md),
+which takes the same arguments, returns a tibble, and does not need `gt`
+installed:
+
+``` r
+
+tl_coefficients(model_reg, conf_int = TRUE)
+#> # A tibble: 3 × 7
+#>   term        estimate std_error conf_low conf_high statistic  p_value
+#>   <chr>          <dbl>     <dbl>    <dbl>     <dbl>     <dbl>    <dbl>
+#> 1 (Intercept)  37.2      1.60     34.0      40.5        23.3  2.57e-20
+#> 2 wt           -3.88     0.633    -5.17     -2.58       -6.13 1.12e- 6
+#> 3 hp           -0.0318   0.00903  -0.0502   -0.0133     -3.52 1.45e- 3
+```
 
 ### Confusion Matrix
 
@@ -239,9 +279,9 @@ tl_table_clusters(km)
 |----|----|----|----|----|----|
 | kmeans \| 3 clusters |  |  |  |  |  |
 | Cluster | Size | Sepal.Length | Sepal.Width | Petal.Length | Petal.Width |
-| 1 | 62 | 5.90 | 2.75 | 4.39 | 1.43 |
+| 1 | 38 | 6.85 | 3.07 | 5.74 | 2.07 |
 | 2 | 50 | 5.01 | 3.43 | 1.46 | 0.25 |
-| 3 | 38 | 6.85 | 3.07 | 5.74 | 2.07 |
+| 3 | 62 | 5.90 | 2.75 | 4.39 | 1.43 |
 | tidylearn \| kmeans \| n = 150 |  |  |  |  |  |
 
 ### Model Comparison
@@ -324,9 +364,9 @@ tl_table_importance(model, top_n = 4)
 | Top 4 features                                                 |            |
 | Feature                                                        | Importance |
 | Petal.Length                                                   | 100.00     |
-| Petal.Width                                                    | 87.13      |
-| Sepal.Length                                                   | 26.63      |
-| Sepal.Width                                                    | 9.82       |
+| Petal.Width                                                    | 91.09      |
+| Sepal.Length                                                   | 28.28      |
+| Sepal.Width                                                    | 13.44      |
 | tidylearn \| forest (classification) \| Species ~ . \| n = 105 |            |
 
 Swap `method = "forest"` for `method = "tree"` or `method = "svm"` and

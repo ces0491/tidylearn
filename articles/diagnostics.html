@@ -442,15 +442,17 @@ high-powered car, which already had little to lose.</p>
 <p><code>slope_se</code> describes the straight line fitted to the
 prediction grid rather than the sampling uncertainty of the marginal
 effect — for a linear model the grid is exactly linear, so it is near
-zero by construction. Use <code>summary(model_int$fit)</code> for
-inference on the interaction coefficient.</p>
+zero by construction. Use <code><a href="../reference/tl_coefficients.html">tl_coefficients()</a></code> for inference
+on the interaction coefficient itself.</p>
 <div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">model_int</span><span class="op">$</span><span class="va">fit</span><span class="op">)</span><span class="op">$</span><span class="va">coefficients</span></span>
-<span><span class="co">#&gt;                Estimate Std. Error   t value     Pr(&gt;|t|)</span></span>
-<span><span class="co">#&gt; (Intercept) 49.80842343 3.60515580 13.815887 5.005761e-14</span></span>
-<span><span class="co">#&gt; wt          -8.21662430 1.26970814 -6.471270 5.199287e-07</span></span>
-<span><span class="co">#&gt; hp          -0.12010209 0.02469835 -4.862758 4.036243e-05</span></span>
-<span><span class="co">#&gt; wt:hp        0.02784815 0.00741958  3.753332 8.108307e-04</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/tl_coefficients.html">tl_coefficients</a></span><span class="op">(</span><span class="va">model_int</span>, conf_int <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 4 × 7</span></span></span>
+<span><span class="co">#&gt;   term        estimate std_error conf_low conf_high statistic  p_value</span></span>
+<span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> (Intercept)  49.8      3.61     42.4      57.2        13.8  5.01<span style="color: #949494;">e</span><span style="color: #BB0000;">-14</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> wt           -<span style="color: #BB0000;">8.22</span>     1.27    -<span style="color: #BB0000;">10.8</span>      -<span style="color: #BB0000;">5.62</span>       -<span style="color: #BB0000;">6.47</span> 5.20<span style="color: #949494;">e</span><span style="color: #BB0000;">- 7</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> hp           -<span style="color: #BB0000;">0.120</span>    0.024<span style="text-decoration: underline;">7</span>   -<span style="color: #BB0000;">0.171</span>    -<span style="color: #BB0000;">0.069</span><span style="color: #BB0000; text-decoration: underline;">5</span>     -<span style="color: #BB0000;">4.86</span> 4.04<span style="color: #949494;">e</span><span style="color: #BB0000;">- 5</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> wt:hp         0.027<span style="text-decoration: underline;">8</span>   0.007<span style="text-decoration: underline;">42</span>   0.012<span style="text-decoration: underline;">6</span>    0.043<span style="text-decoration: underline;">0</span>      3.75 8.11<span style="color: #949494;">e</span><span style="color: #BB0000;">- 4</span></span></span></code></pre></div>
 <p><code><a href="../reference/tl_auto_interactions.html">tl_auto_interactions()</a></code> does the search and the refit in
 one step, returning a model with the surviving interactions already in
 the formula:</p>
