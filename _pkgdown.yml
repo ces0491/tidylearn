@@ -50,6 +50,7 @@ reference:
   - tl_split
   - tl_prepare_data
   - tl_evaluate
+  - tl_coefficients
   - tl_cv
   - tl_compare_cv
   - tl_calc_classification_metrics

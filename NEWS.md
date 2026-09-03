@@ -2,7 +2,54 @@
 
 (Development version.)
 
+## New Features
+
+* `tl_coefficients()` returns a model's coefficients as a tibble, with
+  standard errors, test statistics, p-values and -- with
+  `conf_int = TRUE` -- a confidence interval. It covers `"linear"`,
+  `"polynomial"`, `"logistic"`, `"ridge"`, `"lasso"` and `"elastic_net"`.
+  Until now the only coefficient output was `tl_table_coefficients()`,
+  which needs the suggested `gt` package installed, returns a formatted
+  table rather than data, and carried no interval at all — so getting a
+  slope and its interval meant reaching into `model$fit` and calling
+  `confint()` by hand.
+
+  `exponentiate = TRUE` reports odds ratios for a classification model.
+  The standard error stays on the log-odds scale it was computed on and
+  is renamed `std_error_log`, because `exp()` of a standard error is not
+  the standard error of `exp(estimate)`.
+
+  Intervals are Wald intervals, built from the standard errors reported
+  alongside them, so the interval and the p-value in a row always agree
+  about whether zero is excluded. For `"linear"` and `"polynomial"` they
+  match `confint()` on the underlying `lm` exactly. For `"logistic"` they
+  use the *z* the summary reports rather than profiling the likelihood,
+  which `confint(model$fit)` still gives you.
+
+  Regularised methods return the estimates and the `lambda` they came
+  from. `conf_int = TRUE` is an error there rather than a column of `NA`:
+  glmnet reports no standard errors, and a Wald interval on a shrunken
+  estimate would not cover at its stated rate.
+
+* `tl_table_coefficients()` gained `conf_int`, `level` and `exponentiate`,
+  passed through to `tl_coefficients()`. Existing calls produce the same
+  table as before.
+
+* An unrecognised `lambda` is now rejected by name. Anything that was not
+  `"1se"` or `"min"` used to reach `glmnet::coef()` as a penalty, so a
+  typo such as `"1SE"` failed with `non-numeric argument to binary
+  operator` and a vector of penalties with `the condition has length > 1`,
+  neither of which names the argument at fault.
+
 ## Bug Fixes
+
+* `tl_coefficients()` and `tl_table_coefficients()` report a term the fit
+  could not estimate — one of two collinear predictors, or a factor level
+  with no observations — as a row with an `NA` estimate. `summary()` drops
+  aliased terms from its coefficient matrix, so `tl_table_coefficients()`
+  omitted them silently: `mpg ~ wt + wt_doubled` produced a two-row table
+  for a three-term formula, with nothing to show the third term had ever
+  been there. A fit of full rank is unaffected.
 
 * `tl_plot_regularization_path()` drew its feature labels on top of the
   paths they name, in the same colour, so they were unreadable -- and two

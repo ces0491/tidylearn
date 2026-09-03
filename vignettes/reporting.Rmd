@@ -113,11 +113,31 @@ statistics, and p-values, with significant terms highlighted:
 tl_table_coefficients(model_reg)
 ```
 
+`conf_int = TRUE` adds a confidence interval, and `level` sets its width:
+
+```{r table-coef-ci}
+tl_table_coefficients(model_reg, conf_int = TRUE, level = 0.9)
+```
+
+These are Wald intervals, built from the standard errors in the column
+beside them, so the interval and the p-value in a row always agree about
+whether zero is excluded. For a logistic model, `exponentiate = TRUE`
+reports odds ratios instead of log odds.
+
 For regularised models, coefficients are sorted by magnitude and zero
-coefficients are greyed out:
+coefficients are greyed out. There is no interval to add — glmnet reports
+no standard errors, and `conf_int = TRUE` is an error here rather than a
+column of `NA`:
 
 ```{r table-coef-lasso}
 tl_table_coefficients(model_lasso)
+```
+
+The numbers behind these tables come from `tl_coefficients()`, which takes
+the same arguments, returns a tibble, and does not need `gt` installed:
+
+```{r coef-tibble}
+tl_coefficients(model_reg, conf_int = TRUE)
 ```
 
 ### Confusion Matrix

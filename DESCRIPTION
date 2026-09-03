@@ -125,6 +125,7 @@ Collate:
     'interactions.R'
     'diagnostics.R'
     'metrics.R'
+    'coefficients.R'
     'visualization.R'
     'tables.R'
     'workflows.R'
