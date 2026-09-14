@@ -84,7 +84,7 @@
 <li>Provides one consistent interface (<code><a href="reference/tl_model.html">tl_model()</a></code>) to 20 ML algorithms (13 supervised, 7 unsupervised)</li>
 <li>Returns tidy tibbles instead of varied output formats</li>
 <li>Offers unified ggplot2-based visualization and formatted <code>gt</code> tables</li>
-<li>Enables pipe-friendly workflows with <code>%&gt;%</code>
+<li>Enables pipe-friendly workflows with <code>|&gt;</code>
 </li>
 <li>Orchestrates complex workflows combining multiple techniques</li>
 </ul>
@@ -202,9 +202,9 @@
 <span><span class="va">coefs</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/tl_coefficients.html">tl_coefficients</a></span><span class="op">(</span><span class="va">model</span>, conf_int <span class="op">=</span> <span class="cn">TRUE</span>, level <span class="op">=</span> <span class="fl">0.9</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Easy to pipe</span></span>
-<span><span class="va">model</span> <span class="op"><a href="reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span>new_data <span class="op">=</span> <span class="va">test_data</span><span class="op">)</span> <span class="op"><a href="reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu">bind_cols</span><span class="op">(</span><span class="va">test_data</span><span class="op">)</span> <span class="op"><a href="reference/pipe.html">%&gt;%</a></span></span>
+<span><span class="va">model</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span>new_data <span class="op">=</span> <span class="va">test_data</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">bind_cols</span><span class="op">(</span><span class="va">test_data</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu">ggplot</span><span class="op">(</span><span class="fu">aes</span><span class="op">(</span>x <span class="op">=</span> <span class="va">mpg</span>, y <span class="op">=</span> <span class="va">.pred</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu">geom_point</span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu">geom_abline</span><span class="op">(</span>slope <span class="op">=</span> <span class="fl">1</span>, intercept <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></code></pre></div>

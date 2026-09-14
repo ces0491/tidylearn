@@ -566,7 +566,7 @@ same data side by side.</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># ℹ 1 more variable: total_wss &lt;dbl&gt;</span></span></span></code></pre></div>
 <div class="sourceCode" id="cb47"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_cluster_comparison.html">plot_cluster_comparison</a></span><span class="op">(</span></span>
-<span>  <span class="va">iris</span><span class="op">[</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">4</span><span class="op">]</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="va">iris</span><span class="op">[</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">4</span><span class="op">]</span> <span class="op">|&gt;</span></span>
 <span>    <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>kmeans <span class="op">=</span> <span class="va">km</span><span class="op">$</span><span class="va">clusters</span><span class="op">$</span><span class="va">cluster</span>, hclust <span class="op">=</span> <span class="va">cuts</span><span class="op">$</span><span class="va">cluster</span><span class="op">)</span>,</span>
 <span>  cluster_cols <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"kmeans"</span>, <span class="st">"hclust"</span><span class="op">)</span>,</span>
 <span>  x_col <span class="op">=</span> <span class="st">"Petal.Length"</span>,</span>

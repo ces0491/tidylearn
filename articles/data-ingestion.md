@@ -52,9 +52,9 @@ write.csv(mtcars, tmp, row.names = FALSE)
 data <- tl_read(tmp, .quiet = TRUE)
 data
 #> -- tidylearn data ---------
-#> Source: /tmp/Rtmp17mypU/file2acf71fd7b0d.csv 
+#> Source: /tmp/Rtmpv6MjZF/file28c966930c4e.csv 
 #> Format: csv 
-#> Read at: 2026-09-14 10:23:25 
+#> Read at: 2026-09-14 12:24:31 
 #> 
 #> # A tibble: 32 × 11
 #>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb
@@ -112,7 +112,7 @@ head(excel_data, 3)
 #> -- tidylearn data ---------
 #> Source: /home/runner/work/_temp/Library/readxl/extdata/datasets.xlsx 
 #> Format: excel 
-#> Read at: 2026-09-14 10:23:25 
+#> Read at: 2026-09-14 12:24:32 
 #> 
 #> # A tibble: 3 × 11
 #>     mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb
@@ -156,9 +156,9 @@ write_json(mtcars[1:5, ], tmp_json)
 json_data <- tl_read_json(tmp_json)
 json_data
 #> -- tidylearn data ---------
-#> Source: /tmp/Rtmp17mypU/file2acf106fcf.json 
+#> Source: /tmp/Rtmpv6MjZF/file28c920c399b1.json 
 #> Format: json 
-#> Read at: 2026-09-14 10:23:25 
+#> Read at: 2026-09-14 12:24:32 
 #> 
 #> # A tibble: 5 × 11
 #>     mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb
@@ -246,7 +246,7 @@ db_result
 #> -- tidylearn data ---------
 #> Source: SQLiteConnection: SELECT mpg, wt, hp FROM mtcars_tbl WHERE mpg > 20 
 #> Format: database 
-#> Read at: 2026-09-14 10:23:26 
+#> Read at: 2026-09-14 12:24:33 
 #> 
 #> # A tibble: 14 × 3
 #>      mpg    wt    hp
@@ -467,14 +467,14 @@ attr(data, "tl_format")
 #> [1] "csv"
 
 # Works with dplyr
-data %>%
-  filter(mpg > 20) %>%
-  select(mpg, wt, hp) %>%
+data |>
+  filter(mpg > 20) |>
+  select(mpg, wt, hp) |>
   head(3)
 #> -- tidylearn data ---------
-#> Source: /tmp/Rtmp17mypU/file2acf5bb33e01.csv 
+#> Source: /tmp/Rtmpv6MjZF/file28c96a846373.csv 
 #> Format: csv 
-#> Read at: 2026-09-14 10:23:27 
+#> Read at: 2026-09-14 12:24:33 
 #> 
 #> # A tibble: 3 × 3
 #>     mpg    wt    hp
@@ -501,7 +501,7 @@ write.csv(iris, tmp, row.names = FALSE)
 data <- tl_read(tmp, .quiet = TRUE)
 
 # CSV files lose factor information, so convert character columns as needed
-data <- data %>% mutate(Species = as.factor(Species))
+data <- data |> mutate(Species = as.factor(Species))
 
 # 2. Split
 split <- tl_split(data, prop = 0.7, stratify = "Species", seed = 42)

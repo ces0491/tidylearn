@@ -211,8 +211,8 @@ response has exactly two classes. On a multiclass problem such as
 <span><span class="co">#&gt; [5] "clustered_tree"   "clustered_forest" "advanced_svm"     "advanced_xgboost"</span></span></code></pre></div>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># The same search on a two-class problem picks up the logistic variants</span></span>
-<span><span class="va">iris_binary</span> <span class="op">&lt;-</span> <span class="va">iris</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">Species</span> <span class="op">!=</span> <span class="st">"setosa"</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span><span class="va">iris_binary</span> <span class="op">&lt;-</span> <span class="va">iris</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">Species</span> <span class="op">!=</span> <span class="st">"setosa"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>Species <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/droplevels.html" class="external-link">droplevels</a></span><span class="op">(</span><span class="va">Species</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">binary_result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_auto_ml.html">tl_auto_ml</a></span><span class="op">(</span><span class="va">iris_binary</span>, <span class="va">Species</span> <span class="op">~</span> <span class="va">.</span>, time_budget <span class="op">=</span> <span class="fl">30</span>,</span>
@@ -378,7 +378,7 @@ accepts <code>rmse</code>, <code>mse</code>, <code>mae</code>,
 <span><span class="op">}</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>model <span class="op">=</span> <span class="va">available</span>, test_accuracy <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">scores</span>, <span class="fl">3</span><span class="op">)</span>,</span>
-<span>           row.names <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>           row.names <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/arrange.html" class="external-link">arrange</a></span><span class="op">(</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/desc.html" class="external-link">desc</a></span><span class="op">(</span><span class="va">test_accuracy</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;              model test_accuracy</span></span>
 <span><span class="co">#&gt; 1    baseline_tree         0.933</span></span>

@@ -420,9 +420,9 @@ Because the result is a tibble, dplyr works directly:
 
 ``` r
 
-rules$rules_tbl %>%
-  filter(lift > 5, count >= 15) %>%
-  arrange(desc(confidence)) %>%
+rules$rules_tbl |>
+  filter(lift > 5, count >= 15) |>
+  arrange(desc(confidence)) |>
   select(lhs, rhs, confidence, lift, count)
 #> # A tibble: 70 × 5
 #>    lhs                                              rhs   confidence  lift count
@@ -450,9 +450,9 @@ either.
 ``` r
 
 # What predicts a purchase of whole milk?
-filter_rules_by_item(rules, "whole milk", where = "rhs") %>%
-  arrange(desc(lift)) %>%
-  select(lhs, confidence, lift, count) %>%
+filter_rules_by_item(rules, "whole milk", where = "rhs") |>
+  arrange(desc(lift)) |>
+  select(lhs, confidence, lift, count) |>
   head(5)
 #> # A tibble: 5 × 4
 #>   lhs                                        confidence  lift count
@@ -467,9 +467,9 @@ filter_rules_by_item(rules, "whole milk", where = "rhs") %>%
 ``` r
 
 # And what does a basket containing yoghurt lead to?
-filter_rules_by_item(rules, "yogurt", where = "lhs") %>%
-  arrange(desc(lift)) %>%
-  select(lhs, rhs, confidence, lift) %>%
+filter_rules_by_item(rules, "yogurt", where = "lhs") |>
+  arrange(desc(lift)) |>
+  select(lhs, rhs, confidence, lift) |>
   head(5)
 #> # A tibble: 5 × 4
 #>   lhs                                                     rhs   confidence  lift
@@ -487,7 +487,7 @@ that co-occurrence by sheer popularity is excluded:
 
 ``` r
 
-find_related_items(rules, "yogurt", min_lift = 1.5, top_n = 5) %>%
+find_related_items(rules, "yogurt", min_lift = 1.5, top_n = 5) |>
   select(lhs, rhs, confidence, lift)
 #> # A tibble: 5 × 4
 #>   lhs                                                     rhs   confidence  lift
@@ -675,8 +675,8 @@ small_rules <- tidy_apriori(
 #> writing ... [9 rule(s)] done [0.00s].
 #> creating S4 object  ... done [0.00s].
 
-small_rules$rules_tbl %>%
-  arrange(desc(lift)) %>%
+small_rules$rules_tbl |>
+  arrange(desc(lift)) |>
   select(lhs, rhs, support, confidence, lift)
 #> # A tibble: 9 × 5
 #>   lhs            rhs      support confidence  lift

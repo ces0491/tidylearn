@@ -42,6 +42,10 @@
 <h2 class="pkg-version" data-toc-text="0.5.0.9000" id="tidylearn-0509000">tidylearn 0.5.0.9000<a class="anchor" aria-label="anchor" href="#tidylearn-0509000"></a></h2>
 <p>(Development version.)</p>
 <div class="section level3">
+<h3 id="breaking-changes-0-5-0-9000">Breaking Changes<a class="anchor" aria-label="anchor" href="#breaking-changes-0-5-0-9000"></a></h3>
+<ul><li>tidylearn requires R 4.1.0 or later. The package, its README and the vignettes use the native <code>|&gt;</code> pipe, which R 3.6 and 4.0 cannot parse. magrittr’s <code>%&gt;%</code> is still re-exported, so existing code that pipes with it after <code><a href="https://tidylearn.sheetsolved.com">library(tidylearn)</a></code> keeps working.</li>
+</ul></div>
+<div class="section level3">
 <h3 id="new-features-0-5-0-9000">New Features<a class="anchor" aria-label="anchor" href="#new-features-0-5-0-9000"></a></h3>
 <ul><li>
 <p><code><a href="../reference/tl_coefficients.html">tl_coefficients()</a></code> returns a model’s coefficients as a tibble, with standard errors, test statistics, p-values and – with <code>conf_int = TRUE</code> – a confidence interval. It covers <code>"linear"</code>, <code>"polynomial"</code>, <code>"logistic"</code>, <code>"ridge"</code>, <code>"lasso"</code> and <code>"elastic_net"</code>. Until now the only coefficient output was <code><a href="../reference/tl_table_coefficients.html">tl_table_coefficients()</a></code>, which needs the suggested <code>gt</code> package installed, returns a formatted table rather than data, and carried no interval at all — so getting a slope and its interval meant reaching into <code>model$fit</code> and calling <code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code> by hand.</p>

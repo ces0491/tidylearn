@@ -134,8 +134,8 @@ names(result$models)
 ``` r
 
 # The same search on a two-class problem picks up the logistic variants
-iris_binary <- iris %>%
-  filter(Species != "setosa") %>%
+iris_binary <- iris |>
+  filter(Species != "setosa") |>
   mutate(Species = droplevels(Species))
 
 binary_result <- tl_auto_ml(iris_binary, Species ~ ., time_budget = 30,
@@ -326,7 +326,7 @@ scores <- vapply(available, function(nm) {
 }, numeric(1))
 
 data.frame(model = available, test_accuracy = round(scores, 3),
-           row.names = NULL) %>%
+           row.names = NULL) |>
   arrange(desc(test_accuracy))
 #>              model test_accuracy
 #> 1    baseline_tree         0.933

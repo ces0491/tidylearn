@@ -183,8 +183,8 @@ dim(influence)
 
 ``` r
 
-influence %>%
-  filter(is_influential) %>%
+influence |>
+  filter(is_influential) |>
   select(observation, cooks_distance, leverage, dffits, std_residual)
 #>                   observation cooks_distance   leverage    dffits std_residual
 #> Chrysler Imperial          17      0.3199707 0.19279000 1.2354290     2.314921
@@ -201,9 +201,9 @@ is usually the more useful question:
 
 ``` r
 
-influence %>%
-  select(observation, starts_with("dfbetas_")) %>%
-  arrange(desc(abs(dfbetas_wt))) %>%
+influence |>
+  select(observation, starts_with("dfbetas_")) |>
+  arrange(desc(abs(dfbetas_wt))) |>
   head(4)
 #>                   observation dfbetas__Intercept_ dfbetas_wt  dfbetas_hp
 #> Chrysler Imperial          17          -0.8449206  0.7354152  0.01567383

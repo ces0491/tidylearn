@@ -113,7 +113,7 @@ model_pca <- tl_model(reduced_train$data, Species ~ ., method = "forest")
 # data -- refitting PCA on the test set would leak information
 test_transformed <- predict(
   reduced_train$reduction_model,
-  new_data = split$test %>% select(-Species)
+  new_data = split$test |> select(-Species)
 )
 test_transformed$Species <- split$test$Species
 

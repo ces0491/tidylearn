@@ -63,8 +63,8 @@ subset of iris here. For three or more classes use `"tree"`, `"forest"`,
 # versicolor and virginica overlap, so this is a real classification
 # problem -- setosa is linearly separable from the other two, which makes
 # logistic regression fail to converge
-iris_binary <- iris %>%
-  filter(Species %in% c("versicolor", "virginica")) %>%
+iris_binary <- iris |>
+  filter(Species %in% c("versicolor", "virginica")) |>
   mutate(Species = droplevels(Species))
 
 model_logistic <- tl_model(iris_binary, Species ~ ., method = "logistic")

@@ -173,7 +173,7 @@ smaller, less collinear feature space.</p>
 <span><span class="co"># data -- refitting PCA on the test set would leak information</span></span>
 <span><span class="va">test_transformed</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span></span>
 <span>  <span class="va">reduced_train</span><span class="op">$</span><span class="va">reduction_model</span>,</span>
-<span>  new_data <span class="op">=</span> <span class="va">split</span><span class="op">$</span><span class="va">test</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span><span class="va">Species</span><span class="op">)</span></span>
+<span>  new_data <span class="op">=</span> <span class="va">split</span><span class="op">$</span><span class="va">test</span> <span class="op">|&gt;</span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span><span class="va">Species</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">test_transformed</span><span class="op">$</span><span class="va">Species</span> <span class="op">&lt;-</span> <span class="va">split</span><span class="op">$</span><span class="va">test</span><span class="op">$</span><span class="va">Species</span></span>
 <span></span>

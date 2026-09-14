@@ -50,8 +50,8 @@ Let’s create a binary classification problem from the iris dataset:
 # versicolor and virginica overlap, so this is a real classification
 # problem. Even here, a 70% split of 100 rows is separable at some seeds;
 # this one is not.
-iris_binary <- iris %>%
-  filter(Species %in% c("versicolor", "virginica")) %>%
+iris_binary <- iris |>
+  filter(Species %in% c("versicolor", "virginica")) |>
   mutate(Species = droplevels(Species))
 
 # Split data
@@ -424,7 +424,7 @@ for (model_name in names(models)) {
   ))
 }
 
-results <- results %>% arrange(RMSE)
+results <- results |> arrange(RMSE)
 print(results)
 #>    Model     RMSE
 #> 1 forest 2.012343
@@ -490,7 +490,7 @@ model_subset <- tl_model(
 ``` r
 
 # Create dataset with categorical variables
-mtcars_cat <- mtcars %>%
+mtcars_cat <- mtcars |>
   mutate(
     cyl = as.factor(cyl),
     gear = as.factor(gear),
