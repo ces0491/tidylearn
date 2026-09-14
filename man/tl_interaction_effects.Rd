@@ -15,15 +15,27 @@ tl_interaction_effects(model, var, by_var, at_values = NULL, intervals = TRUE)
 
 \item{at_values}{Named list of values at which to hold other variables}
 
-\item{intervals}{Logical; whether to include confidence intervals}
+\item{intervals}{Logical; whether to add 95\\% confidence limits as columns
+\code{lower} and \code{upper}. This needs a model whose underlying fit is
+an \code{lm} or \code{glm}; for any other fit a message is shown and only
+point estimates are returned. For a \code{glm} the interval is built on
+the link scale and transformed to the response scale.}
 }
 \value{
 For numeric \code{var}: a list with \code{effects} (data frame of
-predicted values across the variable range for each level of
+predicted values across the variable range for each value of
 \code{by_var}) and \code{slopes} (data frame with the slope of
-\code{var} at each level of \code{by_var}). For categorical
+\code{var} at each value of \code{by_var}). For categorical
 \code{var}: a data frame of predicted values at each factor level for
-each level of \code{by_var}.
+each level of \code{by_var}. A numeric \code{by_var} is evaluated at its
+quartiles; quartiles that tie are evaluated once, with a label naming
+each quartile they stand for, such as \code{"Q0/Q25"}.
+
+\code{fit}, \code{lower}, \code{upper} and \code{slope} are on the
+response scale whatever \code{intervals} is set to: predicted
+probabilities for a logistic model. \code{slope} is the slope of a
+straight line fitted to \code{fit} across the range of \code{var}, so
+for a non-linear link it is an average rate of change over that range.
 
 \code{slopes$slope_se} is the standard error of a straight line fitted
 to the prediction grid, not the sampling uncertainty of the marginal

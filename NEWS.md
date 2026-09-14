@@ -29,23 +29,332 @@
   Regularised methods return the estimates and the `lambda` they came
   from. `conf_int = TRUE` is an error there rather than a column of `NA`:
   glmnet reports no standard errors, and a Wald interval on a shrunken
-  estimate would not cover at its stated rate.
+  estimate would not cover at its stated rate. A multiclass regularised
+  model has a set of coefficients per class, returned under a `class`
+  column and grouped by class in the table. `exponentiate` is refused
+  there: glmnet's multinomial coefficients are not relative to a
+  reference class, so their exponent is not an odds ratio.
 
 * `tl_table_coefficients()` gained `conf_int`, `level` and `exponentiate`,
   passed through to `tl_coefficients()`. Existing calls produce the same
-  table as before.
+  table as before, apart from the `lambda` change below. With
+  `exponentiate = TRUE` a regularised table ranks terms by the size of the
+  log odds ratio: ranked by the odds ratio itself, a term the penalty
+  dropped (1) sorted above a strong negative effect (0.02).
 
 * An unrecognised `lambda` is now rejected by name. Anything that was not
   `"1se"` or `"min"` used to reach `glmnet::coef()` as a penalty, so a
   typo such as `"1SE"` failed with `non-numeric argument to binary
   operator` and a vector of penalties with `the condition has length > 1`,
-  neither of which names the argument at fault.
+  neither of which names the argument at fault. A numeric `lambda` outside
+  the penalties the model was fitted over is refused as well. glmnet
+  returns the coefficients at the nearest end of the path for it, which
+  the table labelled with the penalty asked for: `lambda = 0` returned the
+  coefficients at the smallest penalty on the path, labelled as
+  unpenalised. The same penalty checks apply to regularised importance.
+  `tl_coefficients()` takes no `...`, so a misspelt argument such as
+  broom's `conf.int = TRUE` is an error rather than a table without an
+  interval.
 
 ## Bug Fixes
 
+* **`predict()` on a `"ridge"`, `"lasso"` or `"elastic_net"` model now uses
+  `lambda_1se`, so its predictions change.** It used `lambda_min`, while
+  `tl_coefficients()`, `tl_table_coefficients()` and importance all report
+  `lambda_1se` by default, so the coefficients on display were not the
+  ones behind the predictions. `lambda_1se` is the penalty the fit itself
+  was documented as preferring for generalisation. Metrics, cross-
+  validation and tuning scores for these methods move with it.
+
+* `tl_split(stratify = )` no longer corrupts the split when a stratum holds
+  a single row. `sample()` on one number draws from `1:n`, so that
+  stratum drew a row from elsewhere in the data -- sometimes one already
+  drawn -- and left its own row in test. On `mtcars` stratified by `mpg`,
+  most of whose values occur once, the split returned 43 rows from 32.
+
+* `tl_compare_cv()` refits each model with the arguments it was built
+  with. It refitted from the formula and method alone, so every model was
+  scored at its method's defaults: a tree with `cp = 0.5` and one with
+  `cp = 0.0001, minsplit = 2` produced identical fold scores. Models now
+  record their fitting arguments in `$spec$args`; arguments passed to
+  `tl_compare_cv()` override them. A model fitted with `weights`,
+  `subset`, `offset`, `foldid` or `strata` is refused, since those hold one
+  value per training row and cannot follow the rows into a fold. Those are
+  recorded by name only, in `$spec$per_row_args`, so a model does not
+  carry a second copy of its weights.
+
+* `tl_step_selection()` with `direction = "forward"` or `"both"` returned
+  the intercept-only model for any formula using `.`. `step()` expanded
+  the dot against the starting model's `1`, which left no terms to add.
+  The formula is now expanded against the data first.
+
+* `tl_semisupervised()` refuses a numeric response. Labels are propagated
+  by majority vote within a cluster, and the response was passed through
+  `factor()`, so `mpg ~ .` was fitted as a classification with one class
+  per distinct value.
+
+* `tl_semisupervised()` warns about rows whose cluster holds no labelled
+  observation, and leaves them out of training. They were given `NA`
+  labels and dropped when the model was fitted, without a message; with
+  six labels from two iris classes, 53 of 150 rows went that way. The
+  count is in `$semisupervised_info$n_unlabelled_dropped`. A logical
+  `labeled_indices` and a string formula are also accepted now; the
+  logical was matched as the positions 0 and 1.
+
+* `tl_anomaly_aware(action = "downweight")` now changes the model. With
+  the default `"tree"` the weights went to `rpart.control()`, which
+  ignored them, so the fit was identical to the unweighted tree; with
+  `"linear"` the call errored with `..1 used in an incorrect context`.
+  It now requires a method that applies case weights -- `"linear"`,
+  `"polynomial"`, `"logistic"`, `"tree"`, `"ridge"`, `"lasso"`,
+  `"elastic_net"` or `"forest"` -- and refuses the others, of which
+  `"boost"` and `"nn"` errored, `"xgboost"` warned, and `"svm"` ignored the
+  weights. A forest reads them as sampling weights.
+
+* `tl_model()` passes `weights` through to `lm()`, `glm()` and `rpart()`.
+  For `"linear"` and `"logistic"` it failed with `..1 used in an incorrect
+  context`. For `"tree"`, every extra argument went to
+  `rpart.control()`, which discards what it does not recognise, so
+  `weights`, `parms`, `cost` and a whole `control` list were accepted and
+  had no effect. An `offset` argument is refused with a pointer to
+  `offset()` in the formula, which is the form `predict()` can apply to
+  new data.
+
+* `tl_plot_model_comparison()` and `tl_table_comparison()` keep two models
+  of the same method apart. Both got the same default name
+  (`"linear (reg)"` in the table), so the plot drew one bar over the other
+  and the table pivoted the pair into list cells. Repeated default names
+  are now numbered, and `tl_table_comparison()` checks `names` has one
+  unique entry per model, as the plot already checked its length.
+
+* `tl_split(stratify = )` splits rows whose stratify value is missing.
+  `split()` drops an `NA` group, so those rows were never drawn and all
+  went to test. They now form a stratum of their own. `tl_split()` on a
+  one-column data frame also returns data frames rather than bare vectors.
+
+* `tl_prepare_data()` imputes with the method it names. `"mode"` and
+  `"knn"` both used the mean while the message reported the method asked
+  for; `"mode"` is now implemented and anything else is refused. A missing
+  value in a factor or character column was never imputed, and with more
+  than two levels it broke one-hot encoding with `Can't recycle ..1 (size
+  150) to match ..2 (size 148)`. Categorical gaps now take the column's
+  most frequent value.
+
+* `tl_prepare_data(remove_correlated = TRUE)` removes the feature that
+  clears a correlated group rather than the ones around it. Every pair was
+  decided separately against a half-zeroed matrix, so for a chain
+  `x1 - x2 - x3` it dropped `x1` and `x3` and kept `x2`, the one feature
+  correlated with both. Features are now removed one at a time, the most
+  correlated pair first, as `caret::findCorrelation()` does.
+
+* `tl_prepare_data()` processes only the formula's predictors. It read
+  the formula for the response alone, so `y ~ . - id` one-hot encoded
+  `id` into twenty columns. A column the formula excludes is now returned
+  unchanged. `tl_model()` shares that formula reading to record the
+  training levels of factor predictors, and for a formula using `.` it
+  recorded none.
+
+* `tl_add_cluster_features(method = "hclust")` takes `k`. It was passed on
+  to the tree fit, which has no `k`, so every value but the fallback
+  failed with `unused argument (k = 4)`. `tl_semisupervised(cluster_method
+  = "hclust")` failed the same way on every call, and now cuts the tree.
+
+* `tl_anomaly_aware(action = "flag")` adds the flag to the formula as
+  written. It rebuilt the formula from its variable names, so
+  `Species ~ . - Sepal.Width` put `Sepal.Width` back in as a predictor and
+  `mpg ~ poly(wt, 2)` was fitted as `mpg ~ wt`.
+
+* `predict()` on a `tl_stratified_models()` result works on data without
+  the response column. It selected the response out by name and failed
+  with `Element mpg doesn't exist`.
+
+* `tl_step_selection()` with `direction = "forward"` or `"both"` keeps a
+  transformed response. The starting model was built from the response's
+  variable name, so `log(mpg) ~ wt + hp + qsec` selected a model of `mpg`.
+
+* `tl_compare_cv()` refuses repeated model names and names an unnamed
+  entry `Model_<i>`, numbered on (`Model_1.1`) if the caller already chose
+  that name. Results are keyed on the name, so
+  `list(a = m1, a = m2)` pooled both models' folds into one summary row,
+  and a partly named list produced a model called `""`.
+
+* `tl_plot_lift()` and `tl_plot_gain()` no longer depend on row order.
+  Rows with tied probabilities kept the order they arrived in, and a tree
+  scores many rows alike: for a tree of `Species ~ Sepal.Width` on two iris
+  classes, reversing the rows moved the gain at 10% of the population from
+  0% to 20% of responders. Each row now counts the response rate of its
+  tie group, the value any tie-breaking gives on average. A row missing
+  its response turned every point to `NA` and left the chart empty; those
+  rows are now left out, with a warning. The bins also match `bins`:
+  sizing them by rounding up gave 32 rows in 10 bins as 8, and a `bins`
+  that is not a whole number of at least 1 is refused.
+
+* Importance for `"ridge"`, `"lasso"` and `"elastic_net"` no longer
+  depends on the units of each predictor. It was the absolute
+  coefficient, so rescaling `hp` to hundreds multiplied its importance
+  about a hundredfold without changing a prediction. Each coefficient is
+  now multiplied by its predictor's standard deviation. **Importance values
+  for these methods change**, in `tl_table_importance()`,
+  `tl_plot_importance_regularized()` and `tl_plot_importance_comparison()`.
+  A multiclass model, which failed with `non-numeric argument to
+  mathematical function`, now takes each predictor's largest value across
+  classes. A penalty that drops every predictor is reported as such rather
+  than as an empty table and a `max()` warning.
+
+* `tl_plot_importance_comparison()` counts a feature a model did not use as
+  zero. The ranking averaged each feature over only the models that kept
+  it, so a feature a lasso dropped could outrank one both models used.
+
+* `tl_table_confusion()` warns when rows are missing a response or a
+  prediction. `table()` dropped them, and the counts summed to fewer rows
+  than were passed in without saying so.
+
+* `tl_tune_grid()` and `tl_tune_random()` treat `method = "logistic"` as
+  classification whatever type the response is stored as. They checked
+  only for a factor or character response, so a 0/1 numeric response
+  defaulted to `"rmse"`, which a logistic model never produces, and the
+  search failed with `Metric "rmse" was not produced for this task`.
+
+* A parameter set that fails on some folds can no longer be chosen as
+  best. Its `mean_metric` was averaged over whichever folds survived, so
+  it could win on the easier folds alone, and nothing in the results said
+  so. The results now carry an `n_folds_ok` column, and only sets scored
+  on every fold are eligible. If no set completes every fold, the best of
+  the most complete sets is used, with a warning naming it. When every set
+  fails in every fold the tuners stop with a message saying so, rather
+  than `argument is of length zero`.
+
+* `tl_tune_random()` uses a single value as given. `sample(20, 1)` draws
+  from `1:20`, so `param_space = list(minsplit = 20, cp = c(0.01, 0.1))`
+  tried `minsplit` values of 3, 10 and 6 with `seed = 1`. A logical was
+  drawn from `c(TRUE, FALSE)` whatever was supplied, so
+  `importance = TRUE` came out `FALSE` in three draws of four. Logicals are
+  now drawn from the values given. `tl_tune_random()` also accepts a list
+  of candidates, such as
+  `hidden_layers = list(10, c(20, 10))`, and `verbose = TRUE` no longer
+  fails on a character parameter.
+
+* Vector-valued grid candidates reach the model. The grid stores them in
+  a list column, so the default `"deep"` grid passed
+  `hidden_layers = list(c(10, 5))` and every multi-layer candidate failed.
+
+* `tl_default_param_grid("logistic")` returned the ridge `lambda` grid,
+  which `glm()` does not accept, so every fit in a search over it failed.
+  It now returns an empty grid with a warning pointing to `"ridge"`,
+  `"lasso"` and `"elastic_net"`.
+
+* The large `"forest"` grid no longer includes `sampsize`, which
+  randomForest reads as a number of rows and the grid gave as fractions
+  from 0.5 to 1. For `method = "forest"` the tuners cap `mtry` at the
+  number of predictors, with a warning: randomForest reset an oversized
+  `mtry` in every fold while the results credited the value asked for.
+
+* `tl_auto_interactions()` honours `exclude_vars`. It computed the reduced
+  predictor set and never used it, so with a strong `a:z` effect
+  `exclude_vars = "z"` still returned `y ~ a + b + z + a:z`. A name in
+  `exclude_vars` that is not a predictor in the formula is now an error.
+  With a `y ~ .` formula the function failed in its testing step, and now
+  works. When every pair is already in the formula it returns the model as
+  specified, with a message.
+
+* `tl_interaction_effects()` reports `fit`, `lower`, `upper` and `slope`
+  on the response scale whether or not `intervals = TRUE`. With intervals
+  a logistic model's values were log odds (`am ~ wt * hp` gave `fit` from
+  -32 to 40) and without them probabilities. A glm's interval is now built
+  on the link scale and transformed back, and a linear model's is the
+  t-based interval `predict.lm()` gives. **The `se` column is removed**; for
+  a glm it was on the link scale. A model with no standard errors, such as
+  a tree, failed with `$ operator is invalid for atomic vectors` and now
+  returns point estimates with a message.
+
+* `tl_interaction_effects()` and `tl_plot_interaction()` accept a model
+  fitted with `y ~ .`, which failed with `Variables not found in model
+  formula`. `tl_interaction_effects()` also stopped repeating grid blocks
+  when quartiles of `by_var` tie: `mpg ~ wt * cyl` gave five slopes for
+  three values of `cyl`, and now gives one each, labelled with the
+  quartiles it stands for.
+
+* `tl_test_interactions()` accepts a `.` formula and a string formula, and
+  stops with a message naming the formula's predictors when a type filter
+  leaves no pairs. These failed with messages such as `undefined columns
+  selected` and `argument 1 is not a vector`. It no longer re-tests a pair
+  whose interaction the formula already has, which came back as a row of
+  `NA`, and it refuses a formula with no response, whose first predictor it
+  treated as the response.
+
+* The interaction functions keep an `offset()` in the formula. Rebuilding
+  the formula from its terms dropped it, so `tl_test_interactions()` and
+  `tl_auto_interactions()` tested and refitted models without the offset,
+  and `tl_interaction_effects()` failed with `object 'disp' not found`.
+  `tl_plot_interaction()` on a `y ~ . - x` model failed the same way,
+  because its prediction grid left out the removed column the model
+  still evaluates.
+
+* `tl_interaction_effects()` refuses a constant `var`, which failed with
+  `subscript out of bounds`, and `tl_plot_interaction()` refuses a `type`
+  argument: `type = "class"` drew class codes over a probability band.
+
+* `tl_plot_interaction(confidence = TRUE)` draws the confidence band. The
+  band came from `predict()`, which returns no interval, so none was ever
+  drawn. It now comes from the `lm` or `glm` fit, for numeric by
+  categorical plots; a model without standard errors gets a message.
+
+* `tl_split()` refuses a `prop` outside (0, 1). `prop = 1.5` split 32 rows
+  31/1, because each side is kept to at least one row.
+
+* `tl_step_selection(criterion = "BIC")` penalises by the rows the model
+  used. `log(nrow(data))` counted rows `lm()` dropped for missing values,
+  which could change the model selected. Forward and `"both"` selection
+  also find a variable the formula takes from the caller's environment.
+
+* Variable importance works for more models. A forest fitted with
+  `importance = FALSE` failed with `subscript out of bounds`; it now uses
+  the impurity measure the forest does have. `tl_table_importance()`, which
+  documented xgboost support, refused xgboost models; they now report gain.
+  `tl_plot_importance()` shares the table's extraction, and the dashboard's
+  importance panel, which showed an error for `"ridge"`, `"lasso"` and
+  `"elastic_net"`, now plots them. `tl_plot_importance_comparison()` with
+  no supported model failed inside dplyr; it now says so.
+
+* `predict()` on a `tl_stratified_models()` result returns what each
+  cluster's model returns for the requested `type`. With
+  `type = "prob"` it returned only `.cluster`, with a warning per row.
+  Class levels and probability columns follow the classes in the training
+  data: they had followed whichever rows came first, so the second level
+  -- the positive class -- changed with row order, and a class one cluster
+  never saw had probability `NA` rather than 0.
+
+* `tl_anomaly_aware()` names an invalid `action`, which failed with
+  `object 'model' not found`, and no longer documents an
+  `"isolation_forest"` method it never had.
+
+* `tl_default_param_grid()` gives `"polynomial"` a `degree` grid, and says
+  `"linear"` has nothing to tune; both used to warn "Unknown method".
+  `tl_tune_grid()` and `tl_tune_random()` name a parameter given no
+  candidate values, which was reported as every set failing or as
+  `invalid first argument`. In `tl_tune_random()` a whole-number range with
+  equal ends, `c(20, 20)`, is the value 20 -- it drew from 1 to 20 -- and a
+  non-whole one is refused with a message that no longer advises writing
+  `c(20.5, 20.5)` as `c(20.5, 20.5)`. A forest `mtry` below 1 is
+  raised to 1, as randomForest does, so the results report the value
+  used. `tl_plot_tuning_results()` on a one-parameter search explains that
+  its default plot needs two parameters, where the message said
+  `plot_type` must be one of "scatter", ... and had got "scatter".
+
+* The cluster table no longer counts dbscan's noise points as a cluster,
+  averages around missing values in hclust and dbscan tables, and a long
+  formula no longer splits a table's source note in two.
+  `tl_table_coefficients()` warns about arguments it does not use.
+
+* `tl_prepare_data(remove_zero_variance = FALSE)` no longer stops on an
+  entirely missing numeric column, and its documentation says the
+  statistics come from the data passed in, so preparing before splitting
+  lets test rows shape them.
+
 * `tl_coefficients()` and `tl_table_coefficients()` report a term the fit
-  could not estimate — one of two collinear predictors, or a factor level
-  with no observations — as a row with an `NA` estimate. `summary()` drops
+  could not estimate — one of two collinear predictors, or an interaction
+  of factors with a combination no row has — as a row with an `NA`
+  estimate. `summary()` drops
   aliased terms from its coefficient matrix, so `tl_table_coefficients()`
   omitted them silently: `mpg ~ wt + wt_doubled` produced a two-row table
   for a three-term formula, with nothing to show the third term had ever
@@ -57,6 +366,11 @@
   On `mtcars` that hid `drat` behind `qsec` and clipped `am` and `wt` at
   the panel edge. Labels now sit clear of the leftmost point, spread far
   enough apart to read, each with a leader line back to its own path.
+
+## Documentation
+
+* The hex logo and the pkgdown favicons have sharp corners, in line with
+  other R package hex stickers. The artwork is otherwise unchanged.
 
 # tidylearn 0.5.0
 

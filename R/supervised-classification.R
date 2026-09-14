@@ -31,8 +31,15 @@ tl_fit_logistic <- function(data, formula, ...) {
   tl_check_binary_response(data[[response_var]], response_var)
 
   # Fit the logistic regression model
-  glm_model <- stats::glm(formula, data = data, family = stats::binomial(), ...)
+  # By value, so weights = <a vector> reaches glm() as a vector
+  glm_model <- tl_fit_by_value(
+    stats::glm, "glm",
+    list(formula = formula, data = data, family = stats::binomial(), ...)
+  )
 
+  # Store the family as a call update() and step() can re-evaluate, rather
+  # than the family object printed in full
+  glm_model$call$family <- quote(binomial())
   glm_model
 }
 

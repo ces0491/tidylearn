@@ -31,7 +31,7 @@ test_that("glmnet prediction handles factor predictors", {
   )[, -1, drop = FALSE]
   direct <- as.vector(stats::predict(
     model$fit, newx = x_direct,
-    s = attr(model$fit, "lambda_min"), type = "response"
+    s = attr(model$fit, "lambda_1se"), type = "response"
   ))
   expect_equal(preds, direct)
 })

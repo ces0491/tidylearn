@@ -330,3 +330,171 @@ test_that("tl_plot_regularization_path labels every top feature legibly", {
   expect_s3_class(tl_plot_regularization_path(model, label_n = 0), "ggplot")
   expect_s3_class(tl_plot_regularization_path(model, label_n = 1), "ggplot")
 })
+
+test_that("two models of one method get separate comparison bars", {
+  m1 <- tl_model(mtcars, mpg ~ wt, method = "linear")
+  m2 <- tl_model(mtcars, mpg ~ wt + hp + qsec, method = "linear")
+  plot <- suppressMessages(tl_plot_model_comparison(m1, m2))
+
+  expect_length(unique(plot$data$model), 2)
+  built <- ggplot2::ggplot_build(plot)$data[[1]]
+  expect_length(unique(built$x), 2)
+
+  expect_error(
+    suppressMessages(tl_plot_model_comparison(m1, m2, names = c("a", "a"))),
+    "unique"
+  )
+})
+
+test_that("gain and lift do not depend on row order", {
+  ib <- droplevels(iris[iris$Species != "setosa", ])
+  tree <- tl_model(ib, Species ~ Sepal.Width, method = "tree")
+  shuffled <- ib[rev(seq_len(nrow(ib))), ]
+
+  curve_y <- function(plot) ggplot2::ggplot_build(plot)$data[[1]]$y
+  gain <- function(d) curve_y(tl_plot_gain(tree, new_data = d))
+  lift <- function(d) curve_y(tl_plot_lift(tree, new_data = d))
+  expect_equal(gain(ib), gain(shuffled))
+  expect_equal(lift(ib), lift(shuffled))
+  # the curve still ends at every responder
+  expect_equal(utils::tail(gain(ib), 1), 100)
+})
+
+test_that("gain and lift leave out rows missing the response, and say so", {
+  ib <- droplevels(iris[iris$Species != "setosa", ])
+  model <- tl_model(ib, Species ~ Sepal.Width + Petal.Length,
+                    method = "logistic")
+  d <- ib
+  d$Species[c(3, 60)] <- NA
+  expect_warning(p <- tl_plot_lift(model, new_data = d), "2 row")
+  expect_false(anyNA(ggplot2::ggplot_build(p)$data[[1]]$y))
+  expect_warning(p <- tl_plot_gain(model, new_data = d), "2 row")
+  expect_false(anyNA(ggplot2::ggplot_build(p)$data[[1]]$y))
+})
+
+test_that("regularised importance does not depend on a predictor's units", {
+  set.seed(1)
+  r1 <- tl_model(mtcars, mpg ~ wt + hp + qsec, method = "ridge", lambda = 0.5)
+  rescaled <- transform(mtcars, hp = hp / 100)
+  r2 <- tl_model(rescaled, mpg ~ wt + hp + qsec, method = "ridge",
+                 lambda = 0.5)
+  i1 <- tl_get_importance_regularized(r1)
+  i2 <- tl_get_importance_regularized(r2)
+  expect_equal(i1$importance[match(c("wt", "hp", "qsec"), i1$feature)],
+               i2$importance[match(c("wt", "hp", "qsec"), i2$feature)],
+               tolerance = 1e-6)
+})
+
+test_that("a feature one model dropped counts as zero in the ranking", {
+  lasso <- tl_model(mtcars, mpg ~ ., method = "lasso")
+  tree <- tl_model(mtcars, mpg ~ ., method = "tree")
+  p <- tl_plot_importance_comparison(lasso, tree, top_n = 3)
+  # every plotted feature has a bar for both models
+  counts <- table(as.character(p$data$feature))
+  expect_true(all(counts == 2))
+})
+
+test_that("regularised importance works for a multiclass model", {
+  model <- tl_model(iris, Species ~ ., method = "lasso")
+  imp <- tl_get_importance_regularized(model)
+  expect_type(imp$importance, "double")
+  expect_true(all(imp$feature %in% names(iris)[1:4]))
+  skip_if_not_installed("gt")
+  expect_s3_class(tl_table_importance(model), "gt_tbl")
+})
+
+test_that("the dashboard importance panel dispatches regularised models", {
+  expect_s3_class(tl_dashboard_importance_plot(
+    tl_model(mtcars, mpg ~ ., method = "lasso")
+  ), "ggplot")
+  expect_s3_class(tl_dashboard_importance_plot(
+    tl_model(mtcars, mpg ~ ., method = "tree")
+  ), "ggplot")
+})
+
+test_that("importance comparison with no supported model says so", {
+  m1 <- tl_model(mtcars, mpg ~ wt, method = "linear")
+  m2 <- tl_model(mtcars, mpg ~ hp, method = "linear")
+  expect_error(
+    suppressWarnings(tl_plot_importance_comparison(m1, m2)),
+    "None of the models"
+  )
+})
+
+test_that("lift and gain draw the number of bins asked for", {
+  am <- transform(mtcars, am = factor(am))
+  model <- tl_model(am, am ~ wt, method = "logistic")
+  lift <- ggplot2::ggplot_build(tl_plot_lift(model, bins = 10))$data[[1]]
+  expect_equal(nrow(lift), 10)
+  gain <- ggplot2::ggplot_build(tl_plot_gain(model, bins = 10))$data[[1]]
+  expect_equal(nrow(gain), 11)
+  expect_equal(utils::tail(gain$x, 1), 100)
+})
+# Tests for what the review of the medium fixes found.
+
+test_that("the regularised importance plot shows the table's importance", {
+  model <- tl_model(transform(mtcars, hp = hp / 100), mpg ~ wt + hp + qsec,
+                    method = "ridge")
+  plotted <- tl_plot_importance_regularized(model)$data
+  tabled <- tl_get_importance_regularized(model)
+  expect_equal(plotted$importance[match(tabled$feature, plotted$feature)],
+               tabled$importance)
+})
+
+test_that("importance refuses a penalty outside the fitted path", {
+  model <- tl_model(mtcars, mpg ~ wt + hp, method = "ridge", lambda = 0.1)
+  expect_error(tl_get_importance_regularized(model, lambda = 5),
+               "outside the fitted path")
+  expect_error(tl_plot_importance_regularized(model, lambda = 5),
+               "outside the fitted path")
+})
+
+test_that("importance plots share the table's extraction", {
+  forest <- tl_model(iris, Species ~ ., method = "forest", ntree = 50,
+                     importance = FALSE)
+  expect_s3_class(tl_plot_importance(forest), "ggplot")
+  expect_s3_class(tl_dashboard_importance_plot(forest), "ggplot")
+  skip_if_not_installed("xgboost")
+  xgb <- tl_model(mtcars, mpg ~ wt + hp + qsec, method = "xgboost",
+                  nrounds = 10)
+  expect_s3_class(tl_plot_importance(xgb), "ggplot")
+  expect_s3_class(tl_dashboard_importance_plot(xgb), "ggplot")
+})
+
+test_that("tl_table_coefficients reports every ignored argument", {
+  skip_if_not_installed("gt")
+  model <- tl_model(mtcars, mpg ~ wt, method = "linear")
+  expect_warning(tl_table_coefficients(model, conf.int = TRUE),
+                 "conf.int. Did you mean conf_int")
+  # Every formal filled by position, so 99 lands in ... unnamed
+  expect_warning(
+    tl_table_coefficients(model, "1se", 4, FALSE, 0.95, FALSE, 99, foo = 1),
+    "does not use: <unnamed>, foo"
+  )
+  expect_no_warning(tl_table_coefficients(model))
+})
+
+test_that("a model with every predictor penalised away says so", {
+  model <- tl_model(mtcars, mpg ~ wt + hp, method = "lasso", lambda = 100)
+  expect_no_warning(imp <- tl_get_importance_regularized(model))
+  expect_identical(nrow(imp), 0L)
+  expect_error(tl_plot_importance_regularized(model),
+               "dropped every predictor")
+  skip_if_not_installed("gt")
+  expect_error(tl_table_importance(model), "dropped every predictor")
+})
+
+test_that("lift and gain refuse a bin count that is not a whole number", {
+  am <- transform(mtcars, am = factor(am))
+  model <- tl_model(am, am ~ wt, method = "logistic")
+  for (bins in list(0, 2.5, NA_real_, "10")) {
+    expect_error(tl_plot_lift(model, bins = bins), "'bins' must be")
+    expect_error(tl_plot_gain(model, bins = bins), "'bins' must be")
+  }
+})
+
+test_that("a single cluster is not called clusters", {
+  skip_if_not_installed("gt")
+  model <- tl_model(iris[, 1:4], method = "kmeans", k = 1)
+  expect_match(tl_table_clusters(model)[["_heading"]]$subtitle, "1 cluster$")
+})

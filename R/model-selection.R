@@ -34,15 +34,35 @@ tl_step_selection <- function(data, formula, direction = "backward",
   direction <- match.arg(direction, c("forward", "backward", "both"))
   criterion <- match.arg(criterion, c("AIC", "BIC"))
 
+  # Expand `.` and apply `- x` against the data before anything else reads
+  # the formula. step() expands a dot in the upper scope against the start
+  # model's right-hand side, which for forward selection is `1`, so
+  # `y ~ .` offered no terms to add and returned the intercept-only model.
+  formula <- stats::formula(stats::terms(tl_as_formula(formula), data = data,
+                                         simplify = TRUE))
+
   # Create full model
   full_model <- lm(formula, data = data)
 
   # Create null model (intercept only) for forward selection
-  null_formula <- as.formula(paste(all.vars(formula)[1], "~ 1"))
+  # update() keeps the response as written; pasting all.vars()[1] turned
+  # log(mpg) into mpg, so forward selection fitted a different response
+  null_formula <- stats::update(formula, . ~ 1)
+  # step() refits by re-evaluating the model call, which names `data`, and
+  # the lookup falls back to the formula's environment. The caller's may
+  # hold utils::data rather than this frame's data, so `data` is supplied
+  # in an environment in front of the caller's -- which still resolves any
+  # other variable the formula uses there.
+  formula_env <- new.env(parent = environment(formula))
+  formula_env$data <- data
+  environment(null_formula) <- formula_env
   null_model <- lm(null_formula, data = data)
 
   # Set penalty parameter k based on criterion
-  k <- if (criterion == "AIC") 2 else log(nrow(data))
+  # BIC's penalty is log(n) for the rows the model used. nrow(data) counts
+  # rows lm() dropped for missing values, which over-penalises and can
+  # change the model selected.
+  k <- if (criterion == "AIC") 2 else log(stats::nobs(full_model))
 
   # Determine start and scope based on direction
   if (direction == "forward") {
@@ -100,7 +120,9 @@ tl_step_selection <- function(data, formula, direction = "backward",
 #' @param models A list of tidylearn model objects
 #' @param folds Number of cross-validation folds
 #' @param metrics Character vector of metrics to compute
-#' @param ... Additional arguments
+#' @param ... Arguments passed to \code{\link{tl_model}} for every fold
+#'   fit. Each model is refitted with the arguments it was built with;
+#'   anything given here overrides them.
 #' @return A list with two elements:
 #'   \describe{
 #'     \item{\code{$fold_metrics}}{A data frame with columns
@@ -126,11 +148,29 @@ tl_compare_cv <- function(data, models, folds = 5, metrics = NULL, ...) {
     stop("All models must be tidylearn model objects", call. = FALSE)
   }
 
-  # Get model names if not provided
+  # Results are keyed by model name. A name left empty in a partly named
+  # list became a model called "", and a repeated name pooled two models'
+  # folds into one summary row.
   model_names <- names(models)
   if (is.null(model_names)) {
-    model_names <- paste0("Model_", seq_along(models))
+    model_names <- rep("", length(models))
   }
+  unnamed <- is.na(model_names) | model_names == ""
+  if (anyDuplicated(model_names[!unnamed])) {
+    stop(
+      "Model names must be unique; the results are keyed on them. ",
+      "Repeated: ",
+      paste(unique(model_names[!unnamed][duplicated(model_names[!unnamed])]),
+            collapse = ", "),
+      call. = FALSE
+    )
+  }
+  # Generated names skip any the caller chose, so list(m1, Model_1 = m2)
+  # does not collide with a name the caller never repeated
+  model_names[unnamed] <- utils::tail(
+    make.unique(c(model_names[!unnamed], paste0("Model_", which(unnamed)))),
+    sum(unnamed)
+  )
 
   # Check if all models are of the same type (classification or regression)
   model_types <- sapply(models, function(model) model$spec$is_classification)
@@ -153,6 +193,34 @@ tl_compare_cv <- function(data, models, folds = 5, metrics = NULL, ...) {
     }
   }
 
+  # Each model's own fitting arguments, overridden by any passed here. A
+  # model from tl_step_selection() or an older tidylearn has none recorded.
+  fit_args <- lapply(models, function(model) {
+    recorded <- if (is.null(model$spec$args)) list() else model$spec$args
+    # Replace whole arguments. modifyList() would merge a list-valued one
+    # such as parms into the recorded list instead of overriding it.
+    overrides <- list(...)
+    recorded[names(overrides)] <- overrides
+    recorded
+  })
+
+  # An argument with one value per training row cannot follow the rows
+  # into a fold, and replaying it whole would fail on a length mismatch.
+  # A model records such arguments by name only; one passed here to
+  # tl_compare_cv() is checked as well.
+  per_row <- unique(c(
+    unlist(lapply(models, function(model) model$spec$per_row_args)),
+    intersect(names2(list(...)), tl_per_row_args())
+  ))
+  if (length(per_row) > 0) {
+    stop(
+      "tl_compare_cv() cannot re-split '", paste(per_row, collapse = "', '"),
+      "' across folds: it holds one value per row of the data a model was ",
+      "fitted on.",
+      call. = FALSE
+    )
+  }
+
   # Create cross-validation splits
   cv_splits <- rsample::vfold_cv(data, v = folds)
 
@@ -167,14 +235,16 @@ tl_compare_cv <- function(data, models, folds = 5, metrics = NULL, ...) {
       train_data <- rsample::analysis(cv_splits$splits[[j]])
       test_data <- rsample::assessment(cv_splits$splits[[j]])
 
-      # Extract formula and method from the model
-      formula <- model$spec$formula
-      method <- model$spec$method
-
-      # Train model on this fold
-      fold_model <- tl_model(
-        train_data, formula = formula,
-        method = method, ...
+      # Train model on this fold, with the arguments it was built with.
+      # Refitting from formula and method alone scored every model at its
+      # method's defaults, so two trees differing only in cp tied.
+      fold_model <- do.call(
+        tl_model,
+        c(
+          list(train_data, formula = model$spec$formula,
+               method = model$spec$method),
+          fit_args[[i]]
+        )
       )
 
       # Evaluate model on test data

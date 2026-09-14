@@ -37,9 +37,25 @@ tl_metric_maximize <- function(metric) {
 #' @param ... Additional arguments passed to tl_model
 #' @return A tidylearn model object fitted with the best hyperparameters.
 #'   Tuning results are stored as an attribute \code{"tuning_results"},
-#'   a list containing \code{param_grid}, \code{results} (data frame of
-#'   all evaluated combinations), \code{best_params}, \code{best_metric},
-#'   \code{metric}, and \code{maximize}.
+#'   a list containing \code{param_grid}, \code{results}, \code{best_params},
+#'   \code{best_metric}, \code{metric}, and \code{maximize}.
+#'
+#'   \code{results} has one row per evaluated combination: \code{mean_metric}
+#'   (the mean over the folds that produced a score), \code{n_folds_ok} (how
+#'   many of the \code{folds} did), and a column per parameter. A parameter
+#'   with a vector-valued candidate, such as \code{hidden_layers}, is a list
+#'   column.
+#'
+#'   Only combinations with \code{n_folds_ok} equal to \code{folds} are
+#'   eligible to be best, since a mean over the folds that happened to
+#'   succeed is not comparable with a mean over all of them. If no
+#'   combination completed every fold, the best of those scored on the most
+#'   folds is used, with a warning. If every combination failed in every
+#'   fold, the function stops.
+#'
+#'   For \code{method = "forest"}, an \code{mtry} above the number of
+#'   predictors is capped at that number, with a warning, and duplicate
+#'   combinations that result are evaluated once.
 #' @examples
 #' \donttest{
 #' model <- tl_tune_grid(iris, Species ~ ., method = "tree",
@@ -57,11 +73,21 @@ tl_tune_grid <- function(data, formula, method,
   if (!is.list(param_grid)) {
     stop("param_grid must be a named list", call. = FALSE)
   }
+  # An empty candidate vector crosses to zero combinations, which read
+  # later as "every parameter set failed in every fold"
+  empty <- names(param_grid)[lengths(param_grid) == 0]
+  if (length(empty) > 0) {
+    stop("param_grid gives no candidate values for: ",
+         paste(empty, collapse = ", "), ".", call. = FALSE)
+  }
 
-  # Determine if classification or regression
+  # Determine if classification or regression. tl_model() fits logistic
+  # regression as classification whatever the response is stored as, so a
+  # 0/1 numeric response has to default to a classification metric too.
   response_var <- all.vars(formula)[1]
   y <- data[[response_var]]
-  is_classification <- is.factor(y) || is.character(y)
+  is_classification <- is.factor(y) || is.character(y) ||
+    method == "logistic"
 
   # Default metric based on problem type
   if (is.null(metric)) {
@@ -76,13 +102,23 @@ tl_tune_grid <- function(data, formula, method,
     maximize <- tl_metric_maximize(metric)
   }
 
-  # Create parameter grid
+  # Create parameter grid, one list of arguments per combination
   param_df <- do.call(tidyr::crossing, param_grid)
+  param_combinations <- lapply(
+    seq_len(nrow(param_df)), function(i) tl_tune_grid_row(param_df, i)
+  )
+
+  # Capping can turn two candidates into the same one, and fitting a
+  # combination twice would only repeat its score
+  param_combinations <- unique(
+    tl_tune_cap_mtry(param_combinations, method, formula, data)
+  )
+  n_sets <- length(param_combinations)
 
   if (verbose) {
     message(
       "Tuning ", method, " model with ",
-      nrow(param_df), " parameter combinations"
+      n_sets, " parameter combinations"
     )
     message(
       "Cross-validation with ", folds, " folds"
@@ -100,20 +136,15 @@ tl_tune_grid <- function(data, formula, method,
   tuning_results <- list()
 
   # Loop through parameter combinations
-  for (i in seq_len(nrow(param_df))) {
+  for (i in seq_len(n_sets)) {
+    params <- param_combinations[[i]]
+
     if (verbose) {
       message(
-        "Parameter set ", i, " of ",
-        nrow(param_df), ": ",
-        paste(
-          names(param_df), param_df[i, ],
-          sep = "=", collapse = ", "
-        )
+        "Parameter set ", i, " of ", n_sets, ": ",
+        tl_tune_format_params(params)
       )
     }
-
-    # Extract parameters for this iteration
-    params <- as.list(param_df[i, ])
 
     # Initialize metrics storage for this parameter set
     fold_metrics <- numeric(folds)
@@ -145,10 +176,7 @@ tl_tune_grid <- function(data, formula, method,
       }, error = function(e) {
         warning(
           "Error fitting model with parameters: ",
-          paste(
-            names(params), params,
-            sep = "=", collapse = ", "
-          ),
+          tl_tune_format_params(params),
           ". Error: ", e$message
         )
         NULL
@@ -178,18 +206,21 @@ tl_tune_grid <- function(data, formula, method,
       ]
     }
 
-    # Calculate mean metric across folds
-    mean_metric <- mean(fold_metrics, na.rm = TRUE)
+    # Calculate mean metric across the folds that produced a score. The
+    # count is kept alongside it because a mean over fewer folds is not
+    # comparable with one over all of them.
+    n_folds_ok <- sum(!is.na(fold_metrics))
+    mean_metric <- if (n_folds_ok > 0) {
+      mean(fold_metrics, na.rm = TRUE)
+    } else {
+      NA_real_
+    }
 
     # Store result for this parameter set
-    tuning_results[[i]] <- c(
-      params,
-      list(
-        mean_metric = mean_metric,
-        fold_metrics = fold_metrics,
-        metric_name = metric,
-        maximize = maximize
-      )
+    tuning_results[[i]] <- list(
+      mean_metric = mean_metric,
+      n_folds_ok = n_folds_ok,
+      fold_metrics = fold_metrics
     )
 
     if (verbose) {
@@ -201,43 +232,24 @@ tl_tune_grid <- function(data, formula, method,
   }
 
   # Convert results to data frame
-  results_df <- do.call(
-    rbind,
-    lapply(tuning_results, function(x) {
-      df <- data.frame(
-        mean_metric = x$mean_metric
-      )
-
-      # Add parameters
-      for (param in names(param_grid)) {
-        df[[param]] <- x[[param]]
-      }
-
-      df
-    })
+  results_df <- tl_tune_results_frame(
+    tuning_results, param_combinations, names(param_grid)
   )
 
-  # Find best parameter set
-  if (maximize) {
-    best_idx <- which.max(results_df$mean_metric)
-  } else {
-    best_idx <- which.min(results_df$mean_metric)
-  }
-
-  # Extract best parameters. drop = FALSE keeps this a one-row data frame:
-  # with a single tuned parameter it would otherwise collapse to a bare
-  # value, and the unnamed list would reach tl_model() positionally.
-  best_params <- as.list(
-    results_df[best_idx, names(param_grid), drop = FALSE]
+  # Find best parameter set among those scored on every fold
+  best_idx <- tl_tune_select_best(
+    results_df, maximize, folds,
+    vapply(param_combinations, tl_tune_format_params, character(1))
   )
+
+  # Taken from the combinations rather than the results frame, which holds
+  # vector-valued candidates as list cells
+  best_params <- param_combinations[[best_idx]]
 
   if (verbose) {
     message(
       "Best parameters found: ",
-      paste(
-        names(best_params), best_params,
-        sep = "=", collapse = ", "
-      )
+      tl_tune_format_params(best_params)
     )
     message(
       "Best ", metric, ": ",
@@ -328,9 +340,19 @@ tl_check_metric_available <- function(metric, eval_metrics,
 #' @keywords internal
 #' @noRd
 tl_check_param_space <- function(param_space) {
+  # An empty candidate vector failed in the draw with "invalid first
+  # argument", which names neither the parameter nor the cause
+  empty <- names(param_space)[lengths(param_space) == 0]
+  if (length(empty) > 0) {
+    stop("param_space gives no candidate values for: ",
+         paste(empty, collapse = ", "), ".", call. = FALSE)
+  }
+
   for (param_name in names(param_space)) {
     param_def <- param_space[[param_name]]
-    if (is.function(param_def)) {
+    # A function is sampled by calling it, and a list is a set of whole
+    # candidates -- list(10, 1, "log") is three candidates, not a range
+    if (is.function(param_def) || is.list(param_def)) {
       next
     }
 
@@ -355,13 +377,23 @@ tl_check_param_space <- function(param_space) {
       )
     }
 
-    if (bounds[1] >= bounds[2]) {
+    if (bounds[1] == bounds[2]) {
+      # Reversing equal bounds changes nothing, so the old advice to write
+      # c(20.5, 20.5) as c(20.5, 20.5) was no help
+      stop(
+        "param_space$", param_name, " is a range with equal ends, ",
+        bounds[1], ". To fix the parameter, give the single value ",
+        bounds[1], ".",
+        call. = FALSE
+      )
+    }
+
+    if (bounds[1] > bounds[2]) {
       stop(
         "param_space$", param_name, " runs from ", bounds[1], " to ",
         bounds[2], ", but a range is c(min, max). Sampling it would give ",
         "NaN for every iteration. Write it as c(", bounds[2], ", ",
-        bounds[1], ")",
-        if (is_log_spec) ", \"log\")" else ")", ".",
+        bounds[1], if (is_log_spec) ", \"log\")" else ")", ".",
         call. = FALSE
       )
     }
@@ -379,6 +411,299 @@ tl_check_param_space <- function(param_space) {
   invisible(TRUE)
 }
 
+#' Draw one value from a random-search parameter space
+#'
+#' @param param_def One element of \code{param_space}
+#' @param param_name Its name, for the error message
+#' @return A single draw
+#' @keywords internal
+#' @noRd
+tl_draw_param <- function(param_def, param_name = "parameter") {
+  # Order matters here. A log-uniform spec c(min, max, "log") is a
+  # CHARACTER vector -- c() coerces -- so it has to be recognised before
+  # any is.numeric() branch, and the whole-number test has to come before
+  # the continuous one or an integer set like c(100, 500) gets sampled
+  # with runif() and yields 234.66.
+  is_log_spec <- !is.list(param_def) && length(param_def) == 3 &&
+    identical(as.character(param_def[3]), "log") &&
+    !anyNA(suppressWarnings(as.numeric(param_def[1:2])))
+
+  if (is.function(param_def)) {
+    # Custom sampling function
+    param_def()
+  } else if (is.list(param_def) && length(param_def) > 0) {
+    # A list is a set of candidates that are not single values, such as
+    # hidden_layers = list(c(10), c(20, 10)). Each is drawn whole.
+    param_def[[sample.int(length(param_def), 1)]]
+  } else if (is_log_spec) {
+    # Log-uniform range: [min, max, "log"]
+    bounds <- as.numeric(param_def[1:2])
+    exp(runif(1, log(bounds[1]), log(bounds[2])))
+  } else if (is.atomic(param_def) && length(param_def) == 1) {
+    # A single value is a fixed setting. sample() cannot be trusted with
+    # it: sample(20, 1) draws from 1:20, so minsplit = 20 was tuned as
+    # though it were a range.
+    param_def
+  } else if (is.integer(param_def) ||
+               (is.numeric(param_def) &&
+                  all(param_def == floor(param_def)))) {
+    if (length(param_def) == 2) {
+      # Integer range: [min, max]. Indexed rather than sampled, because a
+      # range whose ends match, c(20, 20), is the single number 20, and
+      # sample() would draw from 1:20.
+      candidates <- param_def[1]:param_def[2]
+      candidates[sample.int(length(candidates), 1)]
+    } else {
+      # Discrete values
+      sample(param_def, 1)
+    }
+  } else if (is.numeric(param_def) && length(param_def) == 2) {
+    # Continuous range: [min, max]
+    runif(1, param_def[1], param_def[2])
+  } else if (is.numeric(param_def) && length(param_def) >= 3) {
+    # Discrete set of any numbers, e.g. c(0.001, 0.01, 0.1). Only whole
+    # numbers reached the discrete branch above, so the natural way to
+    # write a set of candidate cp or alpha values -- the parameters that
+    # are never integers -- was rejected as an "Unsupported parameter
+    # space definition", while tl_tune_grid() took the same vector without
+    # complaint.
+    sample(param_def, 1)
+  } else if (is.character(param_def) || is.factor(param_def)) {
+    # Categorical parameter
+    sample(param_def, 1)
+  } else if (is.logical(param_def)) {
+    # Logical parameter, drawn from the values supplied. c(TRUE, TRUE)
+    # reduces to one value, which is returned rather than handed to
+    # sample().
+    values <- unique(param_def)
+    if (length(values) == 1) values else sample(values, 1)
+  } else {
+    stop(
+      "Unsupported parameter space definition ",
+      "for ", param_name, call. = FALSE
+    )
+  }
+}
+
+#' Extract one grid row as arguments for tl_model()
+#'
+#' \code{tidyr::crossing()} stores a candidate that is not a single value,
+#' such as \code{hidden_layers = c(10, 5)}, in a list column, so the row
+#' holds \code{list(c(10, 5))}. Passed on as it stands, the model receives
+#' a list where it expects the vector. Each list cell is unwrapped exactly
+#' once, which leaves a candidate that is itself a list intact.
+#'
+#' @param param_df The grid from \code{tidyr::crossing()}
+#' @param i Row index
+#' @return A named list of arguments
+#' @keywords internal
+#' @noRd
+tl_tune_grid_row <- function(param_df, i) {
+  row <- as.list(param_df[i, , drop = FALSE])
+  lapply(row, function(value) if (is.list(value)) value[[1]] else value)
+}
+
+#' Describe a parameter set for messages
+#'
+#' @param params A named list of parameter values
+#' @return A single string such as \code{"cp=0.01, hidden_layers=c(10, 5)"}
+#' @keywords internal
+#' @noRd
+tl_tune_format_params <- function(params) {
+  # round() on the whole set failed with "non-numeric argument to
+  # mathematical function" as soon as one parameter was a string, and
+  # paste() spread a vector-valued parameter across several entries
+  values <- vapply(params, function(value) {
+    if (is.atomic(value) && length(value) == 1) {
+      format(value, digits = 4)
+    } else {
+      paste(deparse(value), collapse = "")
+    }
+  }, character(1))
+  paste(names(params), values, sep = "=", collapse = ", ")
+}
+
+#' Assemble the tuning results data frame
+#'
+#' @param tuning_results Per-set lists of \code{mean_metric} and
+#'   \code{n_folds_ok}
+#' @param param_combinations Per-set lists of parameter values
+#' @param param_names The tuned parameters, in column order
+#' @param iteration Whether to lead with an \code{iteration} column
+#' @return A data frame with one row per parameter set
+#' @keywords internal
+#' @noRd
+tl_tune_results_frame <- function(tuning_results, param_combinations,
+                                  param_names, iteration = FALSE) {
+  results_df <- data.frame(
+    mean_metric = vapply(tuning_results, function(x) x$mean_metric,
+                         numeric(1)),
+    n_folds_ok = vapply(tuning_results, function(x) x$n_folds_ok,
+                        integer(1))
+  )
+  if (iteration) {
+    results_df <- cbind(
+      data.frame(iteration = seq_len(nrow(results_df))), results_df
+    )
+  }
+
+  # A parameter whose candidates are all single values becomes an ordinary
+  # column. One with any vector-valued candidate cannot, so it is kept as
+  # a list column with one cell per set.
+  for (param in param_names) {
+    values <- lapply(param_combinations, function(p) p[[param]])
+    is_scalar <- vapply(values, function(v) {
+      is.atomic(v) && length(v) == 1
+    }, logical(1))
+    results_df[[param]] <- if (all(is_scalar)) unlist(values) else values
+  }
+
+  results_df
+}
+
+#' Choose the best parameter set
+#'
+#' A mean over the folds that happened to succeed is not comparable with a
+#' mean over all of them: a set that failed on the hardest fold is scored
+#' only on the easier ones, and could win for that reason alone. Only sets
+#' scored on every fold are therefore eligible. When none is, the choice
+#' falls back to the best of the sets scored on the most folds, with a
+#' warning naming it. When no set was scored on any fold, it stops.
+#'
+#' @param results_df The results frame, with \code{mean_metric} and
+#'   \code{n_folds_ok}
+#' @param maximize Whether a higher metric is better
+#' @param folds The number of folds requested
+#' @param labels A description of each set, for the warning
+#' @return The row index of the chosen set
+#' @keywords internal
+#' @noRd
+tl_tune_select_best <- function(results_df, maximize, folds, labels) {
+  n_ok <- results_df$n_folds_ok
+
+  # With nothing scored there is nothing to choose, and carrying on left
+  # best_params empty for the final fit to fail on obscurely
+  if (!any(n_ok > 0)) {
+    stop(
+      "Every parameter set failed in every fold (", nrow(results_df),
+      " set", if (nrow(results_df) == 1) "" else "s", ", ", folds,
+      " folds), so there is no score to choose the best from. The ",
+      "warnings above give the error from each fit; check the candidate ",
+      "values against the arguments the method accepts.",
+      call. = FALSE
+    )
+  }
+
+  complete <- n_ok == folds
+  pool <- if (any(complete)) which(complete) else which(n_ok == max(n_ok))
+  scores <- results_df$mean_metric[pool]
+  best_idx <- pool[if (maximize) which.max(scores) else which.min(scores)]
+
+  if (!any(complete)) {
+    warning(
+      "No parameter set completed all ", folds, " folds. Using ",
+      labels[best_idx], ", the best of the sets scored on ", max(n_ok),
+      " of them, so its score rests on fewer folds than were requested. ",
+      "The warnings above give the error from each failed fit.",
+      call. = FALSE
+    )
+  }
+
+  best_idx
+}
+
+#' Cap a random forest's mtry at the number of predictors
+#'
+#' A default grid is built without seeing the data, so it cannot know how
+#' many predictors there are, and a caller's own grid can overshoot in the
+#' same way. randomForest resets an mtry above that count to the count,
+#' with a warning, in every fold -- so the fit succeeds, but the results
+#' credit the score to an mtry that was never used, and two candidates that
+#' both overshoot are the same model scored twice. Capping here instead of
+#' dropping the values keeps the all-predictors candidate the caller asked
+#' for, and the results record the value each model was actually fitted
+#' with.
+#'
+#' The count is of the columns of the model frame, which is what
+#' randomForest's formula method samples from: a factor counts once, and
+#' \code{y ~ x1 * x2} has two predictors, not three.
+#'
+#' @param param_combinations Per-set lists of parameter values
+#' @param method The model method
+#' @param formula The model formula
+#' @param data The training data
+#' @return \code{param_combinations}, with any mtry capped
+#' @keywords internal
+#' @noRd
+tl_tune_cap_mtry <- function(param_combinations, method, formula, data) {
+  if (method != "forest") {
+    return(param_combinations)
+  }
+
+  is_cappable <- function(p) {
+    is.numeric(p$mtry) && length(p$mtry) == 1 && !is.na(p$mtry)
+  }
+  if (!any(vapply(param_combinations, is_cappable, logical(1)))) {
+    return(param_combinations)
+  }
+
+  # A formula the data cannot satisfy fails every fit with tl_model()'s
+  # own message, which says more than a model.frame() error would here
+  n_predictors <- tryCatch(
+    ncol(stats::model.frame(formula, data = data)) - 1L,
+    error = function(e) NULL
+  )
+  if (is.null(n_predictors)) {
+    return(param_combinations)
+  }
+
+  # Below 1 randomForest resets mtry to 1 with its own warning in every
+  # fold, and the results credited the value asked for
+  too_small <- unique(unlist(lapply(param_combinations, function(p) {
+    if (is_cappable(p) && p$mtry < 1) p$mtry
+  })))
+  if (length(too_small) > 0) {
+    warning(
+      "mtry = ", paste(sort(too_small), collapse = ", "),
+      " is below 1, so it is raised to 1 and the results report that value.",
+      call. = FALSE
+    )
+    param_combinations <- lapply(param_combinations, function(p) {
+      if (is_cappable(p)) {
+        p$mtry <- max(p$mtry, 1)
+      }
+      p
+    })
+  }
+
+  too_large <- unique(unlist(lapply(param_combinations, function(p) {
+    if (is_cappable(p) && p$mtry > n_predictors) p$mtry
+  })))
+  if (length(too_large) == 0) {
+    return(param_combinations)
+  }
+
+  warning(
+    "mtry = ", paste(sort(too_large), collapse = ", "),
+    if (length(too_large) == 1) " exceeds" else " exceed",
+    " the ", n_predictors, " predictors in ",
+    paste(deparse(formula), collapse = " "),
+    ". randomForest would reset ",
+    if (length(too_large) == 1) "it" else "them",
+    " to ", n_predictors, " in every fold, so ",
+    if (length(too_large) == 1) "it is" else "they are",
+    " capped at ", n_predictors, " and the results report that value.",
+    call. = FALSE
+  )
+
+  lapply(param_combinations, function(p) {
+    if (is_cappable(p)) {
+      p$mtry <- min(p$mtry, n_predictors)
+    }
+    p
+  })
+}
+
 #' Tune hyperparameters using random search
 #'
 #' @param data A data frame containing the training
@@ -389,8 +714,11 @@ tl_check_param_space <- function(param_space) {
 #'   Each element is read by its type and length:
 #'   \describe{
 #'     \item{a function}{called with no arguments to draw one value}
+#'     \item{a list}{a set of candidates, each drawn whole, e.g.
+#'       \code{list(c(10), c(20, 10))} for \code{hidden_layers}}
 #'     \item{\code{c(min, max, "log")}}{log-uniform draw between
 #'       \code{min} and \code{max}}
+#'     \item{a single value}{used as given in every iteration}
 #'     \item{two whole numbers}{integer range, e.g.
 #'       \code{c(10, 20)} draws from 10:20}
 #'     \item{three or more numbers}{a discrete set, sampled from as
@@ -398,6 +726,7 @@ tl_check_param_space <- function(param_space) {
 #'     \item{two other numbers}{uniform draw between them, e.g.
 #'       \code{c(0.01, 0.1)}}
 #'     \item{character or factor}{categorical, sampled from as given}
+#'     \item{logical}{sampled from the values given}
 #'   }
 #' @param n_iter Number of random parameter
 #'   combinations to try
@@ -410,9 +739,14 @@ tl_check_param_space <- function(param_space) {
 #' @param ... Additional arguments passed to tl_model
 #' @return A tidylearn model object fitted with the best hyperparameters.
 #'   Tuning results are stored as an attribute \code{"tuning_results"},
-#'   a list containing \code{param_space}, \code{results} (data frame of
-#'   all evaluated iterations), \code{best_params}, \code{best_metric},
-#'   \code{metric}, and \code{maximize}.
+#'   a list containing \code{param_space}, \code{results}, \code{best_params},
+#'   \code{best_metric}, \code{metric}, and \code{maximize}.
+#'
+#'   \code{results} has one row per iteration: \code{iteration},
+#'   \code{mean_metric}, \code{n_folds_ok}, and a column per parameter, as
+#'   described for \code{\link{tl_tune_grid}}. The best parameters are chosen
+#'   by the same rules, and \code{mtry} is capped the same way; duplicate
+#'   draws are kept, so there are always \code{n_iter} rows.
 #' @examples
 #' \donttest{
 #' model <- tl_tune_random(mtcars, mpg ~ ., method = "tree",
@@ -443,10 +777,12 @@ tl_tune_random <- function(data, formula, method,
 
   tl_check_param_space(param_space)
 
-  # Determine if classification or regression
+  # Determine if classification or regression. Logistic regression is
+  # classification whatever the response type -- see tl_tune_grid()
   response_var <- all.vars(formula)[1]
   y <- data[[response_var]]
-  is_classification <- is.factor(y) || is.character(y)
+  is_classification <- is.factor(y) || is.character(y) ||
+    method == "logistic"
 
   # Default metric based on problem type
   if (is.null(metric)) {
@@ -480,76 +816,18 @@ tl_tune_random <- function(data, formula, method,
   tuning_results <- list()
 
   # Generate random parameter combinations
-  param_combinations <- list()
-  for (i in seq_len(n_iter)) {
-    params <- list()
-    for (param_name in names(param_space)) {
-      param_def <- param_space[[param_name]]
+  param_combinations <- lapply(seq_len(n_iter), function(i) {
+    params <- lapply(names(param_space), function(param_name) {
+      tl_draw_param(param_space[[param_name]], param_name)
+    })
+    names(params) <- names(param_space)
+    params
+  })
 
-      # Order matters here. A log-uniform spec c(min, max, "log") is a
-      # CHARACTER vector -- c() coerces -- so it has to be recognised
-      # before any is.numeric() branch, and the whole-number test has to
-      # come before the continuous one or an integer set like c(100, 500)
-      # gets sampled with runif() and yields 234.66.
-      is_log_spec <- length(param_def) == 3 &&
-        identical(as.character(param_def[3]), "log") &&
-        !anyNA(suppressWarnings(as.numeric(param_def[1:2])))
-
-      if (is.function(param_def)) {
-        # Custom sampling function
-        params[[param_name]] <- param_def()
-      } else if (is_log_spec) {
-        # Log-uniform range: [min, max, "log"]
-        bounds <- as.numeric(param_def[1:2])
-        params[[param_name]] <- exp(runif(
-          1, log(bounds[1]), log(bounds[2])
-        ))
-      } else if (is.integer(param_def) ||
-                   (is.numeric(param_def) &&
-                      all(param_def == floor(param_def)))) {
-        if (length(param_def) == 2) {
-          # Integer range: [min, max]
-          params[[param_name]] <- sample(
-            param_def[1]:param_def[2], 1
-          )
-        } else {
-          # Discrete values
-          params[[param_name]] <- sample(param_def, 1)
-        }
-      } else if (is.numeric(param_def) &&
-                   length(param_def) == 2) {
-        # Continuous range: [min, max]
-        params[[param_name]] <- runif(
-          1, param_def[1], param_def[2]
-        )
-      } else if (is.numeric(param_def) && length(param_def) >= 3) {
-        # Discrete set of any numbers, e.g. c(0.001, 0.01, 0.1). Only
-        # whole numbers reached the discrete branch above, so the natural
-        # way to write a set of candidate cp or alpha values -- the
-        # parameters that are never integers -- was rejected as an
-        # "Unsupported parameter space definition", while tl_tune_grid()
-        # took the same vector without complaint.
-        params[[param_name]] <- sample(param_def, 1)
-      } else if (is.character(param_def) ||
-                   is.factor(param_def)) {
-        # Categorical parameter
-        params[[param_name]] <- sample(
-          param_def, 1
-        )
-      } else if (is.logical(param_def)) {
-        # Logical parameter
-        params[[param_name]] <- sample(
-          c(TRUE, FALSE), 1
-        )
-      } else {
-        stop(
-          "Unsupported parameter space definition ",
-          "for ", param_name, call. = FALSE
-        )
-      }
-    }
-    param_combinations[[i]] <- params
-  }
+  # Unlike the grid, duplicates are kept: n_iter rows were asked for
+  param_combinations <- tl_tune_cap_mtry(
+    param_combinations, method, formula, data
+  )
 
   # Loop through parameter combinations
   for (i in seq_len(n_iter)) {
@@ -558,11 +836,7 @@ tl_tune_random <- function(data, formula, method,
     if (verbose) {
       message(
         "Iteration ", i, " of ", n_iter, ": ",
-        paste(
-          names(params),
-          round(unlist(params), 4),
-          sep = "=", collapse = ", "
-        )
+        tl_tune_format_params(params)
       )
     }
 
@@ -596,10 +870,7 @@ tl_tune_random <- function(data, formula, method,
       }, error = function(e) {
         warning(
           "Error fitting model with parameters: ",
-          paste(
-            names(params), params,
-            sep = "=", collapse = ", "
-          ),
+          tl_tune_format_params(params),
           ". Error: ", e$message
         )
         NULL
@@ -629,18 +900,21 @@ tl_tune_random <- function(data, formula, method,
       ]
     }
 
-    # Calculate mean metric across folds
-    mean_metric <- mean(fold_metrics, na.rm = TRUE)
+    # Calculate mean metric across the folds that produced a score. The
+    # count is kept alongside it because a mean over fewer folds is not
+    # comparable with one over all of them.
+    n_folds_ok <- sum(!is.na(fold_metrics))
+    mean_metric <- if (n_folds_ok > 0) {
+      mean(fold_metrics, na.rm = TRUE)
+    } else {
+      NA_real_
+    }
 
     # Store result for this parameter set
-    tuning_results[[i]] <- c(
-      params,
-      list(
-        mean_metric = mean_metric,
-        fold_metrics = fold_metrics,
-        metric_name = metric,
-        maximize = maximize
-      )
+    tuning_results[[i]] <- list(
+      mean_metric = mean_metric,
+      n_folds_ok = n_folds_ok,
+      fold_metrics = fold_metrics
     )
 
     if (verbose) {
@@ -652,46 +926,24 @@ tl_tune_random <- function(data, formula, method,
   }
 
   # Convert results to data frame
-  results_df <- do.call(
-    rbind,
-    lapply(seq_along(tuning_results), function(i) {
-      result <- tuning_results[[i]]
-
-      df <- data.frame(
-        iteration = i,
-        mean_metric = result$mean_metric
-      )
-
-      # Add parameters
-      for (param in names(param_space)) {
-        df[[param]] <- result[[param]]
-      }
-
-      df
-    })
+  results_df <- tl_tune_results_frame(
+    tuning_results, param_combinations, names(param_space),
+    iteration = TRUE
   )
 
-  # Find best parameter set
-  if (maximize) {
-    best_idx <- which.max(results_df$mean_metric)
-  } else {
-    best_idx <- which.min(results_df$mean_metric)
-  }
-
-  # Extract best parameters (drop = FALSE preserves names -- see
-  # tl_tune_grid())
-  best_params <- as.list(
-    results_df[best_idx, names(param_space), drop = FALSE]
+  # Find best parameter set among those scored on every fold
+  best_idx <- tl_tune_select_best(
+    results_df, maximize, folds,
+    vapply(param_combinations, tl_tune_format_params, character(1))
   )
+
+  # See tl_tune_grid(): taken from the combinations, not the results frame
+  best_params <- param_combinations[[best_idx]]
 
   if (verbose) {
     message(
       "Best parameters found: ",
-      paste(
-        names(best_params),
-        round(unlist(best_params), 4),
-        sep = "=", collapse = ", "
-      )
+      tl_tune_format_params(best_params)
     )
     message(
       "Best ", metric, ": ",
@@ -769,7 +1021,7 @@ tl_plot_tuning_results <- function(model,
   # Get parameter names
   param_names <- setdiff(
     names(results_df),
-    c("iteration", "mean_metric")
+    c("iteration", "mean_metric", "n_folds_ok")
   )
 
   # Default parameters for plotting if not specified
@@ -1103,13 +1355,20 @@ tl_plot_tuning_results <- function(model,
         fill = "Correlation\n(numeric only)"
       ) +
       ggplot2::theme_minimal()
+  } else if (plot_type %in% c("scatter", "grid")) {
+    # One message covered both causes, so the default plot of a
+    # one-parameter search said it must be one of "scatter", ... and had
+    # got "scatter"
+    stop(
+      "plot_type = \"", plot_type, "\" needs two tuned parameters, and ",
+      "this search tuned ", length(param_names), ". Use ",
+      "plot_type = \"parallel\" or \"importance\".",
+      call. = FALSE
+    )
   } else {
     stop(
       "plot_type must be one of \"scatter\", \"grid\", ",
-      "\"parallel\" or \"importance\"; got \"", plot_type, "\". ",
-      "\"scatter\" and \"grid\" additionally need two tuned ",
-      "parameters, and this search tuned ",
-      length(param_names), ".",
+      "\"parallel\" or \"importance\"; got \"", plot_type, "\".",
       call. = FALSE
     )
   }
@@ -1127,7 +1386,13 @@ tl_plot_tuning_results <- function(model,
 #' @return A named list of parameter values suitable for passing to
 #'   \code{\link{tl_tune_grid}} or \code{\link{tl_tune_random}}. Each
 #'   element is a numeric or character vector of candidate values for
-#'   that hyperparameter.
+#'   that hyperparameter, or for \code{"deep"}'s \code{hidden_layers} a list
+#'   of layer-size vectors. The grid is built without the data, so a
+#'   \code{"forest"} \code{mtry} can exceed the number of predictors; the
+#'   tuners cap it. \code{"polynomial"} tunes \code{degree}.
+#'   \code{"linear"} and \code{"logistic"} have no tuneable
+#'   hyperparameter and return an empty list with a warning, as does an
+#'   unknown method.
 #' @examples
 #' \donttest{
 #' grid <- tl_default_param_grid("tree", size = "small")
@@ -1173,10 +1438,13 @@ tl_default_param_grid <- function(method,
         ntree = c(100, 300, 500)
       )
     } else { # large
+      # No sampsize: randomForest reads it as a number of rows, which a
+      # grid built without the data cannot choose. mtry values above the
+      # predictor count are capped by the tuners (see tl_tune_cap_mtry()),
+      # because no fixed ceiling suits every data set.
       list(
         mtry = c(1, 2, 3, 4, 5, 6),
         ntree = c(100, 300, 500, 1000),
-        sampsize = c(0.5, 0.632, 0.8, 1.0),
         nodesize = c(1, 3, 5)
       )
     }
@@ -1293,10 +1561,32 @@ tl_default_param_grid <- function(method,
       )
     }
   } else if (method == "logistic") {
-    # For logistic regression, tune regularization
-    tl_default_param_grid(
-      "ridge", size, is_classification
+    # "logistic" is an unpenalised glm(). The ridge lambda grid returned
+    # here before is not a glm() argument, so every fit in a search over it
+    # failed. The penalised classifiers are separate methods with grids of
+    # their own.
+    warning(
+      "Method \"logistic\" is fitted with glm(), and glm() has no ",
+      "hyperparameter to tune. Returning an empty parameter grid. For a ",
+      "regularised logistic model, use method = \"ridge\", \"lasso\" or ",
+      "\"elastic_net\" with their default grids.",
+      call. = FALSE
     )
+    list()
+  } else if (method == "linear") {
+    # A supported method, so "Unknown method" was the wrong warning; lm()
+    # has nothing to tune
+    warning(
+      "Method \"linear\" is fitted with lm(), which has no hyperparameter ",
+      "to tune. Returning an empty parameter grid. For a penalised linear ",
+      "model, use method = \"ridge\", \"lasso\" or \"elastic_net\".",
+      call. = FALSE
+    )
+    list()
+  } else if (method == "polynomial") {
+    # degree is the one setting tl_fit_polynomial() takes. Degree 1 is the
+    # linear model, so the grid starts at 2.
+    list(degree = switch(size, small = 2:3, medium = 2:4, 2:5))
   } else if (method == "deep") {
     if (size == "small") {
       list(

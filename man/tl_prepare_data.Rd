@@ -18,10 +18,13 @@ tl_prepare_data(
 \arguments{
 \item{data}{A data frame}
 
-\item{formula}{Optional formula (for supervised learning)}
+\item{formula}{Optional formula (for supervised learning). Only its
+predictors are processed; a column it excludes, such as \code{- id},
+is returned unchanged.}
 
-\item{impute_method}{Method for missing value imputation:
-"mean", "median", "mode", "knn"}
+\item{impute_method}{Method for imputing a missing numeric value:
+"mean", "median" or "mode". A missing categorical value is always
+filled with the column's most frequent value.}
 
 \item{scale_method}{Scaling method: "standardize",
 "normalize", "robust", "none"}
@@ -40,9 +43,9 @@ A list with components:
 \describe{
 \item{\code{data}}{The processed data frame.}
 \item{\code{original_data}}{The original unprocessed data frame.}
-\item{\code{preprocessing_steps}}{A list of metadata for each
-preprocessing step applied (imputation values, encoding maps,
-scaling parameters, etc.).}
+\item{\code{preprocessing_steps}}{A record of each step applied
+(imputation values, encoding maps, scaling parameters, etc.). It
+is for inspection: no function applies it to new data.}
 \item{\code{formula}}{The formula passed in (or \code{NULL}).}
 }
 }
@@ -54,6 +57,13 @@ Prepare Data for Machine Learning
 \details{
 Comprehensive preprocessing pipeline including imputation, scaling,
 encoding, and feature engineering
+
+The statistics are learned from, and applied to, the data passed in.
+Preparing a whole dataset and then splitting it lets the test rows
+shape the imputation values and scaling their own scores are measured
+against. To evaluate a model, split first, or use
+\code{\link{tl_pipeline}}, which learns its preprocessing inside each
+resampling fold.
 }
 \examples{
 \donttest{

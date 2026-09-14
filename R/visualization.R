@@ -36,7 +36,7 @@ tl_plot_importance_comparison <- function(..., top_n = 10, names = NULL) {
   # Extract importance for each model
   all_importance <- purrr::map2_dfr(models, names, function(model, name) {
     # Check model type
-    if (model$spec$method %in% c("tree", "forest", "boost")) {
+    if (model$spec$method %in% c("tree", "forest", "boost", "xgboost")) {
       # Tree-based models
       imp_data <- tl_extract_importance(model)
 
@@ -63,10 +63,21 @@ tl_plot_importance_comparison <- function(..., top_n = 10, names = NULL) {
   })
 
 
-  # If no importances could be extracted, return NULL
+  # This used to evaluate NULL without returning it, so the function
+  # carried on and failed inside dplyr with "object 'feature' not found"
   if (is.null(all_importance) || nrow(all_importance) == 0) {
-    NULL
+    stop(
+      "None of the models has feature importance to compare. Supported ",
+      "methods: tree, forest, boost, xgboost, ridge, lasso, elastic_net.",
+      call. = FALSE
+    )
   }
+
+  # A feature a model did not use scores zero for it. Left missing, the
+  # average ran over only the models that kept the feature, so one a lasso
+  # dropped outranked one both models used.
+  all_importance <- all_importance %>%
+    tidyr::complete(feature, model, fill = list(importance = 0))
 
   # Find top features across all models
   top_features <- all_importance %>%
@@ -130,20 +141,36 @@ tl_extract_importance <- function(model) {
     # Get variable importance from randomForest
     imp <- randomForest::importance(fit)
 
-    # Create a data frame for plotting
-    if (model$spec$is_classification) {
-      # For classification, use mean decrease in accuracy
-      importance_df <- tibble::tibble(
-        feature = rownames(imp),
-        importance = imp[, "MeanDecreaseAccuracy"]
-      )
+    # Permutation importance (mean decrease in accuracy, % increase in
+    # MSE) exists only when the forest was fitted with importance = TRUE.
+    # Otherwise the table holds the impurity measure alone, and asking for
+    # the permutation column failed with "subscript out of bounds".
+    permutation <- if (model$spec$is_classification) {
+      "MeanDecreaseAccuracy"
     } else {
-      # For regression, use % increase in MSE
-      importance_df <- tibble::tibble(
-        feature = rownames(imp),
-        importance = imp[, "%IncMSE"]
-      )
+      "%IncMSE"
     }
+    impurity <- if (model$spec$is_classification) {
+      "MeanDecreaseGini"
+    } else {
+      "IncNodePurity"
+    }
+    measure <- if (permutation %in% colnames(imp)) permutation else impurity
+
+    importance_df <- tibble::tibble(
+      feature = rownames(imp),
+      importance = imp[, measure]
+    )
+  } else if (method == "xgboost") {
+    # Gain: each feature's share of the loss reduction across its splits
+    imp <- xgboost::xgb.importance(
+      model = fit,
+      feature_names = attr(fit, "feature_names")
+    )
+    importance_df <- tibble::tibble(
+      feature = imp$Feature,
+      importance = imp$Gain
+    )
   } else if (method == "boost") {
     # Gradient boosting importance
     # Get relative influence from gbm
@@ -174,39 +201,45 @@ tl_extract_importance <- function(model) {
 #' Extract importance from a regularized regression model
 #'
 #' @param model A tidylearn regularized model object
-#' @param lambda Which lambda to use ("1se" or "min", default: "1se")
-#' @return A data frame with feature importance values
+#' @param lambda Which lambda to use: "1se" (default), "min", or a numeric
+#'   penalty within the fitted path
+#' @return A data frame with feature importance values: each coefficient's
+#'   absolute value times its predictor's standard deviation, so the
+#'   ranking does not depend on units, rescaled to a maximum of 100. For a
+#'   multiclass model a predictor takes its largest value across classes.
 #' @keywords internal
 tl_get_importance_regularized <- function(model, lambda = "1se") {
   # Extract the glmnet model
   fit <- model$fit
 
-  # Extract lambda value to use
-  if (lambda == "1se") {
-    lambda_val <- attr(fit, "lambda_1se")
-  } else if (lambda == "min") {
-    lambda_val <- attr(fit, "lambda_min")
-  } else if (is.numeric(lambda)) {
-    lambda_val <- lambda
-  } else {
-    stop(
-      "Invalid lambda specification. Use '1se', 'min', or a numeric value.",
-      call. = FALSE
-    )
-  }
+  lambda_val <- tl_resolve_lambda(fit, lambda)
 
-  # Get coefficients at selected lambda
-  coefs <- as.matrix(coef(fit, s = lambda_val))
+  # Coefficients at the selected lambda, stacked by class for a
+  # multinomial fit, whose coef() is a list that as.matrix() could not use
+  coefs <- tl_glmnet_coef_tbl(fit, lambda_val)
+  coefs <- coefs[coefs$term != "(Intercept)", , drop = FALSE]
 
-  # Exclude intercept
-  coefs <- coefs[-1, , drop = FALSE]
+  # A coefficient is per unit of its predictor, so |coefficient| ranked
+  # predictors by their units: hp / 100 made hp 100 times as important
+  # without changing a single prediction. Scale each by its predictor's
+  # standard deviation in the design matrix the model was fitted on.
+  frame <- stats::model.frame(model$spec$formula, data = model$data)
+  design <- stats::model.matrix(stats::terms(frame), frame)[, -1, drop = FALSE]
+  predictor_sd <- apply(design, 2, stats::sd)
+  coefs$importance <- abs(coefs$estimate) * unname(predictor_sd[coefs$term])
 
-  # Create a data frame for plotting
-  importance_df <- tibble::tibble(
-    feature = rownames(coefs),
-    importance = abs(as.vector(coefs))
-  ) %>%
+  # A multiclass predictor matters as much as its largest effect on any
+  # class
+  importance_df <- coefs %>%
+    dplyr::group_by(feature = .data$term) %>%
+    dplyr::summarise(importance = max(.data$importance), .groups = "drop") %>%
     dplyr::filter(.data[["importance"]] > 0)
+
+  # A penalty large enough to drop every predictor leaves nothing to rank;
+  # rescaling an empty column would warn that max() returned -Inf
+  if (nrow(importance_df) == 0) {
+    return(importance_df)
+  }
 
   # Normalize importance to 0-100 scale
   importance_df <- importance_df %>%
@@ -240,19 +273,10 @@ tl_plot_model_comparison <- function(
   # Get models
   models <- list(...)
 
-  # Get model names if not provided
-  if (is.null(names)) {
-    names <- purrr::map_chr(models, function(model) {
-      task <- ifelse(
-        model$spec$is_classification,
-        "classification",
-        "regression"
-      )
-      paste0(model$spec$method, " (", task, ")")
-    })
-  } else if (length(names) != length(models)) {
-    stop("Length of 'names' must match the number of models", call. = FALSE)
-  }
+  names <- tl_comparison_names(models, names, function(model) {
+    task <- if (model$spec$is_classification) "classification" else "regression"
+    paste0(model$spec$method, " (", task, ")")
+  })
 
   # Check if all models are of the same type (classification or regression)
   is_classifications <- purrr::map_lgl(
@@ -575,20 +599,14 @@ tl_dashboard <- function(model, new_data = NULL, ...) {
 
     # Feature importance
     output$importance_plot <- shiny::renderPlot({
-      tree_or_reg <- c(
-        "tree", "forest", "boost",
-        "ridge", "lasso", "elastic_net"
-      )
-      if (model$spec$method %in% tree_or_reg) {
-        tl_plot_importance(model)
-      } else {
-        shiny::validate(
-          shiny::need(
-            FALSE,
-            "Feature importance not available for this model type"
-          )
+      plot <- tl_dashboard_importance_plot(model)
+      shiny::validate(
+        shiny::need(
+          !is.null(plot),
+          "Feature importance not available for this model type"
         )
-      }
+      )
+      plot
     })
 
     # Predictions
@@ -677,6 +695,101 @@ tl_dashboard <- function(model, new_data = NULL, ...) {
   shiny::shinyApp(ui, server)
 }
 
+#' Importance plot for the dashboard's importance panel
+#'
+#' The panel sent ridge, lasso and elastic net to
+#' \code{tl_plot_importance()}, which handles tree-based methods only, so
+#' for those models the panel showed an error in place of a plot.
+#'
+#' @param model A tidylearn model.
+#' @return A ggplot, or NULL for a method with no importance plot.
+#' @keywords internal
+#' @noRd
+tl_dashboard_importance_plot <- function(model) {
+  method <- model$spec$method
+  if (method %in% c("tree", "forest", "boost", "xgboost")) {
+    tl_plot_importance(model)
+  } else if (method %in% c("ridge", "lasso", "elastic_net")) {
+    tl_plot_importance_regularized(model)
+  } else {
+    NULL
+  }
+}
+
+#' Bin number for each of n ranked rows
+#'
+#' Spreads the rows over the bins as evenly as they divide, so every bin
+#' is used whenever there are at least as many rows as bins. Sizing bins
+#' with ceiling(n / bins) left the last ones empty: 32 rows in 10 bins
+#' became 8 bins of 4.
+#'
+#' @param n Number of rows.
+#' @param bins Number of bins requested.
+#' @return An integer vector of length n, non-decreasing, from 1 to
+#'   min(n, bins).
+#' @keywords internal
+#' @noRd
+tl_bin_index <- function(n, bins) {
+  # bins = 0 gave one bin numbered 0, and bins = 2.5 gave three
+  if (!is.numeric(bins) || length(bins) != 1L || is.na(bins) ||
+        bins < 1 || bins != floor(bins)) {
+    stop("'bins' must be a single whole number of at least 1", call. = FALSE)
+  }
+  if (n == 0) {
+    return(integer(0))
+  }
+  bins <- min(bins, n)
+  as.integer(ceiling(seq_len(n) * bins / n))
+}
+
+#' Rows ranked by predicted probability, for lift and gain charts
+#'
+#' Rows with tied probabilities have no order between them, and sorting
+#' kept whatever order they arrived in: a tree scores many rows alike, so
+#' the same model on the same rows gave a different gain curve when the
+#' rows were reversed. Each row's outcome is replaced by the mean outcome
+#' of its tie group -- the value any tie-breaking would give on average --
+#' so a bin boundary falling inside a group takes its share of that group.
+#'
+#' A row missing its response or its probability used to turn every
+#' cumulative total into NA and empty the chart. Those rows are left out,
+#' with a warning giving the count.
+#'
+#' @param model A binary classification model.
+#' @param new_data Data to score.
+#' @param actuals The response as a two-level factor.
+#' @return A tibble of \code{prob} and \code{actual}, sorted by
+#'   \code{prob} descending, where \code{actual} is the tie-group response
+#'   rate for the positive (second) class.
+#' @keywords internal
+#' @noRd
+tl_ranked_response <- function(model, new_data, actuals) {
+  probs <- predict(model, new_data, type = "prob")
+  pos_class <- levels(actuals)[2]
+  pos_probs <- probs[[pos_class]]
+
+  usable <- !is.na(actuals) & !is.na(pos_probs)
+  if (!all(usable)) {
+    warning(
+      sum(!usable), " row(s) with a missing response or predicted ",
+      "probability are left out of the chart.",
+      call. = FALSE
+    )
+  }
+
+  prob <- pos_probs[usable]
+  actual <- as.numeric(actuals[usable] == pos_class)
+  ord <- order(prob, decreasing = TRUE)
+  prob <- prob[ord]
+  actual <- actual[ord]
+
+  tie_group <- match(prob, unique(prob))
+  tibble::tibble(
+    prob = prob,
+    actual = stats::ave(actual, tie_group, FUN = mean)
+  )
+}
+
 #' Plot lift chart for a classification model
 #'
 #' @param model A tidylearn classification model object
@@ -717,25 +830,12 @@ tl_plot_lift <- function(model, new_data = NULL, bins = 10, ...) {
 
   # For binary classification
   if (length(levels(actuals)) == 2) {
-    # Get probabilities
-    probs <- predict(model, new_data, type = "prob")
-    pos_class <- levels(actuals)[2]
-    pos_probs <- probs[[pos_class]]
+    ordered_data <- tl_ranked_response(model, new_data, actuals)
 
-    # Convert actuals to binary (0/1)
-    binary_actuals <- as.integer(actuals == pos_class)
-
-    # Order by probability
-    ordered_data <- tibble::tibble(
-      prob = pos_probs,
-      actual = binary_actuals
-    ) %>%
-      dplyr::arrange(dplyr::desc(.data[["prob"]]))
-
-    # Calculate cumulative metrics
-    decile_size <- ceiling(nrow(ordered_data) / bins)
-
-    # Calculate lift by decile
+    # Calculate lift by decile. tl_bin_index() splits the rows into the
+    # number of bins asked for; rounding the bin size up gave 32 rows in 10
+    # bins as 8 groups of 4.
+    bin <- tl_bin_index(nrow(ordered_data), bins)
     lift_data <- tibble::tibble(
       decile = integer(),
       cumulative_responders = integer(),
@@ -745,23 +845,16 @@ tl_plot_lift <- function(model, new_data = NULL, bins = 10, ...) {
       lift = numeric()
     )
 
-    baseline_rate <- mean(binary_actuals)
+    baseline_rate <- mean(ordered_data$actual)
     cumulative_responders <- 0
     cumulative_total <- 0
 
-    for (i in 1:bins) {
-      # Get current decile indices. ceiling() can size the deciles so
-      # that the last few start past the end of the data, which turns
-      # start:end into a descending range that re-counts earlier rows
-      # and pulls NA.
-      start_idx <- (i - 1) * decile_size + 1
-      end_idx <- min(i * decile_size, nrow(ordered_data))
-
-      if (start_idx > nrow(ordered_data)) next
+    for (i in unique(bin)) {
+      rows <- which(bin == i)
 
       # Update cumulative counts
-      current_responders <- sum(ordered_data$actual[start_idx:end_idx])
-      current_total <- end_idx - start_idx + 1
+      current_responders <- sum(ordered_data$actual[rows])
+      current_total <- length(rows)
 
       cumulative_responders <- cumulative_responders + current_responders
       cumulative_total <- cumulative_total + current_total
@@ -793,7 +886,7 @@ tl_plot_lift <- function(model, new_data = NULL, bins = 10, ...) {
         x = "Decile (sorted by predicted probability)",
         y = "Cumulative Lift"
       ) +
-      ggplot2::scale_x_continuous(breaks = 1:bins) +
+      ggplot2::scale_x_continuous(breaks = unique(bin)) +
       ggplot2::theme_minimal()
 
     p
@@ -845,24 +938,11 @@ tl_plot_gain <- function(model, new_data = NULL, bins = 10, ...) {
 
   # For binary classification
   if (length(levels(actuals)) == 2) {
-    # Get probabilities
-    probs <- predict(model, new_data, type = "prob")
-    pos_class <- levels(actuals)[2]
-    pos_probs <- probs[[pos_class]]
-
-    # Convert actuals to binary (0/1)
-    binary_actuals <- as.integer(actuals == pos_class)
-
-    # Order by probability
-    ordered_data <- tibble::tibble(
-      prob = pos_probs,
-      actual = binary_actuals
-    ) %>%
-      dplyr::arrange(dplyr::desc(.data[["prob"]]))
+    ordered_data <- tl_ranked_response(model, new_data, actuals)
 
     # Calculate cumulative metrics
-    decile_size <- ceiling(nrow(ordered_data) / bins)
-    total_responders <- sum(binary_actuals)
+    bin <- tl_bin_index(nrow(ordered_data), bins)
+    total_responders <- sum(ordered_data$actual)
 
     # Calculate gain by decile
     gain_data <- tibble::tibble(
@@ -873,22 +953,15 @@ tl_plot_gain <- function(model, new_data = NULL, bins = 10, ...) {
 
     cumulative_responders <- 0
 
-    for (i in 1:bins) {
-      # Get current decile indices. ceiling() can size the deciles so
-      # that the last few start past the end of the data, which turns
-      # start:end into a descending range that re-counts earlier rows
-      # and pulls NA.
-      start_idx <- (i - 1) * decile_size + 1
-      end_idx <- min(i * decile_size, nrow(ordered_data))
-
-      if (start_idx > nrow(ordered_data)) next
+    for (i in unique(bin)) {
+      rows <- which(bin == i)
 
       # Update cumulative counts
-      current_responders <- sum(ordered_data$actual[start_idx:end_idx])
+      current_responders <- sum(ordered_data$actual[rows])
       cumulative_responders <- cumulative_responders + current_responders
 
       # Calculate metrics
-      cumulative_pct_population <- end_idx / nrow(ordered_data) * 100
+      cumulative_pct_population <- max(rows) / nrow(ordered_data) * 100
       cumulative_pct_responders <-
         cumulative_responders / total_responders * 100
 

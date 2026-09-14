@@ -9,8 +9,7 @@ tl_coefficients(
   conf_int = FALSE,
   level = 0.95,
   exponentiate = FALSE,
-  lambda = "1se",
-  ...
+  lambda = "1se"
 )
 }
 \arguments{
@@ -31,8 +30,6 @@ and is renamed \code{std_error_log} to say so.}
 
 \item{lambda}{For regularised methods: \code{"1se"} (default),
 \code{"min"}, or a numeric penalty value.}
-
-\item{...}{Additional arguments (currently unused).}
 }
 \value{
 A tibble, one row per model term. For \code{"linear"},
@@ -41,7 +38,11 @@ A tibble, one row per model term. For \code{"linear"},
 plus \code{conf_low} and \code{conf_high} when \code{conf_int = TRUE}.
 For regularised methods: \code{term}, \code{estimate} and the
 \code{lambda} the estimate came from -- glmnet reports no standard
-errors, so there is nothing to test or bound.
+errors, so there is nothing to test or bound. A multiclass
+regularised model has one set of coefficients per class, so its rows
+are led by a \code{class} column; \code{exponentiate} is not available
+for it, because glmnet's multinomial coefficients are not relative to
+a reference class.
 }
 \description{
 Returns the coefficients of a fitted tidylearn model as a tibble, with
@@ -64,8 +65,9 @@ profiles the likelihood, which is the better interval when the sample is
 small or a class is nearly separated. Call
 \code{stats::confint(model$fit)} when you want it.
 
-A rank-deficient fit -- two perfectly collinear predictors, or a factor
-level with no observations -- cannot estimate every term. Those terms are
+A rank-deficient fit -- two perfectly collinear predictors, or an
+interaction of factors with a combination no row has -- cannot estimate
+every term. Those terms are
 returned with an \code{NA} estimate rather than dropped, so a term named
 in the formula never disappears from the output without saying so.
 }

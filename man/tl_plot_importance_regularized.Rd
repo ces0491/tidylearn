@@ -9,8 +9,8 @@ tl_plot_importance_regularized(model, lambda = "1se", top_n = 20, ...)
 \arguments{
 \item{model}{A tidylearn regularized model object}
 
-\item{lambda}{Which lambda to use
-("1se" or "min", default: "1se")}
+\item{lambda}{Which lambda to use: "1se" (default), "min", or a numeric
+penalty within the fitted path}
 
 \item{top_n}{Number of top features to display
 (default: 20)}

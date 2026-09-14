@@ -17,7 +17,8 @@ tl_table_coefficients(
 \arguments{
 \item{model}{A tidylearn model object}
 
-\item{lambda}{For regularised models: "1se" (default) or "min"}
+\item{lambda}{For regularised models: \code{"1se"} (default),
+\code{"min"}, or a numeric penalty within the fitted path}
 
 \item{digits}{Number of decimal places (default: 4)}
 

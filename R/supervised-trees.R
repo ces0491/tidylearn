@@ -29,20 +29,41 @@ tl_fit_tree <- function(data, formula, is_classification = FALSE,
   # Determine method based on problem type
   method <- if (is_classification) "class" else "anova"
 
-  # Fit the tree model
-  tree_model <- rpart::rpart(
-    formula = formula,
-    data = data,
-    method = method,
-    control = rpart::rpart.control(
-      cp = cp,
-      minsplit = minsplit,
-      maxdepth = maxdepth,
-      ...
-    )
-  )
+  # Everything in ... used to go to rpart.control(), which takes its own
+  # ... and discards what it does not recognise -- so weights, cost and
+  # parms were accepted and silently had no effect. Send rpart()'s own
+  # arguments to rpart().
+  dots <- list(...)
+  dot_names <- names(dots)
+  if (is.null(dot_names)) {
+    dot_names <- rep("", length(dots))
+  }
+  rpart_own <- dot_names %in%
+    c("weights", "subset", "na.action", "model", "x", "y", "parms", "cost")
 
-  tree_model
+  # A whole control list passed as control = starts from the caller's
+  # settings; the named arguments here and in ... still apply on top.
+  user_control <- dot_names == "control"
+  control <- do.call(
+    rpart::rpart.control,
+    c(list(cp = cp, minsplit = minsplit, maxdepth = maxdepth),
+      dots[!rpart_own & !user_control])
+  )
+  if (any(user_control)) {
+    explicit <- c(names(match.call(expand.dots = FALSE))[-1],
+                  dot_names[!rpart_own & !user_control])
+    given <- dots[[which(user_control)[1]]]
+    for (setting in setdiff(names(given), explicit)) {
+      control[[setting]] <- given[[setting]]
+    }
+  }
+
+  tl_fit_by_value(
+    rpart::rpart, "rpart",
+    c(list(formula = formula, data = data, method = method,
+           control = control),
+      dots[rpart_own & !user_control])
+  )
 }
 
 #' Predict using a decision tree model
@@ -439,56 +460,18 @@ tl_predict_boost <- function(
 #' @importFrom ggplot2 ggplot aes geom_col coord_flip labs theme_minimal
 #' @keywords internal
 tl_plot_importance <- function(model, top_n = 20, ...) {
-  # Get the model
-  fit <- model$fit
-  method <- model$spec$method
-
-  if (method == "tree") {
-    # Decision tree importance
-    # Get variable importance from rpart
-    imp <- fit$variable.importance
-
-    # Create a data frame for plotting
-    importance_df <- tibble::tibble(
-      feature = names(imp),
-      importance = as.vector(imp)
-    )
-  } else if (method == "forest") {
-    # Random forest importance
-    # Get variable importance from randomForest
-    imp <- randomForest::importance(fit)
-
-    # Create a data frame for plotting
-    if (model$spec$is_classification) {
-      # For classification, use mean decrease in accuracy
-      importance_df <- tibble::tibble(
-        feature = rownames(imp),
-        importance = imp[, "MeanDecreaseAccuracy"]
-      )
-    } else {
-      # For regression, use % increase in MSE
-      importance_df <- tibble::tibble(
-        feature = rownames(imp),
-        importance = imp[, "%IncMSE"]
-      )
-    }
-  } else if (method == "boost") {
-    # Gradient boosting importance
-    # Get relative influence from gbm
-    imp <- summary(fit, plotit = FALSE)
-
-    # Create a data frame for plotting
-    importance_df <- tibble::tibble(
-      feature = imp$var,
-      importance = imp$rel.inf
-    )
-  } else {
+  # The importance tl_table_importance() reports, scaled to a maximum of
+  # 100. This function kept its own copy of the extraction, which still
+  # failed on a forest fitted with importance = FALSE and had no xgboost
+  # branch.
+  if (!model$spec$method %in% c("tree", "forest", "boost", "xgboost")) {
     stop(
       "Variable importance plot not implemented for method: ",
-      method,
+      model$spec$method,
       call. = FALSE
     )
   }
+  importance_df <- tl_extract_importance(model)
 
   # Filter and sort
   importance_df <- importance_df %>%

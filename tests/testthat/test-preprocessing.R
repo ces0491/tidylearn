@@ -140,3 +140,101 @@ test_that("tl_prepare_data preserves response variable", {
   expect_true("Species" %in% names(result$data))
   expect_equal(result$data$Species, iris$Species)
 })
+
+test_that("a one-row stratum keeps the split a partition", {
+  # sample() on a single number draws from 1:n, so a stratum holding row
+  # 10 alone drew some other row -- possibly one already drawn -- and
+  # left row 10 in test.
+  d <- data.frame(x = 1:10, g = c(rep("a", 9), "b"))
+  split <- tl_split(d, stratify = "g", seed = 1)
+
+  expect_setequal(c(split$train$x, split$test$x), d$x)
+  expect_equal(anyDuplicated(split$train$x), 0L)
+  expect_true(10 %in% split$train$x)
+
+  # Every distinct mpg is a stratum, and most hold a single car
+  split <- tl_split(mtcars, stratify = "mpg", seed = 1)
+  expect_equal(nrow(split$train) + nrow(split$test), nrow(mtcars))
+  expect_length(intersect(rownames(split$train), rownames(split$test)), 0)
+})
+
+test_that("rows missing the stratify value are split, not all sent to test", {
+  d <- iris
+  d$Species[c(1, 2, 60, 61, 120, 121)] <- NA
+  split <- tl_split(d, stratify = "Species", seed = 1)
+  expect_equal(nrow(split$train) + nrow(split$test), nrow(d))
+  expect_gt(sum(is.na(split$train$Species)), 0)
+})
+
+test_that("tl_split keeps a one-column data frame a data frame", {
+  split <- tl_split(data.frame(x = 1:10), seed = 1)
+  expect_s3_class(split$train, "data.frame")
+  expect_s3_class(split$test, "data.frame")
+  expect_named(split$train, "x")
+})
+
+test_that("imputation does what the method says, and refuses one it lacks", {
+  d <- mtcars
+  d$mpg[1:3] <- NA
+  expect_error(
+    tl_prepare_data(d, cyl ~ ., impute_method = "knn", scale_method = "none"),
+    "impute_method"
+  )
+  mode_fit <- suppressMessages(
+    tl_prepare_data(transform(d, gear = gear), cyl ~ .,
+                    impute_method = "mode", scale_method = "none")
+  )
+  # mpg has several values tied for most frequent; any of them is a mode
+  observed <- mtcars$mpg[-(1:3)]
+  imputed <- mode_fit$data$mpg[1]
+  expect_equal(sum(observed == imputed), max(table(observed)))
+  expect_false(isTRUE(all.equal(imputed, mean(observed))))
+
+  # categorical gaps are filled with the most frequent level
+  d2 <- iris
+  d2$Species[1:2] <- NA
+  out <- suppressMessages(
+    tl_prepare_data(d2, Sepal.Length ~ ., scale_method = "none",
+                    encode_categorical = FALSE)
+  )
+  expect_false(anyNA(out$data$Species))
+  expect_equal(nrow(out$data), nrow(iris))
+})
+
+test_that("correlated removal drops the feature that clears every pair", {
+  set.seed(1)
+  x1 <- rnorm(200)
+  x2 <- x1 + rnorm(200, sd = .1)
+  x3 <- x2 + rnorm(200, sd = .1)
+  out <- suppressMessages(tl_prepare_data(
+    data.frame(x1, x2, x3), remove_correlated = TRUE,
+    scale_method = "none", correlation_cutoff = .99
+  ))
+  expect_named(out$data, c("x1", "x3"))
+})
+
+test_that("columns the formula excludes are passed through untouched", {
+  d <- data.frame(id = as.character(1:20), y = rnorm(20), x = rnorm(20))
+  out <- suppressMessages(tl_prepare_data(d, y ~ . - id))
+  expect_setequal(names(out$data), c("id", "y", "x"))
+  expect_identical(out$data$id, d$id)
+  # x is still scaled
+  expect_equal(mean(out$data$x), 0)
+})
+
+test_that("tl_split refuses a proportion outside (0, 1)", {
+  for (prop in list(1.5, -1, 0, 1, NA_real_, "0.8", c(0.5, 0.6))) {
+    expect_error(tl_split(mtcars, prop = prop, seed = 1),
+                 "'prop' must be a single number strictly between 0 and 1")
+  }
+  expect_equal(nrow(tl_split(mtcars, prop = 0.5, seed = 1)$train), 16)
+})
+
+test_that("scaling leaves a column with no spread to measure alone", {
+  d <- data.frame(y = rnorm(10), x = rnorm(10), empty = NA_real_)
+  out <- suppressMessages(
+    tl_prepare_data(d, y ~ ., remove_zero_variance = FALSE)
+  )
+  expect_true(all(is.na(out$data$empty)))
+  expect_equal(mean(out$data$x), 0)
+})

@@ -127,3 +127,78 @@ test_that("tl_table errors for unknown type", {
   model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
   expect_error(tl_table(model, type = "nonexistent"), "Unknown table type")
 })
+
+test_that("two models of one method get separate comparison columns", {
+  skip_if_not_installed("gt")
+
+  # Both default to "linear (reg)", which pivoted into list cells
+  m1 <- tl_model(mtcars, mpg ~ wt, method = "linear")
+  m2 <- tl_model(mtcars, mpg ~ wt + hp + qsec, method = "linear")
+  data <- tl_table_comparison(m1, m2)[["_data"]]
+
+  expect_equal(ncol(data), 3)
+  expect_true(all(vapply(data[-1], is.numeric, logical(1))))
+
+  expect_error(tl_table_comparison(m1, m2, names = "a"), "must match")
+  expect_error(tl_table_comparison(m1, m2, names = c("a", "a")), "unique")
+})
+
+test_that("comparison names must not be missing", {
+  skip_if_not_installed("gt")
+  m1 <- tl_model(mtcars, mpg ~ wt, method = "linear")
+  m2 <- tl_model(mtcars, mpg ~ hp, method = "linear")
+  expect_error(tl_table_comparison(m1, m2, names = c("a", NA)),
+               "no missing values")
+})
+
+test_that("the confusion table says when rows are missing the response", {
+  skip_if_not_installed("gt")
+  model <- tl_model(iris, Species ~ ., method = "forest", ntree = 50)
+  d <- iris
+  d$Species[1:5] <- NA
+  expect_warning(tl_table_confusion(model, new_data = d), "5 row")
+})
+
+test_that("forest importance works without permutation importance", {
+  model <- tl_model(iris, Species ~ ., method = "forest", ntree = 50,
+                    importance = FALSE)
+  imp <- tl_extract_importance(model)
+  expect_setequal(imp$feature, names(iris)[1:4])
+  expect_equal(max(imp$importance), 100)
+  reg <- tl_model(mtcars, mpg ~ ., method = "forest", ntree = 50,
+                  importance = FALSE)
+  expect_equal(max(tl_extract_importance(reg)$importance), 100)
+})
+
+test_that("the dbscan cluster table does not count noise as a cluster", {
+  skip_if_not_installed("gt")
+  model <- tl_model(iris[, 1:4], method = "dbscan", eps = 0.4, minPts = 5)
+  subtitle <- tl_table_clusters(model)[["_heading"]]$subtitle
+  expect_match(subtitle, paste(model$fit$n_clusters, "clusters"))
+  expect_match(subtitle, "noise")
+})
+
+test_that("cluster tables average around a missing value", {
+  skip_if_not_installed("gt")
+  with_na <- iris[, 1:4]
+  with_na[5, 1] <- NA
+  tbl <- suppressWarnings(tl_table_clusters(tl_model(with_na,
+                                                     method = "hclust")))
+  expect_false(anyNA(tbl[["_data"]]$Sepal.Length))
+})
+
+test_that("a long formula gives one source note", {
+  model <- tl_model(mtcars, mpg ~ cyl + disp + hp + drat + wt + qsec + vs +
+                      am + gear + carb + I(wt^2) + I(hp^2), method = "linear")
+  expect_length(tl_model_info(model), 1)
+})
+
+test_that("tl_table_importance supports xgboost, as documented", {
+  skip_if_not_installed("xgboost")
+  skip_if_not_installed("gt")
+  model <- tl_model(mtcars, mpg ~ wt + hp + qsec, method = "xgboost",
+                    nrounds = 10)
+  data <- tl_table_importance(model)[["_data"]]
+  expect_true(all(data$feature %in% c("wt", "hp", "qsec")))
+  expect_equal(max(data$importance), 100)
+})

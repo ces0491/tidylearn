@@ -57,7 +57,8 @@ tl_model_info <- function(model) {
   method <- model$spec$method
   if (model$spec$paradigm == "supervised") {
     task <- if (model$spec$is_classification) "classification" else "regression"
-    formula_text <- deparse(model$spec$formula)
+    # deparse() splits a long formula across strings, which made two notes
+    formula_text <- paste(deparse(model$spec$formula), collapse = " ")
     paste0("tidylearn | ", method, " (", task, ") | ", formula_text,
            " | n = ", nrow(model$data))
   } else {
@@ -205,7 +206,8 @@ tl_table_metrics <- function(model, new_data = NULL, digits = 4, ...) {
 #' if you would rather format them yourself.
 #'
 #' @param model A tidylearn model object
-#' @param lambda For regularised models: "1se" (default) or "min"
+#' @param lambda For regularised models: \code{"1se"} (default),
+#'   \code{"min"}, or a numeric penalty within the fitted path
 #' @param digits Number of decimal places (default: 4)
 #' @param conf_int Whether to add a confidence interval (default:
 #'   \code{FALSE}). Not available for regularised models.
@@ -226,6 +228,24 @@ tl_table_coefficients <- function(model, lambda = "1se", digits = 4,
                                   conf_int = FALSE, level = 0.95,
                                   exponentiate = FALSE, ...) {
   tl_check_packages("gt")
+
+  # ... is kept so existing calls still run, but nothing in it is used. A
+  # broom-style conf.int = TRUE landed here and produced a table with no
+  # interval, so a named argument is at least reported.
+  n_extra <- ...length()
+  if (n_extra > 0) {
+    ignored <- names(list(...))
+    if (is.null(ignored)) {
+      ignored <- rep("", n_extra)
+    }
+    ignored[ignored == ""] <- "<unnamed>"
+    warning(
+      "Ignoring argument(s) tl_table_coefficients() does not use: ",
+      paste(ignored, collapse = ", "),
+      if ("conf.int" %in% ignored) ". Did you mean conf_int?" else ".",
+      call. = FALSE
+    )
+  }
 
   method <- model$spec$method
 
@@ -296,17 +316,33 @@ tl_table_coefficients <- function(model, lambda = "1se", digits = 4,
     # Whether a term survived the penalty is a property of the coefficient
     # before it moves to the odds scale, where a dropped term reads as 1.
     dropped <- if (exponentiate) 1 else 0
+    # Rank by the size of the effect on the scale it was estimated on. On
+    # the odds scale |odds ratio| put a dropped term (1) above a strong
+    # negative effect (0.02), so the magnitude is taken of the log odds.
     coef_tbl <- coef_tbl %>%
       dplyr::select(-"lambda") %>%
-      dplyr::mutate(abs_estimate = abs(.data$estimate)) %>%
+      dplyr::mutate(
+        abs_estimate = if (exponentiate) {
+          abs(log(.data$estimate))
+        } else {
+          abs(.data$estimate)
+        }
+      ) %>%
       dplyr::arrange(dplyr::desc(.data$abs_estimate))
 
+    # A multiclass fit has one set of coefficients per class. Keep each
+    # class's rows together, and show them under its name.
+    by_class <- "class" %in% names(coef_tbl)
+    if (by_class) {
+      coef_tbl <- dplyr::arrange(coef_tbl, .data$class)
+    }
+
     gt_tbl <- coef_tbl %>%
-      gt::gt() %>%
+      gt::gt(groupname_col = if (by_class) "class") %>%
       gt::cols_label(
         term = "Term",
         estimate = if (exponentiate) "Odds Ratio" else "Coefficient",
-        abs_estimate = if (exponentiate) "|Odds Ratio|" else "|Coefficient|"
+        abs_estimate = if (exponentiate) "|log Odds Ratio|" else "|Coefficient|"
       ) %>%
       gt::fmt_number(
         columns = c("estimate", "abs_estimate"), decimals = digits
@@ -358,6 +394,17 @@ tl_table_confusion <- function(model, new_data = NULL, ...) {
   if (!is.factor(actuals)) actuals <- factor(actuals)
   predicted <- predict(model, new_data, type = "class")$.pred
 
+  # table() drops a row missing either value, so the counts summed to
+  # fewer rows than were passed in, with nothing to say so
+  incomplete <- is.na(actuals) | is.na(predicted)
+  if (any(incomplete)) {
+    warning(
+      sum(incomplete), " row(s) with a missing response or prediction are ",
+      "left out of the confusion matrix.",
+      call. = FALSE
+    )
+  }
+
   cm <- table(Actual = actuals, Predicted = predicted)
   cm_df <- as.data.frame.matrix(cm)
   cm_df$Actual <- rownames(cm_df)
@@ -407,13 +454,18 @@ tl_table_importance <- function(model, top_n = 20, digits = 2, ...) {
 
   method <- model$spec$method
 
-  if (method %in% c("tree", "forest", "boost")) {
+  if (method %in% c("tree", "forest", "boost", "xgboost")) {
     imp_df <- tl_extract_importance(model)
   } else if (method %in% c("ridge", "lasso", "elastic_net")) {
     imp_df <- tl_get_importance_regularized(model)
   } else {
     stop("Importance table not available for method '", method, "'.",
          call. = FALSE)
+  }
+
+  if (nrow(imp_df) == 0) {
+    stop("No feature has non-zero importance: the penalty dropped every ",
+         "predictor from this model.", call. = FALSE)
   }
 
   imp_df <- imp_df %>%
@@ -574,7 +626,8 @@ tl_table_clusters <- function(model, k = 3, digits = 2, ...) {
       dplyr::group_by(.data$cluster) %>%
       dplyr::summarise(
         size = dplyr::n(),
-        dplyr::across(where(is.numeric) & !dplyr::any_of("cluster"), mean),
+        dplyr::across(where(is.numeric) & !dplyr::any_of("cluster"),
+                      function(x) mean(x, na.rm = TRUE)),
         .groups = "drop"
       )
   } else if (method == "dbscan") {
@@ -586,7 +639,8 @@ tl_table_clusters <- function(model, k = 3, digits = 2, ...) {
       dplyr::group_by(.data$cluster) %>%
       dplyr::summarise(
         size = dplyr::n(),
-        dplyr::across(where(is.numeric) & !dplyr::any_of("cluster"), mean),
+        dplyr::across(where(is.numeric) & !dplyr::any_of("cluster"),
+                      function(x) mean(x, na.rm = TRUE)),
         .groups = "drop"
       )
   } else {
@@ -599,6 +653,9 @@ tl_table_clusters <- function(model, k = 3, digits = 2, ...) {
   ]
   numeric_cols <- setdiff(numeric_cols, c("cluster", "size", "medoid_index"))
 
+  # dbscan labels its noise points cluster 0, which is not a cluster
+  n_clusters <- length(setdiff(unique(summary_tbl$cluster), 0))
+
   summary_tbl %>%
     gt::gt() %>%
     gt::cols_label(cluster = "Cluster", size = "Size") %>%
@@ -608,7 +665,8 @@ tl_table_clusters <- function(model, k = 3, digits = 2, ...) {
       title = "Cluster Summary",
       subtitle = paste0(
         method, " | ",
-        length(unique(summary_tbl$cluster)), " clusters"
+        n_clusters, if (n_clusters == 1) " cluster" else " clusters",
+        if (method == "dbscan" && 0 %in% summary_tbl$cluster) " + noise"
       ),
       source_note = tl_model_info(model)
     )
@@ -645,16 +703,14 @@ tl_table_comparison <- function(..., new_data = NULL,
     stop("Provide at least 2 models to compare", call. = FALSE)
   }
 
-  if (is.null(names)) {
-    names <- vapply(models, function(m) {
-      task <- if (m$spec$paradigm == "supervised") {
-        if (m$spec$is_classification) "cls" else "reg"
-      } else {
-        m$spec$method
-      }
-      paste0(m$spec$method, " (", task, ")")
-    }, character(1))
-  }
+  names <- tl_comparison_names(models, names, function(m) {
+    task <- if (m$spec$paradigm == "supervised") {
+      if (m$spec$is_classification) "cls" else "reg"
+    } else {
+      m$spec$method
+    }
+    paste0(m$spec$method, " (", task, ")")
+  })
 
   if (is.null(new_data)) {
     new_data <- models[[1]]$data

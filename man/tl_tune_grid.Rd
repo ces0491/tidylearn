@@ -40,9 +40,25 @@ or minimize (FALSE) the metric}
 \value{
 A tidylearn model object fitted with the best hyperparameters.
 Tuning results are stored as an attribute \code{"tuning_results"},
-a list containing \code{param_grid}, \code{results} (data frame of
-all evaluated combinations), \code{best_params}, \code{best_metric},
-\code{metric}, and \code{maximize}.
+a list containing \code{param_grid}, \code{results}, \code{best_params},
+\code{best_metric}, \code{metric}, and \code{maximize}.
+
+\code{results} has one row per evaluated combination: \code{mean_metric}
+(the mean over the folds that produced a score), \code{n_folds_ok} (how
+many of the \code{folds} did), and a column per parameter. A parameter
+with a vector-valued candidate, such as \code{hidden_layers}, is a list
+column.
+
+Only combinations with \code{n_folds_ok} equal to \code{folds} are
+eligible to be best, since a mean over the folds that happened to
+succeed is not comparable with a mean over all of them. If no
+combination completed every fold, the best of those scored on the most
+folds is used, with a warning. If every combination failed in every
+fold, the function stops.
+
+For \code{method = "forest"}, an \code{mtry} above the number of
+predictors is capped at that number, with a warning, and duplicate
+combinations that result are evaluated once.
 }
 \description{
 Tune hyperparameters for a model using grid search

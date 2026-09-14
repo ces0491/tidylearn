@@ -19,7 +19,9 @@ tl_test_interactions(
 \arguments{
 \item{data}{A data frame containing the data}
 
-\item{formula}{A formula specifying the base model without interactions}
+\item{formula}{A formula specifying the base model without interactions,
+or a string that parses as one. \code{.} and \code{- var} are expanded
+against \code{data}.}
 
 \item{var1}{First variable to test for interactions}
 
