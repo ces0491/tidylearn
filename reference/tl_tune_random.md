@@ -43,9 +43,18 @@ tl_tune_random(
 
   :   called with no arguments to draw one value
 
+  a list
+
+  :   a set of candidates, each drawn whole, e.g.
+      `list(c(10), c(20, 10))` for `hidden_layers`
+
   `c(min, max, "log")`
 
   :   log-uniform draw between `min` and `max`
+
+  a single value
+
+  :   used as given in every iteration
 
   two whole numbers
 
@@ -63,6 +72,10 @@ tl_tune_random(
   character or factor
 
   :   categorical, sampled from as given
+
+  logical
+
+  :   sampled from the values given
 
 - n_iter:
 
@@ -96,8 +109,15 @@ tl_tune_random(
 
 A tidylearn model object fitted with the best hyperparameters. Tuning
 results are stored as an attribute `"tuning_results"`, a list containing
-`param_space`, `results` (data frame of all evaluated iterations),
-`best_params`, `best_metric`, `metric`, and `maximize`.
+`param_space`, `results`, `best_params`, `best_metric`, `metric`, and
+`maximize`.
+
+`results` has one row per iteration: `iteration`, `mean_metric`,
+`n_folds_ok`, and a column per parameter, as described for
+[`tl_tune_grid`](https://tidylearn.sheetsolved.com/reference/tl_tune_grid.md).
+The best parameters are chosen by the same rules, and `mtry` is capped
+the same way; duplicate draws are kept, so there are always `n_iter`
+rows.
 
 ## Examples
 

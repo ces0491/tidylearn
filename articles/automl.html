@@ -143,11 +143,11 @@ obtained.</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 11 × 3</span></span></span>
 <span><span class="co">#&gt;    model            score evaluation</span></span>
 <span><span class="co">#&gt;    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>            <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> advanced_ridge    2.66 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> clustered_forest  2.67 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> baseline_forest   2.70 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> clustered_forest  2.67 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> baseline_forest   2.70 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> advanced_lasso    2.85 cv        </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> pca_linear        2.97 cv        </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> advanced_lasso    2.97 cv        </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> advanced_ridge    2.98 cv        </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> baseline_linear   3.32 cv        </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> baseline_tree     4.11 cv        </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> pca_forest        4.16 cv        </span></span>
@@ -433,7 +433,7 @@ apply the same transformation to any data you later predict on:</p>
 <span>                               time_budget <span class="op">=</span> <span class="fl">30</span>, cv_folds <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">automl_processed</span><span class="op">$</span><span class="va">leaderboard</span><span class="op">$</span><span class="va">model</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span></span>
-<span><span class="co">#&gt; [1] "clustered_tree"</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] "baseline_tree"</span></span></code></pre></div>
 <p><code><a href="../reference/tl_pipeline.html">tl_pipeline()</a></code> handles that bookkeeping properly — see
 <code><a href="../articles/tuning-and-pipelines.html">vignette("tuning-and-pipelines")</a></code>.</p>
 </div>

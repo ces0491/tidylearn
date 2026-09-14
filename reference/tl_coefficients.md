@@ -16,8 +16,7 @@ tl_coefficients(
   conf_int = FALSE,
   level = 0.95,
   exponentiate = FALSE,
-  lambda = "1se",
-  ...
+  lambda = "1se"
 )
 ```
 
@@ -51,10 +50,6 @@ tl_coefficients(
   For regularised methods: `"1se"` (default), `"min"`, or a numeric
   penalty value.
 
-- ...:
-
-  Additional arguments (currently unused).
-
 ## Value
 
 A tibble, one row per model term. For `"linear"`, `"polynomial"` and
@@ -62,6 +57,10 @@ A tibble, one row per model term. For `"linear"`, `"polynomial"` and
 plus `conf_low` and `conf_high` when `conf_int = TRUE`. For regularised
 methods: `term`, `estimate` and the `lambda` the estimate came from –
 glmnet reports no standard errors, so there is nothing to test or bound.
+A multiclass regularised model has one set of coefficients per class, so
+its rows are led by a `class` column; `exponentiate` is not available
+for it, because glmnet's multinomial coefficients are not relative to a
+reference class.
 
 ## Details
 
@@ -78,10 +77,11 @@ profiles the likelihood, which is the better interval when the sample is
 small or a class is nearly separated. Call `stats::confint(model$fit)`
 when you want it.
 
-A rank-deficient fit – two perfectly collinear predictors, or a factor
-level with no observations – cannot estimate every term. Those terms are
-returned with an `NA` estimate rather than dropped, so a term named in
-the formula never disappears from the output without saying so.
+A rank-deficient fit – two perfectly collinear predictors, or an
+interaction of factors with a combination no row has – cannot estimate
+every term. Those terms are returned with an `NA` estimate rather than
+dropped, so a term named in the formula never disappears from the output
+without saying so.
 
 ## See also
 

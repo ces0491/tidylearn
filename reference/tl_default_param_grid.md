@@ -29,7 +29,12 @@ A named list of parameter values suitable for passing to
 or
 [`tl_tune_random`](https://tidylearn.sheetsolved.com/reference/tl_tune_random.md).
 Each element is a numeric or character vector of candidate values for
-that hyperparameter.
+that hyperparameter, or for `"deep"`'s `hidden_layers` a list of
+layer-size vectors. The grid is built without the data, so a `"forest"`
+`mtry` can exceed the number of predictors; the tuners cap it.
+`"polynomial"` tunes `degree`. `"linear"` and `"logistic"` have no
+tuneable hyperparameter and return an empty list with a warning, as does
+an unknown method.
 
 ## Examples
 

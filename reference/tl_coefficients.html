@@ -65,8 +65,7 @@ intervals. Available for <code>"linear"</code>, <code>"polynomial"</code>,
 <span>  conf_int <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  level <span class="op">=</span> <span class="fl">0.95</span>,</span>
 <span>  exponentiate <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  lambda <span class="op">=</span> <span class="st">"1se"</span>,</span>
-<span>  <span class="va">...</span></span>
+<span>  lambda <span class="op">=</span> <span class="st">"1se"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -101,10 +100,6 @@ and is renamed <code>std_error_log</code> to say so.</p></dd>
 <dd><p>For regularised methods: <code>"1se"</code> (default),
 <code>"min"</code>, or a numeric penalty value.</p></dd>
 
-
-<dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments (currently unused).</p></dd>
-
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
@@ -114,7 +109,11 @@ and is renamed <code>std_error_log</code> to say so.</p></dd>
 plus <code>conf_low</code> and <code>conf_high</code> when <code>conf_int = TRUE</code>.
 For regularised methods: <code>term</code>, <code>estimate</code> and the
 <code>lambda</code> the estimate came from – glmnet reports no standard
-errors, so there is nothing to test or bound.</p>
+errors, so there is nothing to test or bound. A multiclass
+regularised model has one set of coefficients per class, so its rows
+are led by a <code>class</code> column; <code>exponentiate</code> is not available
+for it, because glmnet's multinomial coefficients are not relative to
+a reference class.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -129,8 +128,9 @@ the residual degrees of freedom, which is exactly what
 profiles the likelihood, which is the better interval when the sample is
 small or a class is nearly separated. Call
 <code>stats::confint(model$fit)</code> when you want it.</p>
-<p>A rank-deficient fit – two perfectly collinear predictors, or a factor
-level with no observations – cannot estimate every term. Those terms are
+<p>A rank-deficient fit – two perfectly collinear predictors, or an
+interaction of factors with a combination no row has – cannot estimate
+every term. Those terms are
 returned with an <code>NA</code> estimate rather than dropped, so a term named
 in the formula never disappears from the output without saying so.</p>
     </div>

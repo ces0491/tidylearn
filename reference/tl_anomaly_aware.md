@@ -33,11 +33,16 @@ tl_anomaly_aware(
 
 - anomaly_method:
 
-  Method for anomaly detection: "dbscan", "isolation_forest"
+  Method for anomaly detection. Only "dbscan" is implemented; its noise
+  points are the anomalies.
 
 - action:
 
-  Action to take: "remove", "flag", "downweight"
+  Action to take: "remove", "flag", "downweight". `"downweight"` gives
+  anomalies a case weight of 0.1, and needs a `supervised_method` that
+  takes case weights: `"linear"`, `"polynomial"`, `"logistic"`,
+  `"tree"`, `"ridge"`, `"lasso"`, `"elastic_net"` or `"forest"`. A
+  forest reads them as sampling weights.
 
 - supervised_method:
 

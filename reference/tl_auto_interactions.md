@@ -39,7 +39,9 @@ tl_auto_interactions(
 
 - exclude_vars:
 
-  Character vector of variables to exclude from interaction testing
+  Character vector of predictor variables that may not appear in a
+  selected interaction. They stay in the model as main effects. Every
+  name must be a predictor in `formula`.
 
 ## Value
 

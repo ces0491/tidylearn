@@ -67,7 +67,8 @@ and propagating labels within clusters.</p>
 
 
 <dt id="arg-formula">formula<a class="anchor" aria-label="anchor" href="#arg-formula"></a></dt>
-<dd><p>Model formula</p></dd>
+<dd><p>Model formula. The response must be a factor, character
+or logical column.</p></dd>
 
 
 <dt id="arg-labeled-indices">labeled_indices<a class="anchor" aria-label="anchor" href="#arg-labeled-indices"></a></dt>
@@ -80,9 +81,9 @@ and propagating labels within clusters.</p>
 
 <dt id="arg-supervised-method">supervised_method<a class="anchor" aria-label="anchor" href="#arg-supervised-method"></a></dt>
 <dd><p>Supervised learning method for the final
-model (default: <code>"tree"</code>, which handles both regression and
-classification with any number of classes). <code>"logistic"</code> is
-binary-only and errors on a response with more than two levels.</p></dd>
+model (default: <code>"tree"</code>, which handles any number of classes).
+<code>"logistic"</code> is binary-only and errors on a response with more
+than two levels.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -94,8 +95,16 @@ binary-only and errors on a response with more than two levels.</p></dd>
     <p>A tidylearn model object with additional class
 <code>"tidylearn_semisupervised"</code>, trained on pseudo-labeled data. The
 model includes a <code>semisupervised_info</code> element with
-<code>labeled_indices</code>, <code>cluster_model</code>, and
-<code>label_mapping</code>.</p>
+<code>labeled_indices</code>, <code>cluster_model</code>, <code>label_mapping</code>,
+and <code>n_unlabelled_dropped</code>, the number of rows left out because
+their cluster had no labelled observation.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>Labels are propagated by majority vote within each cluster, so the
+response must be categorical. Rows in a cluster that holds no labelled
+observation have no label to take; they are left out of training, with
+a warning giving the count.</p>
     </div>
 
     <div class="section level2">

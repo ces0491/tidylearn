@@ -69,17 +69,28 @@
 
 
 <dt id="arg-intervals">intervals<a class="anchor" aria-label="anchor" href="#arg-intervals"></a></dt>
-<dd><p>Logical; whether to include confidence intervals</p></dd>
+<dd><p>Logical; whether to add 95\<!-- % confidence limits as columns -->
+<code>lower</code> and <code>upper</code>. This needs a model whose underlying fit is
+an <code>lm</code> or <code>glm</code>; for any other fit a message is shown and only
+point estimates are returned. For a <code>glm</code> the interval is built on
+the link scale and transformed to the response scale.</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>For numeric <code>var</code>: a list with <code>effects</code> (data frame of
-predicted values across the variable range for each level of
+predicted values across the variable range for each value of
 <code>by_var</code>) and <code>slopes</code> (data frame with the slope of
-<code>var</code> at each level of <code>by_var</code>). For categorical
+<code>var</code> at each value of <code>by_var</code>). For categorical
 <code>var</code>: a data frame of predicted values at each factor level for
-each level of <code>by_var</code>.</p>
+each level of <code>by_var</code>. A numeric <code>by_var</code> is evaluated at its
+quartiles; quartiles that tie are evaluated once, with a label naming
+each quartile they stand for, such as <code>"Q0/Q25"</code>.</p>
+<p><code>fit</code>, <code>lower</code>, <code>upper</code> and <code>slope</code> are on the
+response scale whatever <code>intervals</code> is set to: predicted
+probabilities for a logistic model. <code>slope</code> is the slope of a
+straight line fitted to <code>fit</code> across the range of <code>var</code>, so
+for a non-linear link it is an average rate of change over that range.</p>
 <p><code>slopes$slope_se</code> is the standard error of a straight line fitted
 to the prediction grid, not the sampling uncertainty of the marginal
 effect. For a linear model the grid is exactly linear in <code>var</code>,
@@ -96,20 +107,20 @@ interaction coefficient itself.</p>
 <span class="r-in"><span><span class="co"># How the effect of weight changes across horsepower</span></span></span>
 <span class="r-in"><span><span class="va">effects</span> <span class="op">&lt;-</span> <span class="fu">tl_interaction_effects</span><span class="op">(</span><span class="va">model</span>, var <span class="op">=</span> <span class="st">"wt"</span>, by_var <span class="op">=</span> <span class="st">"hp"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">effects</span><span class="op">$</span><span class="va">effects</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         wt hp      fit       se    lower    upper by_value by_label</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 1.513000 52 33.32234 1.241017 30.88995 35.75474       52       Q0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2 1.552505 52 33.05495 1.210429 30.68251 35.42739       52       Q0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 1.592010 52 32.78756 1.180197 30.47438 35.10075       52       Q0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 1.631515 52 32.52017 1.150349 30.26549 34.77485       52       Q0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 1.671020 52 32.25278 1.120916 30.05578 34.44978       52       Q0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6 1.710525 52 31.98539 1.091933 29.84520 34.12558       52       Q0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         wt hp      fit    lower    upper by_value by_label</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 1.513000 52 33.32234 30.78023 35.86445       52       Q0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 1.552505 52 33.05495 30.57550 35.53440       52       Q0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 1.592010 52 32.78756 30.37004 35.20508       52       Q0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 1.631515 52 32.52017 30.16379 34.87655       52       Q0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 1.671020 52 32.25278 29.95669 34.54887       52       Q0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6 1.710525 52 31.98539 29.74867 34.22211       52       Q0</span>
 <span class="r-in"><span><span class="va">effects</span><span class="op">$</span><span class="va">slopes</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>      by_value by_label     slope     slope_se</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Q0       52.0       Q0 -6.768521 5.695734e-16</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Q25      96.5      Q25 -5.529278 4.387243e-16</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Q50     123.0      Q50 -4.791302 6.071491e-16</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Q75     180.0      Q75 -3.203958 4.018576e-16</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Q100    335.0     Q100  1.112505 4.116338e-16</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Q0       52.0       Q0 -6.768521 3.505829e-16</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Q25      96.5      Q25 -5.529278 4.039654e-16</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Q50     123.0      Q50 -4.791302 3.746703e-16</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Q75     180.0      Q75 -3.203958 4.635819e-16</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Q100    335.0     Q100  1.112505 2.313524e-16</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># slopes$slope_se describes the fitted grid, not the sampling</span></span></span>
 <span class="r-in"><span><span class="co"># uncertainty of the marginal effect -- for that, read the coefficient</span></span></span>

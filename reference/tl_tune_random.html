@@ -82,9 +82,16 @@ data</p></dd>
 Each element is read by its type and length:</p><dl><dt>a function</dt>
 <dd><p>called with no arguments to draw one value</p></dd>
 
+<dt>a list</dt>
+<dd><p>a set of candidates, each drawn whole, e.g.
+<code>list(c(10), c(20, 10))</code> for <code>hidden_layers</code></p></dd>
+
 <dt><code>c(min, max, "log")</code></dt>
 <dd><p>log-uniform draw between
 <code>min</code> and <code>max</code></p></dd>
+
+<dt>a single value</dt>
+<dd><p>used as given in every iteration</p></dd>
 
 <dt>two whole numbers</dt>
 <dd><p>integer range, e.g.
@@ -100,6 +107,9 @@ given, whether or not they are whole</p></dd>
 
 <dt>character or factor</dt>
 <dd><p>categorical, sampled from as given</p></dd>
+
+<dt>logical</dt>
+<dd><p>sampled from the values given</p></dd>
 
 
 </dl></dd>
@@ -139,9 +149,13 @@ or minimize (FALSE) the metric</p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A tidylearn model object fitted with the best hyperparameters.
 Tuning results are stored as an attribute <code>"tuning_results"</code>,
-a list containing <code>param_space</code>, <code>results</code> (data frame of
-all evaluated iterations), <code>best_params</code>, <code>best_metric</code>,
-<code>metric</code>, and <code>maximize</code>.</p>
+a list containing <code>param_space</code>, <code>results</code>, <code>best_params</code>,
+<code>best_metric</code>, <code>metric</code>, and <code>maximize</code>.</p>
+<p><code>results</code> has one row per iteration: <code>iteration</code>,
+<code>mean_metric</code>, <code>n_folds_ok</code>, and a column per parameter, as
+described for <code><a href="tl_tune_grid.html">tl_tune_grid</a></code>. The best parameters are chosen
+by the same rules, and <code>mtry</code> is capped the same way; duplicate
+draws are kept, so there are always <code>n_iter</code> rows.</p>
     </div>
 
     <div class="section level2">

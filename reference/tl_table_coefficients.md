@@ -28,7 +28,8 @@ tl_table_coefficients(
 
 - lambda:
 
-  For regularised models: "1se" (default) or "min"
+  For regularised models: `"1se"` (default), `"min"`, or a numeric
+  penalty within the fitted path
 
 - digits:
 

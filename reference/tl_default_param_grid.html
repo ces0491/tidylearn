@@ -71,7 +71,13 @@ classification or regression</p></dd>
     <p>A named list of parameter values suitable for passing to
 <code><a href="tl_tune_grid.html">tl_tune_grid</a></code> or <code><a href="tl_tune_random.html">tl_tune_random</a></code>. Each
 element is a numeric or character vector of candidate values for
-that hyperparameter.</p>
+that hyperparameter, or for <code>"deep"</code>'s <code>hidden_layers</code> a list
+of layer-size vectors. The grid is built without the data, so a
+<code>"forest"</code> <code>mtry</code> can exceed the number of predictors; the
+tuners cap it. <code>"polynomial"</code> tunes <code>degree</code>.
+<code>"linear"</code> and <code>"logistic"</code> have no tuneable
+hyperparameter and return an empty list with a warning, as does an
+unknown method.</p>
     </div>
 
     <div class="section level2">

@@ -16,7 +16,8 @@ tl_plot_importance_regularized(model, lambda = "1se", top_n = 20, ...)
 
 - lambda:
 
-  Which lambda to use ("1se" or "min", default: "1se")
+  Which lambda to use: "1se" (default), "min", or a numeric penalty
+  within the fitted path
 
 - top_n:
 

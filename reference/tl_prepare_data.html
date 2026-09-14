@@ -72,12 +72,15 @@ Prepare Data for Machine Learning</p>
 
 
 <dt id="arg-formula">formula<a class="anchor" aria-label="anchor" href="#arg-formula"></a></dt>
-<dd><p>Optional formula (for supervised learning)</p></dd>
+<dd><p>Optional formula (for supervised learning). Only its
+predictors are processed; a column it excludes, such as <code>- id</code>,
+is returned unchanged.</p></dd>
 
 
 <dt id="arg-impute-method">impute_method<a class="anchor" aria-label="anchor" href="#arg-impute-method"></a></dt>
-<dd><p>Method for missing value imputation:
-"mean", "median", "mode", "knn"</p></dd>
+<dd><p>Method for imputing a missing numeric value:
+"mean", "median" or "mode". A missing categorical value is always
+filled with the column's most frequent value.</p></dd>
 
 
 <dt id="arg-scale-method">scale_method<a class="anchor" aria-label="anchor" href="#arg-scale-method"></a></dt>
@@ -111,9 +114,9 @@ variables (default: TRUE)</p></dd>
 <dd><p>The original unprocessed data frame.</p></dd>
 
 <dt><code>preprocessing_steps</code></dt>
-<dd><p>A list of metadata for each
-preprocessing step applied (imputation values, encoding maps,
-scaling parameters, etc.).</p></dd>
+<dd><p>A record of each step applied
+(imputation values, encoding maps, scaling parameters, etc.). It
+is for inspection: no function applies it to new data.</p></dd>
 
 <dt><code>formula</code></dt>
 <dd><p>The formula passed in (or <code>NULL</code>).</p></dd>
@@ -124,6 +127,12 @@ scaling parameters, etc.).</p></dd>
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>Comprehensive preprocessing pipeline including imputation, scaling,
 encoding, and feature engineering</p>
+<p>The statistics are learned from, and applied to, the data passed in.
+Preparing a whole dataset and then splitting it lets the test rows
+shape the imputation values and scaling their own scores are measured
+against. To evaluate a model, split first, or use
+<code><a href="tl_pipeline.html">tl_pipeline</a></code>, which learns its preprocessing inside each
+resampling fold.</p>
     </div>
 
     <div class="section level2">

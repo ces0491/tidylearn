@@ -25,9 +25,10 @@ predict(object, new_data = NULL, ...)
 
 ## Value
 
-A [tibble](https://tibble.tidyverse.org/reference/tibble.html) with a
-`.pred` column containing predictions and a `.cluster` column with
-cluster assignments.
+A [tibble](https://tibble.tidyverse.org/reference/tibble.html) of the
+columns each cluster's model returns for the requested `type` – `.pred`
+by default, one column per class for `type = "prob"` – and a `.cluster`
+column with cluster assignments.
 
 ## Examples
 

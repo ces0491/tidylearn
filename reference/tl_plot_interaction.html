@@ -81,7 +81,11 @@
 
 
 <dt id="arg-confidence">confidence<a class="anchor" aria-label="anchor" href="#arg-confidence"></a></dt>
-<dd><p>Logical; whether to show confidence intervals</p></dd>
+<dd><p>Logical; whether to show a 95\<!-- % confidence band. The -->
+band is drawn when one variable is numeric and the other categorical,
+and needs a model whose underlying fit is an <code>lm</code> or <code>glm</code>;
+for a <code>glm</code> it is built on the link scale and transformed to the
+response scale. For any other fit a message says no band was drawn.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -90,7 +94,10 @@
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A <code><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></code> object.</p>
+    <p>A <code><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></code> object. Two numeric variables are
+drawn as a filled contour of the prediction; a numeric and a categorical
+variable as one line per category; two categorical variables as dodged
+bars.</p>
     </div>
 
     <div class="section level2">
@@ -98,14 +105,21 @@
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="tl_model.html">tl_model</a></span><span class="op">(</span><span class="va">mtcars</span>, <span class="va">mpg</span> <span class="op">~</span> <span class="va">wt</span> <span class="op">*</span> <span class="va">hp</span>, method <span class="op">=</span> <span class="st">"linear"</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># var2 is drawn as a set of lines across the range of var1</span></span></span>
+<span class="r-in"><span><span class="co"># Two numeric variables are drawn as a filled contour over both ranges</span></span></span>
 <span class="r-in"><span><span class="fu">tl_plot_interaction</span><span class="op">(</span><span class="va">model</span>, var1 <span class="op">=</span> <span class="st">"wt"</span>, var2 <span class="op">=</span> <span class="st">"hp"</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="tl_plot_interaction-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Coarser grid, no ribbon</span></span></span>
-<span class="r-in"><span><span class="fu">tl_plot_interaction</span><span class="op">(</span><span class="va">model</span>, var1 <span class="op">=</span> <span class="st">"wt"</span>, var2 <span class="op">=</span> <span class="st">"hp"</span>,</span></span>
-<span class="r-in"><span>  n_points <span class="op">=</span> <span class="fl">20</span>, confidence <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># A numeric by categorical interaction is drawn as one line per level,</span></span></span>
+<span class="r-in"><span><span class="co"># each with a confidence band</span></span></span>
+<span class="r-in"><span><span class="va">am_model</span> <span class="op">&lt;-</span> <span class="fu"><a href="tl_model.html">tl_model</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/transform.html" class="external-link">transform</a></span><span class="op">(</span><span class="va">mtcars</span>, am <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">am</span><span class="op">)</span><span class="op">)</span>, <span class="va">mpg</span> <span class="op">~</span> <span class="va">wt</span> <span class="op">*</span> <span class="va">am</span>,</span></span>
+<span class="r-in"><span>  method <span class="op">=</span> <span class="st">"linear"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">tl_plot_interaction</span><span class="op">(</span><span class="va">am_model</span>, var1 <span class="op">=</span> <span class="st">"wt"</span>, var2 <span class="op">=</span> <span class="st">"am"</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="tl_plot_interaction-2.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Coarser grid, no band</span></span></span>
+<span class="r-in"><span><span class="fu">tl_plot_interaction</span><span class="op">(</span><span class="va">am_model</span>, var1 <span class="op">=</span> <span class="st">"wt"</span>, var2 <span class="op">=</span> <span class="st">"am"</span>,</span></span>
+<span class="r-in"><span>  n_points <span class="op">=</span> <span class="fl">20</span>, confidence <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="tl_plot_interaction-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

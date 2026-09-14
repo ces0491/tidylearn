@@ -104,9 +104,22 @@ or minimize (FALSE) the metric</p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A tidylearn model object fitted with the best hyperparameters.
 Tuning results are stored as an attribute <code>"tuning_results"</code>,
-a list containing <code>param_grid</code>, <code>results</code> (data frame of
-all evaluated combinations), <code>best_params</code>, <code>best_metric</code>,
-<code>metric</code>, and <code>maximize</code>.</p>
+a list containing <code>param_grid</code>, <code>results</code>, <code>best_params</code>,
+<code>best_metric</code>, <code>metric</code>, and <code>maximize</code>.</p>
+<p><code>results</code> has one row per evaluated combination: <code>mean_metric</code>
+(the mean over the folds that produced a score), <code>n_folds_ok</code> (how
+many of the <code>folds</code> did), and a column per parameter. A parameter
+with a vector-valued candidate, such as <code>hidden_layers</code>, is a list
+column.</p>
+<p>Only combinations with <code>n_folds_ok</code> equal to <code>folds</code> are
+eligible to be best, since a mean over the folds that happened to
+succeed is not comparable with a mean over all of them. If no
+combination completed every fold, the best of those scored on the most
+folds is used, with a warning. If every combination failed in every
+fold, the function stops.</p>
+<p>For <code>method = "forest"</code>, an <code>mtry</code> above the number of
+predictors is capped at that number, with a warning, and duplicate
+combinations that result are evaluated once.</p>
     </div>
 
     <div class="section level2">

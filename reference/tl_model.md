@@ -102,7 +102,7 @@ model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
 model$fit  # Access the raw lm object
 #> 
 #> Call:
-#> stats::lm(formula = formula, data = data)
+#> lm(formula = mpg ~ wt + hp, data = data)
 #> 
 #> Coefficients:
 #> (Intercept)           wt           hp  

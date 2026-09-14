@@ -79,13 +79,13 @@ names(tuning)
 ``` r
 
 tuning$results
-#>   mean_metric    cp minsplit
-#> 1   0.9666667 0.001        5
-#> 2   0.9466667 0.001       20
-#> 3   0.9666667 0.010        5
-#> 4   0.9466667 0.010       20
-#> 5   0.9466667 0.100        5
-#> 6   0.9466667 0.100       20
+#>   mean_metric n_folds_ok    cp minsplit
+#> 1   0.9666667          3 0.001        5
+#> 2   0.9466667          3 0.001       20
+#> 3   0.9666667          3 0.010        5
+#> 4   0.9466667          3 0.010       20
+#> 5   0.9466667          3 0.100        5
+#> 6   0.9466667          3 0.100       20
 ```
 
 ``` r
@@ -188,16 +188,21 @@ samples `n_iter` points instead.
 
 How `param_space` describes each parameter decides how it is sampled:
 
-| Specification              | Sampled as                         |
-|----------------------------|------------------------------------|
-| Two numbers, `c(lo, hi)`   | Uniform on the continuous interval |
-| Three or more numbers      | Drawn from exactly those values    |
-| A character vector         | Drawn from those levels            |
-| A function of no arguments | Whatever the function returns      |
+| Specification | Sampled as |
+|----|----|
+| A single value | Used as given in every draw |
+| Two whole numbers, `c(lo, hi)` | A whole number from `lo` to `hi` |
+| Two other numbers, `c(lo, hi)` | Uniform on the continuous interval |
+| `c(lo, hi, "log")` | Log-uniform on the interval |
+| Three or more numbers | Drawn from exactly those values |
+| A character or logical vector | Drawn from those values |
+| A list | One element drawn whole, e.g. `hidden_layers = list(10, c(20, 10))` |
+| A function of no arguments | Whatever the function returns |
 
-A two-element vector is always continuous, so `minsplit = c(2, 40)`
-samples values like 11.34. For a parameter that has to be a whole
-number, list the candidates instead:
+Whether a pair of numbers is a whole-number or a continuous range
+depends on its values: `minsplit = c(2, 40)` draws whole numbers, while
+`cp = c(0.0001, 0.2)` draws from the interval. To sample from particular
+values, list them:
 
 ``` r
 

@@ -137,13 +137,13 @@ attribute:</p>
 <span><span class="co">#&gt; [6] "maximize"</span></span></code></pre></div>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tuning</span><span class="op">$</span><span class="va">results</span></span>
-<span><span class="co">#&gt;   mean_metric    cp minsplit</span></span>
-<span><span class="co">#&gt; 1   0.9666667 0.001        5</span></span>
-<span><span class="co">#&gt; 2   0.9466667 0.001       20</span></span>
-<span><span class="co">#&gt; 3   0.9666667 0.010        5</span></span>
-<span><span class="co">#&gt; 4   0.9466667 0.010       20</span></span>
-<span><span class="co">#&gt; 5   0.9466667 0.100        5</span></span>
-<span><span class="co">#&gt; 6   0.9466667 0.100       20</span></span></code></pre></div>
+<span><span class="co">#&gt;   mean_metric n_folds_ok    cp minsplit</span></span>
+<span><span class="co">#&gt; 1   0.9666667          3 0.001        5</span></span>
+<span><span class="co">#&gt; 2   0.9466667          3 0.001       20</span></span>
+<span><span class="co">#&gt; 3   0.9666667          3 0.010        5</span></span>
+<span><span class="co">#&gt; 4   0.9466667          3 0.010       20</span></span>
+<span><span class="co">#&gt; 5   0.9466667          3 0.100        5</span></span>
+<span><span class="co">#&gt; 6   0.9466667          3 0.100       20</span></span></code></pre></div>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># The settings that won, and the score they won with</span></span>
 <span><span class="va">tuning</span><span class="op">$</span><span class="va">best_params</span></span>
@@ -230,23 +230,47 @@ points instead.</p>
 <p>How <code>param_space</code> describes each parameter decides how it
 is sampled:</p>
 <table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
 <thead><tr class="header">
 <th>Specification</th>
 <th>Sampled as</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
-<td>Two numbers, <code>c(lo, hi)</code>
+<td>A single value</td>
+<td>Used as given in every draw</td>
+</tr>
+<tr class="even">
+<td>Two whole numbers, <code>c(lo, hi)</code>
+</td>
+<td>A whole number from <code>lo</code> to <code>hi</code>
+</td>
+</tr>
+<tr class="odd">
+<td>Two other numbers, <code>c(lo, hi)</code>
 </td>
 <td>Uniform on the continuous interval</td>
 </tr>
 <tr class="even">
+<td><code>c(lo, hi, "log")</code></td>
+<td>Log-uniform on the interval</td>
+</tr>
+<tr class="odd">
 <td>Three or more numbers</td>
 <td>Drawn from exactly those values</td>
 </tr>
+<tr class="even">
+<td>A character or logical vector</td>
+<td>Drawn from those values</td>
+</tr>
 <tr class="odd">
-<td>A character vector</td>
-<td>Drawn from those levels</td>
+<td>A list</td>
+<td>One element drawn whole,
+e.g. <code>hidden_layers = list(10, c(20, 10))</code>
+</td>
 </tr>
 <tr class="even">
 <td>A function of no arguments</td>
@@ -254,10 +278,10 @@ is sampled:</p>
 </tr>
 </tbody>
 </table>
-<p>A two-element vector is always continuous, so
-<code>minsplit = c(2, 40)</code> samples values like 11.34. For a
-parameter that has to be a whole number, list the candidates
-instead:</p>
+<p>Whether a pair of numbers is a whole-number or a continuous range
+depends on its values: <code>minsplit = c(2, 40)</code> draws whole
+numbers, while <code>cp = c(0.0001, 0.2)</code> draws from the interval.
+To sample from particular values, list them:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tuned_random</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_tune_random.html">tl_tune_random</a></span><span class="op">(</span></span>
 <span>  <span class="va">iris</span>, <span class="va">Species</span> <span class="op">~</span> <span class="va">.</span>,</span>

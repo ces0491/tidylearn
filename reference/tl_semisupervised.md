@@ -24,7 +24,8 @@ tl_semisupervised(
 
 - formula:
 
-  Model formula
+  Model formula. The response must be a factor, character or logical
+  column.
 
 - labeled_indices:
 
@@ -37,9 +38,8 @@ tl_semisupervised(
 - supervised_method:
 
   Supervised learning method for the final model (default: `"tree"`,
-  which handles both regression and classification with any number of
-  classes). `"logistic"` is binary-only and errors on a response with
-  more than two levels.
+  which handles any number of classes). `"logistic"` is binary-only and
+  errors on a response with more than two levels.
 
 - ...:
 
@@ -50,7 +50,15 @@ tl_semisupervised(
 A tidylearn model object with additional class
 `"tidylearn_semisupervised"`, trained on pseudo-labeled data. The model
 includes a `semisupervised_info` element with `labeled_indices`,
-`cluster_model`, and `label_mapping`.
+`cluster_model`, `label_mapping`, and `n_unlabelled_dropped`, the number
+of rows left out because their cluster had no labelled observation.
+
+## Details
+
+Labels are propagated by majority vote within each cluster, so the
+response must be categorical. Rows in a cluster that holds no labelled
+observation have no label to take; they are left out of training, with a
+warning giving the count.
 
 ## Examples
 

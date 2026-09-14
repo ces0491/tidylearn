@@ -26,7 +26,8 @@ tl_test_interactions(
 
 - formula:
 
-  A formula specifying the base model without interactions
+  A formula specifying the base model without interactions, or a string
+  that parses as one. `.` and `- var` are expanded against `data`.
 
 - var1:
 

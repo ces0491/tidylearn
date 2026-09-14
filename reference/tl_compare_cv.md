@@ -28,7 +28,10 @@ tl_compare_cv(data, models, folds = 5, metrics = NULL, ...)
 
 - ...:
 
-  Additional arguments
+  Arguments passed to
+  [`tl_model`](https://tidylearn.sheetsolved.com/reference/tl_model.md)
+  for every fold fit. Each model is refitted with the arguments it was
+  built with; anything given here overrides them.
 
 ## Value
 

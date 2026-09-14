@@ -76,12 +76,17 @@ remove them or down-weight them before supervised learning.</p>
 
 
 <dt id="arg-anomaly-method">anomaly_method<a class="anchor" aria-label="anchor" href="#arg-anomaly-method"></a></dt>
-<dd><p>Method for anomaly detection:
-"dbscan", "isolation_forest"</p></dd>
+<dd><p>Method for anomaly detection. Only "dbscan" is
+implemented; its noise points are the anomalies.</p></dd>
 
 
 <dt id="arg-action">action<a class="anchor" aria-label="anchor" href="#arg-action"></a></dt>
-<dd><p>Action to take: "remove", "flag", "downweight"</p></dd>
+<dd><p>Action to take: "remove", "flag", "downweight".
+<code>"downweight"</code> gives anomalies a case weight of 0.1, and needs a
+<code>supervised_method</code> that takes case weights: <code>"linear"</code>,
+<code>"polynomial"</code>, <code>"logistic"</code>, <code>"tree"</code>, <code>"ridge"</code>,
+<code>"lasso"</code>, <code>"elastic_net"</code> or <code>"forest"</code>. A forest reads
+them as sampling weights.</p></dd>
 
 
 <dt id="arg-supervised-method">supervised_method<a class="anchor" aria-label="anchor" href="#arg-supervised-method"></a></dt>

@@ -93,11 +93,11 @@ result_reg$leaderboard
 #> # A tibble: 11 × 3
 #>    model            score evaluation
 #>    <chr>            <dbl> <chr>     
-#>  1 advanced_ridge    2.66 cv        
-#>  2 clustered_forest  2.67 cv        
-#>  3 baseline_forest   2.70 cv        
+#>  1 clustered_forest  2.67 cv        
+#>  2 baseline_forest   2.70 cv        
+#>  3 advanced_lasso    2.85 cv        
 #>  4 pca_linear        2.97 cv        
-#>  5 advanced_lasso    2.97 cv        
+#>  5 advanced_ridge    2.98 cv        
 #>  6 baseline_linear   3.32 cv        
 #>  7 baseline_tree     4.11 cv        
 #>  8 pca_forest        4.16 cv        
@@ -385,7 +385,7 @@ automl_processed <- tl_auto_ml(processed$data, Species ~ .,
                                time_budget = 30, cv_folds = 3)
 
 automl_processed$leaderboard$model[1]
-#> [1] "clustered_tree"
+#> [1] "baseline_tree"
 ```
 
 [`tl_pipeline()`](https://tidylearn.sheetsolved.com/reference/tl_pipeline.md)
