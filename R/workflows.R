@@ -568,9 +568,9 @@ create_leaderboard <- function(results, metric, task, eval_kinds = NULL) {
                      "auc", "roc_auc", "pr_auc", "rsq", "kap")
 
   if (metric %in% error_metrics) {
-    leaderboard <- leaderboard %>% dplyr::arrange(score)
+    leaderboard <- leaderboard |> dplyr::arrange(score)
   } else if (metric %in% score_metrics) {
-    leaderboard <- leaderboard %>% dplyr::arrange(dplyr::desc(score))
+    leaderboard <- leaderboard |> dplyr::arrange(dplyr::desc(score))
   } else {
     stop(
       "Cannot rank models by '", metric, "': tidylearn does not know ",
@@ -650,7 +650,7 @@ tl_explore <- function(data, response = NULL,
   # 1. Dimensionality Reduction
   message("[1/4] PCA analysis...")
   predictor_data <- if (!is.null(response)) {
-    data %>% dplyr::select(-dplyr::all_of(response))
+    data |> dplyr::select(-dplyr::all_of(response))
   } else {
     data
   }

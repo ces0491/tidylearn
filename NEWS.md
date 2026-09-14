@@ -2,6 +2,13 @@
 
 (Development version.)
 
+## Breaking Changes
+
+* tidylearn requires R 4.1.0 or later. The package, its README and the
+  vignettes use the native `|>` pipe, which R 3.6 and 4.0 cannot parse.
+  magrittr's `%>%` is still re-exported, so existing code that pipes with
+  it after `library(tidylearn)` keeps working.
+
 ## New Features
 
 * `tl_coefficients()` returns a model's coefficients as a tibble, with

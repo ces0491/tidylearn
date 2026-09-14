@@ -702,8 +702,8 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
       # Calculate average metrics across folds
       all_metrics <- do.call(rbind, lapply(cv_results, function(x) x$metrics))
 
-      avg_metrics <- all_metrics %>%
-        dplyr::group_by(.data$metric) %>%
+      avg_metrics <- all_metrics |>
+        dplyr::group_by(.data$metric) |>
         dplyr::summarize(
           mean_value = mean(.data$value, na.rm = TRUE),
           sd_value = sd(.data$value, na.rm = TRUE)

@@ -253,18 +253,18 @@ tl_plot_regularization_path <- function(model,
   )
 
   # Identify the top features (by max absolute coef)
-  top_features <- coef_df %>%
-    dplyr::group_by(.data$feature) %>%
+  top_features <- coef_df |>
+    dplyr::group_by(.data$feature) |>
     dplyr::summarize(
       max_abs_coef = max(abs(.data$coefficient)),
       .groups = "drop"
-    ) %>%
-    dplyr::arrange(dplyr::desc(.data$max_abs_coef)) %>%
-    dplyr::slice_head(n = label_n) %>%
+    ) |>
+    dplyr::arrange(dplyr::desc(.data$max_abs_coef)) |>
+    dplyr::slice_head(n = label_n) |>
     dplyr::pull(.data$feature)
 
   # Mark top features for labeling
-  coef_df <- coef_df %>%
+  coef_df <- coef_df |>
     dplyr::mutate(
       is_top = .data$feature %in% top_features
     )
@@ -327,7 +327,7 @@ tl_plot_regularization_path <- function(model,
   if (label_n > 0) {
     smallest_lambda <- min(fit$lambda)
 
-    label_data <- coef_df %>%
+    label_data <- coef_df |>
       dplyr::filter(
         .data$is_top,
         .data$lambda == smallest_lambda
@@ -490,8 +490,8 @@ tl_plot_importance_regularized <- function(model,
 
   # The same importance tl_table_importance() reports: raw |coefficient|
   # ranked predictors by their units, and failed on a multiclass fit
-  importance_df <- tl_get_importance_regularized(model, lambda = lambda) %>%
-    dplyr::arrange(dplyr::desc(.data$importance)) %>%
+  importance_df <- tl_get_importance_regularized(model, lambda = lambda) |>
+    dplyr::arrange(dplyr::desc(.data$importance)) |>
     dplyr::slice_head(n = top_n)
   if (nrow(importance_df) == 0) {
     stop("No feature has non-zero importance: the penalty dropped every ",

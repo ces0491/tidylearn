@@ -117,8 +117,8 @@ dim(influence)
 ```
 
 ```{r}
-influence %>%
-  filter(is_influential) %>%
+influence |>
+  filter(is_influential) |>
   select(observation, cooks_distance, leverage, dffits, std_residual)
 ```
 
@@ -129,9 +129,9 @@ The DFBETAS columns say *which coefficient* an observation moved, which is
 usually the more useful question:
 
 ```{r}
-influence %>%
-  select(observation, starts_with("dfbetas_")) %>%
-  arrange(desc(abs(dfbetas_wt))) %>%
+influence |>
+  select(observation, starts_with("dfbetas_")) |>
+  arrange(desc(abs(dfbetas_wt))) |>
   head(4)
 ```
 

@@ -474,8 +474,8 @@ tl_plot_importance <- function(model, top_n = 20, ...) {
   importance_df <- tl_extract_importance(model)
 
   # Filter and sort
-  importance_df <- importance_df %>%
-    dplyr::arrange(dplyr::desc(.data$importance)) %>%
+  importance_df <- importance_df |>
+    dplyr::arrange(dplyr::desc(.data$importance)) |>
     dplyr::slice_head(n = top_n)
 
   # Create the plot

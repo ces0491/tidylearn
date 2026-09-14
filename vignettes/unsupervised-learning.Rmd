@@ -410,7 +410,7 @@ comparison
 
 ```{r}
 plot_cluster_comparison(
-  iris[, 1:4] %>%
+  iris[, 1:4] |>
     mutate(kmeans = km$clusters$cluster, hclust = cuts$cluster),
   cluster_cols = c("kmeans", "hclust"),
   x_col = "Petal.Length",

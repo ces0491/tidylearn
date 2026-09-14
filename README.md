@@ -25,7 +25,7 @@ implementations with the convenience of a consistent, tidy API.
   (13 supervised, 7 unsupervised)
 - Returns tidy tibbles instead of varied output formats
 - Offers unified ggplot2-based visualization and formatted `gt` tables
-- Enables pipe-friendly workflows with `%>%`
+- Enables pipe-friendly workflows with `|>`
 - Orchestrates complex workflows combining multiple techniques
 
 **What tidylearn is NOT:**
@@ -128,9 +128,9 @@ coefs <- tl_coefficients(model)
 coefs <- tl_coefficients(model, conf_int = TRUE, level = 0.9)
 
 # Easy to pipe
-model %>%
-  predict(new_data = test_data) %>%
-  bind_cols(test_data) %>%
+model |>
+  predict(new_data = test_data) |>
+  bind_cols(test_data) |>
   ggplot(aes(x = mpg, y = .pred)) +
   geom_point() +
   geom_abline(slope = 1, intercept = 0)

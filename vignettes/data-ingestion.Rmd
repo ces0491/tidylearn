@@ -408,9 +408,9 @@ data <- tl_read(tmp, .quiet = TRUE)
 attr(data, "tl_format")
 
 # Works with dplyr
-data %>%
-  filter(mpg > 20) %>%
-  select(mpg, wt, hp) %>%
+data |>
+  filter(mpg > 20) |>
+  select(mpg, wt, hp) |>
   head(3)
 ```
 
@@ -432,7 +432,7 @@ write.csv(iris, tmp, row.names = FALSE)
 data <- tl_read(tmp, .quiet = TRUE)
 
 # CSV files lose factor information, so convert character columns as needed
-data <- data %>% mutate(Species = as.factor(Species))
+data <- data |> mutate(Species = as.factor(Species))
 
 # 2. Split
 split <- tl_split(data, prop = 0.7, stratify = "Species", seed = 42)

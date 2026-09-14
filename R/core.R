@@ -10,7 +10,6 @@
 #'   visualization. Supervised models keep the wrapped object at
 #'   model$fit; unsupervised ones put it at model$fit$model,
 #'   alongside the tidied components.
-#' @importFrom magrittr %>%
 #' @importFrom rlang .data .env
 #' @importFrom dplyr filter select mutate group_by summarize arrange
 #' @importFrom tibble tibble as_tibble
@@ -722,7 +721,7 @@ predict_unsupervised <- function(object, new_data, type = "response",
           "PC", seq_len(ncol(scores))
         )
         scores <- truncate_components(scores, object$spec$n_components)
-        tibble::as_tibble(scores) %>%
+        tibble::as_tibble(scores) |>
           dplyr::mutate(
             .obs_id = as.character(seq_len(nrow(scores))),
             .before = 1

@@ -375,7 +375,7 @@ tl_plot_nn_tuning <- function(model, ...) {
   tune_results <- model$tuning_results
 
   # Create data for heatmap
-  heatmap_data <- tune_results %>%
+  heatmap_data <- tune_results |>
     dplyr::mutate(size = factor(.data$size), decay = factor(.data$decay))
 
   # Create heatmap

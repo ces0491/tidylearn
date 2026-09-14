@@ -5,7 +5,7 @@
 #' @importFrom stats influence.measures cooks.distance hatvalues dffits dfbetas
 #' @importFrom stats lm.influence rstudent rstandard
 #' @importFrom stats shapiro.test bartlett.test kruskal.test
-#' @importFrom dplyr %>% filter select mutate arrange
+#' @importFrom dplyr filter select mutate arrange
 #' @importFrom ggplot2 ggplot aes geom_point geom_text labs theme_minimal
 NULL
 

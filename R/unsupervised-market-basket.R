@@ -109,7 +109,7 @@ tidy_rules <- function(rules) {
     rule_id = seq_along(lhs),
     lhs = lhs,
     rhs = rhs
-  ) %>%
+  ) |>
     dplyr::bind_cols(tibble::as_tibble(quality_df))
 
   rules_tbl
@@ -153,17 +153,17 @@ inspect_rules <- function(rules_obj, by = "lift", n = 10, decreasing = TRUE) {
 
   # Sort and select top n
   if (by %in% names(rules_tbl)) {
-    rules_tbl <- rules_tbl %>%
-      dplyr::arrange(dplyr::desc(!!rlang::sym(by))) %>%
+    rules_tbl <- rules_tbl |>
+      dplyr::arrange(dplyr::desc(!!rlang::sym(by))) |>
       dplyr::slice(seq_len(min(n, nrow(rules_tbl))))
 
     if (!decreasing) {
-      rules_tbl <- rules_tbl %>%
+      rules_tbl <- rules_tbl |>
         dplyr::arrange(!!rlang::sym(by))
     }
   } else {
     warning("Sorting column not found, returning first n rules")
-    rules_tbl <- rules_tbl %>%
+    rules_tbl <- rules_tbl |>
       dplyr::slice(seq_len(min(n, nrow(rules_tbl))))
   }
 
@@ -203,13 +203,13 @@ filter_rules_by_item <- function(rules_obj, item, where = "both") {
 
   # Filter based on location
   if (where == "lhs") {
-    filtered <- rules_tbl %>%
+    filtered <- rules_tbl |>
       dplyr::filter(grepl(item, lhs, fixed = TRUE))
   } else if (where == "rhs") {
-    filtered <- rules_tbl %>%
+    filtered <- rules_tbl |>
       dplyr::filter(grepl(item, rhs, fixed = TRUE))
   } else {
-    filtered <- rules_tbl %>%
+    filtered <- rules_tbl |>
       dplyr::filter(
         grepl(item, lhs, fixed = TRUE) |
           grepl(item, rhs, fixed = TRUE)
@@ -252,13 +252,13 @@ find_related_items <- function(rules_obj, item, min_lift = 1.5, top_n = 10) {
   }
 
   # Filter rules containing the item
-  related <- rules_tbl %>%
+  related <- rules_tbl |>
     dplyr::filter(
       grepl(item, lhs, fixed = TRUE) |
         grepl(item, rhs, fixed = TRUE)
-    ) %>%
-    dplyr::filter(lift >= min_lift) %>%
-    dplyr::arrange(dplyr::desc(lift)) %>%
+    ) |>
+    dplyr::filter(lift >= min_lift) |>
+    dplyr::arrange(dplyr::desc(lift)) |>
     dplyr::slice(seq_len(min(top_n, dplyr::n())))
 
   related
@@ -449,16 +449,16 @@ recommend_products <- function(rules_obj, basket,
   }
 
   # Find rules where LHS matches basket items
-  recommendations <- rules_tbl %>%
-    dplyr::filter(confidence >= min_confidence) %>%
+  recommendations <- rules_tbl |>
+    dplyr::filter(confidence >= min_confidence) |>
     dplyr::filter(sapply(lhs, function(rule_lhs) {
       # Check if all items in LHS are in basket
       rule_items <- strsplit(gsub("[{}]", "", rule_lhs), ",")[[1]]
       rule_items <- trimws(rule_items)
       all(rule_items %in% basket)
-    })) %>%
-    dplyr::arrange(dplyr::desc(lift)) %>%
-    dplyr::select(rhs, confidence, lift, support) %>%
+    })) |>
+    dplyr::arrange(dplyr::desc(lift)) |>
+    dplyr::select(rhs, confidence, lift, support) |>
     dplyr::slice(seq_len(min(top_n, dplyr::n())))
 
   recommendations
