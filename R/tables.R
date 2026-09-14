@@ -20,7 +20,7 @@ NULL
 tl_gt_theme <- function(gt_tbl, title = NULL,
                         subtitle = NULL,
                         source_note = NULL) {
-  gt_tbl <- gt_tbl %>%
+  gt_tbl <- gt_tbl |>
     gt::tab_options(
       heading.background.color = "#2c3e50",
       heading.title.font.size = gt::px(16),
@@ -32,17 +32,17 @@ tl_gt_theme <- function(gt_tbl, title = NULL,
       table.border.top.color = "#2c3e50",
       table.border.bottom.color = "#2c3e50",
       table.font.size = gt::px(13)
-    ) %>%
+    ) |>
     gt::tab_style(
       style = gt::cell_text(color = "white"),
       locations = gt::cells_column_labels()
     )
 
   if (!is.null(title)) {
-    gt_tbl <- gt_tbl %>% gt::tab_header(title = title, subtitle = subtitle)
+    gt_tbl <- gt_tbl |> gt::tab_header(title = title, subtitle = subtitle)
   }
   if (!is.null(source_note)) {
-    gt_tbl <- gt_tbl %>% gt::tab_source_note(source_note = source_note)
+    gt_tbl <- gt_tbl |> gt::tab_source_note(source_note = source_note)
   }
 
   gt_tbl
@@ -184,14 +184,14 @@ tl_table_metrics <- function(model, new_data = NULL, digits = 4, ...) {
 
   eval_results <- tl_evaluate(model, new_data = new_data, ...)
 
-  eval_results %>%
+  eval_results |>
     dplyr::mutate(
       metric = gsub("_", " ", .data$metric),
       metric = tools::toTitleCase(.data$metric)
-    ) %>%
-    gt::gt() %>%
-    gt::cols_label(metric = "Metric", value = "Value") %>%
-    gt::fmt_number(columns = "value", decimals = digits) %>%
+    ) |>
+    gt::gt() |>
+    gt::cols_label(metric = "Metric", value = "Value") |>
+    gt::fmt_number(columns = "value", decimals = digits) |>
     tl_gt_theme(
       title = "Model Evaluation Metrics",
       source_note = tl_model_info(model)
@@ -263,7 +263,7 @@ tl_table_coefficients <- function(model, lambda = "1se", digits = 4,
     # A rank-deficient fit leaves an unestimable term with no p-value, and
     # ifelse() carries that NA into the flag column, where it prints as the
     # word NA in a column whose other values are a star or nothing.
-    coef_tbl <- coef_tbl %>%
+    coef_tbl <- coef_tbl |>
       dplyr::mutate(
         significant = ifelse(
           !is.na(.data$p_value) & .data$p_value < 0.05, "*", ""
@@ -289,19 +289,19 @@ tl_table_coefficients <- function(model, lambda = "1se", digits = 4,
       labels$conf_high <- paste("Upper", bound)
     }
 
-    gt_tbl <- coef_tbl %>%
-      gt::gt() %>%
-      gt::cols_label(!!!labels) %>%
+    gt_tbl <- coef_tbl |>
+      gt::gt() |>
+      gt::cols_label(!!!labels) |>
       gt::fmt_number(
         columns = dplyr::any_of(c("estimate", error_col, "conf_low",
                                   "conf_high", "statistic")),
         decimals = digits
-      ) %>%
-      gt::fmt_scientific(columns = "p_value", decimals = 2) %>%
+      ) |>
+      gt::fmt_scientific(columns = "p_value", decimals = 2) |>
       gt::tab_style(
         style = gt::cell_fill(color = "#d4edda"),
         locations = gt::cells_body(rows = coef_tbl$significant == "*")
-      ) %>%
+      ) |>
       tl_gt_theme(
         title = paste0(tools::toTitleCase(method), " Model Coefficients"),
         subtitle = if (conf_int) {
@@ -319,15 +319,15 @@ tl_table_coefficients <- function(model, lambda = "1se", digits = 4,
     # Rank by the size of the effect on the scale it was estimated on. On
     # the odds scale |odds ratio| put a dropped term (1) above a strong
     # negative effect (0.02), so the magnitude is taken of the log odds.
-    coef_tbl <- coef_tbl %>%
-      dplyr::select(-"lambda") %>%
+    coef_tbl <- coef_tbl |>
+      dplyr::select(-"lambda") |>
       dplyr::mutate(
         abs_estimate = if (exponentiate) {
           abs(log(.data$estimate))
         } else {
           abs(.data$estimate)
         }
-      ) %>%
+      ) |>
       dplyr::arrange(dplyr::desc(.data$abs_estimate))
 
     # A multiclass fit has one set of coefficients per class. Keep each
@@ -337,20 +337,20 @@ tl_table_coefficients <- function(model, lambda = "1se", digits = 4,
       coef_tbl <- dplyr::arrange(coef_tbl, .data$class)
     }
 
-    gt_tbl <- coef_tbl %>%
-      gt::gt(groupname_col = if (by_class) "class") %>%
+    gt_tbl <- coef_tbl |>
+      gt::gt(groupname_col = if (by_class) "class") |>
       gt::cols_label(
         term = "Term",
         estimate = if (exponentiate) "Odds Ratio" else "Coefficient",
         abs_estimate = if (exponentiate) "|log Odds Ratio|" else "|Coefficient|"
-      ) %>%
+      ) |>
       gt::fmt_number(
         columns = c("estimate", "abs_estimate"), decimals = digits
-      ) %>%
+      ) |>
       gt::tab_style(
         style = gt::cell_text(color = "#999999"),
         locations = gt::cells_body(rows = coef_tbl$estimate == dropped)
-      ) %>%
+      ) |>
       tl_gt_theme(
         title = paste0(tools::toTitleCase(method), " Coefficients"),
         subtitle = paste0(
@@ -408,11 +408,11 @@ tl_table_confusion <- function(model, new_data = NULL, ...) {
   cm <- table(Actual = actuals, Predicted = predicted)
   cm_df <- as.data.frame.matrix(cm)
   cm_df$Actual <- rownames(cm_df)
-  cm_df <- cm_df %>% dplyr::select("Actual", dplyr::everything())
+  cm_df <- cm_df |> dplyr::select("Actual", dplyr::everything())
 
-  gt_tbl <- gt::gt(cm_df, rowname_col = "Actual") %>%
-    gt::tab_spanner(label = "Predicted", columns = -1) %>%
-    gt::tab_stubhead(label = "Actual") %>%
+  gt_tbl <- gt::gt(cm_df, rowname_col = "Actual") |>
+    gt::tab_spanner(label = "Predicted", columns = -1) |>
+    gt::tab_stubhead(label = "Actual") |>
     tl_gt_theme(
       title = "Confusion Matrix",
       source_note = tl_model_info(model)
@@ -422,7 +422,7 @@ tl_table_confusion <- function(model, new_data = NULL, ...) {
   class_levels <- levels(actuals)
   for (cls in class_levels) {
     if (cls %in% colnames(cm_df)) {
-      gt_tbl <- gt_tbl %>%
+      gt_tbl <- gt_tbl |>
         gt::tab_style(
           style = gt::cell_fill(color = "#d4edda"),
           locations = gt::cells_body(columns = cls, rows = cls)
@@ -468,18 +468,18 @@ tl_table_importance <- function(model, top_n = 20, digits = 2, ...) {
          "predictor from this model.", call. = FALSE)
   }
 
-  imp_df <- imp_df %>%
-    dplyr::arrange(dplyr::desc(.data$importance)) %>%
+  imp_df <- imp_df |>
+    dplyr::arrange(dplyr::desc(.data$importance)) |>
     dplyr::slice_head(n = top_n)
 
-  imp_df %>%
-    gt::gt() %>%
-    gt::cols_label(feature = "Feature", importance = "Importance") %>%
-    gt::fmt_number(columns = "importance", decimals = digits) %>%
+  imp_df |>
+    gt::gt() |>
+    gt::cols_label(feature = "Feature", importance = "Importance") |>
+    gt::fmt_number(columns = "importance", decimals = digits) |>
     gt::data_color(
       columns = "importance",
       palette = c("#f8f9fa", "#2c3e50")
-    ) %>%
+    ) |>
     tl_gt_theme(
       title = "Feature Importance",
       subtitle = paste0("Top ", min(top_n, nrow(imp_df)), " features"),
@@ -514,24 +514,24 @@ tl_table_variance <- function(model, n_components = NULL, digits = 4, ...) {
 
   var_tbl <- model$fit$variance_explained
   if (!is.null(n_components)) {
-    var_tbl <- var_tbl %>% dplyr::slice_head(n = n_components)
+    var_tbl <- var_tbl |> dplyr::slice_head(n = n_components)
   }
 
-  var_tbl %>%
-    gt::gt() %>%
+  var_tbl |>
+    gt::gt() |>
     gt::cols_label(
       component = "Component", sdev = "Std. Dev.", variance = "Variance",
       prop_variance = "Proportion", cum_variance = "Cumulative"
-    ) %>%
-    gt::fmt_number(columns = c("sdev", "variance"), decimals = digits) %>%
+    ) |>
+    gt::fmt_number(columns = c("sdev", "variance"), decimals = digits) |>
     gt::fmt_percent(
       columns = c("prop_variance", "cum_variance"),
       decimals = 1
-    ) %>%
+    ) |>
     gt::data_color(
       columns = "cum_variance",
       palette = c("#ffffff", "#27ae60")
-    ) %>%
+    ) |>
     tl_gt_theme(
       title = "PCA Variance Explained",
       source_note = tl_model_info(model)
@@ -564,21 +564,21 @@ tl_table_loadings <- function(model, n_components = NULL, digits = 3, ...) {
   loadings_wide <- model$fit$loadings
   if (!is.null(n_components)) {
     pc_cols <- paste0("PC", seq_len(n_components))
-    loadings_wide <- loadings_wide %>%
+    loadings_wide <- loadings_wide |>
       dplyr::select("variable", dplyr::any_of(pc_cols))
   }
 
   pc_cols <- setdiff(names(loadings_wide), "variable")
 
-  loadings_wide %>%
-    gt::gt() %>%
-    gt::cols_label(variable = "Variable") %>%
-    gt::fmt_number(columns = dplyr::all_of(pc_cols), decimals = digits) %>%
+  loadings_wide |>
+    gt::gt() |>
+    gt::cols_label(variable = "Variable") |>
+    gt::fmt_number(columns = dplyr::all_of(pc_cols), decimals = digits) |>
     gt::data_color(
       columns = dplyr::all_of(pc_cols),
       palette = c("#c0392b", "#ffffff", "#2980b9"),
       domain = c(-1, 1)
-    ) %>%
+    ) |>
     tl_gt_theme(
       title = "PCA Loadings",
       source_note = tl_model_info(model)
@@ -609,21 +609,21 @@ tl_table_clusters <- function(model, k = 3, digits = 2, ...) {
   if (method == "kmeans") {
     centers <- model$fit$centers
     sizes <- model$fit$model$size
-    summary_tbl <- centers %>%
+    summary_tbl <- centers |>
       dplyr::mutate(size = sizes, .after = "cluster")
   } else if (method %in% c("pam", "clara")) {
     centers <- model$fit$medoids
-    cluster_counts <- model$fit$clusters %>%
+    cluster_counts <- model$fit$clusters |>
       dplyr::count(.data$cluster, name = "size")
-    summary_tbl <- centers %>%
+    summary_tbl <- centers |>
       dplyr::left_join(cluster_counts, by = "cluster")
   } else if (method == "hclust") {
     clusters <- stats::cutree(model$fit$model, k = k)
-    data_with_clusters <- model$data %>%
-      dplyr::select(where(is.numeric)) %>%
+    data_with_clusters <- model$data |>
+      dplyr::select(where(is.numeric)) |>
       dplyr::mutate(cluster = as.integer(clusters))
-    summary_tbl <- data_with_clusters %>%
-      dplyr::group_by(.data$cluster) %>%
+    summary_tbl <- data_with_clusters |>
+      dplyr::group_by(.data$cluster) |>
       dplyr::summarise(
         size = dplyr::n(),
         dplyr::across(where(is.numeric) & !dplyr::any_of("cluster"),
@@ -632,11 +632,11 @@ tl_table_clusters <- function(model, k = 3, digits = 2, ...) {
       )
   } else if (method == "dbscan") {
     cluster_assignments <- model$fit$clusters
-    data_with_clusters <- model$data %>%
-      dplyr::select(where(is.numeric)) %>%
+    data_with_clusters <- model$data |>
+      dplyr::select(where(is.numeric)) |>
       dplyr::mutate(cluster = cluster_assignments$cluster)
-    summary_tbl <- data_with_clusters %>%
-      dplyr::group_by(.data$cluster) %>%
+    summary_tbl <- data_with_clusters |>
+      dplyr::group_by(.data$cluster) |>
       dplyr::summarise(
         size = dplyr::n(),
         dplyr::across(where(is.numeric) & !dplyr::any_of("cluster"),
@@ -656,11 +656,11 @@ tl_table_clusters <- function(model, k = 3, digits = 2, ...) {
   # dbscan labels its noise points cluster 0, which is not a cluster
   n_clusters <- length(setdiff(unique(summary_tbl$cluster), 0))
 
-  summary_tbl %>%
-    gt::gt() %>%
-    gt::cols_label(cluster = "Cluster", size = "Size") %>%
-    gt::fmt_number(columns = dplyr::all_of(numeric_cols), decimals = digits) %>%
-    gt::fmt_integer(columns = dplyr::any_of(c("cluster", "size"))) %>%
+  summary_tbl |>
+    gt::gt() |>
+    gt::cols_label(cluster = "Cluster", size = "Size") |>
+    gt::fmt_number(columns = dplyr::all_of(numeric_cols), decimals = digits) |>
+    gt::fmt_integer(columns = dplyr::any_of(c("cluster", "size"))) |>
     tl_gt_theme(
       title = "Cluster Summary",
       subtitle = paste0(
@@ -722,17 +722,17 @@ tl_table_comparison <- function(..., new_data = NULL,
     eval_res
   })
 
-  wide_results <- results %>%
+  wide_results <- results |>
     dplyr::mutate(
       metric = gsub("_", " ", .data$metric),
       metric = tools::toTitleCase(.data$metric)
-    ) %>%
+    ) |>
     tidyr::pivot_wider(names_from = "model", values_from = "value")
 
-  wide_results %>%
-    gt::gt() %>%
-    gt::cols_label(metric = "Metric") %>%
-    gt::fmt_number(columns = -"metric", decimals = digits) %>%
+  wide_results |>
+    gt::gt() |>
+    gt::cols_label(metric = "Metric") |>
+    gt::fmt_number(columns = -"metric", decimals = digits) |>
     tl_gt_theme(
       title = "Model Comparison",
       subtitle = paste0(length(models), " models compared"),

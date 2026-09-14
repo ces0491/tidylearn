@@ -91,3 +91,16 @@ test_that("tl_version returns package version", {
   version <- tl_version()
   expect_s3_class(version, "package_version")
 })
+
+test_that("magrittr's %>% stays exported for existing user code", {
+  # The package itself pipes with |>. The re-export is kept so code that
+  # used %>% after library(tidylearn) alone does not break.
+  expect_true("%>%" %in% getNamespaceExports("tidylearn"))
+  expect_identical(tidylearn::`%>%`, magrittr::`%>%`)
+
+  # nolint start: pipe_consistency_linter.
+  pred <- tl_model(mtcars, mpg ~ wt, method = "linear") %>%
+    predict(new_data = mtcars[1:3, ])
+  # nolint end
+  expect_equal(nrow(pred), 3)
+})

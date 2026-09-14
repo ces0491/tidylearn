@@ -413,8 +413,8 @@ tl_plot_calibration <- function(model, new_data = NULL, bins = 10, ...) {
       bin = bins_idx,
       prob = pos_probs,
       actual = binary_actuals
-    ) %>%
-      dplyr::group_by(.data$bin) %>%
+    ) |>
+      dplyr::group_by(.data$bin) |>
       dplyr::summarize(
         mean_pred_prob = mean(.data$prob),
         frac_pos = mean(.data$actual),

@@ -264,8 +264,8 @@ tl_compare_cv <- function(data, models, folds = 5, metrics = NULL, ...) {
   all_cv_results <- do.call(rbind, cv_results)
 
   # Calculate summary statistics for each model
-  summary_results <- all_cv_results %>%
-    dplyr::group_by(.data$model, .data$metric) %>%
+  summary_results <- all_cv_results |>
+    dplyr::group_by(.data$model, .data$metric) |>
     dplyr::summarize(
       mean_value = mean(.data$value, na.rm = TRUE),
       sd_value = sd(.data$value, na.rm = TRUE),
@@ -303,7 +303,7 @@ tl_plot_cv_comparison <- function(cv_results, metrics = NULL) {
 
   # Filter metrics if specified
   if (!is.null(metrics)) {
-    fold_metrics <- fold_metrics %>%
+    fold_metrics <- fold_metrics |>
       dplyr::filter(.data$metric %in% metrics)
   }
 
@@ -383,12 +383,12 @@ tl_test_model_difference <- function(
   # Perform statistical tests
   results <- lapply(metrics, function(m) {
     # Filter data for current metric
-    metric_data <- fold_metrics %>%
+    metric_data <- fold_metrics |>
       dplyr::filter(.data$metric == m)
 
     # Get baseline model data
-    baseline_data <- metric_data %>%
-      dplyr::filter(.data$model == baseline_model) %>%
+    baseline_data <- metric_data |>
+      dplyr::filter(.data$model == baseline_model) |>
       dplyr::pull(.data$value)
 
     # Compare each model to baseline
@@ -397,10 +397,10 @@ tl_test_model_difference <- function(
       other_models,
       function(model_name) {
         # Get current model data
-        model_data <- metric_data %>%
+        model_data <- metric_data |>
           dplyr::filter(
             .data$model == model_name
-          ) %>%
+          ) |>
           dplyr::pull(.data$value)
 
         # Perform statistical test

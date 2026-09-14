@@ -32,7 +32,7 @@ tidy_mds <- function(data, method = "classical",
   if (inherits(data, "dist")) {
     dist_mat <- data
   } else {
-    data_matrix <- as.matrix(data %>% dplyr::select(where(is.numeric)))
+    data_matrix <- as.matrix(data |> dplyr::select(where(is.numeric)))
     dist_mat <- stats::dist(data_matrix, method = distance)
   }
 
@@ -117,7 +117,7 @@ tidy_mds_classical <- function(dist_mat, ndim = 2, add_rownames = TRUE) {
   colnames(config_matrix) <- paste0("Dim", 1:ndim)
 
   if (add_rownames && !is.null(attr(dist_mat, "Labels"))) {
-    config_tbl <- tibble::as_tibble(config_matrix, .name_repair = "minimal") %>%
+    config_tbl <- tibble::as_tibble(config_matrix, .name_repair = "minimal") |>
       dplyr::mutate(.obs_id = attr(dist_mat, "Labels"), .before = 1)
   } else {
     config_tbl <- tibble::as_tibble(config_matrix)
@@ -182,7 +182,7 @@ tidy_mds_smacof <- function(dist_mat, ndim = 2, type = "ratio", ...) {
   colnames(config_matrix) <- paste0("Dim", 1:ndim)
 
   if (!is.null(attr(dist_mat, "Labels"))) {
-    config_tbl <- tibble::as_tibble(config_matrix) %>%
+    config_tbl <- tibble::as_tibble(config_matrix) |>
       dplyr::mutate(.obs_id = attr(dist_mat, "Labels"), .before = 1)
   } else {
     config_tbl <- tibble::as_tibble(config_matrix)
@@ -239,7 +239,7 @@ tidy_mds_sammon <- function(dist_mat, ndim = 2, ...) {
   colnames(config_matrix) <- paste0("Dim", 1:ndim)
 
   if (!is.null(attr(dist_mat, "Labels"))) {
-    config_tbl <- tibble::as_tibble(config_matrix) %>%
+    config_tbl <- tibble::as_tibble(config_matrix) |>
       dplyr::mutate(.obs_id = attr(dist_mat, "Labels"), .before = 1)
   } else {
     config_tbl <- tibble::as_tibble(config_matrix)
@@ -294,7 +294,7 @@ tidy_mds_kruskal <- function(dist_mat, ndim = 2, ...) {
   colnames(config_matrix) <- paste0("Dim", 1:ndim)
 
   if (!is.null(attr(dist_mat, "Labels"))) {
-    config_tbl <- tibble::as_tibble(config_matrix) %>%
+    config_tbl <- tibble::as_tibble(config_matrix) |>
       dplyr::mutate(.obs_id = attr(dist_mat, "Labels"), .before = 1)
   } else {
     config_tbl <- tibble::as_tibble(config_matrix)
@@ -450,7 +450,7 @@ tl_fit_mds <- function(data, formula = NULL, k = 2, method = "classical", ...) {
     vars <- get_formula_vars(formula, data)
     data_for_mds <- data[, vars, drop = FALSE]
   } else {
-    data_for_mds <- data %>% dplyr::select(where(is.numeric))
+    data_for_mds <- data |> dplyr::select(where(is.numeric))
   }
 
   # Fit MDS using tidy_mds

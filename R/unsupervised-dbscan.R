@@ -63,9 +63,9 @@ tidy_dbscan <- function(data, eps, minPts = 5,
     # Select columns
     if (!is.null(cols)) {
       cols_enquo <- rlang::enquo(cols)
-      data_selected <- data %>% dplyr::select(!!cols_enquo)
+      data_selected <- data |> dplyr::select(!!cols_enquo)
     } else {
-      data_selected <- data %>% dplyr::select(where(is.numeric))
+      data_selected <- data |> dplyr::select(where(is.numeric))
     }
 
     data_matrix <- as.matrix(data_selected)
@@ -101,9 +101,9 @@ tidy_dbscan <- function(data, eps, minPts = 5,
   )
 
   # Create summary statistics
-  cluster_summary <- clusters_tbl %>%
-    dplyr::filter(!is_noise) %>%
-    dplyr::group_by(cluster) %>%
+  cluster_summary <- clusters_tbl |>
+    dplyr::filter(!is_noise) |>
+    dplyr::group_by(cluster) |>
     dplyr::summarise(
       size = dplyr::n(),
       n_core = sum(is_core),
@@ -150,9 +150,9 @@ tidy_knn_dist <- function(data, k = 4, cols = NULL) {
   # Select columns
   if (!is.null(cols)) {
     cols_enquo <- rlang::enquo(cols)
-    data_selected <- data %>% dplyr::select(!!cols_enquo)
+    data_selected <- data |> dplyr::select(!!cols_enquo)
   } else {
-    data_selected <- data %>% dplyr::select(where(is.numeric))
+    data_selected <- data |> dplyr::select(where(is.numeric))
   }
 
   data_matrix <- as.matrix(data_selected)
@@ -254,7 +254,7 @@ plot_knn_dist <- function(data, k = 4,
   }
 
   # Sort by distance
-  knn_data <- knn_data %>% dplyr::arrange(knn_dist)
+  knn_data <- knn_data |> dplyr::arrange(knn_dist)
 
   # Create plot
   p <- ggplot2::ggplot(
@@ -316,7 +316,7 @@ augment_dbscan <- function(dbscan_obj, data) {
     stop("dbscan_obj must be a tidy_dbscan object")
   }
 
-  data %>%
+  data |>
     dplyr::bind_cols(
       tibble::tibble(
         cluster = as.factor(dbscan_obj$model$cluster),
@@ -347,7 +347,7 @@ augment_dbscan <- function(dbscan_obj, data) {
 #' @export
 explore_dbscan_params <- function(data, eps_values, minPts_values) {  # nolint
 
-  data_numeric <- data %>% dplyr::select(where(is.numeric))
+  data_numeric <- data |> dplyr::select(where(is.numeric))
 
   # Create parameter grid
   param_grid <- expand.grid(
@@ -428,7 +428,7 @@ tl_fit_dbscan <- function(data, formula = NULL, eps = 0.5, minPts = 5, ...) {
     vars <- get_formula_vars(formula, data)
     data_for_db <- data[, vars, drop = FALSE]
   } else {
-    data_for_db <- data %>% dplyr::select(where(is.numeric))
+    data_for_db <- data |> dplyr::select(where(is.numeric))
   }
 
   # Fit DBSCAN using tidy_dbscan

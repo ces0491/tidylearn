@@ -39,9 +39,9 @@ tidy_hclust <- function(data, method = "average",
     # Select columns
     if (!is.null(cols)) {
       cols_enquo <- rlang::enquo(cols)
-      data_selected <- data %>% dplyr::select(!!cols_enquo)
+      data_selected <- data |> dplyr::select(!!cols_enquo)
     } else {
-      data_selected <- data %>% dplyr::select(where(is.numeric))
+      data_selected <- data |> dplyr::select(where(is.numeric))
     }
 
     # Compute distance
@@ -141,12 +141,12 @@ augment_hclust <- function(hclust_obj, data, k = NULL, h = NULL) {
   cluster_assignments <- tidy_cutree(hclust_obj, k = k, h = h)
 
   # Add clusters to data
-  data %>%
-    dplyr::mutate(.row_id = dplyr::row_number()) %>%
+  data |>
+    dplyr::mutate(.row_id = dplyr::row_number()) |>
     dplyr::left_join(
-      cluster_assignments %>% dplyr::mutate(.row_id = dplyr::row_number()),
+      cluster_assignments |> dplyr::mutate(.row_id = dplyr::row_number()),
       by = ".row_id"
-    ) %>%
+    ) |>
     dplyr::select(-.row_id, -.obs_id)
 }
 
@@ -339,7 +339,7 @@ tl_fit_hclust <- function(data, formula = NULL,
     vars <- get_formula_vars(formula, data)
     data_for_hc <- data[, vars, drop = FALSE]
   } else {
-    data_for_hc <- data %>% dplyr::select(where(is.numeric))
+    data_for_hc <- data |> dplyr::select(where(is.numeric))
   }
 
   # Fit hierarchical clustering using tidy_hclust

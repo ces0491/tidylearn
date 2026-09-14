@@ -76,22 +76,22 @@ tl_plot_importance_comparison <- function(..., top_n = 10, names = NULL) {
   # A feature a model did not use scores zero for it. Left missing, the
   # average ran over only the models that kept the feature, so one a lasso
   # dropped outranked one both models used.
-  all_importance <- all_importance %>%
+  all_importance <- all_importance |>
     tidyr::complete(feature, model, fill = list(importance = 0))
 
   # Find top features across all models
-  top_features <- all_importance %>%
-    dplyr::group_by(.data[["feature"]]) %>%
+  top_features <- all_importance |>
+    dplyr::group_by(.data[["feature"]]) |>
     dplyr::summarize(
       avg_importance = mean(.data[["importance"]]),
       .groups = "drop"
-    ) %>%
-    dplyr::arrange(dplyr::desc(.data[["avg_importance"]])) %>%
-    dplyr::slice_head(n = top_n) %>%
+    ) |>
+    dplyr::arrange(dplyr::desc(.data[["avg_importance"]])) |>
+    dplyr::slice_head(n = top_n) |>
     dplyr::pull(.data[["feature"]])
 
   # Filter to only top features
-  plot_data <- all_importance %>%
+  plot_data <- all_importance |>
     dplyr::filter(.data[["feature"]] %in% top_features)
 
   # Create the plot
@@ -190,7 +190,7 @@ tl_extract_importance <- function(model) {
   }
 
   # Normalize importance to 0-100 scale
-  importance_df <- importance_df %>%
+  importance_df <- importance_df |>
     dplyr::mutate(
       importance = 100 * .data[["importance"]] / max(.data[["importance"]])
     )
@@ -230,9 +230,9 @@ tl_get_importance_regularized <- function(model, lambda = "1se") {
 
   # A multiclass predictor matters as much as its largest effect on any
   # class
-  importance_df <- coefs %>%
-    dplyr::group_by(feature = .data$term) %>%
-    dplyr::summarise(importance = max(.data$importance), .groups = "drop") %>%
+  importance_df <- coefs |>
+    dplyr::group_by(feature = .data$term) |>
+    dplyr::summarise(importance = max(.data$importance), .groups = "drop") |>
     dplyr::filter(.data[["importance"]] > 0)
 
   # A penalty large enough to drop every predictor leaves nothing to rank;
@@ -242,7 +242,7 @@ tl_get_importance_regularized <- function(model, lambda = "1se") {
   }
 
   # Normalize importance to 0-100 scale
-  importance_df <- importance_df %>%
+  importance_df <- importance_df |>
     dplyr::mutate(
       importance = 100 * .data[["importance"]] / max(.data[["importance"]])
     )
@@ -386,7 +386,7 @@ tl_plot_cv_results <- function(cv_results, metrics = NULL) {
 
   # Filter metrics if specified
   if (!is.null(metrics)) {
-    fold_metrics <- fold_metrics %>%
+    fold_metrics <- fold_metrics |>
       dplyr::filter(.data[["metric"]] %in% metrics)
   }
 
@@ -864,7 +864,7 @@ tl_plot_lift <- function(model, new_data = NULL, bins = 10, ...) {
       lift <- cumulative_response_rate / baseline_rate
 
       # Add to results
-      lift_data <- lift_data %>%
+      lift_data <- lift_data |>
         dplyr::add_row(
           decile = i,
           cumulative_responders = cumulative_responders,
@@ -966,7 +966,7 @@ tl_plot_gain <- function(model, new_data = NULL, bins = 10, ...) {
         cumulative_responders / total_responders * 100
 
       # Add to results
-      gain_data <- gain_data %>%
+      gain_data <- gain_data |>
         dplyr::add_row(
           decile = i,
           cumulative_pct_population = cumulative_pct_population,
@@ -1064,7 +1064,7 @@ plot_clusters <- function(data,
   }
 
   # Ensure cluster column is factor
-  plot_data <- data %>%
+  plot_data <- data |>
     dplyr::mutate(!!cluster_col := as.factor(!!rlang::sym(cluster_col)))
 
   # Create base plot
@@ -1216,7 +1216,7 @@ plot_cluster_comparison <- function(data, cluster_cols, x_col, y_col) {
 #' @export
 plot_cluster_sizes <- function(clusters, title = "Cluster Size Distribution") {
 
-  cluster_counts <- tibble::tibble(cluster = as.factor(clusters)) %>%
+  cluster_counts <- tibble::tibble(cluster = as.factor(clusters)) |>
     dplyr::count(cluster)
 
   ggplot2::ggplot(
@@ -1253,7 +1253,7 @@ plot_cluster_sizes <- function(clusters, title = "Cluster Size Distribution") {
 plot_variance_explained <- function(variance_tbl, threshold = 0.8) {
 
   # Prepare data for plotting
-  plot_data <- variance_tbl %>%
+  plot_data <- variance_tbl |>
     dplyr::mutate(pc_num = seq_len(dplyr::n()))
 
   # Create dual-axis plot
@@ -1440,8 +1440,8 @@ plot_distance_heatmap <- function(dist_mat,
   }
 
   # Convert to long format
-  dist_long <- dist_matrix %>%
-    tibble::as_tibble(rownames = "id1") %>%
+  dist_long <- dist_matrix |>
+    tibble::as_tibble(rownames = "id1") |>
     tidyr::pivot_longer(-id1, names_to = "id2", values_to = "distance")
 
   # Pin the axis order to the matrix. Character IDs on a discrete scale

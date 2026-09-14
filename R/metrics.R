@@ -55,21 +55,21 @@ tl_calc_classification_metrics <- function(
   # Calculate basic classification metrics
   if ("accuracy" %in% metrics) {
     acc <- yardstick::accuracy_vec(actuals, predicted)
-    results <- results %>% dplyr::add_row(metric = "accuracy", value = acc)
+    results <- results |> dplyr::add_row(metric = "accuracy", value = acc)
   }
 
   if ("precision" %in% metrics) {
     prec <- do.call(
       yardstick::precision_vec, c(list(actuals, predicted), ev)
     )
-    results <- results %>% dplyr::add_row(metric = "precision", value = prec)
+    results <- results |> dplyr::add_row(metric = "precision", value = prec)
   }
 
   if ("recall" %in% metrics || "sensitivity" %in% metrics) {
     rec <- do.call(yardstick::recall_vec, c(list(actuals, predicted), ev))
-    results <- results %>% dplyr::add_row(metric = "recall", value = rec)
+    results <- results |> dplyr::add_row(metric = "recall", value = rec)
     if ("sensitivity" %in% metrics) {
-      results <- results %>% dplyr::add_row(metric = "sensitivity", value = rec)
+      results <- results |> dplyr::add_row(metric = "sensitivity", value = rec)
     }
   }
 
@@ -77,14 +77,14 @@ tl_calc_classification_metrics <- function(
     spec <- do.call(
       yardstick::specificity_vec, c(list(actuals, predicted), ev)
     )
-    results <- results %>% dplyr::add_row(metric = "specificity", value = spec)
+    results <- results |> dplyr::add_row(metric = "specificity", value = spec)
   }
 
   if ("f1" %in% metrics) {
     f1 <- do.call(
       yardstick::f_meas_vec, c(list(actuals, predicted, beta = 1), ev)
     )
-    results <- results %>% dplyr::add_row(metric = "f1", value = f1)
+    results <- results |> dplyr::add_row(metric = "f1", value = f1)
   }
 
   # Calculate threshold-dependent metrics if probabilities are provided
@@ -104,7 +104,7 @@ tl_calc_classification_metrics <- function(
         binary_actuals <- as.integer(actuals == pos_class)
         pred_obj <- ROCR::prediction(probs, binary_actuals)
         auc <- unlist(ROCR::performance(pred_obj, "auc")@y.values)
-        results <- results %>% dplyr::add_row(metric = "auc", value = auc)
+        results <- results |> dplyr::add_row(metric = "auc", value = auc)
       }
 
       # PR AUC
@@ -113,7 +113,7 @@ tl_calc_classification_metrics <- function(
         pred_obj <- ROCR::prediction(probs, binary_actuals)
         perf <- ROCR::performance(pred_obj, "prec", "rec")
         pr_auc <- tl_calculate_pr_auc(perf)
-        results <- results %>% dplyr::add_row(metric = "pr_auc", value = pr_auc)
+        results <- results |> dplyr::add_row(metric = "pr_auc", value = pr_auc)
       }
 
       # Evaluate metrics at different thresholds
@@ -148,12 +148,12 @@ tl_calc_classification_metrics <- function(
 
         # Average AUC across classes
         macro_auc <- mean(class_aucs)
-        results <- results %>% dplyr::add_row(metric = "auc", value = macro_auc)
+        results <- results |> dplyr::add_row(metric = "auc", value = macro_auc)
 
         # Add individual class AUCs
         for (i in seq_along(names(predicted_probs))) {
           class_name <- names(predicted_probs)[i]
-          results <- results %>%
+          results <- results |>
             dplyr::add_row(
               metric = paste0("auc_", class_name),
               value = class_aucs[i]
@@ -514,8 +514,8 @@ tl_cv <- function(data, formula, method, folds = 5, metrics = NULL,
   all_results <- dplyr::bind_rows(cv_results)
 
   # Calculate mean and sd for each metric
-  summary_results <- all_results %>%
-    dplyr::group_by(metric) %>%
+  summary_results <- all_results |>
+    dplyr::group_by(metric) |>
     dplyr::summarize(
       mean = mean(value, na.rm = TRUE),
       sd = stats::sd(value, na.rm = TRUE),

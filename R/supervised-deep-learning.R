@@ -99,7 +99,7 @@ tl_fit_deep <- function(data, formula,
   model <- keras::keras_model_sequential()
 
   # Add input layer with appropriate shape
-  model %>% keras::layer_dense(
+  model |> keras::layer_dense(
     units = hidden_layers[1],
     activation = activation,
     input_shape = ncol(x_mat)
@@ -107,7 +107,7 @@ tl_fit_deep <- function(data, formula,
 
   # Add dropout for regularization
   if (dropout > 0) {
-    model %>% keras::layer_dropout(rate = dropout)
+    model |> keras::layer_dropout(rate = dropout)
   }
 
   # Add the remaining hidden layers. seq_len() rather than 2:length():
@@ -115,18 +115,18 @@ tl_fit_deep <- function(data, formula,
   # with units = hidden_layers[1] followed by units = NA. The default
   # tuning grid includes single-layer candidates, so this was reachable.
   for (i in seq_len(length(hidden_layers) - 1L) + 1L) {
-    model %>% keras::layer_dense(
+    model |> keras::layer_dense(
       units = hidden_layers[i],
       activation = activation
     )
 
     if (dropout > 0) {
-      model %>% keras::layer_dropout(rate = dropout)
+      model |> keras::layer_dropout(rate = dropout)
     }
   }
 
   # Add output layer
-  model %>% keras::layer_dense(
+  model |> keras::layer_dense(
     units = output_units,
     activation = output_activation
   )
@@ -140,14 +140,14 @@ tl_fit_deep <- function(data, formula,
     keras::optimizer_adam(learning_rate = learning_rate)
   }
 
-  model %>% keras::compile(
+  model |> keras::compile(
     optimizer = optimizer,
     loss = loss,
     metrics = metrics
   )
 
   # Fit the model
-  history <- model %>% keras::fit(
+  history <- model |> keras::fit(
     x = x_scaled,
     y = y_numeric,
     epochs = epochs,
@@ -322,12 +322,12 @@ tl_plot_deep_history <- function(model,
   }
 
   # Convert to long format for plotting
-  history_long <- history_df %>%
+  history_long <- history_df |>
     tidyr::pivot_longer(
       cols = -epoch,
       names_to = "metric",
       values_to = "value"
-    ) %>%
+    ) |>
     dplyr::filter(.data$metric %in% metrics)
 
   # Create the plot

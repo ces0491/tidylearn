@@ -30,17 +30,17 @@ tidy_silhouette <- function(clusters, dist_mat) {
   sil <- cluster::silhouette(clusters, dist_mat)
 
   # Create silhouette tibble
-  sil_tbl <- tibble::as_tibble(sil[, 1:3]) %>%
+  sil_tbl <- tibble::as_tibble(sil[, 1:3]) |>
     dplyr::rename(
       cluster = cluster,
       neighbor = neighbor,
       sil_width = sil_width
-    ) %>%
+    ) |>
     dplyr::mutate(.id = rownames(sil) %||% seq_len(nrow(sil)), .before = 1)
 
   # Calculate average by cluster
-  cluster_avg <- sil_tbl %>%
-    dplyr::group_by(cluster) %>%
+  cluster_avg <- sil_tbl |>
+    dplyr::group_by(cluster) |>
     dplyr::summarise(
       n = dplyr::n(),
       avg_sil_width = mean(sil_width),
@@ -84,7 +84,7 @@ tidy_silhouette_analysis <- function(data, max_k = 10, method = "kmeans",
                                      nstart = 25, dist_method = "euclidean",
                                      linkage_method = "average") {
 
-  data_numeric <- data %>% dplyr::select(where(is.numeric))
+  data_numeric <- data |> dplyr::select(where(is.numeric))
   tl_check_complete_numeric(data_numeric, "Silhouette analysis")
   dist_mat <- stats::dist(data_numeric, method = dist_method)
 
@@ -172,7 +172,7 @@ plot_silhouette <- function(sil_obj) {
       ggplot2::geom_line(color = "steelblue", linewidth = 1) +
       ggplot2::geom_point(color = "steelblue", size = 3) +
       ggplot2::geom_point(
-        data = sil_obj %>% dplyr::filter(k == optimal_k),
+        data = sil_obj |> dplyr::filter(k == optimal_k),
         color = "red", size = 5
       ) +
       ggplot2::labs(
@@ -225,7 +225,7 @@ tidy_gap_stat <- function(data, FUN_cluster = NULL,  # nolint
                           max_k = 10, B = 50,  # nolint
                           nstart = 25) {
 
-  data_numeric <- data %>% dplyr::select(where(is.numeric))
+  data_numeric <- data |> dplyr::select(where(is.numeric))
   tl_check_complete_numeric(data_numeric, "The gap statistic")
 
   # Use cluster::clusGap
@@ -247,7 +247,7 @@ tidy_gap_stat <- function(data, FUN_cluster = NULL,  # nolint
   }
 
   # Extract results as tibble
-  gap_tbl <- tibble::as_tibble(gap_result$Tab) %>%
+  gap_tbl <- tibble::as_tibble(gap_result$Tab) |>
     dplyr::mutate(k = 1:max_k, .before = 1)
 
   # Determine optimal k using different methods
@@ -406,7 +406,7 @@ calc_validation_metrics <- function(clusters, data = NULL, dist_mat = NULL) {
 
   # WSS if data provided
   if (!is.null(data)) {
-    data_numeric <- data %>% dplyr::select(where(is.numeric))
+    data_numeric <- data |> dplyr::select(where(is.numeric))
 
     # Total within-cluster sum of squares
     wss <- sum(sapply(unique(clusters), function(cl) {
@@ -447,14 +447,14 @@ calc_validation_metrics <- function(clusters, data = NULL, dist_mat = NULL) {
 compare_clusterings <- function(cluster_list, data, dist_mat = NULL) {
 
   if (is.null(dist_mat)) {
-    data_numeric <- data %>% dplyr::select(where(is.numeric))
+    data_numeric <- data |> dplyr::select(where(is.numeric))
     dist_mat <- stats::dist(data_numeric)
   }
 
   comparison <- purrr::map_dfr(names(cluster_list), function(name) {
     clusters <- cluster_list[[name]]
     metrics <- calc_validation_metrics(clusters, data, dist_mat)
-    metrics %>% dplyr::mutate(method = name, .before = 1)
+    metrics |> dplyr::mutate(method = name, .before = 1)
   })
 
   comparison

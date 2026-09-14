@@ -24,7 +24,7 @@ tidy_dist <- function(data, method = "euclidean", cols = NULL, ...) {
   # Select columns
   if (!is.null(cols)) {
     cols_enquo <- rlang::enquo(cols)
-    data_selected <- data %>% dplyr::select(!!cols_enquo)
+    data_selected <- data |> dplyr::select(!!cols_enquo)
   } else {
     data_selected <- data
   }
@@ -34,7 +34,7 @@ tidy_dist <- function(data, method = "euclidean", cols = NULL, ...) {
     dist_mat <- tidy_gower(data_selected, ...)
   } else {
     # Convert to matrix for standard methods
-    data_matrix <- as.matrix(data_selected %>% dplyr::select(where(is.numeric)))
+    data_matrix <- as.matrix(data_selected |> dplyr::select(where(is.numeric)))
     dist_mat <- stats::dist(data_matrix, method = method)
   }
 
@@ -218,7 +218,7 @@ tidy_gower <- function(data, weights = NULL) {
 #' @export
 standardize_data <- function(data, center = TRUE, scale = TRUE) {
 
-  data_std <- data %>%
+  data_std <- data |>
     dplyr::mutate(
       dplyr::across(
         where(is.numeric),
@@ -259,7 +259,7 @@ compare_distances <- function(
     data,
     methods = c("euclidean", "manhattan", "maximum")) {
 
-  data_numeric <- data %>% dplyr::select(where(is.numeric))
+  data_numeric <- data |> dplyr::select(where(is.numeric))
 
   dist_list <- purrr::map(methods, function(method) {
     tidy_dist(data = data_numeric, method = method)

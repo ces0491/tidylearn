@@ -30,9 +30,9 @@ tidy_kmeans <- function(data, k, cols = NULL, nstart = 25, iter_max = 100,
   # Select columns
   if (!is.null(cols)) {
     cols_enquo <- rlang::enquo(cols)
-    data_selected <- data %>% dplyr::select(!!cols_enquo)
+    data_selected <- data |> dplyr::select(!!cols_enquo)
   } else {
-    data_selected <- data %>% dplyr::select(where(is.numeric))
+    data_selected <- data |> dplyr::select(where(is.numeric))
   }
 
   tl_check_complete_numeric(data_selected, "k-means")
@@ -48,7 +48,7 @@ tidy_kmeans <- function(data, k, cols = NULL, nstart = 25, iter_max = 100,
   )
 
   # Create centers tibble
-  centers_tbl <- tibble::as_tibble(km_model$centers) %>%
+  centers_tbl <- tibble::as_tibble(km_model$centers) |>
     dplyr::mutate(cluster = seq_len(k), .before = 1)
 
   # Create metrics tibble
@@ -103,7 +103,7 @@ augment_kmeans <- function(kmeans_obj, data) {
     stop("kmeans_obj must be a tidy_kmeans object")
   }
 
-  data %>%
+  data |>
     dplyr::bind_cols(
       tibble::tibble(cluster = as.factor(kmeans_obj$model$cluster))
     )
@@ -146,7 +146,7 @@ tidy_pam <- function(data, k, metric = "euclidean", cols = NULL) {
     # Select columns
     if (!is.null(cols)) {
       cols_enquo <- rlang::enquo(cols)
-      data_selected <- data %>% dplyr::select(!!cols_enquo)
+      data_selected <- data |> dplyr::select(!!cols_enquo)
     } else {
       data_selected <- data
     }
@@ -174,7 +174,7 @@ tidy_pam <- function(data, k, metric = "euclidean", cols = NULL) {
   # Create medoids tibble
   if (!is.null(data_orig)) {
     medoid_data <- data_orig[pam_model$medoids, , drop = FALSE]
-    medoids_tbl <- tibble::as_tibble(medoid_data) %>%
+    medoids_tbl <- tibble::as_tibble(medoid_data) |>
       dplyr::mutate(
         cluster = seq_len(k),
         medoid_index = pam_model$medoids,
@@ -222,7 +222,7 @@ augment_pam <- function(pam_obj, data) {
     stop("pam_obj must be a tidy_pam object")
   }
 
-  data %>%
+  data |>
     dplyr::bind_cols(
       tibble::tibble(cluster = as.factor(pam_obj$model$clustering))
     )
@@ -261,7 +261,7 @@ tidy_clara <- function(data, k, metric = "euclidean",
 
   # Select numeric columns if data frame
   if (!inherits(data, "dist")) {
-    data_numeric <- data %>% dplyr::select(where(is.numeric))
+    data_numeric <- data |> dplyr::select(where(is.numeric))
   } else {
     data_numeric <- data
   }
@@ -289,7 +289,7 @@ tidy_clara <- function(data, k, metric = "euclidean",
   )
 
   # Create medoids tibble
-  medoids_tbl <- tibble::as_tibble(clara_model$medoids) %>%
+  medoids_tbl <- tibble::as_tibble(clara_model$medoids) |>
     dplyr::mutate(cluster = seq_len(k), .before = 1)
 
   # Return tidy object
@@ -325,7 +325,7 @@ tidy_clara <- function(data, k, metric = "euclidean",
 #' @export
 calc_wss <- function(data, max_k = 10, nstart = 25) {
 
-  data_numeric <- data %>% dplyr::select(where(is.numeric))
+  data_numeric <- data |> dplyr::select(where(is.numeric))
   # Check before the loop: purrr wraps whatever kmeans() throws into
   # "In index: 2. Caused by error in `do_one()`", which buries it further.
   tl_check_complete_numeric(data_numeric, "The within-cluster sum of squares")
@@ -464,7 +464,7 @@ tl_fit_kmeans <- function(data, formula = NULL, k = 3, ...) {
     vars <- get_formula_vars(formula, data)
     data_for_km <- data[, vars, drop = FALSE]
   } else {
-    data_for_km <- data %>% dplyr::select(where(is.numeric))
+    data_for_km <- data |> dplyr::select(where(is.numeric))
   }
 
   # Fit k-means using tidy_kmeans

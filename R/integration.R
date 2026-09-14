@@ -47,7 +47,7 @@ tl_reduce_dimensions <- function(data,
       )
     }
     response_data <- data[[response]]
-    predictor_data <- data %>% dplyr::select(-dplyr::all_of(response))
+    predictor_data <- data |> dplyr::select(-dplyr::all_of(response))
   } else {
     response_data <- NULL
     predictor_data <- data
@@ -68,7 +68,7 @@ tl_reduce_dimensions <- function(data,
     # Select components
     if (!is.null(n_components)) {
       pc_cols <- paste0("PC", seq_len(n_components))
-      transformed <- transformed %>%
+      transformed <- transformed |>
         dplyr::select(dplyr::all_of(pc_cols))
     }
 
@@ -83,7 +83,7 @@ tl_reduce_dimensions <- function(data,
     # Select dimensions
     if (!is.null(n_components)) {
       dim_cols <- paste0("Dim", seq_len(n_components))
-      transformed <- transformed %>%
+      transformed <- transformed |>
         dplyr::select(dplyr::all_of(dim_cols))
     }
 
@@ -141,7 +141,7 @@ tl_add_cluster_features <- function(data,
         "' not found in data", call. = FALSE
       )
     }
-    predictor_data <- data %>% dplyr::select(-dplyr::all_of(response))
+    predictor_data <- data |> dplyr::select(-dplyr::all_of(response))
   } else {
     predictor_data <- data
   }
@@ -174,7 +174,7 @@ tl_add_cluster_features <- function(data,
   }
 
   # Add to original data
-  data_augmented <- data %>%
+  data_augmented <- data |>
     dplyr::mutate(
       !!paste0("cluster_", method) := as.factor(clusters)
     )
@@ -251,7 +251,7 @@ tl_semisupervised <- function(data, formula, labeled_indices,
   labeled_data <- data[labeled_indices, ]
 
   # Cluster the full dataset (excluding response)
-  predictor_data <- data %>% dplyr::select(-dplyr::all_of(response_var))
+  predictor_data <- data |> dplyr::select(-dplyr::all_of(response_var))
 
   # Determine k from labeled data
   k <- length(unique(labeled_data[[response_var]]))
@@ -275,17 +275,17 @@ tl_semisupervised <- function(data, formula, labeled_indices,
   )
 
   # For each cluster, find the most common label from labeled data
-  label_mapping <- cluster_labels %>%
-    dplyr::filter(obs_id %in% labeled_indices) %>%
-    dplyr::group_by(cluster) %>%
+  label_mapping <- cluster_labels |>
+    dplyr::filter(obs_id %in% labeled_indices) |>
+    dplyr::group_by(cluster) |>
     dplyr::summarize(
       cluster_label = names(which.max(table(label))),
       .groups = "drop"
     )
 
   # Assign pseudo-labels to unlabeled data
-  pseudo_labeled <- cluster_labels %>%
-    dplyr::left_join(label_mapping, by = "cluster") %>%
+  pseudo_labeled <- cluster_labels |>
+    dplyr::left_join(label_mapping, by = "cluster") |>
     dplyr::mutate(
       final_label = dplyr::if_else(
         obs_id %in% labeled_indices,
@@ -382,7 +382,7 @@ tl_anomaly_aware <- function(data, formula, response,
   }
 
   # Separate predictors for anomaly detection
-  predictor_data <- data %>% dplyr::select(-dplyr::all_of(response))
+  predictor_data <- data |> dplyr::select(-dplyr::all_of(response))
 
   # Detect anomalies: DBSCAN's noise points
   anomaly_model <- tl_model(predictor_data, method = "dbscan", ...)
@@ -394,7 +394,7 @@ tl_anomaly_aware <- function(data, formula, response,
     model <- tl_model(data_clean, formula, method = supervised_method)
     model$anomalies_removed <- sum(is_anomaly)
   } else if (action == "flag") {
-    data_flagged <- data %>%
+    data_flagged <- data |>
       dplyr::mutate(is_anomaly = is_anomaly)
     # Add the flag to the formula as given. Rebuilding it from all.vars()
     # put an excluded `- Sepal.Width` back in as a predictor and turned
@@ -489,7 +489,7 @@ tl_stratified_models <- function(data, formula, cluster_method = "kmeans",
   response_var <- all.vars(formula)[1]
 
   # Cluster the predictors
-  predictor_data <- data %>% dplyr::select(-dplyr::all_of(response_var))
+  predictor_data <- data |> dplyr::select(-dplyr::all_of(response_var))
   cluster_model <- tl_model(predictor_data, method = cluster_method, k = k, ...)
 
   # Get cluster assignments
@@ -543,7 +543,7 @@ predict.tidylearn_stratified <- function(object, new_data = NULL, ...) {
 
   # Assign new data to clusters. any_of(): data to predict on need not
   # carry the response at all.
-  predictor_data <- new_data %>% dplyr::select(-dplyr::any_of(response_var))
+  predictor_data <- new_data |> dplyr::select(-dplyr::any_of(response_var))
   new_clusters <- predict(object$cluster_model, new_data = predictor_data)
 
   # Predict each cluster's rows with its own model, keeping every column

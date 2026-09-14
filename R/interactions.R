@@ -492,7 +492,7 @@ tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
   }
 
   # Filter significant interactions
-  significant <- test_results %>%
+  significant <- test_results |>
     dplyr::filter(.data$p_value < max_p_value, .data$delta_r2 >= min_r2_change)
 
   # Select top interactions

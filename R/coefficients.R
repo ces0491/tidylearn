@@ -184,11 +184,11 @@ tl_coef_summary <- function(model, conf_int, level, exponentiate) {
     } else {
       stats::qt(1 - alpha / 2, df = stats::df.residual(fit))
     }
-    coef_tbl <- coef_tbl %>%
+    coef_tbl <- coef_tbl |>
       dplyr::mutate(
         conf_low = .data$estimate - crit * .data$std_error,
         conf_high = .data$estimate + crit * .data$std_error
-      ) %>%
+      ) |>
       dplyr::relocate("conf_low", "conf_high", .after = "std_error")
   }
 
@@ -345,11 +345,11 @@ tl_glmnet_coef_tbl <- function(fit, s) {
 tl_coef_exponentiate <- function(coef_tbl) {
   exp_cols <- intersect(c("estimate", "conf_low", "conf_high"),
                         names(coef_tbl))
-  coef_tbl <- coef_tbl %>%
+  coef_tbl <- coef_tbl |>
     dplyr::mutate(dplyr::across(dplyr::all_of(exp_cols), exp))
 
   if ("std_error" %in% names(coef_tbl)) {
-    coef_tbl <- coef_tbl %>%
+    coef_tbl <- coef_tbl |>
       dplyr::rename(std_error_log = "std_error")
   }
 

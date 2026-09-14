@@ -121,7 +121,7 @@ tl_prepare_data <- function(data, formula = NULL,
     zero_var_cols <- find_zero_variance(predictor_data)
     if (length(zero_var_cols) > 0) {
       message("Removing ", length(zero_var_cols), " zero-variance features")
-      predictor_data <- predictor_data %>%
+      predictor_data <- predictor_data |>
         dplyr::select(-dplyr::all_of(zero_var_cols))
       preprocessing_steps$zero_variance <- zero_var_cols
     }
@@ -129,14 +129,14 @@ tl_prepare_data <- function(data, formula = NULL,
 
   # 4. Remove highly correlated features
   if (remove_correlated) {
-    numeric_data <- predictor_data %>% dplyr::select(where(is.numeric))
+    numeric_data <- predictor_data |> dplyr::select(where(is.numeric))
     if (ncol(numeric_data) > 1) {
       cor_matrix <- stats::cor(numeric_data, use = "pairwise.complete.obs")
       high_cor <- find_high_correlation(cor_matrix, cutoff = correlation_cutoff)
 
       if (length(high_cor) > 0) {
         message("Removing ", length(high_cor), " highly correlated features")
-        predictor_data <- predictor_data %>%
+        predictor_data <- predictor_data |>
           dplyr::select(-dplyr::all_of(high_cor))
         preprocessing_steps$high_correlation <- high_cor
       }
@@ -160,8 +160,8 @@ tl_prepare_data <- function(data, formula = NULL,
 
   # Recombine with response and the columns the formula left out
   if (!is.null(response_var)) {
-    processed_data <- predictor_data %>%
-      dplyr::bind_cols(passthrough_data) %>%
+    processed_data <- predictor_data |>
+      dplyr::bind_cols(passthrough_data) |>
       dplyr::mutate(!!response_var := response_data)
   } else {
     processed_data <- predictor_data
@@ -251,8 +251,8 @@ encode_categoricals <- function(data, cat_vars) {
       colnames(dummies) <- paste0(var, "_", gsub("^x", "", colnames(dummies)))
 
       # Remove original column and add dummies
-      encoded_data <- encoded_data %>%
-        dplyr::select(-dplyr::all_of(var)) %>%
+      encoded_data <- encoded_data |>
+        dplyr::select(-dplyr::all_of(var)) |>
         dplyr::bind_cols(as.data.frame(dummies))
 
       encoding_map[[var]] <- colnames(dummies)
@@ -269,7 +269,7 @@ encode_categoricals <- function(data, cat_vars) {
 #' @keywords internal
 #' @noRd
 find_zero_variance <- function(data) {
-  numeric_data <- data %>% dplyr::select(where(is.numeric))
+  numeric_data <- data |> dplyr::select(where(is.numeric))
 
   zero_var <- sapply(numeric_data, function(x) {
     stats::var(x, na.rm = TRUE) == 0 || all(is.na(x))
