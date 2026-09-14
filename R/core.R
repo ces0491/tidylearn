@@ -249,7 +249,14 @@ tl_model_supervised <- function(data, formula, method, ..., compute = "cpu") {
     response_var = response_var,
     response_levels = if (is_classification) levels(y) else NULL,
     xlev = xlev,
-    compute = effective_compute
+    compute = effective_compute,
+    # The fitting arguments, so a refit on other rows -- a CV fold -- fits
+    # the model the caller built rather than the method's defaults
+    args = dots[!names2(dots) %in% tl_per_row_args()],
+    # Arguments with one value per training row cannot be replayed on
+    # other rows, so only their names are kept: storing the values made a
+    # second copy of, say, a weight vector the fit already holds
+    per_row_args = intersect(names2(dots), tl_per_row_args())
   )
 
   # Fit the model based on method. Methods with an upstream GPU path

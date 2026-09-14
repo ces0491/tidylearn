@@ -395,3 +395,69 @@ test_that("a missing predictor does not break glmnet classification", {
     expect_s3_class(model, paste0("tidylearn_", method))
   }
 })
+
+test_that("a tree sends rpart()'s own arguments to rpart()", {
+  # Everything in ... went to rpart.control(), which discards what it does
+  # not recognise, so weights had no effect and raised no error
+  w <- rep(c(1, 10), length.out = nrow(iris))
+  weighted <- tl_model(iris, Species ~ ., method = "tree", weights = w)
+  plain <- tl_model(iris, Species ~ ., method = "tree")
+  expect_false(isTRUE(all.equal(weighted$fit$frame$wt, plain$fit$frame$wt)))
+
+  # Control arguments still reach rpart.control()
+  tuned <- tl_model(iris, Species ~ ., method = "tree", cp = 0.001, xval = 0)
+  expect_equal(tuned$fit$control$cp, 0.001)
+  expect_equal(tuned$fit$control$xval, 0)
+})
+
+test_that("linear and logistic fits take case weights", {
+  w <- rep(c(1, 3), length.out = nrow(mtcars))
+  lin <- tl_model(mtcars, mpg ~ wt, method = "linear", weights = w)
+  expect_equal(coef(lin$fit), coef(lm(mpg ~ wt, data = mtcars, weights = w)))
+  # The call prints names, not a 32-row frame and a weight vector
+  expect_identical(lin$fit$call$data, as.name("data"))
+  expect_identical(lin$fit$call$weights, as.name("weights"))
+
+  am <- transform(mtcars, am = factor(am))
+  logit <- tl_model(am, am ~ wt, method = "logistic", weights = w)
+  reference <- suppressWarnings(
+    glm(am ~ wt, data = am, family = binomial(), weights = w)
+  )
+  expect_equal(unname(coef(logit$fit)), unname(coef(reference)))
+})
+
+test_that("a logistic fit can still be re-run by update() and step()", {
+  # With family stored as the bare symbol `family`, re-evaluating the call
+  # found stats::family() and failed
+  two_class <- droplevels(iris[iris$Species != "setosa", ])
+  fit <- tl_model(two_class, Species ~ Sepal.Length + Sepal.Width + Petal.Width,
+                  method = "logistic")$fit
+  # update() re-evaluates the stored call, which names `data`
+  data <- two_class
+  expect_identical(fit$call$family, quote(binomial()))
+  expect_s3_class(stats::update(fit, . ~ . - Sepal.Width), "glm")
+  expect_s3_class(stats::step(fit, trace = 0), "glm")
+})
+
+test_that("an offset argument is refused for offset() in the formula", {
+  expect_error(
+    tl_model(mtcars, mpg ~ wt, method = "linear", offset = mtcars$hp / 100),
+    "offset\\(<column>\\)"
+  )
+  # offset() in the formula fits and predicts
+  model <- tl_model(transform(mtcars, off = hp / 100),
+                    mpg ~ wt + offset(off), method = "linear")
+  expect_equal(nrow(predict(model, transform(mtcars, off = hp / 100))), 32)
+})
+
+test_that("a tree takes a whole control list", {
+  model <- tl_model(iris, Species ~ ., method = "tree",
+                    control = rpart::rpart.control(cp = 0.2, xval = 0))
+  expect_equal(model$fit$control$cp, 0.2)
+  expect_equal(model$fit$control$xval, 0)
+
+  # an explicit argument still wins over the list
+  model <- tl_model(iris, Species ~ ., method = "tree", cp = 0.05,
+                    control = rpart::rpart.control(cp = 0.2))
+  expect_equal(model$fit$control$cp, 0.05)
+})

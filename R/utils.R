@@ -64,9 +64,11 @@ get_formula_vars <- function(formula, data) {
       all.vars(formula)
     }
   } else {
-    # Two-sided: response ~ predictors
-    vars <- all.vars(formula)
-    vars[-1]  # Exclude response
+    # Two-sided: the variables the expanded terms use. all.vars() on the
+    # formula itself returns "." for `y ~ .` and returns `id` for
+    # `y ~ . - id`, which is exactly the column the caller excluded.
+    labels <- attr(stats::terms(formula, data = data), "term.labels")
+    unique(unlist(lapply(labels, function(label) all.vars(str2lang(label)))))
   }
 }
 
@@ -248,9 +250,12 @@ tl_complete_predictor_rows <- function(formula, new_data) {
   # terms() expands a "." right-hand side against the columns actually
   # present; all.vars() on the raw formula would return nothing for
   # "y ~ ." and the check would silently pass every row.
+  # If the formula cannot be expanded against new_data, fall back to the
+  # names written on its right-hand side. get_formula_vars() is no use
+  # here: it expands the formula the same way and fails the same way.
   predictors <- tryCatch(
     all.vars(stats::delete.response(stats::terms(formula, data = new_data))),
-    error = function(e) get_formula_vars(formula, new_data)
+    error = function(e) all.vars(formula[[length(formula)]])
   )
   predictors <- intersect(predictors, names(new_data))
 
@@ -616,6 +621,124 @@ tl_spec_methods <- function(models) {
 tl_restore_call_data <- function(fit) {
   if (!is.null(fit$call) && is.call(fit$call) && !is.null(fit$call$data)) {
     fit$call$data <- quote(data)
+  }
+  fit
+}
+
+#' Fitting arguments that hold one value per training row
+#'
+#' These cannot follow the rows into a resampling fold, so a model records
+#' only their names, and \code{tl_compare_cv()} refuses to refit it.
+#'
+#' @return A character vector of argument names.
+#' @keywords internal
+#' @noRd
+tl_per_row_args <- function() {
+  c("weights", "subset", "offset", "foldid", "strata")
+}
+
+#' Names of a list, with "" for unnamed elements
+#'
+#' \code{names()} is NULL when no element is named, and indexing with
+#' \code{!NULL \%in\% x} would then select nothing at all.
+#'
+#' @param x A list.
+#' @return A character vector the length of \code{x}.
+#' @keywords internal
+#' @noRd
+names2 <- function(x) {
+  nms <- names(x)
+  if (is.null(nms)) rep("", length(x)) else nms
+}
+
+#' Names for models compared side by side
+#'
+#' The comparisons key their rows on these names, so two models sharing
+#' one were merged: the plot drew both bars at the same position and the
+#' table pivoted them into list cells. The default label is the method and
+#' task, which two models of one method share, so repeats are numbered.
+#'
+#' @param models List of tidylearn models.
+#' @param names Caller-supplied names, or NULL.
+#' @param label Function from a model to its default label.
+#' @return A character vector of unique names, one per model.
+#' @keywords internal
+#' @noRd
+tl_comparison_names <- function(models, names, label) {
+  if (is.null(names)) {
+    names <- vapply(models, label, character(1))
+    repeated <- names %in% names[duplicated(names)]
+    names[repeated] <- paste0(
+      names[repeated], " #",
+      stats::ave(seq_along(names), names, FUN = seq_along)[repeated]
+    )
+    return(names)
+  }
+
+  if (length(names) != length(models)) {
+    stop("Length of 'names' (", length(names), ") must match the number ",
+         "of models (", length(models), ")", call. = FALSE)
+  }
+  if (anyNA(names) || !is.character(names)) {
+    stop("'names' must be a character vector with no missing values",
+         call. = FALSE)
+  }
+  if (anyDuplicated(names)) {
+    stop("'names' must be unique; the comparison keys each model on its ",
+         "name. Repeated: ",
+         paste(unique(names[duplicated(names)]), collapse = ", "),
+         call. = FALSE)
+  }
+  names
+}
+
+#' Call a model-frame fitting function with arguments that are values
+#'
+#' \code{lm()}, \code{glm()} and \code{rpart()} evaluate \code{weights},
+#' \code{subset} and \code{offset} inside the data, with the formula's
+#' environment as the fallback. Forwarded through \code{...} that lookup
+#' fails with "..1 used in an incorrect context", and a local variable is
+#' not in the formula's environment either. \code{do.call()} places the
+#' values themselves in the call, which is what those functions can
+#' evaluate.
+#'
+#' The stored call then holds every value literally, so \code{print()} on
+#' the fit would spill the whole frame and weight vector. Each is put back
+#' as the symbol of its argument name, and the function name replaces the
+#' function object. \code{family} is left to the caller: as a bare symbol
+#' it resolves to \code{stats::family()} when \code{update()} or
+#' \code{step()} re-runs the call.
+#'
+#' A vector \code{offset} is refused. It would fit, but \code{predict()}
+#' evaluates the stored \code{offset} in the new data, finds
+#' \code{stats::offset()} and fails.
+#'
+#' @param fun The fitting function.
+#' @param fun_name Its name, for the stored call.
+#' @param args Named list of arguments.
+#' @return The fitted object.
+#' @keywords internal
+#' @noRd
+tl_fit_by_value <- function(fun, fun_name, args) {
+  if ("offset" %in% names(args)) {
+    stop(
+      "Pass an offset in the formula, as offset(<column>), rather than ",
+      "as the 'offset' argument.\nAn argument offset cannot be applied to ",
+      "new data at predict().",
+      call. = FALSE
+    )
+  }
+
+  fit <- do.call(fun, args)
+  if (is.list(fit) && is.call(fit$call)) {
+    fit$call[[1]] <- as.name(fun_name)
+    literal <- intersect(
+      names(fit$call),
+      c("data", "weights", "subset", "control")
+    )
+    for (arg in literal) {
+      fit$call[[arg]] <- as.name(arg)
+    }
   }
   fit
 }

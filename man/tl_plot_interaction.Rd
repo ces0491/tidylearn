@@ -25,12 +25,19 @@ tl_plot_interaction(
 
 \item{fixed_values}{Named list of values for other variables in the model}
 
-\item{confidence}{Logical; whether to show confidence intervals}
+\item{confidence}{Logical; whether to show a 95\\% confidence band. The
+band is drawn when one variable is numeric and the other categorical,
+and needs a model whose underlying fit is an \code{lm} or \code{glm};
+for a \code{glm} it is built on the link scale and transformed to the
+response scale. For any other fit a message says no band was drawn.}
 
 \item{...}{Additional arguments to pass to predict()}
 }
 \value{
-A \code{\link[ggplot2]{ggplot}} object.
+A \code{\link[ggplot2]{ggplot}} object. Two numeric variables are
+drawn as a filled contour of the prediction; a numeric and a categorical
+variable as one line per category; two categorical variables as dodged
+bars.
 }
 \description{
 Plot interaction effects
@@ -39,11 +46,17 @@ Plot interaction effects
 \donttest{
 model <- tl_model(mtcars, mpg ~ wt * hp, method = "linear")
 
-# var2 is drawn as a set of lines across the range of var1
+# Two numeric variables are drawn as a filled contour over both ranges
 tl_plot_interaction(model, var1 = "wt", var2 = "hp")
 
-# Coarser grid, no ribbon
-tl_plot_interaction(model, var1 = "wt", var2 = "hp",
+# A numeric by categorical interaction is drawn as one line per level,
+# each with a confidence band
+am_model <- tl_model(transform(mtcars, am = factor(am)), mpg ~ wt * am,
+  method = "linear")
+tl_plot_interaction(am_model, var1 = "wt", var2 = "am")
+
+# Coarser grid, no band
+tl_plot_interaction(am_model, var1 = "wt", var2 = "am",
   n_points = 20, confidence = FALSE)
 }
 }

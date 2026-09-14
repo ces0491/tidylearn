@@ -16,16 +16,17 @@ tl_semisupervised(
 \arguments{
 \item{data}{A data frame}
 
-\item{formula}{Model formula}
+\item{formula}{Model formula. The response must be a factor, character
+or logical column.}
 
 \item{labeled_indices}{Indices of labeled observations}
 
 \item{cluster_method}{Clustering method for label propagation}
 
 \item{supervised_method}{Supervised learning method for the final
-model (default: \code{"tree"}, which handles both regression and
-classification with any number of classes). \code{"logistic"} is
-binary-only and errors on a response with more than two levels.}
+model (default: \code{"tree"}, which handles any number of classes).
+\code{"logistic"} is binary-only and errors on a response with more
+than two levels.}
 
 \item{...}{Additional arguments}
 }
@@ -33,12 +34,19 @@ binary-only and errors on a response with more than two levels.}
 A tidylearn model object with additional class
 \code{"tidylearn_semisupervised"}, trained on pseudo-labeled data. The
 model includes a \code{semisupervised_info} element with
-\code{labeled_indices}, \code{cluster_model}, and
-\code{label_mapping}.
+\code{labeled_indices}, \code{cluster_model}, \code{label_mapping},
+and \code{n_unlabelled_dropped}, the number of rows left out because
+their cluster had no labelled observation.
 }
 \description{
 Train a supervised model with limited labels by first clustering the data
 and propagating labels within clusters.
+}
+\details{
+Labels are propagated by majority vote within each cluster, so the
+response must be categorical. Rows in a cluster that holds no labelled
+observation have no label to take; they are left out of training, with
+a warning giving the count.
 }
 \examples{
 \donttest{

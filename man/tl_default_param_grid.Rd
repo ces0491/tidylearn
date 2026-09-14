@@ -19,7 +19,13 @@ classification or regression}
 A named list of parameter values suitable for passing to
 \code{\link{tl_tune_grid}} or \code{\link{tl_tune_random}}. Each
 element is a numeric or character vector of candidate values for
-that hyperparameter.
+that hyperparameter, or for \code{"deep"}'s \code{hidden_layers} a list
+of layer-size vectors. The grid is built without the data, so a
+\code{"forest"} \code{mtry} can exceed the number of predictors; the
+tuners cap it. \code{"polynomial"} tunes \code{degree}.
+\code{"linear"} and \code{"logistic"} have no tuneable
+hyperparameter and return an empty list with a warning, as does an
+unknown method.
 }
 \description{
 Create pre-defined parameter grids for common models

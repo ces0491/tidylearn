@@ -468,8 +468,8 @@ tl_plot_regularization_cv <- function(model, ...) {
 #' Plot variable importance for a regularized model
 #'
 #' @param model A tidylearn regularized model object
-#' @param lambda Which lambda to use
-#'   ("1se" or "min", default: "1se")
+#' @param lambda Which lambda to use: "1se" (default), "min", or a numeric
+#'   penalty within the fitted path
 #' @param top_n Number of top features to display
 #'   (default: 20)
 #' @param ... Additional arguments
@@ -486,38 +486,17 @@ tl_plot_importance_regularized <- function(model,
                                            lambda = "1se",
                                            top_n = 20,
                                            ...) {
-  # Extract the glmnet model
-  fit <- model$fit
+  lambda_val <- tl_resolve_lambda(model$fit, lambda)
 
-  # Extract lambda value to use
-  if (lambda == "1se") {
-    lambda_val <- attr(fit, "lambda_1se")
-  } else if (lambda == "min") {
-    lambda_val <- attr(fit, "lambda_min")
-  } else if (is.numeric(lambda)) {
-    lambda_val <- lambda
-  } else {
-    stop(
-      "Invalid lambda specification. ",
-      "Use '1se', 'min', or a numeric value.",
-      call. = FALSE
-    )
-  }
-
-  # Get coefficients at selected lambda
-  coefs <- as.matrix(coef(fit, s = lambda_val))
-
-  # Exclude intercept
-  coefs <- coefs[-1, , drop = FALSE]
-
-  # Create a data frame for plotting
-  importance_df <- tibble::tibble(
-    feature = rownames(coefs),
-    importance = abs(as.vector(coefs))
-  ) %>%
+  # The same importance tl_table_importance() reports: raw |coefficient|
+  # ranked predictors by their units, and failed on a multiclass fit
+  importance_df <- tl_get_importance_regularized(model, lambda = lambda) %>%
     dplyr::arrange(dplyr::desc(.data$importance)) %>%
-    dplyr::filter(.data$importance > 0) %>%
     dplyr::slice_head(n = top_n)
+  if (nrow(importance_df) == 0) {
+    stop("No feature has non-zero importance: the penalty dropped every ",
+         "predictor from this model.", call. = FALSE)
+  }
 
   # Create the plot
   p <- ggplot2::ggplot(
@@ -532,11 +511,11 @@ tl_plot_importance_regularized <- function(model,
     ggplot2::labs(
       title = "Feature Importance",
       subtitle = paste0(
-        "Based on coefficient magnitudes at ",
-        "lambda = ", round(lambda_val, 5)
+        "|coefficient| x predictor SD at ",
+        "lambda = ", signif(lambda_val, 4)
       ),
       x = NULL,
-      y = "Absolute Coefficient Value"
+      y = "Importance (largest = 100)"
     ) +
     ggplot2::theme_minimal()
 
@@ -580,11 +559,15 @@ tl_predict_glmnet <- function(model, new_data,
     predictor_terms, new_frame
   )[, -1, drop = FALSE]
 
-  # Get optimal lambda value from model
-  lambda_val <- attr(fit, "lambda_min")
-  if (is.null(lambda_val)) {
-    # If no cv was used, use the first lambda
-    lambda_val <- fit$lambda[1]
+  # Predict at the same penalty the coefficients, the coefficient table and
+  # importance report by default. Predicting at lambda_min while those
+  # showed lambda_1se meant the coefficients on display were not the ones
+  # behind the predictions.
+  lambda_val <- if (is.null(attr(fit, "lambda_1se"))) {
+    # A fit carrying no selected penalty: use the first on the path
+    fit$lambda[1]
+  } else {
+    tl_resolve_lambda(fit, "1se")
   }
 
   if (!is_classification) {

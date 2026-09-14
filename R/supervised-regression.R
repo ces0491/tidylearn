@@ -14,8 +14,11 @@ NULL
 #' @return A fitted linear regression model
 #' @keywords internal
 tl_fit_linear <- function(data, formula, ...) {
-  lm_model <- stats::lm(formula, data = data, ...)
-  lm_model
+  # By value, so weights = <a vector> reaches lm() as a vector
+  tl_fit_by_value(
+    stats::lm, "lm",
+    list(formula = formula, data = data, ...)
+  )
 }
 
 
@@ -60,8 +63,9 @@ tl_fit_polynomial <- function(data, formula, degree = 2, ...) {
   }
 
   # Fit the polynomial model
-  poly_model <- stats::lm(
-    as.formula(poly_formula), data = data, ...
+  poly_model <- tl_fit_by_value(
+    stats::lm, "lm",
+    list(formula = as.formula(poly_formula), data = data, ...)
   )
 
   # Store original formula and degree for future reference

@@ -21,10 +21,15 @@ tl_anomaly_aware(
 
 \item{response}{Response variable name}
 
-\item{anomaly_method}{Method for anomaly detection:
-"dbscan", "isolation_forest"}
+\item{anomaly_method}{Method for anomaly detection. Only "dbscan" is
+implemented; its noise points are the anomalies.}
 
-\item{action}{Action to take: "remove", "flag", "downweight"}
+\item{action}{Action to take: "remove", "flag", "downweight".
+\code{"downweight"} gives anomalies a case weight of 0.1, and needs a
+\code{supervised_method} that takes case weights: \code{"linear"},
+\code{"polynomial"}, \code{"logistic"}, \code{"tree"}, \code{"ridge"},
+\code{"lasso"}, \code{"elastic_net"} or \code{"forest"}. A forest reads
+them as sampling weights.}
 
 \item{supervised_method}{Supervised learning method (default:
 \code{"tree"}, which handles both regression and classification with

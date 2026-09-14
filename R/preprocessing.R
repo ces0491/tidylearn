@@ -8,10 +8,20 @@
 #' Comprehensive preprocessing pipeline including imputation, scaling,
 #' encoding, and feature engineering
 #'
+#' The statistics are learned from, and applied to, the data passed in.
+#' Preparing a whole dataset and then splitting it lets the test rows
+#' shape the imputation values and scaling their own scores are measured
+#' against. To evaluate a model, split first, or use
+#' \code{\link{tl_pipeline}}, which learns its preprocessing inside each
+#' resampling fold.
+#'
 #' @param data A data frame
-#' @param formula Optional formula (for supervised learning)
-#' @param impute_method Method for missing value imputation:
-#'   "mean", "median", "mode", "knn"
+#' @param formula Optional formula (for supervised learning). Only its
+#'   predictors are processed; a column it excludes, such as \code{- id},
+#'   is returned unchanged.
+#' @param impute_method Method for imputing a missing numeric value:
+#'   "mean", "median" or "mode". A missing categorical value is always
+#'   filled with the column's most frequent value.
 #' @param scale_method Scaling method: "standardize",
 #'   "normalize", "robust", "none"
 #' @param encode_categorical Whether to encode categorical
@@ -23,9 +33,9 @@
 #'   \describe{
 #'     \item{\code{data}}{The processed data frame.}
 #'     \item{\code{original_data}}{The original unprocessed data frame.}
-#'     \item{\code{preprocessing_steps}}{A list of metadata for each
-#'       preprocessing step applied (imputation values, encoding maps,
-#'       scaling parameters, etc.).}
+#'     \item{\code{preprocessing_steps}}{A record of each step applied
+#'       (imputation values, encoding maps, scaling parameters, etc.). It
+#'       is for inspection: no function applies it to new data.}
 #'     \item{\code{formula}}{The formula passed in (or \code{NULL}).}
 #'   }
 #' @export
@@ -46,6 +56,16 @@ tl_prepare_data <- function(data, formula = NULL,
     formula <- tl_as_formula(formula)
   }
 
+  imputers <- c("mean", "median", "mode")
+  if (!is.character(impute_method) || length(impute_method) != 1L ||
+        !impute_method %in% imputers) {
+    stop(
+      "'impute_method' must be one of ",
+      paste0("\"", imputers, "\"", collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
   processed_data <- data
   preprocessing_steps <- list()
 
@@ -55,11 +75,17 @@ tl_prepare_data <- function(data, formula = NULL,
     response_var <- all.vars(formula)[1]
   }
 
-  # Separate predictors and response
+  # Separate predictors and response. Only the formula's predictors are
+  # processed: a column it excludes, such as `- id`, used to be one-hot
+  # encoded and scaled with the rest. Excluded columns are carried through
+  # unchanged, so the same formula still finds them downstream.
+  passthrough <- character(0)
   if (!is.null(response_var)) {
     response_data <- processed_data[[response_var]]
-    predictor_data <- processed_data %>%
-      dplyr::select(-dplyr::all_of(response_var))
+    predictors <- intersect(get_formula_vars(formula, data), names(data))
+    passthrough <- setdiff(names(data), c(response_var, predictors))
+    passthrough_data <- processed_data[passthrough]
+    predictor_data <- processed_data[predictors]
   } else {
     response_data <- NULL
     predictor_data <- processed_data
@@ -132,9 +158,10 @@ tl_prepare_data <- function(data, formula = NULL,
     }
   }
 
-  # Recombine with response
+  # Recombine with response and the columns the formula left out
   if (!is.null(response_var)) {
     processed_data <- predictor_data %>%
+      dplyr::bind_cols(passthrough_data) %>%
       dplyr::mutate(!!response_var := response_data)
   } else {
     processed_data <- predictor_data
@@ -155,21 +182,29 @@ impute_missing <- function(data, method = "mean") {
   imputed_data <- data
   imputation_values <- list()
 
-  numeric_cols <- names(data)[sapply(data, is.numeric)]
-
-  for (col in numeric_cols) {
-    if (any(is.na(data[[col]]))) {
-      if (method == "mean") {
-        impute_val <- mean(data[[col]], na.rm = TRUE)
-      } else if (method == "median") {
-        impute_val <- stats::median(data[[col]], na.rm = TRUE)
-      } else {
-        impute_val <- mean(data[[col]], na.rm = TRUE)
-      }
-
-      imputed_data[[col]][is.na(imputed_data[[col]])] <- impute_val
-      imputation_values[[col]] <- impute_val
+  # "mode" and "knn" used to fall through to the mean while the message
+  # named the method asked for, and a categorical column was never filled
+  # -- its NA rows then broke one-hot encoding with a recycling error. A
+  # categorical column takes its most frequent value whatever the method,
+  # since a mean or median of categories does not exist.
+  for (col in names(data)) {
+    values <- data[[col]]
+    # An entirely missing column has nothing to impute from and is left
+    # as it is. The zero-variance step removes it when it is numeric.
+    if (!anyNA(values) || all(is.na(values))) {
+      next
     }
+
+    impute_val <- if (is.numeric(values) && method == "mean") {
+      mean(values, na.rm = TRUE)
+    } else if (is.numeric(values) && method == "median") {
+      stats::median(values, na.rm = TRUE)
+    } else {
+      tl_most_frequent(values)
+    }
+
+    imputed_data[[col]][is.na(values)] <- impute_val
+    imputation_values[[col]] <- impute_val
   }
 
   list(
@@ -177,6 +212,21 @@ impute_missing <- function(data, method = "mean") {
     method = method,
     imputation_values = imputation_values
   )
+}
+
+#' Most frequent non-missing value
+#'
+#' Ties go to the value seen first. Works on the values themselves rather
+#' than on \code{table()} names, which would turn a number into a string.
+#'
+#' @param x A vector with at least one non-missing value.
+#' @return A length-one vector of the same type as \code{x}.
+#' @keywords internal
+#' @noRd
+tl_most_frequent <- function(x) {
+  observed <- x[!is.na(x)]
+  candidates <- unique(observed)
+  candidates[which.max(tabulate(match(observed, candidates)))]
 }
 
 #' Encode categorical variables
@@ -232,35 +282,32 @@ find_zero_variance <- function(data) {
 #' @keywords internal
 #' @noRd
 find_high_correlation <- function(cor_matrix, cutoff = 0.95) {
-  cor_matrix[lower.tri(cor_matrix, diag = TRUE)] <- 0
-
-  high_cor_pairs <- which(abs(cor_matrix) > cutoff, arr.ind = TRUE)
-
-  if (nrow(high_cor_pairs) == 0) {
-    return(character(0))
-  }
-
-  # For each pair, remove the one with higher average correlation
+  # Remove one feature at a time: take the most correlated remaining pair,
+  # drop whichever member is more correlated with everything else still
+  # present, and look again. Deciding every pair up front against a matrix
+  # whose lower triangle had been zeroed dropped both ends of a chain
+  # x1 - x2 - x3 and kept x2, the one feature correlated with both.
+  abs_cor <- abs(cor_matrix)
+  diag(abs_cor) <- NA
+  remaining <- colnames(abs_cor)
   to_remove <- character()
-  for (i in seq_len(nrow(high_cor_pairs))) {
-    row_idx <- high_cor_pairs[i, 1]
-    col_idx <- high_cor_pairs[i, 2]
 
-    row_name <- rownames(cor_matrix)[row_idx]
-    col_name <- colnames(cor_matrix)[col_idx]
-
-    # Calculate average correlation
-    row_avg_cor <- mean(abs(cor_matrix[row_idx, ]), na.rm = TRUE)
-    col_avg_cor <- mean(abs(cor_matrix[, col_idx]), na.rm = TRUE)
-
-    if (row_avg_cor > col_avg_cor) {
-      to_remove <- c(to_remove, row_name)
-    } else {
-      to_remove <- c(to_remove, col_name)
+  repeat {
+    current <- abs_cor[remaining, remaining, drop = FALSE]
+    if (length(remaining) < 2 || !any(current > cutoff, na.rm = TRUE)) {
+      break
     }
+
+    pair <- which(current == max(current, na.rm = TRUE), arr.ind = TRUE)[1, ]
+    candidates <- remaining[pair]
+    mean_cor <- colMeans(current[, candidates, drop = FALSE], na.rm = TRUE)
+    drop <- candidates[which.max(mean_cor)]
+
+    to_remove <- c(to_remove, drop)
+    remaining <- setdiff(remaining, drop)
   }
 
-  unique(to_remove)
+  to_remove
 }
 
 #' Scale numeric features
@@ -271,6 +318,12 @@ scale_features <- function(data, numeric_cols, method = "standardize") {
   scaling_params <- list()
 
   for (col in numeric_cols) {
+    # A column with fewer than two observed values has no spread to scale
+    # by; its sd is NA, and `if (NA > 0)` stopped the whole call
+    if (sum(!is.na(data[[col]])) < 2) {
+      next
+    }
+
     if (method == "standardize") {
       # Z-score standardization
       mean_val <- mean(data[[col]], na.rm = TRUE)
@@ -331,6 +384,14 @@ scale_features <- function(data, numeric_cols, method = "standardize") {
 #' test <- split_data$test
 #' }
 tl_split <- function(data, prop = 0.8, stratify = NULL, seed = NULL) {
+  # prop = 1.5 gave a 31/1 split of 32 rows and prop = -1 a 1/31 one,
+  # because the per-group size is clamped to leave a row on each side
+  if (!is.numeric(prop) || length(prop) != 1L || is.na(prop) ||
+        prop <= 0 || prop >= 1) {
+    stop("'prop' must be a single number strictly between 0 and 1, ",
+         "such as 0.8", call. = FALSE)
+  }
+
   # Seed this call without rewriting the caller's random stream
   tl_local_seed(seed)
 
@@ -344,9 +405,14 @@ tl_split <- function(data, prop = 0.8, stratify = NULL, seed = NULL) {
     # Stratified sampling. Each stratum keeps at least one training row
     # and one test row where it has the rows to spare, so a small group
     # cannot vanish from the training set entirely.
-    groups <- split(seq_len(n), data[[stratify]])
+    # Index into idx rather than sampling it: sample() on a single number
+    # draws from 1:idx, so a one-row stratum took a row from some other
+    # stratum -- sometimes one already drawn -- and left its own in test.
+    # split() drops an NA group, so rows missing the stratify value were in
+    # no stratum, never drawn, and all landed in test. They form their own.
+    groups <- split(seq_len(n), addNA(factor(data[[stratify]]), ifany = TRUE))
     train_indices <- unlist(lapply(groups, function(idx) {
-      sample(idx, size = tl_train_size(length(idx), prop))
+      idx[sample.int(length(idx), size = tl_train_size(length(idx), prop))]
     }))
 
   } else {
@@ -364,9 +430,10 @@ tl_split <- function(data, prop = 0.8, stratify = NULL, seed = NULL) {
     )
   }
 
+  # drop = FALSE, or a one-column frame comes back as a bare vector
   list(
-    train = data[train_indices, ],
-    test = data[-train_indices, ]
+    train = data[train_indices, , drop = FALSE],
+    test = data[-train_indices, , drop = FALSE]
   )
 }
 

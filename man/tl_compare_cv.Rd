@@ -15,7 +15,9 @@ tl_compare_cv(data, models, folds = 5, metrics = NULL, ...)
 
 \item{metrics}{Character vector of metrics to compute}
 
-\item{...}{Additional arguments}
+\item{...}{Arguments passed to \code{\link{tl_model}} for every fold
+fit. Each model is refitted with the arguments it was built with;
+anything given here overrides them.}
 }
 \value{
 A list with two elements:

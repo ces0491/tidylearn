@@ -14,8 +14,10 @@
 \item{...}{Additional arguments}
 }
 \value{
-A \link[tibble]{tibble} with a \code{.pred} column containing
-predictions and a \code{.cluster} column with cluster assignments.
+A \link[tibble]{tibble} of the columns each cluster's model
+returns for the requested \code{type} -- \code{.pred} by default, one
+column per class for \code{type = "prob"} -- and a \code{.cluster}
+column with cluster assignments.
 }
 \description{
 Predict from stratified models

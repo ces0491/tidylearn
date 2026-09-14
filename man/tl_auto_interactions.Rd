@@ -24,8 +24,9 @@ tl_auto_interactions(
 
 \item{max_p_value}{Maximum p-value for significance}
 
-\item{exclude_vars}{Character vector of variables to exclude
-from interaction testing}
+\item{exclude_vars}{Character vector of predictor variables that may not
+appear in a selected interaction. They stay in the model as main effects.
+Every name must be a predictor in \code{formula}.}
 }
 \value{
 A tidylearn model object (class \code{"tidylearn_model"}) fitted

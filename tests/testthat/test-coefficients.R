@@ -180,3 +180,96 @@ test_that("the gt table formats the same numbers the tibble carries", {
   expect_s3_class(tl_table_coefficients(lasso), "gt_tbl")
   expect_error(tl_table_coefficients(lasso, conf_int = TRUE), "no standard")
 })
+
+test_that("a multiclass regularised model gives numbers per class", {
+  # coef() on a multinomial glmnet is a list of sparse matrices, which
+  # became a column of dgCMatrix objects
+  model <- tl_model(iris, Species ~ ., method = "ridge")
+  coefs <- tl_coefficients(model)
+
+  expect_identical(names(coefs), c("class", "term", "estimate", "lambda"))
+  expect_type(coefs$estimate, "double")
+  expect_equal(nrow(coefs), 3 * 5)
+  expect_setequal(coefs$class, levels(iris$Species))
+
+  reference <- coef(model$fit, s = attr(model$fit, "lambda_1se"))$setosa
+  expect_equal(coefs$estimate[coefs$class == "setosa"],
+               as.vector(as.matrix(reference)))
+
+  # There is no reference class, so no odds ratio to report
+  expect_error(tl_coefficients(model, exponentiate = TRUE), "multiclass")
+
+  skip_if_not_installed("gt")
+  expect_s3_class(tl_table_coefficients(model), "gt_tbl")
+})
+
+test_that("a penalty outside the fitted path is refused, not relabelled", {
+  model <- tl_model(mtcars, mpg ~ wt + hp + disp, method = "lasso")
+  path <- range(model$fit$lambda)
+  expect_error(tl_coefficients(model, lambda = 0), "outside the fitted path")
+  expect_error(tl_coefficients(model, lambda = path[2] * 10),
+               "outside the fitted path")
+  # both ends of the path are still accepted
+  expect_equal(tl_coefficients(model, lambda = path[1])$lambda[[1]], path[1])
+  expect_equal(tl_coefficients(model, lambda = path[2])$lambda[[1]], path[2])
+
+  single <- tl_model(mtcars, mpg ~ wt + hp + disp, method = "lasso",
+                     lambda = 0.5)
+  expect_error(tl_coefficients(single, lambda = 0.01),
+               "outside the fitted path")
+  expect_equal(tl_coefficients(single, lambda = 0.5)$lambda[[1]], 0.5)
+})
+
+test_that("an odds-ratio table ranks terms by the size of the log odds", {
+  skip_if_not_installed("gt")
+  bin <- transform(mtcars, am = factor(am))
+  model <- tl_model(bin, am ~ wt + hp + qsec + drat, method = "lasso")
+  data <- tl_table_coefficients(model, exponentiate = TRUE,
+                                lambda = "min")[["_data"]]
+  log_size <- abs(log(data$estimate))
+  expect_false(is.unsorted(rev(log_size)))
+  # a dropped term (odds ratio exactly 1) sorts last
+  expect_equal(data$estimate[nrow(data)], 1)
+})
+
+test_that("a misspelt argument to tl_coefficients() is an error", {
+  # broom spells it conf.int; ... used to swallow it and return no interval
+  model <- tl_model(mtcars, mpg ~ wt, method = "linear")
+  expect_error(tl_coefficients(model, conf.int = TRUE), "unused argument")
+  skip_if_not_installed("gt")
+  expect_warning(tl_table_coefficients(model, conf.int = TRUE),
+                 "conf.int")
+})
+
+test_that("an empty interaction cell is the aliased row the docs describe", {
+  d <- data.frame(
+    y = c(1, 2, 3, 4, 5, 6, 7, 8.5),
+    f = factor(c("a", "a", "b", "b", "a", "a", "b", "b")),
+    g = factor(c("u", "v", "u", "u", "u", "v", "u", "u"))
+  )
+  coefs <- tl_coefficients(tl_model(d, y ~ f * g, method = "linear"))
+  expect_true("fb:gv" %in% coefs$term)
+  expect_true(is.na(coefs$estimate[coefs$term == "fb:gv"]))
+})
+
+test_that("a model fitted at several penalties says so", {
+  model <- tl_model(mtcars, mpg ~ wt + hp + disp, method = "lasso",
+                    lambda = c(1, 0.1))
+  expect_error(tl_coefficients(model), "several penalties")
+  expect_equal(tl_coefficients(model, lambda = 0.1)$lambda[[1]], 0.1)
+})
+
+test_that("predictions come from the coefficients tl_coefficients() reports", {
+  # predict() used lambda_min while the coefficients defaulted to
+  # lambda_1se, so the numbers on display did not produce the predictions
+  set.seed(1)
+  model <- tl_model(mtcars, mpg ~ wt + hp + disp + drat + qsec,
+                    method = "lasso")
+  expect_false(isTRUE(all.equal(attr(model$fit, "lambda_min"),
+                                attr(model$fit, "lambda_1se"))))
+
+  coefs <- tl_coefficients(model)
+  design <- cbind(1, as.matrix(mtcars[coefs$term[-1]]))
+  by_hand <- as.vector(design %*% coefs$estimate)
+  expect_equal(predict(model, mtcars)$.pred, by_hand)
+})

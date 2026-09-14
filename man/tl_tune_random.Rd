@@ -30,8 +30,11 @@ data}
 Each element is read by its type and length:
 \describe{
 \item{a function}{called with no arguments to draw one value}
+\item{a list}{a set of candidates, each drawn whole, e.g.
+\code{list(c(10), c(20, 10))} for \code{hidden_layers}}
 \item{\code{c(min, max, "log")}}{log-uniform draw between
 \code{min} and \code{max}}
+\item{a single value}{used as given in every iteration}
 \item{two whole numbers}{integer range, e.g.
 \code{c(10, 20)} draws from 10:20}
 \item{three or more numbers}{a discrete set, sampled from as
@@ -39,6 +42,7 @@ given, whether or not they are whole}
 \item{two other numbers}{uniform draw between them, e.g.
 \code{c(0.01, 0.1)}}
 \item{character or factor}{categorical, sampled from as given}
+\item{logical}{sampled from the values given}
 }}
 
 \item{n_iter}{Number of random parameter
@@ -60,9 +64,14 @@ or minimize (FALSE) the metric}
 \value{
 A tidylearn model object fitted with the best hyperparameters.
 Tuning results are stored as an attribute \code{"tuning_results"},
-a list containing \code{param_space}, \code{results} (data frame of
-all evaluated iterations), \code{best_params}, \code{best_metric},
-\code{metric}, and \code{maximize}.
+a list containing \code{param_space}, \code{results}, \code{best_params},
+\code{best_metric}, \code{metric}, and \code{maximize}.
+
+\code{results} has one row per iteration: \code{iteration},
+\code{mean_metric}, \code{n_folds_ok}, and a column per parameter, as
+described for \code{\link{tl_tune_grid}}. The best parameters are chosen
+by the same rules, and \code{mtry} is capped the same way; duplicate
+draws are kept, so there are always \code{n_iter} rows.
 }
 \description{
 Tune hyperparameters using random search
