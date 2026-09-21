@@ -379,6 +379,12 @@
 * The hex logo and the pkgdown favicons have sharp corners, in line with
   other R package hex stickers. The artwork is otherwise unchanged.
 
+* `PACKAGE_ARCHITECTURE.md`'s four links into the README were 404s on the
+  documentation site. pkgdown rewrote `README.md#...` to `README.html`, a
+  page it never builds, because it publishes the README as the site's home
+  page. They now point at the home page's sections directly, which also
+  works when the file is read on GitHub.
+
 # tidylearn 0.5.0
 
 ## New Features
