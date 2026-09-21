@@ -52,9 +52,9 @@ write.csv(mtcars, tmp, row.names = FALSE)
 data <- tl_read(tmp, .quiet = TRUE)
 data
 #> -- tidylearn data ---------
-#> Source: /tmp/Rtmpv6MjZF/file28c966930c4e.csv 
+#> Source: /tmp/RtmpCugTLh/file281c4d0b3380.csv 
 #> Format: csv 
-#> Read at: 2026-09-14 12:24:31 
+#> Read at: 2026-09-21 08:06:23 
 #> 
 #> # A tibble: 32 × 11
 #>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb
@@ -112,7 +112,7 @@ head(excel_data, 3)
 #> -- tidylearn data ---------
 #> Source: /home/runner/work/_temp/Library/readxl/extdata/datasets.xlsx 
 #> Format: excel 
-#> Read at: 2026-09-14 12:24:32 
+#> Read at: 2026-09-21 08:06:23 
 #> 
 #> # A tibble: 3 × 11
 #>     mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb
@@ -156,9 +156,9 @@ write_json(mtcars[1:5, ], tmp_json)
 json_data <- tl_read_json(tmp_json)
 json_data
 #> -- tidylearn data ---------
-#> Source: /tmp/Rtmpv6MjZF/file28c920c399b1.json 
+#> Source: /tmp/RtmpCugTLh/file281cba5ba0d.json 
 #> Format: json 
-#> Read at: 2026-09-14 12:24:32 
+#> Read at: 2026-09-21 08:06:23 
 #> 
 #> # A tibble: 5 × 11
 #>     mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb
@@ -246,7 +246,7 @@ db_result
 #> -- tidylearn data ---------
 #> Source: SQLiteConnection: SELECT mpg, wt, hp FROM mtcars_tbl WHERE mpg > 20 
 #> Format: database 
-#> Read at: 2026-09-14 12:24:33 
+#> Read at: 2026-09-21 08:06:24 
 #> 
 #> # A tibble: 14 × 3
 #>      mpg    wt    hp
@@ -472,9 +472,9 @@ data |>
   select(mpg, wt, hp) |>
   head(3)
 #> -- tidylearn data ---------
-#> Source: /tmp/Rtmpv6MjZF/file28c96a846373.csv 
+#> Source: /tmp/RtmpCugTLh/file281c22a39c3a.csv 
 #> Format: csv 
-#> Read at: 2026-09-14 12:24:33 
+#> Read at: 2026-09-21 08:06:25 
 #> 
 #> # A tibble: 3 × 3
 #>     mpg    wt    hp

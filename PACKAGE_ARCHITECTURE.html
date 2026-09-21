@@ -40,11 +40,11 @@
 
 <div id="tidylearn-package-architecture" class="section level1">
 
-<p>This document is the map of the source tree: which file holds what, and why the modules are cut where they are. What the package is for is in the README’s <a href="README.html#overview">Overview</a>, and the reasoning behind the design is in its <a href="README.html#philosophy">Philosophy</a> — restating either here would give the project two versions to keep in step.</p>
+<p>This document is the map of the source tree: which file holds what, and why the modules are cut where they are. What the package is for is in the README’s <a href="https://tidylearn.sheetsolved.com/#overview">Overview</a>, and the reasoning behind the design is in its <a href="https://tidylearn.sheetsolved.com/#philosophy">Philosophy</a> — restating either here would give the project two versions to keep in step.</p>
 <p>tidylearn implements no algorithms. Each module wraps an established package, so the module boundaries follow the packages rather than the statistics — which is why <code>supervised-trees.R</code> covers rpart, randomForest and gbm together, and why regularisation gets a file of its own.</p>
 <div class="section level2">
 <h2 id="wrapped-packages">Wrapped Packages<a class="anchor" aria-label="anchor" href="#wrapped-packages"></a></h2>
-<p>The method-to-package mapping is maintained in one place, the <a href="README.html#wrapped-packages">README</a>, and repeated in <code><a href="articles/getting-started.html">vignette("getting-started")</a></code>. Three copies of the same table drift; this document links to it rather than adding a fourth.</p>
+<p>The method-to-package mapping is maintained in one place, the <a href="https://tidylearn.sheetsolved.com/#wrapped-packages">README</a>, and repeated in <code><a href="articles/getting-started.html">vignette("getting-started")</a></code>. Three copies of the same table drift; this document links to it rather than adding a fourth.</p>
 <p><code><a href="reference/tl_model.html">tl_model()</a></code> dispatches on 20 methods: 13 supervised and 7 unsupervised. The authoritative list is <code>supervised_methods</code> and <code>unsupervised_methods</code> in <code>R/core.R</code>, which is what the error message for an unknown method prints.</p>
 </div>
 <div class="section level2">
@@ -373,7 +373,7 @@
 </div>
 <div class="section level2">
 <h2 id="acknowledgments">Acknowledgments<a class="anchor" aria-label="anchor" href="#acknowledgments"></a></h2>
-<p>Credited in the <a href="README.html#acknowledgments">README</a>, which names each package and what it implements.</p>
+<p>Credited in the <a href="https://tidylearn.sheetsolved.com/#acknowledgments">README</a>, which names each package and what it implements.</p>
 </div>
 </div>
 

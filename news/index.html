@@ -109,7 +109,8 @@
 </ul></div>
 <div class="section level3">
 <h3 id="documentation-0-5-0-9000">Documentation<a class="anchor" aria-label="anchor" href="#documentation-0-5-0-9000"></a></h3>
-<ul><li>The hex logo and the pkgdown favicons have sharp corners, in line with other R package hex stickers. The artwork is otherwise unchanged.</li>
+<ul><li><p>The hex logo and the pkgdown favicons have sharp corners, in line with other R package hex stickers. The artwork is otherwise unchanged.</p></li>
+<li><p><code>PACKAGE_ARCHITECTURE.md</code>’s four links into the README were 404s on the documentation site. pkgdown rewrote <code>README.md#...</code> to <code>README.html</code>, a page it never builds, because it publishes the README as the site’s home page. They now point at the home page’s sections directly, which also works when the file is read on GitHub.</p></li>
 </ul></div>
 </div>
     <div class="section level2">

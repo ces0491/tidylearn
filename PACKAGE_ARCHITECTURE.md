@@ -2,12 +2,10 @@
 
 This document is the map of the source tree: which file holds what, and
 why the modules are cut where they are. What the package is for is in
-the README’s
-[Overview](https://tidylearn.sheetsolved.com/README.html#overview), and
-the reasoning behind the design is in its
-[Philosophy](https://tidylearn.sheetsolved.com/README.html#philosophy) —
-restating either here would give the project two versions to keep in
-step.
+the README’s [Overview](https://tidylearn.sheetsolved.com/#overview),
+and the reasoning behind the design is in its
+[Philosophy](https://tidylearn.sheetsolved.com/#philosophy) — restating
+either here would give the project two versions to keep in step.
 
 tidylearn implements no algorithms. Each module wraps an established
 package, so the module boundaries follow the packages rather than the
@@ -18,8 +16,8 @@ own.
 ## Wrapped Packages
 
 The method-to-package mapping is maintained in one place, the
-[README](https://tidylearn.sheetsolved.com/README.html#wrapped-packages),
-and repeated in
+[README](https://tidylearn.sheetsolved.com/#wrapped-packages), and
+repeated in
 [`vignette("getting-started")`](https://tidylearn.sheetsolved.com/articles/getting-started.md).
 Three copies of the same table drift; this document links to it rather
 than adding a fourth.
@@ -372,5 +370,5 @@ best_model <- result$best_model
 ## Acknowledgments
 
 Credited in the
-[README](https://tidylearn.sheetsolved.com/README.html#acknowledgments),
-which names each package and what it implements.
+[README](https://tidylearn.sheetsolved.com/#acknowledgments), which
+names each package and what it implements.
