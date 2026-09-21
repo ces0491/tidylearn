@@ -2,8 +2,8 @@
 
 This document is the map of the source tree: which file holds what, and why
 the modules are cut where they are. What the package is for is in the
-README's [Overview](README.md#overview), and the reasoning behind the design
-is in its [Philosophy](README.md#philosophy) — restating either here would
+README's [Overview](https://tidylearn.sheetsolved.com/#overview), and the reasoning behind the design
+is in its [Philosophy](https://tidylearn.sheetsolved.com/#philosophy) — restating either here would
 give the project two versions to keep in step.
 
 tidylearn implements no algorithms. Each module wraps an established
@@ -14,7 +14,7 @@ and gbm together, and why regularisation gets a file of its own.
 ## Wrapped Packages
 
 The method-to-package mapping is maintained in one place, the
-[README](README.md#wrapped-packages), and repeated in
+[README](https://tidylearn.sheetsolved.com/#wrapped-packages), and repeated in
 `vignette("getting-started")`. Three copies of the same table drift; this
 document links to it rather than adding a fourth.
 
@@ -304,5 +304,5 @@ tidylearn/
 
 ## Acknowledgments
 
-Credited in the [README](README.md#acknowledgments), which names each
+Credited in the [README](https://tidylearn.sheetsolved.com/#acknowledgments), which names each
 package and what it implements.
