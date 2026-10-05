@@ -365,8 +365,9 @@ tl_get_importance_regularized <- function(model, lambda = "1se") {
 #' Plot model comparison
 #'
 #' @param ... tidylearn model objects to compare
-#' @param new_data Optional data frame for evaluation
-#'   (if NULL, uses training data)
+#' @param new_data Optional data frame for evaluation. If NULL, the models
+#'   are scored on their training data, which they must share: models
+#'   fitted on different data are an error asking for \code{new_data}.
 #' @param metrics Character vector of metrics to compute
 #' @param names Optional character vector of model names
 #' @return A \code{\link[ggplot2]{ggplot}} object.
@@ -404,9 +405,10 @@ tl_plot_model_comparison <- function(
 
   is_classification <- is_classifications[1]
 
-  # Use first model's training data if new_data not provided
+  # Without new_data each model is scored on its own training rows, which
+  # the check confirms are the same rows for every model
   if (is.null(new_data)) {
-    new_data <- models[[1]]$data
+    tl_check_shared_training_data(models, names)
     message(
       "Evaluating on training data. ",
       "For model validation, provide separate test data."
@@ -452,6 +454,73 @@ tl_plot_model_comparison <- function(
     )
 
   p
+}
+
+#' Check that compared models share the training data they default to
+#'
+#' With no \code{new_data} the comparisons scored every model on the first
+#' model's training rows. A model fitted on other rows was scored partly
+#' on rows it never saw, without a word. A model fitted on engineered
+#' features -- \code{tl_auto_ml()}'s PCA and cluster candidates store
+#' their features -- either failed on another model's rows or was scored
+#' on them, depending on the order the models were listed in. The training
+#' rows stand in for \code{new_data} only when every model was fitted on
+#' the same data.
+#'
+#' @param models List of tidylearn models.
+#' @param names Their names in the comparison.
+#' @return Invisibly TRUE; an error naming the models whose training data
+#'   differs from the first model's.
+#' @keywords internal
+#' @noRd
+tl_check_shared_training_data <- function(models, names) {
+  reference <- models[[1]]$data
+  differs <- !vapply(
+    models,
+    function(model) tl_same_training_data(model$data, reference),
+    logical(1)
+  )
+  if (any(differs)) {
+    stop(
+      "The models were fitted on different data, so they share no ",
+      "training rows to be compared on. Models whose training data ",
+      "differs from that of '", names[1], "': ",
+      paste0("'", names[differs], "'", collapse = ", "),
+      ". Pass the rows to compare them on as 'new_data'.",
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
+}
+
+#' Whether two models were fitted on the same data
+#'
+#' \code{tl_model()} stores the frame it fitted after making a factor of
+#' each text column its formula uses, so two models of one frame can store
+#' a column as a factor and as text. Text and factor columns are compared
+#' by their labels and numbers by value, which keeps those models counted
+#' as fitted on the same data.
+#'
+#' @param a,b The stored data of two models.
+#' @return TRUE when both hold the same columns and the same rows.
+#' @keywords internal
+#' @noRd
+tl_same_training_data <- function(a, b) {
+  if (!identical(dim(a), dim(b)) || !setequal(names(a), names(b))) {
+    return(FALSE)
+  }
+  same_column <- function(column) {
+    x <- a[[column]]
+    y <- b[[column]]
+    if (is.factor(x) || is.character(x) || is.factor(y) || is.character(y)) {
+      identical(as.character(x), as.character(y))
+    } else if (is.numeric(x) && is.numeric(y)) {
+      identical(as.numeric(x), as.numeric(y))
+    } else {
+      identical(x, y)
+    }
+  }
+  all(vapply(names(a), same_column, logical(1)))
 }
 
 #' Plot cross-validation results

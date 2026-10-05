@@ -155,6 +155,69 @@ test_that("two models of one method get separate comparison columns", {
   expect_error(tl_table_comparison(m1, m2, names = c("a", "a")), "unique")
 })
 
+test_that("the comparison table needs new_data for models fitted apart", {
+  skip_if_not_installed("gt")
+  # With no new_data every model was scored on the first model's training
+  # rows: a model fitted on other rows was scored partly on rows it never
+  # saw, without a word
+  early <- tl_model(mtcars[1:20, ], mpg ~ wt, method = "linear")
+  late <- tl_model(mtcars[13:32, ], mpg ~ wt, method = "linear")
+  expect_error(
+    tl_table_comparison(early, late, names = c("early", "late")),
+    "fitted on different data.*'late'.*Pass the rows to compare them on"
+  )
+
+  # Given the rows, both are scored on them
+  data <- tl_table_comparison(early, late, names = c("early", "late"),
+                              new_data = mtcars)[["_data"]]
+  rmse <- function(m) sqrt(mean((mtcars$mpg - predict(m, mtcars)$.pred)^2))
+  expect_equal(data$early[data$metric == "Rmse"], rmse(early))
+  expect_equal(data$late[data$metric == "Rmse"], rmse(late))
+})
+
+test_that("the comparison table needs new_data for engineered features", {
+  skip_if_not_installed("gt")
+  # A model fitted on PCA scores, as tl_auto_ml() builds its candidates,
+  # stores the scores. Listed first, its data was handed to every model and
+  # the tree failed with "object 'Sepal.Length' not found"; listed second,
+  # it was scored on the tree's rows without a word.
+  ib <- droplevels(iris[iris$Species != "setosa", ])
+  reduced <- tl_reduce_dimensions(ib, response = "Species", method = "pca",
+                                  n_components = 2)
+  pca <- tl_model(reduced$data, Species ~ PC1 + PC2, method = "logistic")
+  pca$feature_transform <- list(
+    kind = "pca", reduction_model = reduced$reduction_model,
+    response = "Species"
+  )
+  tree <- tl_model(ib, Species ~ ., method = "tree")
+  expect_error(tl_table_comparison(pca, tree), "fitted on different data")
+  expect_error(tl_table_comparison(tree, pca), "fitted on different data")
+
+  # The raw rows score both, the PCA model through its own projection
+  data <- tl_table_comparison(tree, pca, names = c("tree", "pca"),
+                              new_data = ib)[["_data"]]
+  accuracy <- function(m) {
+    mean(predict(m, ib, type = "class")$.pred == ib$Species)
+  }
+  expect_equal(data$tree, accuracy(tree))
+  expect_equal(data$pca, accuracy(pca))
+})
+
+test_that("models fitted on one frame still share it as the default", {
+  skip_if_not_installed("gt")
+  # tl_model() makes a text column a factor only where its formula uses
+  # the column, so the two models store the frame with gear as a factor and
+  # as text. They were fitted on the same rows, and are compared on them.
+  cars <- transform(mtcars, gear = as.character(gear))
+  with_gear <- tl_model(cars, mpg ~ wt + gear, method = "linear")
+  without <- tl_model(cars, mpg ~ wt + hp, method = "linear")
+  data <- tl_table_comparison(with_gear, without,
+                              names = c("a", "b"))[["_data"]]
+  rmse <- function(m) sqrt(mean((cars$mpg - predict(m, cars)$.pred)^2))
+  expect_equal(data$a[data$metric == "Rmse"], rmse(with_gear))
+  expect_equal(data$b[data$metric == "Rmse"], rmse(without))
+})
+
 test_that("comparison names must not be missing", {
   skip_if_not_installed("gt")
   m1 <- tl_model(mtcars, mpg ~ wt, method = "linear")

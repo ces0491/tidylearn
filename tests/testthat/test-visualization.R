@@ -346,6 +346,31 @@ test_that("two models of one method get separate comparison bars", {
   )
 })
 
+test_that("model comparison needs new_data for models fitted apart", {
+  # With no new_data both models were scored on the first one's training
+  # rows, so the second was scored partly on rows it never saw
+  early <- tl_model(mtcars[1:20, ], mpg ~ wt, method = "linear")
+  late <- tl_model(mtcars[13:32, ], mpg ~ wt, method = "linear")
+  expect_error(
+    tl_plot_model_comparison(early, late),
+    "fitted on different data.*Pass the rows to compare them on"
+  )
+
+  # Given the rows, both are scored on them
+  p <- tl_plot_model_comparison(early, late, new_data = mtcars,
+                                metrics = "rmse", names = c("early", "late"))
+  geoms <- vapply(p$layers, function(l) class(l$geom)[1], character(1))
+  bars <- ggplot2::layer_data(p, which(geoms == "GeomCol"))
+  rmse <- function(m) sqrt(mean((mtcars$mpg - predict(m, mtcars)$.pred)^2))
+  expect_equal(sort(bars$y), sort(c(rmse(early), rmse(late))))
+
+  # Models fitted on the same frame are still compared on it
+  m1 <- tl_model(mtcars, mpg ~ wt, method = "linear")
+  m2 <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+  expect_message(tl_plot_model_comparison(m1, m2, metrics = "rmse"),
+                 "Evaluating on training data")
+})
+
 test_that("gain and lift do not depend on row order", {
   ib <- droplevels(iris[iris$Species != "setosa", ])
   tree <- tl_model(ib, Species ~ Sepal.Width, method = "tree")

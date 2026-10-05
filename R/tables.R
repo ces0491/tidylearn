@@ -771,8 +771,9 @@ tl_cluster_fit_columns <- function(model) {
 #' in a styled gt table.
 #'
 #' @param ... tidylearn model objects to compare
-#' @param new_data Optional test data for evaluation. If NULL, uses the
-#'   training data of the first model.
+#' @param new_data Optional test data for evaluation. If NULL, the models
+#'   are scored on their training data, which they must share: models
+#'   fitted on different data are an error asking for \code{new_data}.
 #' @param names Optional character vector of model names
 #' @param digits Number of decimal places (default: 4)
 #' @return A \code{\link[gt]{gt}} table object. Its source note counts the
@@ -804,8 +805,10 @@ tl_table_comparison <- function(..., new_data = NULL,
     paste0(m$spec$method, " (", task, ")")
   })
 
+  # Without new_data each model is scored on its own training rows, which
+  # the check confirms are the same rows for every model
   if (is.null(new_data)) {
-    new_data <- models[[1]]$data
+    tl_check_shared_training_data(models, names)
   }
 
   results <- purrr::map2_dfr(models, names, function(model, name) {
