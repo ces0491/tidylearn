@@ -360,6 +360,79 @@ test_that("held values given in at_values match the column's type", {
   expect_true(all(plot$data$am == "1"))
 })
 
+test_that("a variable named like an output column is refused", {
+  # The results are added to the prediction grid, so a variable of the same
+  # name was overwritten: var = "fit" failed with "subscript out of
+  # bounds", and a by_var named fit, or a held variable named lower, came
+  # back replaced by the predictions or the interval
+  named_fit <- transform(mtcars, fit = wt)
+  model <- tl_model(named_fit, mpg ~ fit * hp, method = "linear")
+  for (args in list(c("fit", "hp"), c("hp", "fit"))) {
+    expect_error(
+      tl_interaction_effects(model, args[1], args[2]),
+      "the model's variable 'fit' would be overwritten",
+      fixed = TRUE
+    )
+  }
+  held <- tl_model(transform(mtcars, lower = qsec), mpg ~ wt * hp + lower,
+                   method = "linear")
+  expect_error(
+    tl_interaction_effects(held, "wt", "hp"),
+    "the model's variable 'lower' would be overwritten",
+    fixed = TRUE
+  )
+  # Without intervals there is no lower column to overwrite
+  expect_named(
+    tl_interaction_effects(held, "wt", "hp", intervals = FALSE)$effects,
+    c("wt", "hp", "lower", "fit", "by_value", "by_label")
+  )
+
+  # A plot variable named prediction was drawn as the predictions
+  named_prediction <- transform(mtcars, prediction = wt)
+  plotted <- tl_model(named_prediction, mpg ~ prediction * hp,
+                      method = "linear")
+  expect_error(
+    tl_plot_interaction(plotted, "prediction", "hp"),
+    "the model's variable 'prediction' would be overwritten",
+    fixed = TRUE
+  )
+
+  # A name that only contains one of them is accepted
+  fitness <- tl_model(transform(mtcars, fitness = wt), mpg ~ fitness * hp,
+                      method = "linear")
+  expect_equal(
+    tl_interaction_effects(fitness, "fitness", "hp")$slopes$slope,
+    tl_interaction_effects(tl_model(mtcars, mpg ~ wt * hp, method = "linear"),
+                           "wt", "hp")$slopes$slope
+  )
+})
+
+test_that("a non-syntactic variable name works in the interaction functions", {
+  # Its name was pasted into formula text, "fit ~ car weight", which does
+  # not parse: "unexpected symbol"
+  renamed <- mtcars[, c("mpg", "wt", "hp")]
+  names(renamed)[2] <- "car weight"
+  model <- tl_model(renamed, mpg ~ `car weight` * hp, method = "linear")
+  reference <- tl_model(mtcars, mpg ~ wt * hp, method = "linear")
+
+  expect_equal(
+    tl_interaction_effects(model, "car weight", "hp")$slopes$slope,
+    tl_interaction_effects(reference, "wt", "hp")$slopes$slope
+  )
+
+  tested <- tl_test_interactions(renamed, mpg ~ `car weight` + hp,
+                                 var1 = "car weight", var2 = "hp")
+  expected <- tl_test_interactions(mtcars, mpg ~ wt + hp,
+                                   var1 = "wt", var2 = "hp")
+  expect_equal(tested$p_value, expected$p_value)
+  expect_identical(tested$var1, "`car weight`")
+  expect_equal(
+    tl_test_interactions(renamed, mpg ~ `car weight` + hp,
+                         var1 = "car weight")$p_value,
+    expected$p_value
+  )
+})
+
 # ---- formulas written with `.` ---------------------------------------------
 
 test_that("tl_interaction_effects accepts a model fitted with y ~ .", {

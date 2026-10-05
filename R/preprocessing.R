@@ -31,7 +31,8 @@
 #'   variables (default: TRUE)
 #' @param remove_zero_variance Remove zero-variance features (default: TRUE)
 #' @param remove_correlated Remove highly correlated features (default: FALSE)
-#' @param correlation_cutoff Correlation threshold for removal (default: 0.95)
+#' @param correlation_cutoff Correlation threshold for removal, greater than
+#'   0 and at most 1 (default: 0.95)
 #' @return A list with components:
 #'   \describe{
 #'     \item{\code{data}}{The processed data frame.}
@@ -86,6 +87,19 @@ tl_prepare_data <- function(data, formula = NULL,
     stop(
       "'scale_method' must be one of ",
       paste0("\"", scalers, "\"", collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
+  # No correlation exceeds 1, so a cutoff of 95, meant as a percentage,
+  # removed nothing without a word
+  if (!is.numeric(correlation_cutoff) || length(correlation_cutoff) != 1L ||
+        is.na(correlation_cutoff) || correlation_cutoff <= 0 ||
+        correlation_cutoff > 1) {
+    stop(
+      "'correlation_cutoff' must be a single number greater than 0 and at ",
+      "most 1, such as 0.95; got ", tl_describe_value(correlation_cutoff),
+      ".",
       call. = FALSE
     )
   }

@@ -1159,9 +1159,11 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
       )
     }
 
-    # Use first variable as response
-    formula <- stats::as.formula(
-      paste(variables[1], "~", paste(variables[-1], collapse = " + "))
+    # Use first variable as response. The names are backquoted, since a
+    # column such as `car weight` pasted in as it stands does not parse.
+    formula <- stats::reformulate(
+      paste0("`", variables[-1], "`"),
+      response = as.name(variables[1])
     )
 
     # Fit linear model. na.exclude keeps one distance per row of the data,

@@ -445,6 +445,20 @@ test_that("outlier counts survive a missing value", {
   expect_identical(mahal$outlier_counts$total, 3L)
 })
 
+test_that("Cook's distance accepts a non-syntactic column name", {
+  # The formula was pasted together as "mpg ~ car weight + hp", which does
+  # not parse: "unexpected symbol"
+  renamed <- mtcars[, c("mpg", "wt", "hp")]
+  names(renamed)[2] <- "car weight"
+  result <- tl_detect_outliers(renamed, c("mpg", "car weight", "hp"),
+                               method = "cook", plot = FALSE)
+
+  cooks <- stats::cooks.distance(stats::lm(mpg ~ wt + hp, data = mtcars))
+  expect_identical(result$outlier_indices, unname(which(cooks > 4 / 32)))
+  expect_identical(colnames(result$outlier_flags),
+                   c("mpg", "car weight", "hp"))
+})
+
 test_that("per-variable outlier flags stay a matrix for a single row", {
   # sapply() simplified one row's flags to a vector, and combining them
   # failed with "dim(X) must have a positive length"

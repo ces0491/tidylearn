@@ -77,6 +77,20 @@ tl_test_interactions <- function(data, formula, var1 = NULL, var2 = NULL,
     }
   }, character(1))
 
+  # A name given as var1 or var2 is matched to its term label, which
+  # backquotes a non-syntactic name: "car weight" went into the formula
+  # text as it stood, which does not parse
+  as_term <- function(v) {
+    quoted <- paste0("`", v, "`")
+    if (!is.null(v) && !v %in% predictors && quoted %in% predictors) {
+      quoted
+    } else {
+      v
+    }
+  }
+  var1 <- as_term(var1)
+  var2 <- as_term(var2)
+
   # Generate pairs to test
   if (all_pairs) {
     # combn() on a single name counts from 1 to that value instead of
@@ -217,7 +231,9 @@ tl_test_interactions <- function(data, formula, var1 = NULL, var2 = NULL,
 #'   bars. A factor, character or logical variable is categorical, and only
 #'   the values the data holds are drawn. For a classification model the
 #'   prediction is the probability of the second class, so the response
-#'   must have two classes.
+#'   must have two classes. The plot's data holds the prediction in a column
+#'   named \code{prediction}, and a band in \code{.lower} and \code{.upper},
+#'   so a model variable with one of those names is refused.
 #' @export
 #' @examples
 #' \donttest{
@@ -287,6 +303,14 @@ tl_plot_interaction <- function(model, var1, var2,
   all_other_vars <- setdiff(tl_model_frame_columns(formula, data),
                             c(var1, var2))
 
+  # Only the line plots have a place to draw a confidence band
+  is_line_plot <- xor(var1_type == "categorical", var2_type == "categorical")
+  tl_check_output_names(
+    c(var1, var2, all_other_vars),
+    c("prediction", if (confidence && is_line_plot) c(".lower", ".upper")),
+    "tl_plot_interaction"
+  )
+
   for (v in all_other_vars) {
     grid[[v]] <- if (!is.null(fixed_values) && v %in% names(fixed_values)) {
       tl_given_value(fixed_values[[v]], data[[v]], v, "fixed_values")
@@ -309,8 +333,7 @@ tl_plot_interaction <- function(model, var1, var2,
   upper_col <- NULL
 
   # tidylearn's predict() returns no interval, so the band comes from the
-  # underlying lm or glm fit. Only the line plots have a place to draw it.
-  is_line_plot <- xor(var1_type == "categorical", var2_type == "categorical")
+  # underlying lm or glm fit
   if (confidence && is_line_plot) {
     band <- tl_interaction_band(model, grid)
     if (is.null(band)) {
@@ -579,7 +602,9 @@ tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
 #'   class, so the response must have two classes. \code{slope} is the slope
 #'   of a straight line fitted to \code{fit} across the range of \code{var},
 #'   so for a non-linear link it is an average rate of change over that
-#'   range.
+#'   range. A model variable named \code{fit}, \code{by_value} or
+#'   \code{by_label}, or with intervals \code{lower} or \code{upper}, would
+#'   be overwritten by these columns and is refused.
 #'
 #'   \code{slopes$slope_se} is the standard error of a straight line fitted
 #'   to the prediction grid, not the sampling uncertainty of the marginal
@@ -686,6 +711,11 @@ tl_interaction_effects <- function(model, var, by_var,
   # removes, which the model frame still evaluates
   other_vars <- setdiff(tl_model_frame_columns(formula, data),
                         c(var, by_var))
+  tl_check_output_names(
+    c(var, by_var, other_vars),
+    c("fit", if (intervals) c("lower", "upper"), "by_value", "by_label"),
+    "tl_interaction_effects"
+  )
   held <- lapply(other_vars, function(v) {
     if (!is.null(at_values) && v %in% names(at_values)) {
       tl_given_value(at_values[[v]], data[[v]], v, "at_values")
@@ -762,8 +792,11 @@ tl_interaction_effects <- function(model, var, by_var,
       # Note this makes slope_se the standard error of the fit to the
       # prediction grid, not the uncertainty in the marginal effect
       # itself -- for a linear model it is near zero by construction.
-      slope_formula <- stats::as.formula(paste("fit ~", var))
-      slope_model <- lm(slope_formula, data = sub_grid)
+      #
+      # The line is fitted under fixed names: var pasted into a formula
+      # did not parse when it was a name such as `car weight`.
+      slope_data <- data.frame(.tl_fit = sub_grid$fit, .tl_x = sub_grid[[var]])
+      slope_model <- lm(.tl_fit ~ .tl_x, data = slope_data)
       slope_coef <- withCallingHandlers(
         coef(summary(slope_model)),
         warning = function(w) {
@@ -995,6 +1028,34 @@ tl_interaction_predict <- function(model, grid, positive, ...) {
     return(if (is.data.frame(preds)) preds$.pred else preds)
   }
   predict(model, grid, type = "prob", ...)[[positive]]
+}
+
+#' Refuse a model variable named like a column the results are written to
+#'
+#' The interaction functions add their results to the prediction grid, so a
+#' variable of the same name was overwritten: \code{var = "fit"} failed with
+#' "subscript out of bounds", and a held variable named \code{lower} came
+#' back as the interval's lower bound.
+#'
+#' @param columns The model variables in the grid
+#' @param reserved The result columns the caller will write
+#' @param caller The calling function's name, for the message
+#' @return NULL, invisibly
+#' @keywords internal
+#' @noRd
+tl_check_output_names <- function(columns, reserved, caller) {
+  clash <- intersect(columns, reserved)
+  if (length(clash) > 0) {
+    stop(
+      caller, "() writes its results to ",
+      if (length(reserved) == 1L) "a column named " else "columns named ",
+      paste(reserved, collapse = ", "), ", so the model's variable ",
+      paste0("'", clash, "'", collapse = ", "), " would be overwritten. ",
+      "Rename it and refit the model to use this function.",
+      call. = FALSE
+    )
+  }
+  invisible(NULL)
 }
 
 #' Refuse a formula with no response

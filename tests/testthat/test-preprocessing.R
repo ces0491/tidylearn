@@ -281,6 +281,33 @@ test_that("correlated removal drops the feature that clears every pair", {
   expect_named(out$data, c("x1", "x3"))
 })
 
+test_that("tl_prepare_data refuses a correlation cutoff outside (0, 1]", {
+  # 95, meant as a percentage, is never exceeded by a correlation, so
+  # remove_correlated = TRUE removed nothing without a word
+  set.seed(1)
+  x1 <- rnorm(200)
+  chain <- data.frame(x1, x2 = x1 + rnorm(200, sd = .1))
+  for (cutoff in list(95, 0, -0.5, NA_real_, "0.9", c(0.8, 0.9))) {
+    expect_error(
+      tl_prepare_data(chain, remove_correlated = TRUE,
+                      correlation_cutoff = cutoff, scale_method = "none"),
+      paste0("'correlation_cutoff' must be a single number greater than 0 ",
+             "and at most 1"),
+      fixed = TRUE
+    )
+  }
+
+  removed <- suppressMessages(tl_prepare_data(
+    chain, remove_correlated = TRUE, correlation_cutoff = 0.9,
+    scale_method = "none"
+  ))
+  expect_length(names(removed$data), 1)
+  # No correlation exceeds 1, so the boundary is accepted and removes nothing
+  kept <- tl_prepare_data(chain, remove_correlated = TRUE,
+                          correlation_cutoff = 1, scale_method = "none")
+  expect_named(kept$data, c("x1", "x2"))
+})
+
 test_that("columns the formula excludes are passed through untouched", {
   d <- data.frame(id = as.character(1:20), y = rnorm(20), x = rnorm(20))
   out <- suppressMessages(tl_prepare_data(d, y ~ . - id))
