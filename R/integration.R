@@ -2,6 +2,8 @@
 #'
 #' These functions demonstrate the power of tidylearn's unified approach by
 #' seamlessly integrating supervised and unsupervised learning techniques.
+#' @noRd
+NULL
 
 #' Feature Engineering via Dimensionality Reduction
 #'
