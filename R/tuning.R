@@ -485,8 +485,12 @@ tl_tune_score_set <- function(params, cv_splits, formula, method, metric,
       dots
     )
 
+    # tl_model() notes things about the response -- that a numeric column
+    # with few distinct values is being treated as regression, say -- and
+    # every fold refit repeated it. The final fit on all the rows gives it
+    # once, as tl_cv() leaves it to the caller's own fit.
     fold_model <- tryCatch(
-      do.call(tl_model, model_args),
+      suppressMessages(do.call(tl_model, model_args)),
       error = function(e) {
         warning(
           "Error fitting model with parameters: ",

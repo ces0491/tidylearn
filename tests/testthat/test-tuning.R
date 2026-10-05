@@ -942,6 +942,47 @@ test_that("tuning logistic on a numeric 0/1 response scores accuracy", {
   expect_identical(attr(tree, "tuning_results")$metric, "rmse")
 })
 
+test_that("the response note is given once per search, not once per fold", {
+  # tl_model() notes a numeric response with few values once per fit, and
+  # every fold refit repeated it: a 2-set, 3-fold search printed it 7 times
+  note <- "Note: Response 'cyl' has 3 unique numeric values"
+  messages_of <- function(expr) {
+    seen <- character()
+    withCallingHandlers(expr, message = function(m) {
+      seen <<- c(seen, conditionMessage(m))
+      invokeRestart("muffleMessage")
+    })
+    seen
+  }
+
+  set.seed(1)
+  seen <- messages_of(tl_tune_grid(
+    mtcars, cyl ~ wt + hp, method = "tree",
+    param_grid = list(cp = c(0.01, 0.1)), folds = 3, verbose = TRUE
+  ))
+  # Once, from the final fit on all the rows
+  expect_identical(sum(grepl(note, seen, fixed = TRUE)), 1L)
+  # The search's own progress messages are still given
+  expect_true(any(grepl("Parameter set 2 of 2", seen, fixed = TRUE)))
+
+  seen <- messages_of(tl_tune_random(
+    mtcars, cyl ~ wt + hp, method = "tree",
+    param_space = list(cp = c(0.01, 0.1)), n_iter = 2, folds = 3,
+    verbose = FALSE, seed = 1
+  ))
+  expect_identical(sum(grepl(note, seen, fixed = TRUE)), 1L)
+
+  # tl_compare_cv() refits models the caller has already built, and the
+  # note was given when they were
+  shallow <- suppressMessages(tl_model(mtcars, cyl ~ wt, method = "tree"))
+  deep <- suppressMessages(tl_model(mtcars, cyl ~ wt + hp, method = "tree"))
+  set.seed(1)
+  seen <- messages_of(tl_compare_cv(
+    mtcars, list(shallow = shallow, deep = deep), folds = 3, metrics = "rmse"
+  ))
+  expect_identical(sum(grepl(note, seen, fixed = TRUE)), 0L)
+})
+
 test_that("a parameter set that failed a fold cannot win", {
   results <- data.frame(
     mean_metric = c(3.0, 2.0, 2.5),

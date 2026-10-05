@@ -415,15 +415,18 @@ tl_compare_cv <- function(data, models, folds = 5, metrics = NULL, ...) {
 
       # Train model on this fold, with the arguments it was built with.
       # Refitting from formula and method alone scored every model at its
-      # method's defaults, so two trees differing only in cp tied.
-      fold_model <- do.call(
+      # method's defaults, so two trees differing only in cp tied. The
+      # notes tl_model() gives about the response were given when the
+      # model was built, and every fold refit repeated them, as tl_cv()
+      # does not.
+      fold_model <- suppressMessages(do.call(
         tl_model,
         c(
           list(train_data, formula = model$spec$formula,
                method = model$spec$method),
           fit_args[[i]]
         )
-      )
+      ))
 
       # Evaluate model on test data. tl_evaluate() refuses a fold on which
       # no row can be scored -- every predictor missing, say -- and one
