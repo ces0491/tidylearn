@@ -9,32 +9,55 @@ NULL
 
 #' Should a metric be maximised?
 #'
-#' Error metrics are minimised; scores are maximised. Unknown metric names
-#' are treated as scores, which matches every metric tidylearn currently
-#' computes apart from the error family listed here.
+#' The direction is \code{tl_metric_higher_better()}'s, the rule pipelines
+#' and AutoML rank models by, so that a search and a leaderboard cannot
+#' disagree about which score is best. A list kept here read every name
+#' outside its error metrics as higher-is-better, unknown ones included.
+#' The tuners refuse a name tidylearn does not compute before asking, and
+#' one that reaches here anyway has no direction to give.
 #'
 #' @param metric Metric name
 #' @return \code{TRUE} to maximise, \code{FALSE} to minimise
 #' @keywords internal
 #' @noRd
 tl_metric_maximize <- function(metric) {
-  error_metrics <- c("rmse", "mse", "mae", "mape")
-  !(metric %in% error_metrics)
+  higher <- tl_metric_higher_better(metric)
+  if (anyNA(higher)) {
+    stop(
+      "Metric \"", metric, "\" has no direction to optimise: it is not one ",
+      "tidylearn computes. Name one of: ",
+      paste(c(tl_known_metrics(TRUE), tl_known_metrics(FALSE)),
+            collapse = ", "),
+      ".",
+      call. = FALSE
+    )
+  }
+  higher
 }
 
 #' Tune hyperparameters for a model using grid search
 #'
 #' @param data A data frame containing the training data
 #' @param formula A formula specifying the model
-#' @param method The modeling method to tune
-#' @param param_grid A named list of parameter values
-#'   to tune
-#' @param folds Number of cross-validation folds
-#' @param metric Metric to optimize
+#' @param method The modeling method to tune, one of the supervised methods
+#'   \code{\link{tl_model}} fits
+#' @param param_grid A named list of candidate values, one element for each
+#'   \code{\link{tl_model}} argument to tune, named after it
+#' @param folds Number of cross-validation folds, a whole number between 2
+#'   and \code{nrow(data)}
+#' @param metric Metric to optimize: one of the names
+#'   \code{\link{tl_evaluate}} computes for the task. Defaults to
+#'   \code{"accuracy"} for classification and \code{"rmse"} for regression.
 #' @param maximize Logical; whether to maximize (TRUE)
-#'   or minimize (FALSE) the metric
+#'   or minimize (FALSE) the metric. \code{NULL}, the default, maximizes
+#'   every metric but the error metrics \code{"rmse"}, \code{"mse"},
+#'   \code{"mae"} and \code{"mape"}.
 #' @param verbose Logical; whether to print progress
-#' @param ... Additional arguments passed to tl_model
+#' @param ... Additional arguments passed to \code{\link{tl_model}} for
+#'   every fold and for the final fit. Arguments holding one value per row
+#'   of \code{data} -- \code{weights}, \code{subset}, \code{offset},
+#'   \code{foldid} and \code{strata} -- are refused, since they cannot
+#'   follow the rows into a fold.
 #' @return A tidylearn model object fitted with the best hyperparameters.
 #'   Tuning results are stored as an attribute \code{"tuning_results"},
 #'   a list containing \code{param_grid}, \code{results}, \code{best_params},
@@ -44,18 +67,25 @@ tl_metric_maximize <- function(metric) {
 #'   (the mean over the folds that produced a score), \code{n_folds_ok} (how
 #'   many of the \code{folds} did), and a column per parameter. A parameter
 #'   with a vector-valued candidate, such as \code{hidden_layers}, is a list
-#'   column.
+#'   column. A fold produces no score when its fit fails, when the metric
+#'   is undefined on it -- \code{"auc"} on a fold holding one class, or
+#'   \code{"precision"} on one where nothing is predicted positive -- or
+#'   when none of its rows can be scored, as when every predictor is
+#'   missing there, which is warned about.
 #'
 #'   Only combinations with \code{n_folds_ok} equal to \code{folds} are
 #'   eligible to be best, since a mean over the folds that happened to
 #'   succeed is not comparable with a mean over all of them. If no
-#'   combination completed every fold, the best of those scored on the most
-#'   folds is used, with a warning. If every combination failed in every
-#'   fold, the function stops.
+#'   combination was scored on every fold, the best of those scored on the
+#'   most folds is used, with a warning saying whether fits failed or the
+#'   metric was undefined. If no combination was scored on any fold, the
+#'   function stops.
 #'
 #'   For \code{method = "forest"}, an \code{mtry} above the number of
 #'   predictors is capped at that number, with a warning, and duplicate
-#'   combinations that result are evaluated once.
+#'   combinations that result are evaluated once. Predictors are counted as
+#'   randomForest counts them, so a column removed with \code{- id} is not
+#'   one.
 #' @examples
 #' \donttest{
 #' model <- tl_tune_grid(iris, Species ~ ., method = "tree",
@@ -73,6 +103,7 @@ tl_tune_grid <- function(data, formula, method,
   if (!is.list(param_grid)) {
     stop("param_grid must be a named list", call. = FALSE)
   }
+  tl_check_param_names(param_grid, "param_grid")
   # An empty candidate vector crosses to zero combinations, which read
   # later as "every parameter set failed in every fold"
   empty <- names(param_grid)[lengths(param_grid) == 0]
@@ -80,6 +111,9 @@ tl_tune_grid <- function(data, formula, method,
     stop("param_grid gives no candidate values for: ",
          paste(empty, collapse = ", "), ".", call. = FALSE)
   }
+  tl_check_tuning_inputs(data, method, folds)
+  dots <- list(...)
+  tl_check_per_row_args(c(names2(dots), names(param_grid)), "tl_tune_grid()")
 
   # Determine if classification or regression. tl_model() fits logistic
   # regression as classification whatever the response is stored as, so a
@@ -93,6 +127,7 @@ tl_tune_grid <- function(data, formula, method,
   if (is.null(metric)) {
     metric <- if (is_classification) "accuracy" else "rmse"
   }
+  tl_check_tuning_metric(metric, is_classification)
 
   # Optimisation direction. Derived from the metric itself, not from
   # whether the caller supplied one -- naming a metric while leaving
@@ -101,6 +136,7 @@ tl_tune_grid <- function(data, formula, method,
   if (is.null(maximize)) {
     maximize <- tl_metric_maximize(metric)
   }
+  tl_check_maximize(maximize)
 
   # Create parameter grid, one list of arguments per combination
   param_df <- do.call(tidyr::crossing, param_grid)
@@ -146,87 +182,14 @@ tl_tune_grid <- function(data, formula, method,
       )
     }
 
-    # Initialize metrics storage for this parameter set
-    fold_metrics <- numeric(folds)
-
-    # Cross-validation loop
-    for (j in seq_len(folds)) {
-      # Get training and validation data for this fold
-      train_fold <- rsample::analysis(
-        cv_splits$splits[[j]]
-      )
-      valid_fold <- rsample::assessment(
-        cv_splits$splits[[j]]
-      )
-
-      # Fit model with current parameters
-      model_args <- c(
-        list(
-          data = train_fold,
-          formula = formula,
-          method = method
-        ),
-        params,
-        list(...)
-      )
-
-      # Train model
-      fold_model <- tryCatch({
-        do.call(tl_model, model_args)
-      }, error = function(e) {
-        warning(
-          "Error fitting model with parameters: ",
-          tl_tune_format_params(params),
-          ". Error: ", e$message
-        )
-        NULL
-      })
-
-      # If model failed, skip this fold
-      if (is.null(fold_model)) {
-        fold_metrics[j] <- NA
-        next
-      }
-
-      # Evaluate model
-      eval_metrics <- tl_evaluate(
-        fold_model, valid_fold, metrics = metric
-      )
-
-      # Store metric value. A metric the evaluation did not produce --
-      # a classification metric on a regression task, or a name that is
-      # not a metric at all -- leaves a zero-length right-hand side, and
-      # the assignment failed with "replacement has length zero", which
-      # says nothing about the metric that was asked for.
-      tl_check_metric_available(
-        metric, eval_metrics, fold_model, valid_fold
-      )
-      fold_metrics[j] <- eval_metrics$value[
-        eval_metrics$metric == metric
-      ]
-    }
-
-    # Calculate mean metric across the folds that produced a score. The
-    # count is kept alongside it because a mean over fewer folds is not
-    # comparable with one over all of them.
-    n_folds_ok <- sum(!is.na(fold_metrics))
-    mean_metric <- if (n_folds_ok > 0) {
-      mean(fold_metrics, na.rm = TRUE)
-    } else {
-      NA_real_
-    }
-
-    # Store result for this parameter set
-    tuning_results[[i]] <- list(
-      mean_metric = mean_metric,
-      n_folds_ok = n_folds_ok,
-      fold_metrics = fold_metrics
+    tuning_results[[i]] <- tl_tune_score_set(
+      params, cv_splits, formula, method, metric, dots
     )
 
     if (verbose) {
       message(
         "  Mean ", metric, ": ",
-        round(mean_metric, 4)
+        round(tuning_results[[i]]$mean_metric, 4)
       )
     }
   }
@@ -239,7 +202,10 @@ tl_tune_grid <- function(data, formula, method,
   # Find best parameter set among those scored on every fold
   best_idx <- tl_tune_select_best(
     results_df, maximize, folds,
-    vapply(param_combinations, tl_tune_format_params, character(1))
+    vapply(param_combinations, tl_tune_format_params, character(1)),
+    n_failed = vapply(tuning_results, function(x) x$n_fit_failed,
+                      integer(1)),
+    metric = metric
   )
 
   # Taken from the combinations rather than the results frame, which holds
@@ -265,7 +231,7 @@ tl_tune_grid <- function(data, formula, method,
       method = method
     ),
     best_params,
-    list(...)
+    dots
   )
 
   final_model <- do.call(tl_model, final_model_args)
@@ -321,6 +287,284 @@ tl_check_metric_available <- function(metric, eval_metrics,
     "nor regression metrics for a factor one.",
     call. = FALSE
   )
+}
+
+#' Refuse a metric argument the tuners cannot optimise
+#'
+#' The name is checked before anything is fitted. \code{metric =
+#' c("rmse", "mae")} used to reach the first fold and fail there with "the
+#' condition has length > 1", and an unknown name failed with whatever
+#' \code{tl_evaluate()} said about it.
+#'
+#' @param metric The requested metric
+#' @param is_classification Whether the task is classification
+#' @return `TRUE`, invisibly, when the metric is usable
+#' @keywords internal
+#' @noRd
+tl_check_tuning_metric <- function(metric, is_classification) {
+  if (!is.character(metric) || length(metric) != 1L || is.na(metric)) {
+    stop(
+      "'metric' must be a single metric name, such as \"",
+      if (is_classification) "accuracy" else "rmse", "\"; got ",
+      tl_describe_value(metric), ".",
+      call. = FALSE
+    )
+  }
+  tl_check_metric_available(
+    metric, list(metric = tl_known_metrics(is_classification))
+  )
+}
+
+#' Refuse a maximize argument that is not a single logical
+#'
+#' @param maximize The optimisation direction, already defaulted
+#' @return `TRUE`, invisibly, when it is TRUE or FALSE
+#' @keywords internal
+#' @noRd
+tl_check_maximize <- function(maximize) {
+  if (!is.logical(maximize) || length(maximize) != 1L || is.na(maximize)) {
+    stop(
+      "'maximize' must be TRUE, FALSE or NULL, which follows the metric; ",
+      "got ", tl_describe_value(maximize), ".",
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
+}
+
+#' Refuse a parameter list whose elements are not all named
+#'
+#' Each element is passed to \code{tl_model()} under its name. An unnamed
+#' one went in positionally, where \code{rpart.control()} and the like
+#' discard it, so \code{list(c(0.01, 0.1))} fitted the same model once per
+#' candidate and reported a best value under no name at all.
+#'
+#' @param params \code{param_grid} or \code{param_space}
+#' @param arg Its argument name, for the message
+#' @return `TRUE`, invisibly, when every element has a name of its own
+#' @keywords internal
+#' @noRd
+tl_check_param_names <- function(params, arg) {
+  param_names <- names2(params)
+  unnamed <- which(is.na(param_names) | param_names == "")
+  if (length(unnamed) > 0) {
+    stop(
+      arg, " must be a named list: ",
+      if (length(unnamed) == 1L) "element " else "elements ",
+      paste(unnamed, collapse = ", "),
+      if (length(unnamed) == 1L) " has" else " have",
+      " no name. Name each element after the tl_model() argument it sets, ",
+      "as in list(cp = c(0.01, 0.1)).",
+      call. = FALSE
+    )
+  }
+
+  repeated <- unique(param_names[duplicated(param_names)])
+  if (length(repeated) > 0) {
+    stop(
+      arg, " names must be unique, since each sets one tl_model() ",
+      "argument; repeated: ", paste(repeated, collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
+  invisible(TRUE)
+}
+
+#' Refuse data, a method or a fold count the tuners cannot use
+#'
+#' rsample checks the fold count itself, but its messages name \code{v},
+#' which is not an argument of anything the caller wrote. An unknown method
+#' failed every fit, and the search then advised checking the candidate
+#' values.
+#'
+#' @param data The training data
+#' @param method The method to tune
+#' @param folds The number of folds
+#' @return `TRUE`, invisibly, when all three are usable
+#' @keywords internal
+#' @noRd
+tl_check_tuning_inputs <- function(data, method, folds) {
+  if (!is.data.frame(data)) {
+    stop("'data' must be a data frame", call. = FALSE)
+  }
+
+  methods <- tl_supervised_methods()
+  if (!is.character(method) || length(method) != 1L ||
+        !method %in% methods) {
+    stop(
+      "'method' must be one of the supervised methods: ",
+      paste(methods, collapse = ", "), "; got ",
+      tl_describe_value(method), ".",
+      call. = FALSE
+    )
+  }
+
+  tl_check_folds(folds, data)
+}
+
+#' Refuse a fold count that cannot split the data
+#'
+#' @param folds The number of folds
+#' @param data The data to split
+#' @return `TRUE`, invisibly, when the count is usable
+#' @keywords internal
+#' @noRd
+tl_check_folds <- function(folds, data) {
+  n <- nrow(data)
+  if (!is.numeric(folds) || length(folds) != 1L || is.na(folds) ||
+        folds != round(folds) || folds < 2 || folds > n) {
+    stop(
+      "'folds' must be a whole number between 2 and nrow(data) (", n,
+      "). Got: ", tl_describe_value(folds), ".",
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
+}
+
+#' Refuse a per-row argument a resampling search cannot split
+#'
+#' An argument with one value per row of the data reached every fold
+#' whole, so each fit failed on "variable lengths differ", and the search
+#' reported that every parameter set had failed.
+#'
+#' @param arg_names Names of the arguments to be passed to tl_model()
+#' @param caller The function refusing them, for the message
+#' @return `TRUE`, invisibly, when none holds one value per row
+#' @keywords internal
+#' @noRd
+tl_check_per_row_args <- function(arg_names, caller) {
+  per_row <- intersect(arg_names, tl_per_row_args())
+  if (length(per_row) == 0) {
+    return(invisible(TRUE))
+  }
+
+  several <- length(per_row) > 1L
+  stop(
+    caller, " cannot re-split '", paste(per_row, collapse = "', '"),
+    "' across folds: ", if (several) "they hold" else "it holds",
+    " one value per row of `data`, and each fold fits a subset of the ",
+    "rows. Tune without ", if (several) "them" else "it", ", then pass ",
+    if (several) "them" else "it", " to tl_model() with the parameters ",
+    "chosen.",
+    call. = FALSE
+  )
+}
+
+#' Cross-validate one parameter set
+#'
+#' A fold yields no score for one of two reasons: its fit failed, or the
+#' fit succeeded and the fold could not be scored -- the metric is
+#' undefined on its rows (auc on a fold holding one class, precision where
+#' nothing is predicted positive), or no row of it can be scored at all.
+#' Both leave the score \code{NA}. Failed fits are counted separately so
+#' that the messages can say which happened.
+#'
+#' @param params The parameter values, a named list
+#' @param cv_splits The folds, from \code{rsample::vfold_cv()}
+#' @param formula,method Passed to \code{tl_model()}
+#' @param metric The metric scored
+#' @param dots Further arguments for \code{tl_model()}
+#' @return A list: \code{mean_metric} over the scored folds,
+#'   \code{n_folds_ok}, \code{n_fit_failed} and \code{fold_metrics}
+#' @keywords internal
+#' @noRd
+tl_tune_score_set <- function(params, cv_splits, formula, method, metric,
+                              dots) {
+  n_folds <- length(cv_splits$splits)
+  fold_metrics <- rep(NA_real_, n_folds)
+  fit_failed <- logical(n_folds)
+
+  for (j in seq_len(n_folds)) {
+    split <- cv_splits$splits[[j]]
+    model_args <- c(
+      list(data = rsample::analysis(split), formula = formula,
+           method = method),
+      params,
+      dots
+    )
+
+    fold_model <- tryCatch(
+      do.call(tl_model, model_args),
+      error = function(e) {
+        warning(
+          "Error fitting model with parameters: ",
+          tl_tune_format_params(params),
+          ". Error: ", conditionMessage(e),
+          call. = FALSE
+        )
+        NULL
+      }
+    )
+    if (is.null(fold_model)) {
+      fit_failed[j] <- TRUE
+      next
+    }
+
+    # tl_evaluate() refuses a fold on which no row can be scored -- every
+    # predictor missing, say. The fit did not fail, and one such fold is no
+    # reason to stop the search, so it goes unscored like a fold whose
+    # metric is undefined.
+    valid_fold <- rsample::assessment(split)
+    eval_metrics <- tryCatch(
+      tl_evaluate(fold_model, valid_fold, metrics = metric),
+      tidylearn_no_scored_rows = function(e) {
+        warning(
+          "Fold ", j, " is left out of the score for ",
+          if (length(params) > 0) {
+            tl_tune_format_params(params)
+          } else {
+            "the method's defaults"
+          },
+          ", since ", tl_unscored_fold_reason(e),
+          call. = FALSE
+        )
+        NULL
+      }
+    )
+    if (is.null(eval_metrics)) {
+      next
+    }
+
+    # A metric the evaluation did not produce left a zero-length
+    # right-hand side, and the assignment failed with "replacement has
+    # length zero", which says nothing about the metric asked for
+    tl_check_metric_available(metric, eval_metrics, fold_model, valid_fold)
+    fold_metrics[j] <- eval_metrics$value[eval_metrics$metric == metric]
+  }
+
+  # The count is kept alongside the mean because a mean over fewer folds
+  # is not comparable with one over all of them
+  n_folds_ok <- sum(!is.na(fold_metrics))
+  list(
+    mean_metric = if (n_folds_ok > 0) {
+      mean(fold_metrics, na.rm = TRUE)
+    } else {
+      NA_real_
+    },
+    n_folds_ok = n_folds_ok,
+    n_fit_failed = sum(fit_failed),
+    fold_metrics = fold_metrics
+  )
+}
+
+#' Why a resampling fold could not be scored
+#'
+#' Worded as \code{tl_cv()} words it, for the warnings of the other
+#' resampling functions.
+#'
+#' @param e A condition of class \code{tidylearn_no_scored_rows}
+#' @return The end of a sentence, from "it has" or "none of its" to the
+#'   full stop
+#' @keywords internal
+#' @noRd
+tl_unscored_fold_reason <- function(e) {
+  if (is.null(e$reason)) {
+    "it has no rows to score."
+  } else {
+    paste0("none of its ", e$n_rows, " rows can be scored: ", e$reason, ".")
+  }
 }
 
 #' Refuse a parameter range that runs the wrong way
@@ -513,14 +757,22 @@ tl_tune_format_params <- function(params) {
   # round() on the whole set failed with "non-numeric argument to
   # mathematical function" as soon as one parameter was a string, and
   # paste() spread a vector-valued parameter across several entries
-  values <- vapply(params, function(value) {
-    if (is.atomic(value) && length(value) == 1) {
-      format(value, digits = 4)
-    } else {
-      paste(deparse(value), collapse = "")
-    }
-  }, character(1))
+  values <- vapply(params, tl_tune_format_value, character(1))
   paste(names(params), values, sep = "=", collapse = ", ")
+}
+
+#' Describe one parameter value
+#'
+#' @param value A candidate value: a single value, a vector or a list
+#' @return A single string, such as \code{"0.01"} or \code{"c(10, 5)"}
+#' @keywords internal
+#' @noRd
+tl_tune_format_value <- function(value) {
+  if (is.atomic(value) && length(value) == 1) {
+    format(value, digits = 4)
+  } else {
+    paste(deparse(value), collapse = "")
+  }
 }
 
 #' Assemble the tuning results data frame
@@ -570,26 +822,63 @@ tl_tune_results_frame <- function(tuning_results, param_combinations,
 #' falls back to the best of the sets scored on the most folds, with a
 #' warning naming it. When no set was scored on any fold, it stops.
 #'
+#' A fold without a score either failed to fit or fitted and left the
+#' metric undefined. The remedies differ -- fix the candidate values, or
+#' choose a metric these folds define -- so the messages say which
+#' happened. The warning used to blame failed fits in both cases.
+#'
 #' @param results_df The results frame, with \code{mean_metric} and
 #'   \code{n_folds_ok}
 #' @param maximize Whether a higher metric is better
 #' @param folds The number of folds requested
 #' @param labels A description of each set, for the warning
+#' @param n_failed The folds on which each set's fit failed. The rest of
+#'   its unscored folds had an undefined metric.
+#' @param metric The metric name, for the messages
 #' @return The row index of the chosen set
 #' @keywords internal
 #' @noRd
-tl_tune_select_best <- function(results_df, maximize, folds, labels) {
+tl_tune_select_best <- function(results_df, maximize, folds, labels,
+                                n_failed = folds - results_df$n_folds_ok,
+                                metric = NULL) {
   n_ok <- results_df$n_folds_ok
+  any_failed <- any(n_failed > 0)
+  any_undefined <- any(folds - n_ok - n_failed > 0)
+  metric_name <- if (is.null(metric)) {
+    "the metric"
+  } else {
+    paste0("\"", metric, "\"")
+  }
+  searched <- paste0(
+    nrow(results_df), " set", if (nrow(results_df) == 1) "" else "s",
+    ", ", folds, " folds"
+  )
 
   # With nothing scored there is nothing to choose, and carrying on left
   # best_params empty for the final fit to fail on obscurely
   if (!any(n_ok > 0)) {
+    if (!any_undefined) {
+      stop(
+        "Every parameter set failed in every fold (", searched, "), so ",
+        "there is no score to choose the best from. The warnings above ",
+        "give the error from each fit; check the candidate values against ",
+        "the arguments the method accepts.",
+        call. = FALSE
+      )
+    }
+    if (!any_failed) {
+      stop(
+        "No parameter set could be scored: every fit succeeded, but ",
+        metric_name, " could not be computed on any fold (", searched,
+        "). The warnings above say why; tune on a metric these folds can ",
+        "produce.",
+        call. = FALSE
+      )
+    }
     stop(
-      "Every parameter set failed in every fold (", nrow(results_df),
-      " set", if (nrow(results_df) == 1) "" else "s", ", ", folds,
-      " folds), so there is no score to choose the best from. The ",
-      "warnings above give the error from each fit; check the candidate ",
-      "values against the arguments the method accepts.",
+      "No parameter set could be scored on any fold (", searched, "): ",
+      "some fits failed, and on the other folds ", metric_name, " could ",
+      "not be computed. The warnings above give each cause.",
       call. = FALSE
     )
   }
@@ -600,11 +889,28 @@ tl_tune_select_best <- function(results_df, maximize, folds, labels) {
   best_idx <- pool[if (maximize) which.max(scores) else which.min(scores)]
 
   if (!any(complete)) {
+    cause <- if (!any_undefined) {
+      "The warnings above give the error from each failed fit."
+    } else if (!any_failed) {
+      paste0(
+        "No fit failed: ", metric_name, " could not be computed on the ",
+        "other folds, and the warnings above say why."
+      )
+    } else {
+      paste0(
+        "On some folds the fit failed and on others ", metric_name,
+        " could not be computed; the warnings above give each cause."
+      )
+    }
     warning(
-      "No parameter set completed all ", folds, " folds. Using ",
-      labels[best_idx], ", the best of the sets scored on ", max(n_ok),
-      " of them, so its score rests on fewer folds than were requested. ",
-      "The warnings above give the error from each failed fit.",
+      if (any_undefined) {
+        "No parameter set was scored on all "
+      } else {
+        "No parameter set completed all "
+      },
+      folds, " folds. Using ", labels[best_idx], ", the best of the sets ",
+      "scored on ", max(n_ok), " of them, so its score rests on fewer ",
+      "folds than were requested. ", cause,
       call. = FALSE
     )
   }
@@ -624,9 +930,12 @@ tl_tune_select_best <- function(results_df, maximize, folds, labels) {
 #' for, and the results record the value each model was actually fitted
 #' with.
 #'
-#' The count is of the columns of the model frame, which is what
-#' randomForest's formula method samples from: a factor counts once, and
-#' \code{y ~ x1 * x2} has two predictors, not three.
+#' The count is the one randomForest's formula method makes. It rebuilds
+#' the model frame from the formula's term labels and samples from the
+#' variables in it: a factor counts once, \code{y ~ x1 * x2} has two
+#' predictors, not three, and \code{y ~ . - id} does not count \code{id}.
+#' The formula's own model frame keeps a column that \code{- id} removed
+#' from the terms, so counting its columns overstated the predictors.
 #'
 #' @param param_combinations Per-set lists of parameter values
 #' @param method The model method
@@ -648,12 +957,17 @@ tl_tune_cap_mtry <- function(param_combinations, method, formula, data) {
   }
 
   # A formula the data cannot satisfy fails every fit with tl_model()'s
-  # own message, which says more than a model.frame() error would here
+  # own message, which says more than a terms() error would here, and a
+  # formula with no predictors fails the same way
   n_predictors <- tryCatch(
-    ncol(stats::model.frame(formula, data = data)) - 1L,
+    {
+      labels <- attr(stats::terms(formula, data = data), "term.labels")
+      variables <- attr(stats::terms(stats::reformulate(labels)), "variables")
+      length(variables) - 1L
+    },
     error = function(e) NULL
   )
-  if (is.null(n_predictors)) {
+  if (is.null(n_predictors) || n_predictors < 1L) {
     return(param_combinations)
   }
 
@@ -709,9 +1023,11 @@ tl_tune_cap_mtry <- function(param_combinations, method, formula, data) {
 #' @param data A data frame containing the training
 #'   data
 #' @param formula A formula specifying the model
-#' @param method The modeling method to tune
-#' @param param_space A named list of parameter spaces to sample from.
-#'   Each element is read by its type and length:
+#' @param method The modeling method to tune, one of the supervised methods
+#'   \code{\link{tl_model}} fits
+#' @param param_space A named list of parameter spaces to sample from, one
+#'   element for each \code{\link{tl_model}} argument to tune, named after
+#'   it. Each element is read by its type and length:
 #'   \describe{
 #'     \item{a function}{called with no arguments to draw one value}
 #'     \item{a list}{a set of candidates, each drawn whole, e.g.
@@ -729,14 +1045,18 @@ tl_tune_cap_mtry <- function(param_combinations, method, formula, data) {
 #'     \item{logical}{sampled from the values given}
 #'   }
 #' @param n_iter Number of random parameter
-#'   combinations to try
-#' @param folds Number of cross-validation folds
-#' @param metric Metric to optimize
+#'   combinations to try, a whole number of at least 1
+#' @param folds Number of cross-validation folds, a whole number between 2
+#'   and \code{nrow(data)}
+#' @param metric Metric to optimize, as for \code{\link{tl_tune_grid}}
 #' @param maximize Logical; whether to maximize (TRUE)
-#'   or minimize (FALSE) the metric
+#'   or minimize (FALSE) the metric. \code{NULL}, the default, follows the
+#'   metric, as for \code{\link{tl_tune_grid}}.
 #' @param verbose Logical; whether to print progress
 #' @param seed Random seed for reproducibility
-#' @param ... Additional arguments passed to tl_model
+#' @param ... Additional arguments passed to \code{\link{tl_model}} for
+#'   every fold and for the final fit. Per-row arguments are refused, as for
+#'   \code{\link{tl_tune_grid}}.
 #' @return A tidylearn model object fitted with the best hyperparameters.
 #'   Tuning results are stored as an attribute \code{"tuning_results"},
 #'   a list containing \code{param_space}, \code{results}, \code{best_params},
@@ -775,7 +1095,23 @@ tl_tune_random <- function(data, formula, method,
     )
   }
 
+  tl_check_param_names(param_space, "param_space")
   tl_check_param_space(param_space)
+  tl_check_tuning_inputs(data, method, folds)
+  # n_iter = 0 searched nothing, then reported that every parameter set
+  # had failed in every fold
+  if (!is.numeric(n_iter) || length(n_iter) != 1L || !is.finite(n_iter) ||
+        n_iter != round(n_iter) || n_iter < 1) {
+    stop(
+      "'n_iter' must be a single whole number of at least 1; got ",
+      tl_describe_value(n_iter), ".",
+      call. = FALSE
+    )
+  }
+  dots <- list(...)
+  tl_check_per_row_args(
+    c(names2(dots), names(param_space)), "tl_tune_random()"
+  )
 
   # Determine if classification or regression. Logistic regression is
   # classification whatever the response type -- see tl_tune_grid()
@@ -788,12 +1124,14 @@ tl_tune_random <- function(data, formula, method,
   if (is.null(metric)) {
     metric <- if (is_classification) "accuracy" else "rmse"
   }
+  tl_check_tuning_metric(metric, is_classification)
 
   # See tl_tune_grid(): the direction follows the metric, not whether one
   # was supplied
   if (is.null(maximize)) {
     maximize <- tl_metric_maximize(metric)
   }
+  tl_check_maximize(maximize)
 
   if (verbose) {
     message(
@@ -840,87 +1178,14 @@ tl_tune_random <- function(data, formula, method,
       )
     }
 
-    # Initialize metrics storage for this parameter set
-    fold_metrics <- numeric(folds)
-
-    # Cross-validation loop
-    for (j in seq_len(folds)) {
-      # Get training and validation data for this fold
-      train_fold <- rsample::analysis(
-        cv_splits$splits[[j]]
-      )
-      valid_fold <- rsample::assessment(
-        cv_splits$splits[[j]]
-      )
-
-      # Fit model with current parameters
-      model_args <- c(
-        list(
-          data = train_fold,
-          formula = formula,
-          method = method
-        ),
-        params,
-        list(...)
-      )
-
-      # Train model
-      fold_model <- tryCatch({
-        do.call(tl_model, model_args)
-      }, error = function(e) {
-        warning(
-          "Error fitting model with parameters: ",
-          tl_tune_format_params(params),
-          ". Error: ", e$message
-        )
-        NULL
-      })
-
-      # If model failed, skip this fold
-      if (is.null(fold_model)) {
-        fold_metrics[j] <- NA
-        next
-      }
-
-      # Evaluate model
-      eval_metrics <- tl_evaluate(
-        fold_model, valid_fold, metrics = metric
-      )
-
-      # Store metric value. A metric the evaluation did not produce --
-      # a classification metric on a regression task, or a name that is
-      # not a metric at all -- leaves a zero-length right-hand side, and
-      # the assignment failed with "replacement has length zero", which
-      # says nothing about the metric that was asked for.
-      tl_check_metric_available(
-        metric, eval_metrics, fold_model, valid_fold
-      )
-      fold_metrics[j] <- eval_metrics$value[
-        eval_metrics$metric == metric
-      ]
-    }
-
-    # Calculate mean metric across the folds that produced a score. The
-    # count is kept alongside it because a mean over fewer folds is not
-    # comparable with one over all of them.
-    n_folds_ok <- sum(!is.na(fold_metrics))
-    mean_metric <- if (n_folds_ok > 0) {
-      mean(fold_metrics, na.rm = TRUE)
-    } else {
-      NA_real_
-    }
-
-    # Store result for this parameter set
-    tuning_results[[i]] <- list(
-      mean_metric = mean_metric,
-      n_folds_ok = n_folds_ok,
-      fold_metrics = fold_metrics
+    tuning_results[[i]] <- tl_tune_score_set(
+      params, cv_splits, formula, method, metric, dots
     )
 
     if (verbose) {
       message(
         "  Mean ", metric, ": ",
-        round(mean_metric, 4)
+        round(tuning_results[[i]]$mean_metric, 4)
       )
     }
   }
@@ -934,7 +1199,10 @@ tl_tune_random <- function(data, formula, method,
   # Find best parameter set among those scored on every fold
   best_idx <- tl_tune_select_best(
     results_df, maximize, folds,
-    vapply(param_combinations, tl_tune_format_params, character(1))
+    vapply(param_combinations, tl_tune_format_params, character(1)),
+    n_failed = vapply(tuning_results, function(x) x$n_fit_failed,
+                      integer(1)),
+    metric = metric
   )
 
   # See tl_tune_grid(): taken from the combinations, not the results frame
@@ -959,7 +1227,7 @@ tl_tune_random <- function(data, formula, method,
       method = method
     ),
     best_params,
-    list(...)
+    dots
   )
 
   final_model <- do.call(tl_model, final_model_args)
@@ -990,6 +1258,13 @@ tl_tune_random <- function(data, formula, method,
 #' @param plot_type Type of plot: "scatter", "grid",
 #'   "parallel", "importance"
 #' @return A \code{\link[ggplot2]{ggplot}} object.
+#' @details A parameter whose candidates are not single values, such as
+#'   \code{hidden_layers = list(c(10), c(20, 10))} or a \code{parms} list,
+#'   is drawn as a categorical one, each value labelled as the verbose
+#'   messages print it. The importance of a numeric parameter is the
+#'   absolute correlation of its values with the score; that of a
+#'   categorical one is eta squared from a one-way ANOVA of the score,
+#'   and 0 when the sets that were scored all share one value.
 #' @examples
 #' \donttest{
 #' model <- tl_tune_grid(iris, Species ~ ., method = "tree",
@@ -1023,6 +1298,21 @@ tl_plot_tuning_results <- function(model,
     names(results_df),
     c("iteration", "mean_metric", "n_folds_ok")
   )
+
+  # A candidate that is not a single value -- a hidden_layers vector, an
+  # rpart parms list -- is held in a list column, which no geom, scale or
+  # order() can take. Each cell is drawn under its printed label instead,
+  # in the order the search met them.
+  for (param in param_names) {
+    if (is.list(results_df[[param]])) {
+      labels <- vapply(results_df[[param]], tl_tune_format_value,
+                       character(1))
+      results_df[[param]] <- factor(labels, levels = unique(labels))
+    }
+  }
+  # Identifies each set's line in the parallel plot. The rank did that
+  # before, and sets whose scores tied shared a rank and so one line.
+  results_df$.set <- seq_len(nrow(results_df))
 
   # Default parameters for plotting if not specified
   if (is.null(param1) && length(param_names) > 0) {
@@ -1200,7 +1490,7 @@ tl_plot_tuning_results <- function(model,
       ggplot2::aes(
         x = .data$parameter,
         y = .data$value,
-        group = .data$rank,
+        group = .data$.set,
         color = .data$mean_metric,
         # `size` on a line is deprecated since ggplot2 3.4.0 and warns
         # the caller to file a bug against tidylearn
@@ -1251,6 +1541,10 @@ tl_plot_tuning_results <- function(model,
 
   } else if (plot_type == "importance") {
     # Parameter importance plot
+    # A set that failed every fold has no score, so it says nothing about
+    # its parameters' effect
+    scored <- !is.na(results_df$mean_metric)
+
     param_importance <- lapply(
       param_names,
       function(param) {
@@ -1260,17 +1554,15 @@ tl_plot_tuning_results <- function(model,
           # cor() a zero-variance input: it warns and returns NA, and the
           # bar silently disappears from the plot. Zero variance means the
           # parameter explained none of the score, so say that instead.
+          # Spread is judged on the pairs cor() uses.
+          values <- results_df[[param]]
+          pairs <- scored & !is.na(values)
           has_spread <- function(x) {
-            x <- x[!is.na(x)]
             length(x) > 1L && stats::sd(x) > 0
           }
-          cor_val <- if (has_spread(results_df[[param]]) &&
-                           has_spread(results_df$mean_metric)) {
-            cor(
-              results_df[[param]],
-              results_df$mean_metric,
-              use = "pairwise.complete.obs"
-            )
+          cor_val <- if (has_spread(values[pairs]) &&
+                           has_spread(results_df$mean_metric[pairs])) {
+            cor(values[pairs], results_df$mean_metric[pairs])
           } else {
             0
           }
@@ -1284,6 +1576,17 @@ tl_plot_tuning_results <- function(model,
           results_df[[param]] <- as.factor(
             results_df[[param]]
           )
+
+          # aov() needs two levels among the scored sets, and stopped on a
+          # parameter held at one value -- or one whose other value failed
+          # every fold -- with "contrasts can be applied only to factors
+          # with 2 or more levels". One value explains none of the score.
+          observed <- unique(results_df[[param]][scored])
+          if (length(observed[!is.na(observed)]) < 2L) {
+            return(data.frame(
+              parameter = param, importance = 0, correlation = NA
+            ))
+          }
 
           # Run ANOVA. The formula is built with stats::reformulate --
           # the .data pronoun is a tidy-eval construct and is not
@@ -1379,17 +1682,25 @@ tl_plot_tuning_results <- function(model,
 #' Create pre-defined parameter grids for common models
 #'
 #' @param method Model method ("tree", "forest",
-#'   "boost", "svm", etc.)
+#'   "boost", "svm", "xgboost", etc.)
 #' @param size Grid size: "small", "medium", "large"
-#' @param is_classification Whether the task is
-#'   classification or regression
+#' @param is_classification Whether the grid is for a classification task
+#'   (the default) or a regression one. For regression, an \code{"svm"}
+#'   grid also tunes \code{epsilon}, the width of the band within which
+#'   e1071's regression SVM ignores errors, and the large \code{"forest"}
+#'   grid centres \code{nodesize} on randomForest's regression default of
+#'   5 rather than its classification default of 1. The other grids are
+#'   the same for both tasks.
 #' @return A named list of parameter values suitable for passing to
 #'   \code{\link{tl_tune_grid}} or \code{\link{tl_tune_random}}. Each
 #'   element is a numeric or character vector of candidate values for
 #'   that hyperparameter, or for \code{"deep"}'s \code{hidden_layers} a list
 #'   of layer-size vectors. The grid is built without the data, so a
 #'   \code{"forest"} \code{mtry} can exceed the number of predictors; the
-#'   tuners cap it. \code{"polynomial"} tunes \code{degree}.
+#'   tuners cap it. \code{"polynomial"} tunes \code{degree}. The
+#'   \code{"xgboost"} grids draw on the values \code{\link{tl_tune_xgboost}}
+#'   searches by default, and add \code{nrounds}, which that function
+#'   chooses by early stopping and \code{\link{tl_tune_grid}} has to tune.
 #'   \code{"linear"} and \code{"logistic"} have no tuneable
 #'   hyperparameter and return an empty list with a warning, as does an
 #'   unknown method.
@@ -1397,6 +1708,7 @@ tl_plot_tuning_results <- function(model,
 #' \donttest{
 #' grid <- tl_default_param_grid("tree", size = "small")
 #' grid <- tl_default_param_grid("forest", size = "medium")
+#' grid <- tl_default_param_grid("svm", is_classification = FALSE)
 #' }
 #' @export
 tl_default_param_grid <- function(method,
@@ -1404,7 +1716,22 @@ tl_default_param_grid <- function(method,
                                   is_classification =
                                     TRUE) {
   # Input validation
+  if (!is.character(method) || length(method) != 1L || is.na(method)) {
+    stop(
+      "'method' must be a single method name, such as \"tree\"; got ",
+      tl_describe_value(method), ".",
+      call. = FALSE
+    )
+  }
   size <- match.arg(size, c("small", "medium", "large"))
+  if (!is.logical(is_classification) || length(is_classification) != 1L ||
+        is.na(is_classification)) {
+    stop(
+      "'is_classification' must be TRUE or FALSE; got ",
+      tl_describe_value(is_classification), ".",
+      call. = FALSE
+    )
+  }
 
   # Define default grids for different methods
   if (method == "tree") {
@@ -1441,11 +1768,13 @@ tl_default_param_grid <- function(method,
       # No sampsize: randomForest reads it as a number of rows, which a
       # grid built without the data cannot choose. mtry values above the
       # predictor count are capped by the tuners (see tl_tune_cap_mtry()),
-      # because no fixed ceiling suits every data set.
+      # because no fixed ceiling suits every data set. randomForest's
+      # default nodesize is 1 for classification and 5 for regression, and
+      # the candidates start from the task's own.
       list(
         mtry = c(1, 2, 3, 4, 5, 6),
         ntree = c(100, 300, 500, 1000),
-        nodesize = c(1, 3, 5)
+        nodesize = if (is_classification) c(1, 3, 5) else c(3, 5, 10)
       )
     }
   } else if (method == "boost") {
@@ -1472,7 +1801,7 @@ tl_default_param_grid <- function(method,
       )
     }
   } else if (method == "svm") {
-    if (size == "small") {
+    grid <- if (size == "small") {
       list(
         kernel = c("linear", "radial"),
         cost = c(0.1, 1, 10)
@@ -1495,6 +1824,41 @@ tl_default_param_grid <- function(method,
         gamma = c(0.001, 0.01, 0.1, 1, 10),
         degree = c(2, 3, 4),
         coef0 = c(0, 0.1, 1)
+      )
+    }
+    # A regression SVM ignores errors within epsilon of the fit, 0.1 by
+    # default on the response e1071 has scaled. Classification has no such
+    # band, so the parameter would only repeat every fit.
+    if (!is_classification) {
+      grid$epsilon <- if (size == "small") c(0.1, 0.5) else c(0.01, 0.1, 0.5)
+    }
+    grid
+  } else if (method == "xgboost") {
+    # The values tl_tune_xgboost() searches by default. It picks the number
+    # of rounds by early stopping, which tl_tune_grid() cannot, so nrounds
+    # is tuned here as well.
+    if (size == "small") {
+      list(
+        nrounds = c(50, 100),
+        max_depth = c(3, 6),
+        eta = c(0.1, 0.3)
+      )
+    } else if (size == "medium") {
+      list(
+        nrounds = c(50, 100, 200),
+        max_depth = c(3, 6, 9),
+        eta = c(0.01, 0.1, 0.3),
+        subsample = c(0.7, 1.0)
+      )
+    } else { # large
+      list(
+        nrounds = c(100, 200, 500),
+        max_depth = c(3, 6, 9),
+        eta = c(0.01, 0.1, 0.3),
+        subsample = c(0.7, 1.0),
+        colsample_bytree = c(0.7, 1.0),
+        min_child_weight = c(1, 3, 5),
+        gamma = c(0, 0.1, 0.2)
       )
     }
   } else if (method == "nn") {
@@ -1623,7 +1987,8 @@ tl_default_param_grid <- function(method,
     # Default empty grid for unknown method
     warning(
       "Unknown method: ", method,
-      ". Returning empty parameter grid."
+      ". Returning empty parameter grid.",
+      call. = FALSE
     )
     list()
   }
