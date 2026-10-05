@@ -70,7 +70,9 @@ tl_influence_measures <- function(model, threshold_cook = NULL,
   # rows: 60, 59".
   fitted_rows <- tl_fitted_rows(model)
   n <- length(fitted_rows)
-  p <- length(coef(fit)) - 1  # Number of predictors (excluding intercept)
+  # Predictors excluding the intercept, counted from the rank: an aliased
+  # coefficient is NA in coef() and was counted as a parameter
+  p <- fit$rank - 1
 
   # Set default thresholds if not provided
   if (is.null(threshold_cook)) threshold_cook <- 4 / n
@@ -82,14 +84,14 @@ tl_influence_measures <- function(model, threshold_cook = NULL,
   }
 
   # Calculate influence measures
-  cooks_d <- cooks.distance(fit)
-  leverage <- hatvalues(fit)
-  dffits_val <- dffits(fit)
-  dfbetas_val <- dfbetas(fit)
+  cooks_d <- tl_drop_excluded(cooks.distance(fit), fit)
+  leverage <- tl_drop_excluded(hatvalues(fit), fit)
+  dffits_val <- tl_drop_excluded(dffits(fit), fit)
+  dfbetas_val <- tl_drop_excluded(dfbetas(fit), fit)
 
   # Get standardized residuals
-  std_resid <- rstandard(fit)
-  stud_resid <- rstudent(fit)
+  std_resid <- tl_drop_excluded(rstandard(fit), fit)
+  stud_resid <- tl_drop_excluded(rstudent(fit), fit)
 
   # Create data frame
   # Number the observations by their row in the data, so a dropped row
@@ -112,11 +114,12 @@ tl_influence_measures <- function(model, threshold_cook = NULL,
     abs(influence_df$dffits) > threshold_dffits
   influence_df$is_outlier <- abs(influence_df$std_residual) > 3
 
-  # Add dfbetas as separate columns
-  coef_names <- names(coef(fit))
-  for (i in seq_along(coef_names)) {
-    col_name <- paste0("dfbetas_", gsub("[^[:alnum:]]", "_", coef_names[i]))
-    influence_df[[col_name]] <- dfbetas_val[, i]
+  # Add dfbetas as separate columns. dfbetas() has a column only for the
+  # coefficients the fit estimated, so looping over coef() ran past its
+  # last column on a rank-deficient fit.
+  for (coef_name in colnames(dfbetas_val)) {
+    col_name <- paste0("dfbetas_", gsub("[^[:alnum:]]", "_", coef_name))
+    influence_df[[col_name]] <- dfbetas_val[, coef_name]
   }
 
   # Add summary column for overall influence
@@ -131,6 +134,27 @@ tl_influence_measures <- function(model, threshold_cook = NULL,
   attr(influence_df, "threshold_dffits") <- threshold_dffits
 
   influence_df
+}
+
+#' Drop the rows na.exclude pads back in
+#'
+#' Under \code{na.action = na.exclude}, \code{residuals()}, \code{fitted()}
+#' and the influence functions pad their result with NA at the rows the fit
+#' dropped, so it is longer than the rows the fit used, which is what
+#' \code{tl_fitted_rows()} counts. Under \code{na.omit} nothing is padded.
+#'
+#' @param x A vector, or a matrix with one row per observation
+#' @param fit The lm or glm fit it was computed from
+#' @return \code{x} without the padded rows
+#' @keywords internal
+#' @noRd
+tl_drop_excluded <- function(x, fit) {
+  omitted <- stats::na.action(fit)
+  if (!inherits(omitted, "exclude")) {
+    return(x)
+  }
+  dropped <- as.integer(omitted)
+  if (is.matrix(x)) x[-dropped, , drop = FALSE] else x[-dropped]
 }
 
 #' Plot influence diagnostics
@@ -365,7 +389,11 @@ tl_check_linearity <- function(fitted_values, residuals) {
   # standardised scale
   scaled_fit <- as.vector(scale(fitted_values))
 
-  if (length(unique(scaled_fit)) < 4 || anyNA(scaled_fit)) {
+  # Distinct values are counted after rounding. A one-factor model such as
+  # len ~ supp has two fitted values that differ in their last bits; read
+  # as four, they let the test run on a fit it cannot judge, and it
+  # reported a p-value of 1.
+  if (anyNA(scaled_fit) || length(unique(round(scaled_fit, 8))) < 4) {
     return(result(
       NA,
       "Not enough distinct fitted values to test linearity",
@@ -414,6 +442,109 @@ tl_check_linearity <- function(fitted_values, residuals) {
   )
 }
 
+#' An ordinary least squares assumption a logistic model does not make
+#'
+#' @param assumption The assumption's label
+#' @param reason Why logistic regression does not assume it
+#' @return An assumption entry whose \code{check} is NULL, so it is neither
+#'   satisfied nor violated
+#' @keywords internal
+#' @noRd
+tl_not_logistic_assumption <- function(assumption, reason) {
+  list(
+    assumption = assumption,
+    check = NULL,
+    details = paste0("Not an assumption of logistic regression: ", reason),
+    recommendation = "No check needed for a logistic model"
+  )
+}
+
+#' Check a fit for multicollinearity
+#'
+#' Uses \code{car::vif()} when it is installed and can run, and otherwise
+#' the largest correlation between columns of the fit's design matrix.
+#' \code{car::vif()} refuses a model with fewer than two terms, and one with
+#' an aliased coefficient.
+#'
+#' @param fit An lm or glm fit
+#' @param verbose Whether to say when VIF could not be computed
+#' @return An assumption entry
+#' @keywords internal
+#' @noRd
+tl_check_multicollinearity <- function(fit, verbose) {
+  result <- function(check, details, recommendation) {
+    list(
+      assumption = "No Multicollinearity", check = check,
+      details = details, recommendation = recommendation
+    )
+  }
+  single <- result(
+    TRUE, "Model has only one predictor",
+    "Not applicable with a single predictor"
+  )
+
+  # Terms are counted from the fit: all.vars() on the formula counted `.`
+  # as one predictor
+  if (length(attr(stats::terms(fit), "term.labels")) < 2) {
+    return(single)
+  }
+
+  vif_values <- NULL
+  if (requireNamespace("car", quietly = TRUE)) {
+    vif_values <- tryCatch(car::vif(fit), error = function(e) {
+      if (verbose) {
+        message("VIF calculation failed. Checking correlations instead.")
+      }
+      NULL
+    })
+  }
+
+  if (!is.null(vif_values)) {
+    # With a term of more than one df, car::vif() returns a table of GVIF,
+    # Df and GVIF^(1/(2*Df)), and max() over the table read the Df column:
+    # a six-level factor scored 5. GVIF^(1/Df), the square of the
+    # size-adjusted GVIF, is on the scale of an ordinary VIF and equals it
+    # for a one-df term.
+    if (is.matrix(vif_values)) {
+      vif_values <- vif_values[, "GVIF"]^(1 / vif_values[, "Df"])
+    }
+    max_vif <- max(vif_values)
+    return(result(
+      max_vif < 5,
+      paste("Maximum VIF:", round(max_vif, 4)),
+      if (max_vif >= 5) {
+        paste(
+          "Multicollinearity detected.",
+          "Consider removing or combining highly correlated predictors."
+        )
+      } else {
+        "No serious multicollinearity detected"
+      }
+    ))
+  }
+
+  design <- stats::model.matrix(fit)
+  design <- design[, colnames(design) != "(Intercept)", drop = FALSE]
+  if (ncol(design) < 2) {
+    return(single)
+  }
+  cor_matrix <- suppressWarnings(stats::cor(design))
+  max_cor <- max(abs(cor_matrix[upper.tri(cor_matrix)]), na.rm = TRUE)
+
+  result(
+    max_cor < 0.7,
+    paste("Maximum correlation between predictors:", round(max_cor, 4)),
+    if (max_cor >= 0.7) {
+      paste(
+        "Potential multicollinearity.",
+        "Consider removing or combining correlated predictors."
+      )
+    } else {
+      "No serious multicollinearity detected"
+    }
+  )
+}
+
 #' Check model assumptions
 #'
 #' @param model A tidylearn model object
@@ -422,10 +553,18 @@ tl_check_linearity <- function(fitted_values, residuals) {
 #' @return A named list with one element per assumption checked
 #'   (\code{linearity}, \code{independence}, \code{homoscedasticity},
 #'   \code{normality}, \code{multicollinearity}, \code{outliers}), each
-#'   containing \code{assumption} (character label), \code{check} (logical
-#'   or \code{NULL}), \code{details} (character), and
-#'   \code{recommendation} (character). An additional \code{overall} element
-#'   summarises the number of assumptions checked, violated, and satisfied.
+#'   containing \code{assumption} (character label), \code{check} (logical,
+#'   \code{NA} when the test could not decide, or \code{NULL} when no test
+#'   was run), \code{details} (character), and \code{recommendation}
+#'   (character). An additional \code{overall} element summarises the
+#'   number of assumptions checked, violated, and satisfied; an \code{NA} or
+#'   \code{NULL} check counts as neither.
+#'
+#'   Logistic regression assumes neither normal residuals nor a constant
+#'   variance, so for a logistic model \code{normality} and
+#'   \code{homoscedasticity} have a \code{NULL} check and a note saying so.
+#'   For a factor, multicollinearity is judged on \code{GVIF^(1/Df)}, the
+#'   generalised VIF on the scale of an ordinary one.
 #' @examples
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
@@ -464,14 +603,18 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
     )
   }
 
-  # Extract fitted model and data. Align the data to the rows the fit
-  # used, for the same reason as tl_influence_measures() above.
+  # Extract the fit. Under na.exclude its residuals and fitted values are
+  # padded back to every row of the data, so the padding is dropped to
+  # leave the rows the fit used.
   fit <- model$fit
-  data <- model$data[tl_fitted_rows(model), , drop = FALSE]
+  residuals <- tl_drop_excluded(residuals(fit), fit)
+  fitted_values <- tl_drop_excluded(fitted(fit), fit)
 
-  # Get residuals
-  residuals <- residuals(fit)
-  fitted_values <- fitted(fit)
+  # A logistic model assumes neither normal residuals nor a constant
+  # variance: the variance of a binary outcome is set by its mean. Testing
+  # them reported violations that are not violations, with advice to
+  # transform the response.
+  is_logistic <- model$spec$method == "logistic"
 
   # Initialize results list
   assumptions <- list()
@@ -480,11 +623,19 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
   assumptions$linearity <- tl_check_linearity(fitted_values, residuals)
 
   # 2. Independence
-  # Durbin-Watson test for autocorrelation
-  if (test && requireNamespace("car", quietly = TRUE)) {
-    dw_test <- car::durbinWatsonTest(fit)
-    dw_statistic <- dw_test$dw
-    dw_recommendation <- if (dw_statistic < 1.5 || dw_statistic > 2.5) {
+  # Durbin-Watson statistic for autocorrelation. It is computed directly:
+  # car::durbinWatsonTest() also bootstraps a p-value, which drew from the
+  # caller's random stream though only the statistic was read.
+  if (test) {
+    dw_statistic <- sum(diff(residuals)^2) / sum(residuals^2)
+    dw_check <- if (is.finite(dw_statistic)) {
+      dw_statistic >= 1.5 && dw_statistic <= 2.5
+    } else {
+      NA
+    }
+    dw_recommendation <- if (is.na(dw_check)) {
+      "Inspect the residuals in observation order directly"
+    } else if (!dw_check) {
       paste(
         "Possible autocorrelation in residuals.",
         "Check for time-series structure or clustering."
@@ -494,7 +645,7 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
     }
     assumptions$independence <- list(
       assumption = "Independence",
-      check = dw_statistic >= 1.5 && dw_statistic <= 2.5,
+      check = dw_check,
       details = paste("Durbin-Watson statistic:", round(dw_statistic, 4)),
       recommendation = dw_recommendation
     )
@@ -512,10 +663,17 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
 
   # 3. Homoscedasticity (Equal Variance)
   # Breusch-Pagan test
-  if (test && requireNamespace("lmtest", quietly = TRUE)) {
+  if (is_logistic) {
+    assumptions$homoscedasticity <- tl_not_logistic_assumption(
+      "Homoscedasticity",
+      "the variance of a binary outcome is set by its mean, p(1 - p)"
+    )
+  } else if (test && requireNamespace("lmtest", quietly = TRUE)) {
     bp_test <- lmtest::bptest(fit)
-    bp_p_value <- bp_test$p.value
-    bp_recommendation <- if (bp_p_value < 0.05) {
+    bp_p_value <- unname(bp_test$p.value)
+    bp_recommendation <- if (is.na(bp_p_value)) {
+      "Inspect a plot of residuals against fitted values directly"
+    } else if (bp_p_value < 0.05) {
       paste(
         "Heteroscedasticity detected.",
         "Consider variance stabilizing transformations or robust SEs."
@@ -555,7 +713,12 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
   # 4. Normality of Residuals
   # Shapiro-Wilk test
   # Shapiro-Wilk limited to 5000 observations
-  if (test && length(residuals) <= 5000) {
+  if (is_logistic) {
+    assumptions$normality <- tl_not_logistic_assumption(
+      "Normality of Residuals",
+      "the residuals of a binary outcome are not expected to be normal"
+    )
+  } else if (test && length(residuals) <= 5000) {
     sw_test <- shapiro.test(residuals)
     sw_p_value <- sw_test$p.value
     norm_recommendation <- if (sw_p_value < 0.05) {
@@ -618,112 +781,18 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
   }
 
   # 5. Multicollinearity
-  if (requireNamespace("car", quietly = TRUE)) {
-    # Attempt to calculate VIF
-    tryCatch({
-      vif_values <- car::vif(fit)
-      max_vif <- max(vif_values)
-      vif_recommendation <- if (max_vif >= 5) {
-        paste(
-          "Multicollinearity detected.",
-          "Consider removing or combining highly correlated predictors."
-        )
-      } else {
-        "No serious multicollinearity detected"
-      }
-      assumptions$multicollinearity <- list(
-        assumption = "No Multicollinearity",
-        check = max_vif < 5,
-        details = paste("Maximum VIF:", round(max_vif, 4)),
-        recommendation = vif_recommendation
-      )
-    }, error = function(e) {
-      # If VIF calculation fails, use correlation matrix
-      if (verbose) {
-        message("VIF calculation failed. Checking correlations instead.")
-      }
+  assumptions$multicollinearity <- tl_check_multicollinearity(fit, verbose)
 
-      # Create correlation matrix of predictors
-      formula <- model$spec$formula
-      predictor_vars <- all.vars(formula)[-1]  # Remove response variable
-
-      if (length(predictor_vars) > 1) {
-        pred_data <- stats::model.matrix(formula, data)[, -1]
-        cor_matrix <- cor(pred_data)
-        max_cor <- max(abs(cor_matrix[upper.tri(cor_matrix)]))
-
-        cor_details <- paste(
-          "Maximum correlation between predictors:",
-          round(max_cor, 4)
-        )
-        cor_recommendation <- if (max_cor >= 0.7) {
-          paste(
-            "Potential multicollinearity.",
-            "Consider removing or combining correlated predictors."
-          )
-        } else {
-          "No serious multicollinearity detected"
-        }
-        assumptions$multicollinearity <- list(
-          assumption = "No Multicollinearity",
-          check = max_cor < 0.7,
-          details = cor_details,
-          recommendation = cor_recommendation
-        )
-      } else {
-        assumptions$multicollinearity <- list(
-          assumption = "No Multicollinearity",
-          check = TRUE,
-          details = "Model has only one predictor",
-          recommendation = "Not applicable with a single predictor"
-        )
-      }
-    })
-  } else {
-    # If car package not available, use correlation matrix
-    formula <- model$spec$formula
-    predictor_vars <- all.vars(formula)[-1]
-
-    if (length(predictor_vars) > 1) {
-      pred_data <- stats::model.matrix(formula, data)[, -1]
-      cor_matrix <- cor(pred_data)
-      max_cor <- max(abs(cor_matrix[upper.tri(cor_matrix)]))
-
-      cor_details2 <- paste(
-        "Maximum correlation between predictors:",
-        round(max_cor, 4)
-      )
-      cor_recommendation2 <- if (max_cor >= 0.7) {
-        paste(
-          "Potential multicollinearity.",
-          "Consider removing or combining correlated predictors."
-        )
-      } else {
-        "No serious multicollinearity detected"
-      }
-      assumptions$multicollinearity <- list(
-        assumption = "No Multicollinearity",
-        check = max_cor < 0.7,
-        details = cor_details2,
-        recommendation = cor_recommendation2
-      )
-    } else {
-      assumptions$multicollinearity <- list(
-        assumption = "No Multicollinearity",
-        check = TRUE,
-        details = "Model has only one predictor",
-        recommendation = "Not applicable with a single predictor"
-      )
-    }
-  }
-
-  # 6. Outliers and Influential Points
+  # 6. Outliers and Influential Points. which() leaves out a flag that a
+  # NaN measure made NA; sum() would count it as NA.
   influence_df <- tl_influence_measures(model)
-  n_influential <- sum(influence_df$is_influential)
+  influential_obs <- influence_df$observation[
+    which(influence_df$is_influential)
+  ]
+  n_influential <- length(influential_obs)
 
   outlier_recommendation <- if (n_influential > 0) {
-    influential_obs <- influence_df$observation[influence_df$is_influential]
-    obs_to_show <- influential_obs[1:min(5, n_influential)]
+    obs_to_show <- utils::head(influential_obs, 5)
     paste(
       "Consider inspecting observations:",
       paste(obs_to_show, collapse = ", "),
@@ -739,18 +808,19 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
     recommendation = outlier_recommendation
   )
 
-  # Print summary if verbose
+  # Print summary if verbose. A check is NA when its test could not decide,
+  # and `if (NA)` stopped the summary partway through.
   if (verbose) {
     message("Model Assumptions Check Summary:")
     message("--------------------------------")
     for (name in names(assumptions)) {
       check <- assumptions[[name]]
-      check_status <- if (is.null(check$check)) {
-        "UNKNOWN"
-      } else if (check$check) {
+      check_status <- if (isTRUE(check$check)) {
         "SATISFIED"
-      } else {
+      } else if (isFALSE(check$check)) {
         "VIOLATED"
+      } else {
+        "UNKNOWN"
       }
 
       message(
@@ -761,12 +831,14 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
     }
   }
 
-  # Add overall assessment
+  # Add overall assessment. An undecided (NA) check is neither satisfied nor
+  # violated; counted, it made the totals NA.
   checks <- Filter(
     Negate(is.null),
     lapply(assumptions, function(x) x$check)
   )
   checks <- unlist(checks)
+  checks <- checks[!is.na(checks)]
 
   if (length(checks) > 0) {
     overall_status <- if (all(checks)) {
@@ -794,7 +866,9 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
 
 #' Create a comprehensive diagnostic dashboard
 #'
-#' @param model A tidylearn model object
+#' @param model A tidylearn model object whose fit is an \code{lm} or
+#'   \code{glm}: method \code{"linear"}, \code{"polynomial"} or
+#'   \code{"logistic"}
 #' @param include_influence Logical; whether to include influence diagnostics
 #' @param include_assumptions Logical; whether to include assumption checks
 #' @param include_performance Logical; whether to include performance metrics
@@ -813,6 +887,20 @@ tl_diagnostic_dashboard <- function(model, include_influence = TRUE,
                                     include_assumptions = TRUE,
                                     include_performance = TRUE,
                                     arrange_plots = "grid") {
+
+  # The panels read standardised residuals, hat values and Cook's distance
+  # off an lm or glm fit. A tree reached rstandard() and failed with "no
+  # applicable method for 'rstandard' applied to an object of class rpart".
+  if (!inherits(model, "tidylearn_model") || !inherits(model$fit, "lm")) {
+    method <- if (inherits(model, "tidylearn_model")) model$spec$method
+    stop(
+      "The diagnostic dashboard is only available for linear-based models ",
+      "(method \"linear\", \"polynomial\" or \"logistic\")",
+      if (!is.null(method)) paste0("; this model's method is \"", method, "\""),
+      ".",
+      call. = FALSE
+    )
+  }
 
   # Check package dependencies
   if (!requireNamespace("gridExtra", quietly = TRUE)) {
@@ -855,14 +943,22 @@ tl_diagnostic_dashboard <- function(model, include_influence = TRUE,
   if (include_assumptions) {
     assumptions <- tl_check_assumptions(model, verbose = FALSE)
 
-    # Create plot with assumption check results
+    # Create plot with assumption check results. A check left NA by a test
+    # that could not decide is shown as unknown, not as a missing fill.
+    shown <- assumptions[c("linearity", "independence", "homoscedasticity",
+                           "normality", "multicollinearity")]
     assumption_results <- data.frame(
-      Assumption = sapply(assumptions[1:5], function(x) x$assumption),
-      Status = sapply(assumptions[1:5], function(x) {
-        if (is.null(x$check)) return("Unknown")
-        ifelse(x$check, "Satisfied", "Violated")
-      }),
-      Details = sapply(assumptions[1:5], function(x) x$details)
+      Assumption = vapply(shown, function(x) x$assumption, character(1)),
+      Status = vapply(shown, function(x) {
+        if (isTRUE(x$check)) {
+          "Satisfied"
+        } else if (isFALSE(x$check)) {
+          "Violated"
+        } else {
+          "Unknown"
+        }
+      }, character(1)),
+      Details = vapply(shown, function(x) x$details, character(1))
     )
 
     # Create a textual summary plot
@@ -965,9 +1061,13 @@ tl_diagnostic_dashboard <- function(model, include_influence = TRUE,
 #'     \item{method_name}{Human-readable method name (character).}
 #'     \item{threshold}{The threshold value used (numeric).}
 #'     \item{threshold_label}{Formatted threshold description (character).}
-#'     \item{outlier_flags}{A logical matrix (observations x variables).}
+#'     \item{outlier_flags}{A logical matrix (observations x variables),
+#'       \code{NA} where a value is missing. For \code{"cook"} and
+#'       \code{"mahalanobis"} a row's flags are the same in every column,
+#'       and \code{NA} when any of its values is missing.}
 #'     \item{any_outlier}{Logical vector indicating if each observation is an
-#'       outlier in any variable.}
+#'       outlier in any variable. Missing flags are ignored, so a row with
+#'       no flag at all is \code{FALSE}.}
 #'     \item{outlier_counts}{List with \code{total}, \code{by_variable}, and
 #'       \code{by_observation} counts.}
 #'     \item{outlier_indices}{Integer vector of outlier row indices.}
@@ -983,8 +1083,9 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
                                threshold = NULL, plot = TRUE) {
   # Handle variables selection
   if (is.null(variables)) {
-    # Select only numeric variables
-    variables <- names(data)[sapply(data, is.numeric)]
+    # Select only numeric variables. vapply() keeps a frame with no columns
+    # a logical index, where sapply() returned list().
+    variables <- names(data)[vapply(data, is.numeric, logical(1))]
     if (length(variables) == 0) {
       stop("No numeric variables found in the data", call. = FALSE)
     }
@@ -1016,16 +1117,26 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
     )
   }
 
+  # One column of flags per variable. matrix() keeps a single row a 1 x k
+  # matrix, which sapply() simplified to a vector, and apply() below failed
+  # with "dim(X) must have a positive length".
+  flag_each <- function(flag) {
+    flags <- vapply(variables, function(var) as.vector(flag(var_data[[var]])),
+                    logical(nrow(var_data)))
+    matrix(flags, nrow = nrow(var_data), ncol = length(variables),
+           dimnames = list(NULL, variables))
+  }
+
   # Detect outliers based on method
   if (method == "boxplot" || method == "iqr") {
     # IQR method for each variable
-    outlier_flags <- sapply(variables, function(var) {
-      q1 <- stats::quantile(var_data[[var]], 0.25, na.rm = TRUE)
-      q3 <- stats::quantile(var_data[[var]], 0.75, na.rm = TRUE)
+    outlier_flags <- flag_each(function(x) {
+      q1 <- stats::quantile(x, 0.25, na.rm = TRUE)
+      q3 <- stats::quantile(x, 0.75, na.rm = TRUE)
       iqr <- q3 - q1
       lower_bound <- q1 - threshold * iqr
       upper_bound <- q3 + threshold * iqr
-      var_data[[var]] < lower_bound | var_data[[var]] > upper_bound
+      x < lower_bound | x > upper_bound
     })
 
     method_name <- "Interquartile Range (IQR)"
@@ -1033,10 +1144,7 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
 
   } else if (method == "z-score") {
     # Z-score method for each variable
-    outlier_flags <- sapply(variables, function(var) {
-      z_scores <- abs(scale(var_data[[var]]))
-      z_scores > threshold
-    })
+    outlier_flags <- flag_each(function(x) abs(scale(x)) > threshold)
 
     method_name <- "Z-Score"
     threshold_label <- paste0("Standard deviations: ", threshold)
@@ -1056,8 +1164,10 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
       paste(variables[1], "~", paste(variables[-1], collapse = " + "))
     )
 
-    # Fit linear model
-    model <- stats::lm(formula, data = data)
+    # Fit linear model. na.exclude keeps one distance per row of the data,
+    # NA where a value is missing: under na.omit the 31 distances of 32 rows
+    # were recycled into the flag matrix, shifting every column.
+    model <- stats::lm(formula, data = data, na.action = stats::na.exclude)
 
     # Calculate Cook's distance
     cooks_d <- stats::cooks.distance(model)
@@ -1114,8 +1224,9 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
     )
   }
 
-  # Combine flags across variables
-  any_outlier <- apply(outlier_flags, 1, any)
+  # Combine flags across variables. A missing value's flag is NA, and any()
+  # over it made the row, and with it the total count, NA.
+  any_outlier <- apply(outlier_flags, 1, any, na.rm = TRUE)
 
   # Count outliers
   outlier_counts <- list(
@@ -1173,12 +1284,14 @@ tl_detect_outliers <- function(data, variables = NULL, method = "iqr",
           ggplot2::theme_minimal()
       }
     } else if (method == "cook") {
-      # For Cook's distance, create index plot
+      # For Cook's distance, create index plot. A row the fit dropped has
+      # no distance to draw.
       plot_data <- data.frame(
         observation = seq_along(cooks_d),
         cooks_distance = cooks_d,
         is_outlier = cooks_d > threshold
       )
+      plot_data <- plot_data[!is.na(plot_data$cooks_distance), , drop = FALSE]
 
       outlier_plot <- ggplot2::ggplot(
         plot_data,

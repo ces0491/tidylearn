@@ -131,6 +131,74 @@ test_that("tl_split validates inputs", {
   )
 })
 
+test_that("tl_split refuses a stratify that is not one column name", {
+  # A vector of two names failed the column lookup with "the condition has
+  # length > 1"
+  for (stratify in list(c("am", "vs"), 1, NA_character_, TRUE)) {
+    expect_error(
+      tl_split(mtcars, stratify = stratify, seed = 1),
+      "'stratify' must be the name of one column of 'data'",
+      fixed = TRUE
+    )
+  }
+  expect_error(
+    tl_split(mtcars, stratify = "amm", seed = 1),
+    "Stratify variable not found in data: 'amm'",
+    fixed = TRUE
+  )
+  expect_equal(nrow(tl_split(mtcars, stratify = "am", seed = 1)$train), 25)
+})
+
+test_that("stratifying on a continuous column splits by its quartiles", {
+  # Every distinct value was a one-row stratum, and a one-row stratum goes
+  # wholly to training, so 50 rows split 50/0 and the empty test set gave
+  # tl_evaluate() an rmse of NaN
+  set.seed(1)
+  d <- data.frame(y = stats::rnorm(50), x = stats::rnorm(50))
+  split <- tl_split(d, prop = 0.8, stratify = "y", seed = 1)
+
+  breaks <- stats::quantile(d$y, probs = seq(0, 1, 0.25))
+  bins <- cut(d$y, breaks, include.lowest = TRUE)
+  train_bins <- cut(split$train$y, breaks, include.lowest = TRUE)
+  expect_equal(as.vector(table(train_bins)),
+               floor(as.vector(table(bins)) * 0.8))
+  expect_equal(nrow(split$train) + nrow(split$test), 50)
+  expect_length(intersect(split$train$x, split$test$x), 0)
+
+  # Rows missing the value still form a stratum of their own
+  d$y[1:6] <- NA
+  split <- tl_split(d, prop = 0.8, stratify = "y", seed = 1)
+  expect_equal(sum(is.na(split$train$y)), 4)
+  expect_equal(sum(is.na(split$test$y)), 2)
+})
+
+test_that("strata too small to split are pooled", {
+  # An ID column made every row a stratum of one, all sent to training
+  ids <- data.frame(id = sprintf("id%02d", 1:50), x = seq_len(50))
+  split <- tl_split(ids, prop = 0.8, stratify = "id", seed = 1)
+  expect_equal(nrow(split$train), 40)
+  expect_equal(nrow(split$test), 10)
+
+  # A numeric column with few distinct values is still split by value.
+  # Binning cyl by its quartiles would put 4 and 6 in one bin and draw 25.
+  split <- tl_split(mtcars, prop = 0.8, stratify = "cyl", seed = 1)
+  expect_equal(as.vector(table(split$train$cyl)), c(8, 5, 11))
+})
+
+test_that("tl_split warns when the test set comes back empty", {
+  expect_warning(
+    split <- tl_split(data.frame(x = 1), seed = 1),
+    "Splitting 1 row(s) at prop = 0.8 leaves no test data",
+    fixed = TRUE
+  )
+  expect_equal(nrow(split$train), 1)
+  expect_equal(nrow(split$test), 0)
+
+  expect_no_warning(tl_split(data.frame(x = 1:2), seed = 1))
+  expect_no_warning(tl_split(data.frame(x = 1:2, g = 1:2), stratify = "g",
+                             seed = 1))
+})
+
 test_that("tl_prepare_data preserves response variable", {
   result <- tl_prepare_data(iris, Species ~ .,
                             scale_method = "standardize",
@@ -237,4 +305,121 @@ test_that("scaling leaves a column with no spread to measure alone", {
   )
   expect_true(all(is.na(out$data$empty)))
   expect_equal(mean(out$data$x), 0)
+
+  # An Inf has an undefined variance, and the NA it gave the zero-variance
+  # step stopped the call with "Selections can't have missing values"
+  d <- data.frame(y = 1:5, x = c(1, 2, Inf, 4, 5), z = c(2, 7, 1, 8, 2))
+  out <- suppressMessages(tl_prepare_data(d, y ~ .))
+  expect_identical(out$data$x, d$x)
+  expect_equal(out$data$z, (d$z - mean(d$z)) / stats::sd(d$z))
+})
+
+test_that("tl_prepare_data runs when no formula predictor is numeric", {
+  # sapply() over a frame with no numeric column returns list(), and
+  # indexing names() with that failed with "invalid subscript type 'list'"
+  d <- transform(mtcars, am = factor(am, labels = c("auto", "manual")))
+  out <- suppressMessages(tl_prepare_data(d, mpg ~ am))
+  expect_equal(dim(out$data), c(32L, 11L))
+  expect_identical(out$data$am, d$am)
+  expect_identical(out$data$mpg, d$mpg)
+  expect_identical(out$data$disp, d$disp)
+
+  logical_pred <- transform(mtcars, manual = am == 1)
+  out <- suppressMessages(tl_prepare_data(logical_pred, mpg ~ manual))
+  expect_identical(out$data$manual, logical_pred$manual)
+
+  # A three-level factor is still one-hot encoded
+  d$gear <- factor(d$gear)
+  out <- suppressMessages(
+    tl_prepare_data(d, mpg ~ gear, scale_method = "none")
+  )
+  expect_equal(out$data$gear_4, as.numeric(d$gear == "4"))
+
+  intercept_only <- suppressMessages(tl_prepare_data(mtcars, mpg ~ 1))
+  expect_equal(as.list(intercept_only$data[names(mtcars)]), as.list(mtcars))
+})
+
+test_that("tl_prepare_data refuses a response that is not a column", {
+  # mgp ~ . standardised mpg as one of the predictors, and the misspelt
+  # response was dropped without a word
+  expect_error(
+    tl_prepare_data(mtcars, mgp ~ .),
+    "The formula's response, 'mgp', is not a column of `data`",
+    fixed = TRUE
+  )
+  out <- suppressMessages(tl_prepare_data(mtcars[, 1:4], log(mpg) ~ .))
+  expect_identical(out$data$mpg, mtcars$mpg)
+})
+
+test_that("tl_prepare_data refuses a scaling method it lacks", {
+  # "zscore" reported scaling and returned the data unchanged
+  expect_error(
+    tl_prepare_data(mtcars[, 1:3], mpg ~ ., scale_method = "zscore"),
+    paste0("'scale_method' must be one of \"standardize\", \"normalize\", ",
+           "\"robust\", \"none\"."),
+    fixed = TRUE
+  )
+  expect_error(
+    tl_prepare_data(mtcars[, 1:3], mpg ~ .,
+                    scale_method = c("standardize", "none")),
+    "'scale_method' must be one of",
+    fixed = TRUE
+  )
+
+  robust <- suppressMessages(
+    tl_prepare_data(mtcars[, 1:3], mpg ~ ., scale_method = "robust")
+  )
+  expect_equal(robust$data$disp,
+               (mtcars$disp - stats::median(mtcars$disp)) /
+                 stats::IQR(mtcars$disp),
+               ignore_attr = TRUE)
+  unscaled <- tl_prepare_data(mtcars[, 1:3], mpg ~ ., scale_method = "none")
+  expect_identical(unscaled$data$disp, mtcars$disp)
+})
+
+test_that("an entirely missing factor is left as it is", {
+  # model.matrix() drops NA rows, so the factor's dummies had no rows and
+  # binding them back failed with "Can't recycle `..1` (size 6) to match
+  # `..2` (size 0)"
+  d <- data.frame(
+    y = c(1, 4, 2, 8, 5, 7), x = c(3, 1, 4, 1, 5, 9),
+    g = factor(rep(NA, 6), levels = c("a", "b", "c"))
+  )
+  out <- suppressMessages(tl_prepare_data(d, y ~ .))
+  expect_identical(out$data$g, d$g)
+  expect_equal(out$data$x, (d$x - mean(d$x)) / stats::sd(d$x))
+})
+
+test_that("a single row is returned without scaling", {
+  # One value has an NA variance, and NA in the zero-variance selection
+  # failed with "Selections can't have missing values"
+  out <- suppressMessages(
+    tl_prepare_data(data.frame(y = 1, x = 2, z = 3), y ~ .)
+  )
+  expect_equal(as.list(out$data[c("y", "x", "z")]),
+               list(y = 1, x = 2, z = 3))
+})
+
+test_that("a grouped tibble is prepared as a whole", {
+  # The response was added back inside each group: "`mpg` must be size 11
+  # or 1, not 32"
+  grouped <- dplyr::group_by(tibble::as_tibble(mtcars[, 1:4]), cyl)
+  out <- suppressMessages(tl_prepare_data(grouped, mpg ~ .))
+  expect_false(dplyr::is_grouped_df(out$data))
+  expect_equal(out$data$mpg, mtcars$mpg)
+  expect_equal(out$data$disp,
+               (mtcars$disp - mean(mtcars$disp)) / stats::sd(mtcars$disp))
+})
+
+test_that("tl_prepare_data refuses a formula with no response", {
+  # all.vars(~ x1 + x2)[1] made x1 the response, so it was left unscaled
+  # and only x2 was processed
+  d <- data.frame(x1 = c(1, 2, 3, 4), x2 = c(10, 20, 30, 45))
+  expect_error(
+    tl_prepare_data(d, ~ x1 + x2),
+    "'formula' has no response",
+    fixed = TRUE
+  )
+  expect_equal(suppressMessages(tl_prepare_data(d))$data$x1,
+               (d$x1 - mean(d$x1)) / stats::sd(d$x1))
 })

@@ -12,7 +12,8 @@ NULL
 #' @param data A data frame containing the data
 #' @param formula A formula specifying the base model without interactions,
 #'   or a string that parses as one. \code{.} and \code{- var} are expanded
-#'   against \code{data}.
+#'   against \code{data}. The models are fitted with \code{lm()}, so the
+#'   response must be numeric or logical.
 #' @param var1 First variable to test for interactions
 #' @param var2 Second variable to test for interactions
 #'   (if NULL, tests var1 with all others)
@@ -37,6 +38,24 @@ tl_test_interactions <- function(data, formula, var1 = NULL, var2 = NULL,
                                  alpha = 0.05) {
   formula <- tl_as_formula(formula)
   tl_check_two_sided(formula, "tl_test_interactions")
+
+  # lm() cannot fit a factor response: a two-class one came back as a row
+  # of NaN after a run of base-R warnings. A logical response is fitted as
+  # 0/1, like a binary numeric one.
+  response <- eval(formula[[2]], data, environment(formula))
+  if (!is.numeric(response) && !is.logical(response)) {
+    stop(
+      "Interactions are tested with linear models fitted by lm(), so the ",
+      "response must be numeric; '", deparse1(formula[[2]]), "' is ",
+      if (is.factor(response)) {
+        "a factor"
+      } else {
+        paste0("of class '", class(response)[1], "'")
+      },
+      ".",
+      call. = FALSE
+    )
+  }
 
   # The candidates are the main-effect terms of the expanded formula.
   # all.vars() cannot see the columns behind `.` and still counts a column
@@ -183,7 +202,9 @@ tl_test_interactions <- function(data, formula, var1 = NULL, var2 = NULL,
 #' @param var1 First variable in the interaction
 #' @param var2 Second variable in the interaction
 #' @param n_points Number of points to use for continuous variables
-#' @param fixed_values Named list of values for other variables in the model
+#' @param fixed_values Named list of values for other variables in the
+#'   model. A variable not named is held at its median if it is numeric, and
+#'   otherwise at its most frequent value, a tie going to the earlier level.
 #' @param confidence Logical; whether to show a 95\% confidence band. The
 #'   band is drawn when one variable is numeric and the other categorical,
 #'   and needs a model whose underlying fit is an \code{lm} or \code{glm};
@@ -193,7 +214,10 @@ tl_test_interactions <- function(data, formula, var1 = NULL, var2 = NULL,
 #' @return A \code{\link[ggplot2]{ggplot}} object. Two numeric variables are
 #'   drawn as a filled contour of the prediction; a numeric and a categorical
 #'   variable as one line per category; two categorical variables as dodged
-#'   bars.
+#'   bars. A factor, character or logical variable is categorical, and only
+#'   the values the data holds are drawn. For a classification model the
+#'   prediction is the probability of the second class, so the response
+#'   must have two classes.
 #' @export
 #' @examples
 #' \donttest{
@@ -226,22 +250,15 @@ tl_plot_interaction <- function(model, var1, var2,
   if (!var1 %in% all_vars || !var2 %in% all_vars) {
     stop("Variables not found in model formula", call. = FALSE)
   }
+  positive <- tl_interaction_class(model, "tl_plot_interaction")
 
   # Determine variable types
-  var1_type <- if (
-    is.factor(data[[var1]]) || is.character(data[[var1]])
-  ) "categorical" else "numeric"
-  var2_type <- if (
-    is.factor(data[[var2]]) || is.character(data[[var2]])
-  ) "categorical" else "numeric"
+  var1_type <- if (tl_is_categorical(data[[var1]])) "categorical" else "numeric"
+  var2_type <- if (tl_is_categorical(data[[var2]])) "categorical" else "numeric"
 
   # Create grid of values
   if (var1_type == "categorical") {
-    if (is.factor(data[[var1]])) {
-      var1_values <- levels(data[[var1]])
-    } else {
-      var1_values <- unique(data[[var1]])
-    }
+    var1_values <- tl_present_values(data[[var1]])
   } else {
     var1_values <- seq(min(data[[var1]], na.rm = TRUE),
                        max(data[[var1]], na.rm = TRUE),
@@ -249,11 +266,7 @@ tl_plot_interaction <- function(model, var1, var2,
   }
 
   if (var2_type == "categorical") {
-    if (is.factor(data[[var2]])) {
-      var2_values <- levels(data[[var2]])
-    } else {
-      var2_values <- unique(data[[var2]])
-    }
+    var2_values <- tl_present_values(data[[var2]])
   } else {
     var2_values <- seq(min(data[[var2]], na.rm = TRUE),
                        max(data[[var2]], na.rm = TRUE),
@@ -266,6 +279,8 @@ tl_plot_interaction <- function(model, var1, var2,
     var2 = var2_values
   )
   names(grid) <- c(var1, var2)
+  grid[[var1]] <- tl_as_grid_column(grid[[var1]], data[[var1]])
+  grid[[var2]] <- tl_as_grid_column(grid[[var2]], data[[var2]])
 
   # Add fixed values for other variables. The grid needs every column the
   # model frame evaluates, which for `y ~ . - qsec` still includes qsec.
@@ -273,26 +288,10 @@ tl_plot_interaction <- function(model, var1, var2,
                             c(var1, var2))
 
   for (v in all_other_vars) {
-    if (!is.null(fixed_values) && v %in% names(fixed_values)) {
-      # Use provided value
-      grid[[v]] <- fixed_values[[v]]
+    grid[[v]] <- if (!is.null(fixed_values) && v %in% names(fixed_values)) {
+      tl_given_value(fixed_values[[v]], data[[v]], v, "fixed_values")
     } else {
-      # Use median/mode as default
-      if (is.numeric(data[[v]])) {
-        grid[[v]] <- median(data[[v]], na.rm = TRUE)
-      } else if (is.factor(data[[v]]) || is.character(data[[v]])) {
-        # Use most frequent value
-        tab <- table(data[[v]])
-        grid[[v]] <- names(tab)[which.max(tab)]
-
-        # Convert to factor if necessary
-        if (is.factor(data[[v]])) {
-          grid[[v]] <- factor(grid[[v]], levels = levels(data[[v]]))
-        }
-      } else {
-        # Use first value
-        grid[[v]] <- data[[v]][1]
-      }
+      tl_hold_value(data[[v]])
     }
   }
 
@@ -304,13 +303,7 @@ tl_plot_interaction <- function(model, var1, var2,
          "and takes no 'type' argument.", call. = FALSE)
   }
 
-  # Make predictions -- tidylearn predict returns a tibble with .pred
-  predictions <- predict(model, grid, ...)
-  if (is.data.frame(predictions) && ".pred" %in% names(predictions)) {
-    grid$prediction <- predictions$.pred
-  } else {
-    grid$prediction <- predictions
-  }
+  grid$prediction <- tl_interaction_predict(model, grid, positive, ...)
   y_col <- "prediction"
   lower_col <- NULL
   upper_col <- NULL
@@ -425,7 +418,8 @@ tl_plot_interaction <- function(model, var1, var2,
 #'
 #' @param data A data frame containing the data
 #' @param formula A formula specifying the base model without interactions
-#' @param top_n Number of top interactions to return
+#' @param top_n Number of top interactions to return, a whole number. With
+#'   \code{0} none is added.
 #' @param min_r2_change Minimum change in R-squared to consider
 #' @param max_p_value Maximum p-value for significance
 #' @param exclude_vars Character vector of predictor variables that may not
@@ -435,7 +429,9 @@ tl_plot_interaction <- function(model, var1, var2,
 #'   with the top significant interaction terms added to the formula.
 #'   The interaction test results and selected interactions are stored as
 #'   attributes \code{"interaction_tests"} and
-#'   \code{"selected_interactions"}.
+#'   \code{"selected_interactions"}, data frames in the layout
+#'   \code{\link{tl_test_interactions}} returns. Both are present when no
+#'   interaction is added, with no rows where there is nothing to report.
 #' @examples
 #' \donttest{
 #' model <- tl_auto_interactions(mtcars, mpg ~ wt + hp + cyl, top_n = 2)
@@ -445,6 +441,21 @@ tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
                                  max_p_value = 0.05, exclude_vars = NULL) {
   formula <- tl_as_formula(formula)
   tl_check_two_sided(formula, "tl_auto_interactions")
+
+  # significant[1:top_n, ] read top_n = 0 as row 1, so it still added an
+  # interaction
+  if (!is.numeric(top_n) || length(top_n) != 1L || is.na(top_n) ||
+        top_n < 0 || top_n != round(top_n)) {
+    stop("'top_n' must be a single whole number, 0 or more; got ",
+         tl_describe_value(top_n), ".", call. = FALSE)
+  }
+
+  # The attributes @return documents, set on every model returned
+  with_tests <- function(model, tests, selected) {
+    attr(model, "interaction_tests") <- tests
+    attr(model, "selected_interactions") <- selected
+    model
+  }
 
   # A misspelt exclusion would otherwise exclude nothing without a word.
   if (!is.null(exclude_vars)) {
@@ -476,7 +487,13 @@ tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
   )
   if (is.null(test_results)) {
     message("No interactions left to test; returning the model as specified")
-    return(tl_model(data, formula, method = "linear"))
+    no_tests <- data.frame(
+      var1 = character(0), var2 = character(0), p_value = numeric(0),
+      significant = logical(0), delta_r2 = numeric(0),
+      f_statistic = numeric(0)
+    )
+    return(with_tests(tl_model(data, formula, method = "linear"),
+                      no_tests, no_tests))
   }
 
   # Drop every pair that involves an excluded variable before any selection,
@@ -496,16 +513,19 @@ tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
     dplyr::filter(.data$p_value < max_p_value, .data$delta_r2 >= min_r2_change)
 
   # Select top interactions
-  if (nrow(significant) > top_n) {
-    top_interactions <- significant[1:top_n, ]
-  } else {
-    top_interactions <- significant
-  }
+  top_interactions <- utils::head(significant, top_n)
 
   if (nrow(top_interactions) == 0) {
-    message("No significant interactions found based on criteria")
-    # Return original model
-    return(tl_model(data, formula, method = "linear"))
+    message(
+      if (nrow(significant) == 0) {
+        "No significant interactions found based on criteria"
+      } else {
+        paste0("top_n = 0 selects none of the significant interactions; ",
+               "returning the model as specified")
+      }
+    )
+    return(with_tests(tl_model(data, formula, method = "linear"),
+                      test_results, top_interactions))
   }
 
   # Build formula with interactions
@@ -525,11 +545,7 @@ tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
   # Fit model with interactions
   interaction_model <- tl_model(data, new_formula, method = "linear")
 
-  # Add interaction test results to model
-  attr(interaction_model, "interaction_tests") <- test_results
-  attr(interaction_model, "selected_interactions") <- top_interactions
-
-  interaction_model
+  with_tests(interaction_model, test_results, top_interactions)
 }
 
 #' Calculate partial effects based on a model with interactions
@@ -537,7 +553,9 @@ tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
 #' @param model A tidylearn model object
 #' @param var Variable to calculate effects for
 #' @param by_var Variable to calculate effects by (interaction variable)
-#' @param at_values Named list of values at which to hold other variables
+#' @param at_values Named list of values at which to hold other variables.
+#'   A variable not named is held at its median if it is numeric, and
+#'   otherwise at its most frequent value, a tie going to the earlier level.
 #' @param intervals Logical; whether to add 95\% confidence limits as columns
 #'   \code{lower} and \code{upper}. This needs a model whose underlying fit is
 #'   an \code{lm} or \code{glm}; for any other fit a message is shown and only
@@ -550,13 +568,18 @@ tl_auto_interactions <- function(data, formula, top_n = 3, min_r2_change = 0.01,
 #'   \code{var}: a data frame of predicted values at each factor level for
 #'   each level of \code{by_var}. A numeric \code{by_var} is evaluated at its
 #'   quartiles; quartiles that tie are evaluated once, with a label naming
-#'   each quartile they stand for, such as \code{"Q0/Q25"}.
+#'   each quartile they stand for, such as \code{"Q0/Q25"}. A factor,
+#'   character or logical variable is categorical, and is evaluated at the
+#'   values the data holds: a level no row uses, and a missing value, are
+#'   left out.
 #'
 #'   \code{fit}, \code{lower}, \code{upper} and \code{slope} are on the
-#'   response scale whatever \code{intervals} is set to: predicted
-#'   probabilities for a logistic model. \code{slope} is the slope of a
-#'   straight line fitted to \code{fit} across the range of \code{var}, so
-#'   for a non-linear link it is an average rate of change over that range.
+#'   response scale whatever \code{intervals} is set to. For a
+#'   classification model that is the predicted probability of the second
+#'   class, so the response must have two classes. \code{slope} is the slope
+#'   of a straight line fitted to \code{fit} across the range of \code{var},
+#'   so for a non-linear link it is an average rate of change over that
+#'   range.
 #'
 #'   \code{slopes$slope_se} is the standard error of a straight line fitted
 #'   to the prediction grid, not the sampling uncertainty of the marginal
@@ -590,6 +613,7 @@ tl_interaction_effects <- function(model, var, by_var,
   if (!var %in% all_vars || !by_var %in% all_vars) {
     stop("Variables not found in model formula", call. = FALSE)
   }
+  positive <- tl_interaction_class(model, "tl_interaction_effects")
 
   # An effect of var needs var to vary. A constant column fitted as an
   # aliased coefficient and failed later with "subscript out of bounds".
@@ -599,13 +623,17 @@ tl_interaction_effects <- function(model, var, by_var,
          call. = FALSE)
   }
 
-  # Check if the interaction term exists in the model. terms() needs the
-  # data to expand a `.` in the formula.
+  # Check if the interaction term exists in the model: a term of order two
+  # or more that uses both variables. terms() needs the data to expand a
+  # `.` in the formula. Matching the text "wt:hp" missed log(wt):hp.
   int_term <- paste0(var, ":", by_var)
-  rev_int_term <- paste0(by_var, ":", var)
-  term_labels <- attr(stats::terms(formula, data = data), "term.labels")
-
-  has_interaction <- int_term %in% term_labels || rev_int_term %in% term_labels
+  model_terms <- stats::terms(formula, data = data)
+  interaction_labels <- attr(model_terms, "term.labels")[
+    attr(model_terms, "order") > 1
+  ]
+  has_interaction <- any(vapply(interaction_labels, function(label) {
+    all(c(var, by_var) %in% all.vars(str2lang(label)))
+  }, logical(1)))
 
   if (!has_interaction) {
     warning(paste("Interaction term", int_term, "not found in model formula"),
@@ -613,12 +641,8 @@ tl_interaction_effects <- function(model, var, by_var,
   }
 
   # Determine by_var values
-  if (is.factor(data[[by_var]]) || is.character(data[[by_var]])) {
-    if (is.factor(data[[by_var]])) {
-      by_values <- levels(data[[by_var]])
-    } else {
-      by_values <- unique(data[[by_var]])
-    }
+  if (tl_is_categorical(data[[by_var]])) {
+    by_values <- tl_present_values(data[[by_var]])
   } else {
     # For continuous by_var, use quantiles. A discrete variable such as
     # cyl has tied quartiles, and each tie would otherwise produce a
@@ -649,18 +673,27 @@ tl_interaction_effects <- function(model, var, by_var,
   }
 
   # Set up variable values
-  if (is.factor(data[[var]]) || is.character(data[[var]])) {
-    if (is.factor(data[[var]])) {
-      var_values <- levels(data[[var]])
-    } else {
-      var_values <- unique(data[[var]])
-    }
+  if (tl_is_categorical(data[[var]])) {
+    var_values <- tl_present_values(data[[var]])
     var_is_numeric <- FALSE
   } else {
     var_range <- range(data[[var]], na.rm = TRUE)
     var_values <- seq(var_range[1], var_range[2], length.out = 100)
     var_is_numeric <- TRUE
   }
+
+  # Values for the other variables, including any the formula names but
+  # removes, which the model frame still evaluates
+  other_vars <- setdiff(tl_model_frame_columns(formula, data),
+                        c(var, by_var))
+  held <- lapply(other_vars, function(v) {
+    if (!is.null(at_values) && v %in% names(at_values)) {
+      tl_given_value(at_values[[v]], data[[v]], v, "at_values")
+    } else {
+      tl_hold_value(data[[v]])
+    }
+  })
+  names(held) <- other_vars
 
   # Create grid for predictions
   grid_list <- list()
@@ -669,25 +702,10 @@ tl_interaction_effects <- function(model, var, by_var,
     # Create data frame for this by_value
     grid <- data.frame(var_values)
     names(grid) <- var
-    grid[[by_var]] <- bv
-
-    # Add values for other variables, including any the formula names but
-    # removes, which the model frame still evaluates
-    other_vars <- setdiff(tl_model_frame_columns(formula, data),
-                          c(var, by_var))
+    grid[[var]] <- tl_as_grid_column(grid[[var]], data[[var]])
+    grid[[by_var]] <- tl_as_grid_column(bv, data[[by_var]])
     for (v in other_vars) {
-      if (!is.null(at_values) && v %in% names(at_values)) {
-        grid[[v]] <- at_values[[v]]
-      } else {
-        # Use median/mode
-        if (is.numeric(data[[v]])) {
-          grid[[v]] <- median(data[[v]], na.rm = TRUE)
-        } else if (is.factor(data[[v]])) {
-          grid[[v]] <- levels(data[[v]])[1]
-        } else {
-          grid[[v]] <- unique(data[[v]])[1]
-        }
-      }
+      grid[[v]] <- held[[v]]
     }
 
     # Make predictions. tidylearn's predict() has no standard errors, so
@@ -699,8 +717,7 @@ tl_interaction_effects <- function(model, var, by_var,
       grid$lower <- band$lower
       grid$upper <- band$upper
     } else {
-      preds <- predict(model, grid)
-      grid$fit <- if (is.data.frame(preds)) preds$.pred else preds
+      grid$fit <- tl_interaction_predict(model, grid, positive)
     }
 
     # Add by_value label
@@ -724,19 +741,16 @@ tl_interaction_effects <- function(model, var, by_var,
     slopes <- lapply(by_values, function(bv) {
       # Get data for this by_value
       sub_grid <- final_grid[final_grid$by_value == bv, ]
+      by_label <- if (is.null(names(by_values))) {
+        as.character(bv)
+      } else {
+        names(by_values)[match(bv, by_values)]
+      }
 
-      # If only one value, can't compute slope
-      if (nrow(sub_grid) <= 1) {
-        data.frame(
-          by_value = bv,
-          by_label = if (is.null(names(by_values))) {
-            as.character(bv)
-          } else {
-            names(by_values)[match(bv, by_values)]
-          },
-          slope = NA,
-          slope_se = NA
-        )
+      # Fewer than two predictions leave no line to fit
+      if (sum(!is.na(sub_grid$fit)) < 2) {
+        return(data.frame(by_value = bv, by_label = by_label,
+                          slope = NA_real_, slope_se = NA_real_))
       }
 
       # Fit linear model to get slope. The response here is the model's
@@ -761,11 +775,7 @@ tl_interaction_effects <- function(model, var, by_var,
 
       data.frame(
         by_value = bv,
-        by_label = if (is.null(names(by_values))) {
-          as.character(bv)
-        } else {
-          names(by_values)[match(bv, by_values)]
-        },
+        by_label = by_label,
         slope = slope_coef[2, 1],
         slope_se = slope_coef[2, 2]
       )
@@ -831,6 +841,160 @@ tl_interaction_variables <- function(formula, data) {
 tl_model_frame_columns <- function(formula, data) {
   predictor_terms <- stats::delete.response(stats::terms(formula, data = data))
   intersect(all.vars(predictor_terms), names(data))
+}
+
+#' Whether the interaction functions treat a variable as categorical
+#'
+#' A logical used to count as numeric, so the grid ran from 0 to 1 and
+#' predict() refused it: "variable 'x' was fitted with type "logical" but
+#' type "numeric" was supplied".
+#'
+#' @param x A column of the model's data
+#' @return TRUE for a factor, character or logical column
+#' @keywords internal
+#' @noRd
+tl_is_categorical <- function(x) {
+  is.factor(x) || is.character(x) || is.logical(x)
+}
+
+#' The values of a categorical variable that the data holds
+#'
+#' A level no row uses was predicted at and failed with "factor Species has
+#' new level setosa", and a missing value gave a block of NA predictions
+#' that the slope fit refused with "0 (non-NA) cases". Both are left out.
+#'
+#' @param x A factor, character or logical column
+#' @return The levels in use, in level order; the distinct character values
+#'   in the order they appear; or FALSE then TRUE
+#' @keywords internal
+#' @noRd
+tl_present_values <- function(x) {
+  if (is.factor(x)) {
+    levels(droplevels(x))
+  } else if (is.logical(x)) {
+    sort(unique(x[!is.na(x)]))
+  } else {
+    unique(x[!is.na(x)])
+  }
+}
+
+#' Grid values in the form the model was fitted on
+#'
+#' A factor has to reach predict() as a factor with every training level.
+#' Held as the level's name, randomForest refused it: "Type of predictors in
+#' new data do not match that of the training data".
+#'
+#' @param values Values for one grid column
+#' @param column The model data's column they stand for
+#' @return \code{values}, as a factor with the column's levels when the
+#'   column is a factor
+#' @keywords internal
+#' @noRd
+tl_as_grid_column <- function(values, column) {
+  if (is.factor(column)) {
+    factor(values, levels = levels(column))
+  } else {
+    values
+  }
+}
+
+#' The value at which to hold a variable the grid does not vary
+#'
+#' The median of a numeric variable, otherwise the most frequent value, a
+#' tie going to the earlier level (alphabetical for a character column).
+#' Holding a factor at its first level picked one a subset of the data may
+#' not use at all.
+#'
+#' @param x A column of the model's data
+#' @return A single value of the column's type
+#' @keywords internal
+#' @noRd
+tl_hold_value <- function(x) {
+  if (is.numeric(x)) {
+    return(stats::median(x, na.rm = TRUE))
+  }
+  if (tl_is_categorical(x)) {
+    counts <- table(x)
+    mode <- names(counts)[which.max(counts)]
+    if (is.logical(x)) {
+      return(as.logical(mode))
+    }
+    return(tl_as_grid_column(mode, x))
+  }
+  x[!is.na(x)][1]
+}
+
+#' A held value supplied by the caller, in the column's form
+#'
+#' @param value The value from \code{at_values} or \code{fixed_values}
+#' @param column The model data's column it is for
+#' @param name The column's name, for the message
+#' @param arg The argument it came from, for the message
+#' @return \code{value}, as a factor with the column's levels when the
+#'   column is a factor
+#' @keywords internal
+#' @noRd
+tl_given_value <- function(value, column, name, arg) {
+  held <- tl_as_grid_column(value, column)
+  unknown <- !is.na(value) & is.na(held)
+  if (any(unknown)) {
+    stop(
+      "'", arg, "' holds '", name, "' at \"", value[unknown][1],
+      "\", which is not one of its levels: ",
+      paste(levels(column), collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+  held
+}
+
+#' The class whose probability a classifier's effects are reported on
+#'
+#' A classifier's default prediction is the class label, so the effects were
+#' slopes fitted to a factor and the plot drew labels. The interaction
+#' functions report the probability of the second class instead, the
+#' positive class, which needs a response with two classes.
+#'
+#' @param model A tidylearn model
+#' @param caller The calling function's name, for the message
+#' @return The second class, or NULL for a regression model
+#' @keywords internal
+#' @noRd
+tl_interaction_class <- function(model, caller) {
+  if (!isTRUE(model$spec$is_classification)) {
+    return(NULL)
+  }
+  response_var <- model$spec$response_var %||%
+    all.vars(tl_as_formula(model$spec$formula))[1]
+  classes <- model$spec$response_levels %||%
+    levels(tl_normalise_response(model$data[[response_var]]))
+  if (length(classes) != 2L) {
+    stop(
+      caller, "() reports a classification model on the probability of ",
+      "its second class, so the response needs two classes; '",
+      response_var, "' has ", length(classes), " classes.",
+      call. = FALSE
+    )
+  }
+  classes[2]
+}
+
+#' Predictions on the scale the interaction functions report
+#'
+#' @param model A tidylearn model
+#' @param grid The prediction grid
+#' @param positive The class from \code{tl_interaction_class()}, or NULL
+#' @param ... Passed to \code{predict()}
+#' @return A numeric vector: the prediction, or the probability of
+#'   \code{positive}
+#' @keywords internal
+#' @noRd
+tl_interaction_predict <- function(model, grid, positive, ...) {
+  if (is.null(positive)) {
+    preds <- predict(model, grid, ...)
+    return(if (is.data.frame(preds)) preds$.pred else preds)
+  }
+  predict(model, grid, type = "prob", ...)[[positive]]
 }
 
 #' Refuse a formula with no response

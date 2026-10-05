@@ -61,9 +61,7 @@ test_that("a pipeline still runs end to end and predicts", {
 
   pipe <- tl_pipeline(
     data, y ~ x1 + x2,
-    preprocessing = list(
-      impute_missing = TRUE, standardize = TRUE, dummy_encode = FALSE
-    ),
+    preprocessing = list(impute_missing = TRUE, standardize = TRUE),
     models = list(linear = list(method = "linear")),
     evaluation = list(
       metrics = "rmse", validation = "cv", cv_folds = 3,
@@ -298,6 +296,16 @@ test_that("the caller's next draw does not depend on the seed we were given", {
   with_seed_two <- runif(1)
 
   expect_equal(with_seed_one, with_seed_two)
+})
+
+test_that("tl_check_assumptions draws no random numbers", {
+  # car::durbinWatsonTest() bootstraps a p-value, drawing from the
+  # session's stream, though only the statistic was read
+  model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+  set.seed(1)
+  before <- get(".Random.seed", envir = globalenv())
+  invisible(tl_check_assumptions(model, verbose = FALSE))
+  expect_identical(get(".Random.seed", envir = globalenv()), before)
 })
 
 test_that("preserving the stream did not break the seed's own job", {
