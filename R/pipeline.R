@@ -5,6 +5,27 @@
 #' @importFrom dplyr filter select mutate
 NULL
 
+#' Whether a higher value of a metric is better
+#'
+#' One list for every place that ranks models, covering exactly the metrics
+#' \code{tl_known_metrics()} names. The pipeline, its comparison plot and
+#' the AutoML leaderboard each kept their own list, and the pipeline's left
+#' out sensitivity, specificity and pr_auc, so a stump scoring 0.40 beat a
+#' tree scoring 0.90.
+#'
+#' @param metrics Character vector of metric names
+#' @return A logical vector: \code{TRUE} where higher is better,
+#'   \code{FALSE} where lower is, \code{NA} for a name tidylearn does not
+#'   compute
+#' @keywords internal
+#' @noRd
+tl_metric_higher_better <- function(metrics) {
+  higher <- c("accuracy", "precision", "recall", "sensitivity",
+              "specificity", "f1", "auc", "pr_auc", "rsq")
+  lower <- c("rmse", "mse", "mae", "mape")
+  ifelse(metrics %in% higher, TRUE, ifelse(metrics %in% lower, FALSE, NA))
+}
+
 #' Fill in and validate a pipeline evaluation specification
 #'
 #' @param evaluation A named list of evaluation settings, or NULL.
@@ -190,6 +211,21 @@ merge_preprocessing_spec <- function(preprocessing) {
     )
   }
 
+  # The pipeline has no encoding step of its own: model.matrix() encodes
+  # factors for lm, glm and glmnet, and the tree methods split on them
+  # directly. FALSE therefore ran exactly the models TRUE did.
+  if (isFALSE(preprocessing$dummy_encode)) {
+    stop(
+      "preprocessing$dummy_encode = FALSE cannot be honoured. Categorical ",
+      "predictors are encoded by each model's own fitting function -- ",
+      "model.matrix() for the linear, logistic and glmnet methods, while ",
+      "trees and forests split on factors directly -- so there is no ",
+      "encoding step to switch off. Leave dummy_encode out, or remove the ",
+      "categorical columns from the formula.",
+      call. = FALSE
+    )
+  }
+
   utils::modifyList(defaults, preprocessing)
 }
 
@@ -197,10 +233,20 @@ merge_preprocessing_spec <- function(preprocessing) {
 #'
 #' @param data A data frame containing the data
 #' @param formula A formula specifying the model
-#' @param preprocessing A list of preprocessing steps
+#' @param preprocessing A named list of preprocessing switches, each
+#'   \code{TRUE} or \code{FALSE}: \code{impute_missing} (default
+#'   \code{TRUE}) replaces missing predictor values with the training
+#'   median or mode; \code{standardize} (default \code{TRUE}) centres and
+#'   scales numeric predictors, leaving alone any column the formula uses
+#'   inside a function call such as \code{log()}, \code{poly()} or
+#'   \code{offset()}, so those terms are computed on the column's own
+#'   scale; \code{dummy_encode} (default \code{TRUE}) only records that
+#'   categorical predictors are encoded by each model's fitting function,
+#'   and cannot be set to \code{FALSE}.
 #' @param models A list of models to train
 #' @param evaluation A list of evaluation criteria
-#' @param ... Additional arguments
+#' @param ... Not used. Anything passed here is an error, so a misspelt
+#'   argument such as \code{evalution} is reported rather than ignored.
 #' @return A \code{tidylearn_pipeline} object (S3 list) with components
 #'   \code{$formula}, \code{$data}, \code{$preprocessing},
 #'   \code{$models}, \code{$evaluation}, and \code{$results}
@@ -216,6 +262,18 @@ tl_pipeline <- function(data, formula,
                         preprocessing = NULL,
                         models = NULL,
                         evaluation = NULL, ...) {
+  # A misspelt argument -- evalution = list(cv_folds = 2) -- landed here
+  # and was dropped, leaving every setting at its default without a word
+  extra <- names2(list(...))
+  if (length(extra) > 0) {
+    extra[!nzchar(extra)] <- "<unnamed>"
+    stop(
+      "tl_pipeline() has no argument(s) ", paste(extra, collapse = ", "),
+      ". It takes data, formula, preprocessing, models and evaluation.",
+      call. = FALSE
+    )
+  }
+
   formula <- tl_as_formula(formula)
 
   # Fill in whichever preprocessing steps the caller left unnamed. A
@@ -319,6 +377,27 @@ tl_pipeline <- function(data, formula,
   pipeline
 }
 
+#' Columns a formula uses inside a function call
+#'
+#' Standardising happens before the formula is evaluated, so a column the
+#' formula transforms would be transformed on the standardised scale:
+#' \code{log(hp)} of a below-average car is \code{log()} of a negative
+#' number, and \code{offset(0.05 * hp)} adds 0.05 per standard deviation
+#' rather than per horsepower. Those columns are left on their own scale.
+#'
+#' @param formula The model formula
+#' @param data The data it is evaluated against, to expand \code{.}
+#' @return A character vector of column names, possibly empty
+#' @keywords internal
+#' @noRd
+tl_formula_call_columns <- function(formula, data) {
+  variables <- as.list(
+    attr(stats::terms(formula, data = data), "variables")
+  )[-1]
+  in_calls <- variables[!vapply(variables, is.name, logical(1))]
+  unique(unlist(lapply(in_calls, all.vars)))
+}
+
 #' Learn preprocessing statistics from a training set
 #'
 #' Split out from \code{tl_run_pipeline()} so that every resampling fold
@@ -370,6 +449,9 @@ tl_learn_preprocessing <- function(data, formula, preprocessing) {
   if (isTRUE(preprocessing$standardize)) {
     numeric_cols <- vapply(data, is.numeric, logical(1))
     numeric_cols[response_var] <- FALSE  # Don't standardize response
+    transformed <- intersect(tl_formula_call_columns(formula, data),
+                             names(data))
+    numeric_cols[transformed] <- FALSE
 
     for (col in names(data)[numeric_cols]) {
       col_mean <- mean(data[[col]], na.rm = TRUE)
@@ -440,6 +522,11 @@ tl_apply_preprocessing <- function(data, preprocessing, stats_learned) {
 #'   list of per-model fits and metrics), \code{$best_model_name},
 #'   \code{$best_model} (the winning \code{tidylearn_model}), and
 #'   \code{$metric_values}.
+#'
+#'   The training data is every row when \code{validation = "cv"}: each
+#'   model is scored across the folds and then refitted on all of them.
+#'   With \code{validation = "split"} it is the training split alone, since
+#'   the models kept are the ones fitted there and scored on the test rows.
 #' @examples
 #' \donttest{
 #' pipe <- tl_pipeline(iris, Species ~ .,
@@ -588,19 +675,21 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
     }
   }
 
-  # Statistics for the final model, which is legitimately fitted on
-  # everything. tl_predict_pipeline() replays these on raw new data.
-  #
-  # Resampling below deliberately does NOT use them: each fold relearns
-  # from its own analysis rows, so no assessment row contributes to the
-  # transformation it is later scored under.
-  preprocessing_stats <- tl_learn_preprocessing(data, formula, preprocessing)
-  processed_data <- tl_apply_preprocessing(
-    data, preprocessing, preprocessing_stats
-  )
-
   # Set up validation strategy. Splits are drawn from the RAW data.
   if (evaluation$validation == "cv") {
+    # Statistics for the final model, which is legitimately fitted on
+    # everything. tl_predict_pipeline() replays these on raw new data.
+    #
+    # Resampling below deliberately does NOT use them: each fold relearns
+    # from its own analysis rows, so no assessment row contributes to the
+    # transformation it is later scored under.
+    preprocessing_stats <- tl_learn_preprocessing(
+      data, formula, preprocessing
+    )
+    processed_data <- tl_apply_preprocessing(
+      data, preprocessing, preprocessing_stats
+    )
+
     cv_folds <- evaluation$cv_folds
 
     if (verbose) {
@@ -632,6 +721,13 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
     test_data <- tl_apply_preprocessing(
       data[-train_idx, ], preprocessing, split_stats
     )
+
+    # The models kept are the ones fitted on the training rows, so these
+    # are the statistics tl_predict_pipeline() has to replay. Full-data
+    # statistics moved its predictions away from the ones each model was
+    # scored on.
+    preprocessing_stats <- split_stats
+    processed_data <- train_data
   }
 
   # Train and evaluate models
@@ -686,10 +782,27 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
 
         fold_model <- do.call(tl_model, model_args)
 
-        # Evaluate on test fold
-        fold_metrics <- tl_evaluate(
-          fold_model, test_fold,
-          metrics = evaluation$metrics
+        # Evaluate on test fold. tl_evaluate() refuses a fold with no row
+        # it can score -- every response in it missing, say -- and one such
+        # fold is no reason to stop the run, so it scores NA and the
+        # average is taken over the rest, as in tl_cv(). The split below
+        # lets the error through: it has no other rows to score.
+        fold_metrics <- tryCatch(
+          tl_evaluate(fold_model, test_fold, metrics = evaluation$metrics),
+          tidylearn_no_scored_rows = function(e) {
+            warning(
+              "Fold ", i, " of model '", model_name, "' is left out of its ",
+              "average, since ",
+              if (is.null(e$reason)) {
+                "it has no rows to score."
+              } else {
+                paste0("none of its ", e$n_rows, " rows can be scored: ",
+                       e$reason, ".")
+              },
+              call. = FALSE
+            )
+            tibble::tibble(metric = evaluation$metrics, value = NA_real_)
+          }
         )
 
         # Store fold results
@@ -810,13 +923,8 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
     }
   )
 
-  # Determine if higher or lower is better for this metric
-  metrics_higher_better <- c(
-    "accuracy", "precision", "recall",
-    "f1", "auc", "rsq"
-  )
-  is_higher_better <- best_metric %in%
-    metrics_higher_better
+  # merge_evaluation_spec() admits known metrics only, so this is never NA
+  is_higher_better <- tl_metric_higher_better(best_metric)
 
   # Find best model (use na.rm-safe which.max/which.min)
   valid_values <- !is.na(metric_values)
@@ -859,6 +967,12 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
 #' @param pipeline A tidylearn pipeline object with results
 #' @return The best \code{tidylearn_model} object from the pipeline,
 #'   selected by the metric specified in \code{evaluation$best_metric}.
+#'   The model was fitted on the preprocessed training data, so under the
+#'   default preprocessing it expects predictors imputed and standardised
+#'   the same way. Predict through \code{\link{tl_predict_pipeline}}, which
+#'   replays that preprocessing on raw rows; \code{predict()} on the model
+#'   itself reads raw values as if they were already standardised, and
+#'   returns wrong predictions without a warning.
 #' @examples
 #' \donttest{
 #' pipe <- tl_pipeline(iris, Species ~ .,
@@ -867,6 +981,10 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
 #'     cv_folds = 2, best_metric = "accuracy"))
 #' pipe <- tl_run_pipeline(pipe, verbose = FALSE)
 #' best <- tl_get_best_model(pipe)
+#' best$spec$method
+#'
+#' # Predict through the pipeline, which preprocesses the new rows first
+#' tl_predict_pipeline(pipe, iris[c(1, 51, 101), ])
 #' }
 #' @export
 tl_get_best_model <- function(pipeline) {
@@ -884,8 +1002,8 @@ tl_get_best_model <- function(pipeline) {
 #' Compare models from a pipeline
 #'
 #' @param pipeline A tidylearn pipeline object with results
-#' @param metrics Character vector of metrics to compare
-#'   (if NULL, uses all available)
+#' @param metrics Character vector of metrics to compare, each one the
+#'   pipeline scored (if NULL, uses all available)
 #' @return A \code{\link[ggplot2]{ggplot}} object showing a faceted bar
 #'   chart comparing metric values across models, with the best model
 #'   highlighted.
@@ -917,6 +1035,25 @@ tl_compare_pipeline_models <- function(pipeline, metrics = NULL) {
 
   # Extract model results
   model_results <- pipeline$results$model_results
+  is_cv <- !is.null(pipeline$evaluation) &&
+    pipeline$evaluation$validation == "cv"
+
+  # A metric the run did not score left nothing to plot, and the failure
+  # surfaced inside ggplot2's faceting
+  if (!is.null(metrics)) {
+    scored <- unique(unlist(lapply(model_results, function(result) {
+      if (is_cv) result$avg_metrics$metric else result$test_metrics$metric
+    })))
+    unscored <- setdiff(metrics, scored)
+    if (length(unscored) > 0) {
+      stop(
+        "Metric(s) not scored by this pipeline: ",
+        paste(unscored, collapse = ", "), ". Scored: ",
+        paste(scored, collapse = ", "), ".",
+        call. = FALSE
+      )
+    }
+  }
 
   # Create data frame for plotting
   comparison_data <- NULL
@@ -924,8 +1061,7 @@ tl_compare_pipeline_models <- function(pipeline, metrics = NULL) {
   for (model_name in names(model_results)) {
     result <- model_results[[model_name]]
 
-    if (!is.null(pipeline$evaluation) &&
-          pipeline$evaluation$validation == "cv") {
+    if (is_cv) {
       # Get from average metrics
       model_metrics <- result$avg_metrics
 
@@ -973,12 +1109,8 @@ tl_compare_pipeline_models <- function(pipeline, metrics = NULL) {
     pipeline$results$best_model_name
 
   # Determine which metrics are "higher is better"
-  metrics_higher_better <- c(
-    "accuracy", "precision", "recall",
-    "f1", "auc", "rsq"
-  )
   comparison_data$higher_better <-
-    comparison_data$metric %in% metrics_higher_better
+    tl_metric_higher_better(comparison_data$metric)
 
   # Create comparison plot
   p <- ggplot2::ggplot(
@@ -1263,10 +1395,11 @@ summary.tidylearn_pipeline <- function(object, ...) {
     }
   }
 
-  # Summary of best model
+  # Summary of best model. summary() prints and returns the model, so
+  # wrapping it in print() showed the model a second time.
   cat("\nBest Model Summary\n")
   cat("=================\n")
-  print(summary(object$results$best_model))
+  summary(object$results$best_model)
 
   invisible(object)
 }

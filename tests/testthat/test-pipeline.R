@@ -43,6 +43,74 @@ test_that("tl_predict_pipeline standardizes new data with training stats", {
   expect_true(all(abs(preds$.pred - mtcars$mpg) < 10))
 })
 
+test_that("columns the formula transforms are left on their own scale", {
+  # log(hp) was evaluated on the standardised column, so every car with
+  # below-average hp gave NaN: the final lm kept 15 of 32 rows and
+  # tl_predict_pipeline() returned NaN for 5 of the first 6 cars
+  set.seed(1)
+  expect_no_warning(run <- tl_run_pipeline(
+    tl_pipeline(
+      mtcars, mpg ~ log(hp) + wt,
+      models = list(lin = list(method = "linear")),
+      evaluation = list(cv_folds = 4)
+    ),
+    verbose = FALSE
+  ))
+  best <- tl_get_best_model(run)
+  direct <- lm(mpg ~ log(hp) + wt, data = mtcars)
+
+  expect_equal(stats::nobs(best$fit), nrow(mtcars))
+  expect_equal(coef(best$fit)[["log(hp)"]], coef(direct)[["log(hp)"]])
+  expect_equal(tl_predict_pipeline(run, mtcars)$.pred, fitted(direct))
+
+  # wt enters as a plain term, so it is still standardised; hp is not
+  expect_equal(run$results$preprocessing_stats$center$wt, mean(mtcars$wt))
+  expect_null(run$results$preprocessing_stats$center$hp)
+
+  # The offset was computed from standardised hp, which put the
+  # predictions up to 8.5 mpg from lm()'s
+  set.seed(1)
+  offset_run <- tl_run_pipeline(
+    tl_pipeline(
+      mtcars, mpg ~ wt + offset(0.05 * hp),
+      models = list(lin = list(method = "linear")),
+      evaluation = list(cv_folds = 4)
+    ),
+    verbose = FALSE
+  )
+  direct_offset <- lm(mpg ~ wt + offset(0.05 * hp), data = mtcars)
+  expect_equal(
+    tl_predict_pipeline(offset_run, mtcars)$.pred,
+    predict(direct_offset, mtcars)
+  )
+})
+
+test_that("a transformed term in a logistic pipeline matches glm()", {
+  # The standardised Sepal.Length gave NaN under log(), so the final glm
+  # kept 51 of the 100 rows
+  binary_iris <- droplevels(iris[iris$Species != "setosa", ])
+  set.seed(2)
+  run <- tl_run_pipeline(
+    tl_pipeline(
+      binary_iris, Species ~ log(Sepal.Length) + Petal.Width,
+      models = list(logit = list(method = "logistic")),
+      evaluation = list(cv_folds = 4)
+    ),
+    verbose = FALSE
+  )
+  direct <- glm(Species ~ log(Sepal.Length) + Petal.Width,
+                data = binary_iris, family = binomial)
+
+  best <- tl_get_best_model(run)
+  expect_equal(stats::nobs(best$fit), nrow(binary_iris))
+  expect_equal(coef(best$fit)[["log(Sepal.Length)"]],
+               coef(direct)[["log(Sepal.Length)"]])
+  expect_equal(
+    tl_predict_pipeline(run, binary_iris, type = "response")$.pred,
+    fitted(direct)
+  )
+})
+
 test_that("tl_predict_pipeline imputes with the raw training median", {
   set.seed(203)
   res <- tl_run_pipeline(make_regression_pipeline(), verbose = FALSE)
@@ -94,6 +162,191 @@ test_that("tl_run_pipeline selects a best model using the default metrics", {
 
   expect_equal(res$results$best_model_name, "tree")
   expect_false(is.na(res$results$metric_values[["tree"]]))
+})
+
+test_that("every metric a pipeline can score has a direction", {
+  known <- c(tl_known_metrics(TRUE), tl_known_metrics(FALSE))
+  expect_false(anyNA(tl_metric_higher_better(known)))
+  expect_equal(
+    tl_metric_higher_better(
+      c("sensitivity", "specificity", "pr_auc", "rsq", "rmse", "mape")
+    ),
+    c(TRUE, TRUE, TRUE, TRUE, FALSE, FALSE)
+  )
+  expect_true(is.na(tl_metric_higher_better("mystery")))
+})
+
+test_that("sensitivity, specificity and pr_auc select the highest score", {
+  # These were missing from the higher-is-better list, so the lowest score
+  # won: a cp = 1 stump at sensitivity 0.40 over a tree at 0.90, and a tree
+  # over a logistic model with the higher pr_auc
+  binary_iris <- droplevels(iris[iris$Species != "setosa", ])
+  candidates <- list(
+    sensitivity = list(good = list(method = "tree"),
+                       stump = list(method = "tree", cp = 1)),
+    specificity = list(good = list(method = "tree"),
+                       stump = list(method = "tree", cp = 1)),
+    pr_auc = list(tree = list(method = "tree"),
+                  logistic = list(method = "logistic"))
+  )
+
+  for (metric in names(candidates)) {
+    set.seed(10)
+    run <- suppressWarnings(tl_run_pipeline(
+      tl_pipeline(
+        binary_iris, Species ~ .,
+        models = candidates[[metric]],
+        evaluation = list(metrics = c(metric, "accuracy"),
+                          best_metric = metric, cv_folds = 5)
+      ),
+      verbose = FALSE
+    ))
+    values <- run$results$metric_values
+    expect_false(isTRUE(all.equal(min(values), max(values))), info = metric)
+    expect_equal(run$results$best_model_name, names(which.max(values)),
+                 info = metric)
+
+    plotted <- tl_compare_pipeline_models(run)$data
+    expect_true(all(plotted$higher_better[plotted$metric == metric]),
+                info = metric)
+  }
+})
+
+test_that("split validation predicts under the split's own statistics", {
+  # The model was fitted on the training rows under their centre and
+  # scale, but tl_predict_pipeline() replayed the full-data ones: wt was
+  # centred on 3.217 rather than 3.279, and predictions on the test rows
+  # moved by up to 0.685 mpg from the ones the model was scored on
+  set.seed(3)
+  run <- tl_run_pipeline(
+    tl_pipeline(
+      mtcars, mpg ~ wt + hp,
+      models = list(lin = list(method = "linear")),
+      evaluation = list(validation = "split", train_prop = 0.7)
+    ),
+    verbose = FALSE
+  )
+  train_rows <- rownames(tl_get_best_model(run)$data)
+  test_rows <- setdiff(rownames(mtcars), train_rows)
+
+  expect_length(train_rows, round(0.7 * nrow(mtcars)))
+  expect_equal(run$results$preprocessing_stats$center$wt,
+               mean(mtcars[train_rows, "wt"]))
+  expect_equal(nrow(run$results$processed_data), length(train_rows))
+
+  preds <- tl_predict_pipeline(run, mtcars[test_rows, ])$.pred
+  direct <- lm(mpg ~ wt + hp, data = mtcars[train_rows, ])
+  expect_equal(preds, predict(direct, mtcars[test_rows, ]))
+
+  # The reported test score is the score of those same predictions
+  scored <- run$results$model_results$lin$test_metrics
+  expect_equal(scored$value[scored$metric == "rmse"],
+               sqrt(mean((mtcars[test_rows, "mpg"] - preds)^2)))
+})
+
+test_that("a fold with no row to score is left out of the average", {
+  # tl_evaluate() refuses a fold none of whose rows can be scored -- here
+  # every response in it is missing -- and unhandled, that one fold
+  # stopped the whole run
+  scored <- mtcars[, c("mpg", "wt", "hp")]
+  set.seed(209)
+  folds <- rsample::vfold_cv(scored, v = 4)
+  scored$mpg[rsample::complement(folds$splits[[1]])] <- NA
+
+  # vfold_cv() draws its folds from the row count alone, so the same seed
+  # gives the pipeline the same folds
+  set.seed(209)
+  expect_warning(
+    run <- tl_run_pipeline(
+      tl_pipeline(
+        scored, mpg ~ wt + hp,
+        models = list(lin = list(method = "linear")),
+        evaluation = list(metrics = "rmse", best_metric = "rmse",
+                          cv_folds = 4)
+      ),
+      verbose = FALSE
+    ),
+    "Fold 1 of model 'lin' is left out of its average"
+  )
+
+  fold_scores <- vapply(
+    run$results$model_results$lin$cv_results,
+    function(fold) fold$metrics$value[fold$metrics$metric == "rmse"],
+    numeric(1)
+  )
+  expect_true(is.na(fold_scores[1]))
+  expect_false(anyNA(fold_scores[-1]))
+  expect_equal(run$results$metric_values[["lin"]], mean(fold_scores[-1]))
+
+  # A single split has nothing else to score, so the error stands there
+  test_only <- mtcars[, c("mpg", "wt", "hp")]
+  set.seed(210)
+  train_rows <- sample(nrow(test_only), round(0.7 * nrow(test_only)))
+  test_only$mpg[-train_rows] <- NA
+  set.seed(210)
+  expect_error(
+    tl_run_pipeline(
+      tl_pipeline(
+        test_only, mpg ~ wt + hp,
+        models = list(lin = list(method = "linear")),
+        evaluation = list(validation = "split", train_prop = 0.7)
+      ),
+      verbose = FALSE
+    ),
+    class = "tidylearn_no_scored_rows"
+  )
+})
+
+test_that("tl_pipeline refuses arguments and settings it would ignore", {
+  # A misspelt argument was swallowed by `...`, leaving cv_folds at 5
+  expect_error(
+    tl_pipeline(iris, Species ~ ., evalution = list(cv_folds = 2)),
+    "tl_pipeline\\(\\) has no argument\\(s\\) evalution"
+  )
+  expect_error(
+    tl_pipeline(iris, Species ~ ., NULL, NULL, NULL, "extra"),
+    "has no argument\\(s\\) <unnamed>"
+  )
+
+  # dummy_encode = FALSE ran the same models as TRUE: model.matrix() and
+  # the tree methods encode factors whatever the switch says
+  expect_error(
+    tl_pipeline(iris, Sepal.Length ~ .,
+                preprocessing = list(dummy_encode = FALSE)),
+    "dummy_encode = FALSE cannot be honoured"
+  )
+
+  # The real arguments, and dummy_encode = TRUE, are still taken
+  pipe <- tl_pipeline(iris, Species ~ .,
+                      preprocessing = list(dummy_encode = TRUE),
+                      evaluation = list(cv_folds = 2))
+  expect_equal(pipe$evaluation$cv_folds, 2)
+  expect_true(pipe$preprocessing$dummy_encode)
+})
+
+test_that("tl_compare_pipeline_models names a metric the run did not score", {
+  set.seed(207)
+  run <- tl_run_pipeline(make_regression_pipeline(), verbose = FALSE)
+
+  # An unscored metric left nothing to plot and failed inside ggplot2's
+  # faceting
+  expect_error(
+    tl_compare_pipeline_models(run, metrics = "nope"),
+    "not scored by this pipeline: nope. Scored: rmse"
+  )
+  plotted <- tl_compare_pipeline_models(run, metrics = "rmse")
+  expect_s3_class(plotted, "ggplot")
+  expect_equal(unique(plotted$data$metric), "rmse")
+})
+
+test_that("summary() of a run pipeline shows the best model once", {
+  set.seed(208)
+  run <- tl_run_pipeline(make_regression_pipeline(), verbose = FALSE)
+
+  # The best model's summary was printed, then printed again by print()
+  out <- utils::capture.output(summary(run))
+  expect_equal(sum(grepl("^tidylearn Model", out)), 1)
+  expect_true(any(grepl("^Training Performance", out)))
 })
 
 test_that("tl_run_pipeline standardizes constant columns safely", {

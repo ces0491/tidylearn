@@ -136,6 +136,32 @@ test_that("predict.tidylearn_stratified assigns to clusters and predicts", {
   expect_equal(nrow(preds_new), 10)
 })
 
+test_that("tl_reduce_dimensions names an unknown method or component count", {
+  # method = "kmeans" failed with "object 'transformed' not found", and
+  # more components than the data has with "Elements PC5 and PC6 don't
+  # exist"
+  expect_error(
+    tl_reduce_dimensions(iris, "Species", method = "kmeans"),
+    "'method' must be \"pca\" or \"mds\"; got \"kmeans\""
+  )
+  expect_error(
+    tl_reduce_dimensions(iris, "Species", n_components = 6),
+    "'n_components' is 6, but the PCA has 4 components"
+  )
+  expect_error(
+    tl_reduce_dimensions(iris, "Species", method = "mds", n_components = 3),
+    "'n_components' is 3, but the MDS has 2 dimensions"
+  )
+  expect_error(
+    tl_reduce_dimensions(iris, "Species", n_components = 0),
+    "'n_components' must be a single whole number of at least 1"
+  )
+
+  # Every component the data has is still a valid request
+  all_four <- tl_reduce_dimensions(iris, "Species", n_components = 4)
+  expect_setequal(names(all_four$data), c(paste0("PC", 1:4), "Species"))
+})
+
 test_that("integration functions validate inputs", {
   # Invalid response variable
   expect_error(
@@ -215,6 +241,137 @@ test_that("rows whose cluster holds no label are left out, and counted", {
   expect_equal(nrow(model$data) + dropped, nrow(iris))
 })
 
+test_that("tl_semisupervised keeps the response's level order", {
+  # as.factor() on the pseudo-labels sorted them alphabetically, which put
+  # versicolor first and made virginica the positive class: .pred for the
+  # first versicolor row was 0.001
+  binary_iris <- iris[iris$Species != "setosa", ]
+  binary_iris$Species <- factor(as.character(binary_iris$Species),
+                                levels = c("virginica", "versicolor"))
+  set.seed(1)
+  model <- suppressWarnings(tl_semisupervised(
+    binary_iris, Species ~ .,
+    labeled_indices = c(1:5, 51:55), supervised_method = "logistic"
+  ))
+  expect_identical(model$spec$response_levels, c("virginica", "versicolor"))
+  expect_identical(levels(model$data$Species), c("virginica", "versicolor"))
+
+  # glm() on the same pseudo-labels, in the declared order, models the
+  # probability of versicolor
+  pseudo <- model$data
+  pseudo$Species <- factor(as.character(pseudo$Species),
+                           levels = c("virginica", "versicolor"))
+  direct <- suppressWarnings(
+    glm(Species ~ ., data = pseudo, family = binomial)
+  )
+  expect_equal(
+    predict(model, binary_iris, type = "response")$.pred,
+    predict(direct, binary_iris, type = "response")
+  )
+})
+
+test_that("a cluster whose labelled rows have no label propagates nothing", {
+  # The labelled virginica rows carry NA. Their cluster used to take the
+  # first level, setosa, for all its rows -- a label nothing in the cluster
+  # had -- and k counted NA as a third class
+  ir <- iris
+  ir$Species[101:105] <- NA
+  labelled <- c(1:5, 51:55, 101:105)
+  set.seed(2)
+  model <- suppressWarnings(
+    tl_semisupervised(ir, Species ~ ., labeled_indices = labelled)
+  )
+  info <- model$semisupervised_info
+
+  # Two classes carry labels, so two clusters
+  expect_equal(nrow(info$cluster_model$fit$model$centers), 2)
+  expect_false(anyNA(info$label_mapping$cluster_label))
+
+  # Every training label comes from a labelled row in the same cluster
+  clusters <- info$cluster_model$fit$clusters$cluster
+  kept <- as.integer(rownames(model$data))
+  carried <- split(as.character(ir$Species[labelled]), clusters[labelled])
+  from_own_cluster <- mapply(
+    function(label, cluster) label %in% carried[[as.character(cluster)]],
+    as.character(model$data$Species), clusters[kept]
+  )
+  expect_true(all(from_own_cluster))
+  expect_equal(nrow(model$data) + info$n_unlabelled_dropped, nrow(ir))
+})
+
+test_that("a character response with missing labels propagates", {
+  # The setosa cluster's only labels are NA. table() of them is empty, and
+  # summarize() failed with "Can't combine NULL and non NULL results"
+  chr <- transform(iris, Species = as.character(Species))
+  chr$Species[1:5] <- NA
+  set.seed(2)
+  expect_warning(
+    model <- tl_semisupervised(chr, Species ~ .,
+                               labeled_indices = c(1:5, 51:55, 101:105)),
+    "5 labelled rows whose own label is missing"
+  )
+  expect_s3_class(model, "tidylearn_semisupervised")
+  expect_false(anyNA(model$data$Species))
+  # The setosa rows have no labelled class to take, so none is trained on
+  expect_false(any(as.integer(rownames(model$data)) %in% 1:50))
+})
+
+test_that("tl_semisupervised needs two labelled classes", {
+  expect_error(
+    tl_semisupervised(iris, Species ~ ., labeled_indices = 1:10),
+    "needs labelled rows from at least two classes; found 1 \\(setosa\\)"
+  )
+  no_labels <- iris
+  no_labels$Species[1:10] <- NA
+  expect_error(
+    tl_semisupervised(no_labels, Species ~ ., labeled_indices = 1:10),
+    "found 0"
+  )
+})
+
+test_that("supervised and clustering settings reach their own stage", {
+  labelled <- c(1:5, 51:55, 101:105)
+
+  # cp = 0.001 went to k-means too, which failed with "unused argument"
+  set.seed(3)
+  semi <- tl_semisupervised(iris, Species ~ ., labeled_indices = labelled,
+                            cp = 0.001)
+  expect_equal(semi$fit$control$cp, 0.001)
+
+  # and k-means settings had no way in that left the supervised model alone
+  set.seed(3)
+  semi_lloyd <- tl_semisupervised(
+    iris, Species ~ ., labeled_indices = labelled,
+    cluster_args = list(algorithm = "Lloyd", nstart = 1)
+  )
+  # kmeans() sets ifault for Hartigan-Wong only, so a recorded convergence
+  # flag of NA is the mark of Lloyd
+  expect_true(is.na(
+    semi_lloyd$semisupervised_info$cluster_model$fit$metrics$converged
+  ))
+
+  set.seed(3)
+  strat <- tl_stratified_models(mtcars, mpg ~ wt + hp, k = 2, cp = 0.001,
+                                cluster_args = list(algorithm = "Lloyd"))
+  expect_true(all(vapply(strat$supervised_models,
+                         function(m) m$fit$control$cp, numeric(1)) == 0.001))
+  expect_true(is.na(strat$cluster_model$fit$metrics$converged))
+
+  expect_error(
+    tl_semisupervised(iris, Species ~ ., labeled_indices = labelled,
+                      cluster_args = list(k = 4)),
+    "sets k to the number of labelled classes"
+  )
+  expect_error(
+    tl_stratified_models(mtcars, mpg ~ wt, cluster_args = list(k = 4)),
+    "Pass k as the k argument"
+  )
+  expect_error(
+    tl_stratified_models(mtcars, mpg ~ wt, cluster_args = list(5)),
+    "'cluster_args' must be a named list"
+  )
+})
+
 test_that("downweight reaches the fit, or is refused", {
   skip_if_not_installed("dbscan")
 
@@ -225,17 +382,21 @@ test_that("downweight reaches the fit, or is refused", {
                            action = "downweight")
   expect_gt(tree$anomaly_info$n_anomalies, 0)
   expect_false(isTRUE(all.equal(tree$fit$frame, unweighted$fit$frame)))
-  expect_identical(tree$fit$call$weights, as.name("weights"))
+  direct_tree <- rpart::rpart(
+    Species ~ ., data = iris, method = "class",
+    weights = ifelse(tree$anomaly_info$is_anomaly, 0.1, 1)
+  )
+  expect_equal(tree$fit$frame, direct_tree$frame)
 
   # and lm() errored on weights arriving through ...
   d <- mtcars[, c("mpg", "wt", "hp")]
-  lin <- tl_anomaly_aware(d, mpg ~ wt, response = "mpg",
+  lin <- tl_anomaly_aware(d, mpg ~ wt + hp, response = "mpg",
                           action = "downweight",
                           supervised_method = "linear", eps = 15, minPts = 3)
   expect_gt(lin$anomaly_info$n_anomalies, 0)
   w <- ifelse(lin$anomaly_info$is_anomaly, 0.1, 1)
   expect_equal(unname(coef(lin$fit)),
-               unname(coef(lm(mpg ~ wt, data = d, weights = w))))
+               unname(coef(lm(mpg ~ wt + hp, data = d, weights = w))))
 
   expect_error(
     tl_anomaly_aware(iris, Species ~ ., response = "Species",
@@ -342,6 +503,28 @@ test_that("stratified probability predictions keep their columns", {
   expect_equal(probs$a + probs$b, rep(1, nrow(d)))
 })
 
+test_that("tl_anomaly_aware stops when DBSCAN marks every row", {
+  skip_if_not_installed("dbscan")
+
+  # At the default eps on unscaled mtcars all 32 cars are noise. remove
+  # then failed in lm() with "0 (non-NA) cases", downweight returned the
+  # unweighted fit without a word, and flag gave an NA coefficient.
+  for (action in c("remove", "flag", "downweight")) {
+    expect_error(
+      tl_anomaly_aware(mtcars, mpg ~ wt + hp, response = "mpg",
+                       action = action, supervised_method = "linear"),
+      "DBSCAN marked all 32 rows as noise.*eps = 0.5.*minPts = 5",
+      info = action
+    )
+  }
+
+  # A neighbourhood wide enough for these units finds some normal rows
+  model <- tl_anomaly_aware(mtcars, mpg ~ wt + hp, response = "mpg",
+                            action = "remove", supervised_method = "linear",
+                            eps = 40, minPts = 3)
+  expect_lt(model$anomaly_info$n_anomalies, nrow(mtcars))
+})
+
 test_that("tl_anomaly_aware names a bad action or method", {
   skip_if_not_installed("dbscan")
   expect_error(
@@ -381,4 +564,94 @@ test_that("stratified predictions carry the training classes in order", {
   expect_equal(rowSums(probs[c("A", "B", "C")]), rep(1, nrow(d)))
   reversed_probs <- predict(models, d[rev(seq_len(nrow(d))), ], type = "prob")
   expect_identical(names(reversed_probs)[1:3], c("A", "B", "C"))
+})
+
+test_that("a cluster holding one class predicts that class", {
+  # k-means puts all 50 setosa rows in a cluster of their own, and the tree
+  # refused it as a one-class response, so the whole call failed
+  set.seed(1)
+  models <- tl_stratified_models(iris, Species ~ ., k = 3)
+  expect_equal(unname(models$single_class_clusters), "setosa")
+  expect_length(models$supervised_models, 2)
+
+  setosa <- iris$Species == "setosa"
+  preds <- predict(models)
+  expect_identical(levels(preds$.pred), levels(iris$Species))
+  expect_true(all(preds$.pred[setosa] == "setosa"))
+  expect_false(anyNA(preds$.pred))
+
+  probs <- predict(models, iris, type = "prob")
+  expect_equal(probs$setosa[setosa], rep(1, sum(setosa)))
+  expect_equal(probs$versicolor[setosa], rep(0, sum(setosa)))
+  expect_equal(rowSums(probs[levels(iris$Species)]), rep(1, nrow(iris)))
+
+  # type can also be given by position, as the other clusters' models take it
+  expect_equal(predict(models, iris, "prob"), probs)
+})
+
+test_that("tl_stratified_models cuts hclust at k and predicts training rows", {
+  # hclust failed with "unused argument (k = 2)", and pam and clara fits
+  # could not predict even the rows they were fitted on
+  hc <- tl_stratified_models(mtcars, mpg ~ wt + hp,
+                             cluster_method = "hclust", k = 2)
+  tree <- stats::hclust(stats::dist(mtcars[, c("wt", "hp")]),
+                        method = "average")
+  expect_equal(hc$clusters, unname(stats::cutree(tree, k = 2)))
+  preds <- predict(hc)
+  expect_equal(preds$.cluster, hc$clusters)
+  expect_false(anyNA(preds$.pred))
+
+  skip_if_not_installed("cluster")
+  for (method in c("pam", "clara")) {
+    fitted <- tl_stratified_models(mtcars, mpg ~ wt + hp,
+                                   cluster_method = method, k = 2)
+    preds <- predict(fitted)
+    expect_equal(preds$.cluster, fitted$clusters, info = method)
+    expect_false(anyNA(preds$.pred), info = method)
+    # New rows still need a method that can assign them
+    expect_error(predict(fitted, new_data = mtcars[1:3, ]),
+                 "does not support out-of-sample prediction", info = method)
+  }
+})
+
+test_that("the cluster-based helpers refuse a method they cannot use", {
+  # dbscan takes no k and failed with "unused argument (k = 2)"
+  expect_error(
+    tl_stratified_models(mtcars, mpg ~ wt + hp, cluster_method = "dbscan"),
+    paste0("'cluster_method' must be one of \"kmeans\", \"pam\", ",
+           "\"clara\", \"hclust\"; got \"dbscan\".*chooses its own ",
+           "number of clusters")
+  )
+  expect_error(
+    tl_semisupervised(iris, Species ~ ., labeled_indices = c(1:5, 51:55),
+                      cluster_method = "pca"),
+    "'cluster_method' must be one of"
+  )
+})
+
+test_that("clustering and anomaly detection use the formula's predictors", {
+  # A column the formula excludes still took part in the clusters and the
+  # noise points: with a row id in iris, which is sorted by class, the id
+  # was one of the k-means columns.
+  ir <- iris
+  ir$id <- seq_len(nrow(ir))
+  measurements <- names(iris)[1:4]
+
+  set.seed(5)
+  semi <- tl_semisupervised(ir, Species ~ . - id,
+                            labeled_indices = c(1:5, 51:55, 101:105))
+  expect_setequal(
+    colnames(semi$semisupervised_info$cluster_model$fit$model$centers),
+    measurements
+  )
+
+  set.seed(5)
+  strat <- tl_stratified_models(ir, Species ~ . - id, k = 2)
+  expect_setequal(colnames(strat$cluster_model$fit$model$centers),
+                  measurements)
+
+  skip_if_not_installed("dbscan")
+  flagged <- tl_anomaly_aware(ir, Species ~ . - id, response = "Species")
+  direct <- dbscan::dbscan(ir[, measurements], eps = 0.5, minPts = 5)
+  expect_equal(flagged$anomaly_info$is_anomaly, direct$cluster == 0)
 })

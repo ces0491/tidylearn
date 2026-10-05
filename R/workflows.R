@@ -19,51 +19,292 @@ tl_cluster_levels <- function(cluster_model) {
   as.character(sort(unique(cluster_model$fit$clusters$cluster)))
 }
 
+#' Settle tl_auto_ml()'s task against its response
+#'
+#' @param task The \code{task} argument
+#' @param y The response column
+#' @param response_var Its name, for the message
+#' @return \code{"classification"} or \code{"regression"}
+#' @keywords internal
+#' @noRd
+tl_automl_task <- function(task, y, response_var) {
+  tasks <- c("auto", "classification", "regression")
+  if (!is.character(task) || length(task) != 1L || !task %in% tasks) {
+    stop(
+      "'task' must be one of ", paste0("\"", tasks, "\"", collapse = ", "),
+      "; got ", tl_describe_value(task), ".",
+      call. = FALSE
+    )
+  }
+
+  # tl_model() takes the task from the response whatever `task` says, so a
+  # task the response contradicts had every candidate scored on metrics it
+  # could not produce, and the leaderboard came back all NA
+  observed <- if (is.factor(y) || is.character(y)) {
+    "classification"
+  } else {
+    "regression"
+  }
+  if (task != "auto" && task != observed) {
+    stop(
+      "task = \"", task, "\", but '", response_var, "' is ",
+      if (observed == "classification") "categorical" else "numeric",
+      ", which tl_model() fits as a ", observed, ". Use task = \"",
+      observed, "\" or \"auto\"",
+      if (task == "classification") {
+        paste0(", or convert '", response_var,
+               "' with factor() if its values are classes")
+      } else {
+        ""
+      },
+      ".",
+      call. = FALSE
+    )
+  }
+
+  observed
+}
+
+#' Settle tl_auto_ml()'s ranking metric
+#'
+#' @param metric The \code{metric} argument, or NULL for the task's default
+#' @param task \code{"classification"} or \code{"regression"}
+#' @return A single metric name that tl_evaluate() computes for the task
+#' @keywords internal
+#' @noRd
+tl_automl_metric <- function(metric, task) {
+  is_classification <- task == "classification"
+  if (is.null(metric)) {
+    return(if (is_classification) "accuracy" else "rmse")
+  }
+
+  known <- tl_known_metrics(is_classification)
+  if (!is.character(metric) || length(metric) != 1L || !metric %in% known) {
+    stop(
+      "'metric' must be one of the ", task, " metrics: ",
+      paste(known, collapse = ", "), "; got ", tl_describe_value(metric),
+      ".",
+      call. = FALSE
+    )
+  }
+
+  metric
+}
+
+#' The numeric columns among a formula's predictors
+#'
+#' PCA and k-means take numeric columns only, and drop the rest themselves.
+#' Selecting them here keeps the fold refits and the stored model on the
+#' same columns.
+#'
+#' @param data The training data
+#' @param predictor_vars The formula's predictors
+#' @param what What they are for, for the message
+#' @return A character vector of column names
+#' @keywords internal
+#' @noRd
+tl_numeric_predictors <- function(data, predictor_vars, what) {
+  numeric_vars <- predictor_vars[
+    vapply(data[predictor_vars], is.numeric, logical(1))
+  ]
+  if (length(numeric_vars) == 0) {
+    stop("the formula names no numeric predictors to ", what, ".",
+         call. = FALSE)
+  }
+  numeric_vars
+}
+
+#' Build AutoML's PCA-augmented candidates
+#'
+#' The rotation is fitted on the formula's predictors only. Fitted on every
+#' column but the response, it took in columns the formula leaves out, and
+#' a row id on data sorted by class carries the class into the components.
+#'
+#' @param data The training data
+#' @param formula The caller's formula; its left-hand side is kept
+#' @param response_var The response column
+#' @param predictor_vars The formula's predictors
+#' @return A list: \code{data} (component scores and the response),
+#'   \code{formula}, \code{reduction_model}, \code{n_components}, and
+#'   \code{transform}, which refits the rotation inside a \code{tl_cv()}
+#'   fold
+#' @keywords internal
+#' @noRd
+tl_automl_pca_variant <- function(data, formula, response_var,
+                                  predictor_vars) {
+  numeric_vars <- tl_numeric_predictors(data, predictor_vars, "reduce")
+  n_components <- min(5, ceiling(length(numeric_vars) / 2))
+  pc_cols <- paste0("PC", seq_len(n_components))
+
+  reduced <- tl_reduce_dimensions(
+    data[, c(numeric_vars, response_var), drop = FALSE],
+    response = response_var,
+    method = "pca",
+    n_components = n_components
+  )
+  formula_reduced <- stats::reformulate(pc_cols, response = formula[[2]])
+
+  # Refit the rotation inside every fold. Scoring against a rotation
+  # derived from the assessment rows themselves would put these
+  # variants on the leaderboard with an advantage the baselines
+  # never get.
+  transform <- function(train_rows) {
+    fold_reduction <- tl_model(
+      train_rows[, numeric_vars, drop = FALSE],
+      method = "pca"
+    )
+
+    list(
+      formula = formula_reduced,
+      apply = function(rows) {
+        scores <- predict(
+          fold_reduction,
+          new_data = rows[, numeric_vars, drop = FALSE]
+        )
+        out <- scores[, pc_cols, drop = FALSE]
+        out[[response_var]] <- rows[[response_var]]
+        out
+      }
+    )
+  }
+
+  list(
+    data = reduced$data,
+    formula = formula_reduced,
+    reduction_model = reduced$reduction_model,
+    n_components = n_components,
+    transform = transform
+  )
+}
+
+#' Build AutoML's cluster-augmented candidates
+#'
+#' k-means is fitted on the formula's predictors only, for the reason given
+#' in \code{tl_automl_pca_variant()}, and the assignment is added to the
+#' formula's own terms. Fitted under the caller's formula, the candidates
+#' saw the cluster column only through a \code{.}: an explicit right-hand
+#' side left it out, and the clustered models predicted exactly what the
+#' baselines did.
+#'
+#' @param data The training data
+#' @param formula The caller's formula
+#' @param response_var The response column
+#' @param predictor_vars The formula's predictors
+#' @param k The number of clusters
+#' @return A list: \code{data} (the training data plus the cluster column),
+#'   \code{formula}, \code{cluster_model}, \code{column}, \code{levels},
+#'   and \code{transform}, which refits the centres inside a \code{tl_cv()}
+#'   fold
+#' @keywords internal
+#' @noRd
+tl_automl_cluster_variant <- function(data, formula, response_var,
+                                      predictor_vars, k) {
+  numeric_vars <- tl_numeric_predictors(data, predictor_vars, "cluster")
+  column <- "cluster_kmeans"
+
+  clustered <- tl_add_cluster_features(
+    data[, c(numeric_vars, response_var), drop = FALSE],
+    response = response_var,
+    method = "kmeans", k = k
+  )
+  data_clustered <- data
+  data_clustered[[column]] <- clustered[[column]]
+
+  # update() cannot expand `.` itself, so the formula is expanded against
+  # the data first -- the data without the cluster column, which would
+  # otherwise be counted twice
+  expanded <- stats::formula(
+    stats::terms(formula, data = data, simplify = TRUE)
+  )
+  formula_clustered <- stats::update(expanded, . ~ . + cluster_kmeans)
+
+  # Refit the centroids inside every fold, for the same reason as the PCA
+  # variants
+  transform <- function(train_rows) {
+    fold_clusters <- tl_model(
+      train_rows[, numeric_vars, drop = FALSE],
+      method = "kmeans", k = k
+    )
+    fold_levels <- tl_cluster_levels(fold_clusters)
+
+    list(
+      formula = formula_clustered,
+      apply = function(rows) {
+        assignments <- predict(
+          fold_clusters,
+          new_data = rows[, numeric_vars, drop = FALSE]
+        )
+        rows[[column]] <- factor(assignments$cluster, levels = fold_levels)
+        rows
+      }
+    )
+  }
+
+  list(
+    data = data_clustered,
+    formula = formula_clustered,
+    cluster_model = attr(clustered, "cluster_model"),
+    column = column,
+    levels = levels(data_clustered[[column]]),
+    transform = transform
+  )
+}
+
 #' Auto ML: Automated Machine Learning Workflow
 #'
 #' Automatically explores multiple modeling approaches including
 #' dimensionality reduction, clustering, and various supervised methods.
-#' Returns the best performing model based on cross-validation.
+#' Returns the best performing model, scored by cross-validation where the
+#' time budget allows.
+#'
+#' The PCA and cluster variants are built from the formula's predictors
+#' only, so a column the formula leaves out (\code{y ~ . - id}) reaches no
+#' candidate. The cluster variants add the cluster assignment to the
+#' formula's terms.
 #'
 #' @param data A data frame
 #' @param formula Model formula (for supervised learning)
-#' @param task Task type: "classification", "regression", or "auto" (default)
+#' @param task Task type: "classification", "regression", or "auto"
+#'   (default), which reads it off the response. An explicit task has to
+#'   agree with the response, since \code{tl_model()} fits a factor or
+#'   character response as a classification and a numeric one as a
+#'   regression.
 #' @param use_reduction Whether to try dimensionality reduction (default: TRUE)
 #' @param use_clustering Whether to add cluster features (default: TRUE)
-#' @param time_budget Time budget in seconds (default: 300). Controls which
-#'   models are attempted and whether cross-validation is used for evaluation.
-#'   The budget is checked **between** model fits, not during them -- once a
-#'   model starts training it runs to completion because R cannot safely
-#'   interrupt C-level code (e.g. randomForest, xgboost, e1071).
+#' @param time_budget Time budget in seconds (default: 300). The budget is
+#'   checked between model fits, not during them: once a model starts
+#'   training it runs to completion, because R cannot safely interrupt
+#'   C-level code (randomForest, xgboost, e1071). A run can therefore
+#'   overshoot the budget by the length of the last fit it started.
 #'
-#'   How the budget shapes the workflow:
+#'   The budget gates the workflow as follows:
 #'   \itemize{
-#'     \item **Under 30s**: Only fast models are attempted
-#'       (tree, logistic/linear).
-#'       Cross-validation is skipped; models are ranked on training-set metrics
-#'       only. Expect 2 models in the leaderboard. Use this for quick sanity
-#'       checks or interactive exploration.
-#'     \item **30--120s**: All baseline models are attempted including random
-#'       forest. Cross-validation runs when enough time remains after each
-#'       model fit; otherwise training metrics are used. Advanced models
-#'       (SVM, XGBoost / ridge, lasso) are attempted if 40\% of the budget
-#'       remains after baselines. Dimensionality reduction and clustering
-#'       pipelines run if enabled and 10\% of the budget remains.
-#'     \item **120s+ (recommended)**: The full pipeline runs -- all baselines,
-#'       advanced models, PCA-augmented variants, and cluster-augmented
-#'       variants, each with cross-validation. Expect 9--11 models in the
-#'       leaderboard.
+#'     \item Baseline models: a tree, with linear regression for a numeric
+#'       response or logistic regression for a two-class one. A random
+#'       forest is added when \code{time_budget} is 30 or more.
+#'     \item PCA and cluster variants, when enabled: each phase starts only
+#'       if more than \code{max(5, 0.1 * time_budget)} seconds remain, and
+#'       fits one variant per baseline method while at least
+#'       \code{max(2, 0.05 * time_budget)} seconds remain.
+#'     \item Advanced models (SVM and XGBoost for classification, ridge and
+#'       lasso for regression): only when \code{time_budget} is 30 or more
+#'       and more than 40\% of it remains when the phase starts.
+#'     \item Scoring: a model is cross-validated when more than 30\% of the
+#'       budget remains at the moment it is scored, and scored on its own
+#'       training data otherwise. The leaderboard's \code{evaluation} column
+#'       records which.
 #'   }
 #'
-#'   Because individual model fits (especially forest, SVM, XGBoost with CV)
-#'   can take 5--30s each depending on data size, the actual wall-clock time
-#'   may modestly exceed the budget by the duration of the last model that
-#'   was started before the budget expired.
+#'   The example below, with \code{time_budget = 10} on the three-class
+#'   \code{iris}, fits a single tree and cross-validates it.
 #' @param cv_folds Number of cross-validation folds (default: 5). Reducing
 #'   this (e.g. to 2 or 3) is an effective way to stay closer to the time
 #'   budget since CV is typically the most expensive step.
-#' @param metric Evaluation metric (default: auto-selected based on task).
-#'   For classification: "accuracy"; for regression: "rmse".
+#' @param metric Evaluation metric (default: "accuracy" for classification,
+#'   "rmse" for regression). Classification takes "accuracy", "precision",
+#'   "recall", "sensitivity", "specificity", "f1", "auc" or "pr_auc";
+#'   regression takes "rmse", "mse", "mae", "mape" or "rsq". It is checked
+#'   before any model is fitted.
 #' @return A list with class \code{"tidylearn_automl"} containing:
 #'   \describe{
 #'     \item{best_model}{The best tidylearn model object}
@@ -94,6 +335,37 @@ tl_auto_ml <- function(data, formula, task = "auto",
                        use_reduction = TRUE, use_clustering = TRUE,
                        time_budget = 300, cv_folds = 5, metric = NULL) {
   formula <- tl_as_formula(formula)
+
+  # Settled before the clock starts. Checked at the leaderboard, an
+  # unrankable metric cost every fit before it was refused, and an
+  # unrecognised task fitted the regression methods to a factor.
+  response_var <- all.vars(formula)[1]
+  if (!response_var %in% names(data)) {
+    stop(
+      "The formula's response, '", response_var,
+      "', is not a column of `data`.",
+      call. = FALSE
+    )
+  }
+  y <- data[[response_var]]
+  task <- tl_automl_task(task, y, response_var)
+
+  n_classes <- length(unique(stats::na.omit(y)))
+
+  if (task == "classification" && n_classes < 2) {
+    stop(
+      "Classification requires at least two observed classes in '",
+      response_var, "'; found ", n_classes, ".",
+      call. = FALSE
+    )
+  }
+
+  metric <- tl_automl_metric(metric, task)
+
+  # The predictors the formula names. The PCA and cluster variants are
+  # built from these alone, as the baselines are.
+  predictor_vars <- tl_formula_predictors(formula, data)
+
   start_time <- Sys.time()
 
   # Helper: remaining seconds in the budget
@@ -153,33 +425,6 @@ tl_auto_ml <- function(data, formula, task = "auto",
     list(result = train_result, kind = "train")
   }
 
-  # Determine task type
-  response_var <- all.vars(formula)[1]
-  y <- data[[response_var]]
-
-  if (task == "auto") {
-    task <- if (is.factor(y) || is.character(y)) {
-      "classification"
-    } else {
-      "regression"
-    }
-  }
-
-  n_classes <- length(unique(stats::na.omit(y)))
-
-  if (task == "classification" && n_classes < 2) {
-    stop(
-      "Classification requires at least two observed classes in '",
-      response_var, "'; found ", n_classes, ".",
-      call. = FALSE
-    )
-  }
-
-  # Set default metric
-  if (is.null(metric)) {
-    metric <- if (task == "classification") "accuracy" else "rmse"
-  }
-
   message("Starting Auto ML with task: ", task)
   message("Time budget: ", time_budget, " seconds")
 
@@ -187,8 +432,6 @@ tl_auto_ml <- function(data, formula, task = "auto",
   models <- list()
   results <- list()
   eval_kinds <- character()
-
-  response_var <- all.vars(formula)[1]
 
   # 1. Baseline models (ordered fast to slow)
   # Slow methods (forest, svm, xgboost) involve C code that cannot be
@@ -234,58 +477,9 @@ tl_auto_ml <- function(data, formula, task = "auto",
     message("\n[2/4] Training models with dimensionality reduction...")
 
     tryCatch({
-      response_var <- all.vars(formula)[1]
-      n_predictors <- ncol(data) - 1
-      n_components <- min(5, ceiling(n_predictors / 2))
-
-      reduced <- tl_reduce_dimensions(
-        data, response = response_var,
-        method = "pca",
-        n_components = n_components
+      reduced <- tl_automl_pca_variant(
+        data, formula, response_var, predictor_vars
       )
-
-      # Update formula for reduced data -- exclude .obs_id
-      pred_vars <- names(reduced$data)[
-        !names(reduced$data) %in% c(".obs_id", response_var)
-      ]
-      formula_reduced <- as.formula(paste(
-        response_var, "~",
-        paste(pred_vars, collapse = " + ")
-      ))
-
-      # Drop .obs_id from reduced data
-      reduced_data <- reduced$data
-      if (".obs_id" %in% names(reduced_data)) {
-        reduced_data <- reduced_data[, names(reduced_data) != ".obs_id",
-                                     drop = FALSE]
-      }
-
-      # Refit the rotation inside every fold. Scoring against a rotation
-      # derived from the assessment rows themselves would put these
-      # variants on the leaderboard with an advantage the baselines
-      # never get.
-      pca_transform <- function(train_rows) {
-        fold_reduction <- tl_model(
-          train_rows[, setdiff(names(train_rows), response_var),
-                     drop = FALSE],
-          method = "pca"
-        )
-        pc_cols <- paste0("PC", seq_len(n_components))
-
-        list(
-          formula = formula_reduced,
-          apply = function(rows) {
-            scores <- predict(
-              fold_reduction,
-              new_data = rows[, setdiff(names(rows), response_var),
-                              drop = FALSE]
-            )
-            out <- scores[, pc_cols, drop = FALSE]
-            out[[response_var]] <- rows[[response_var]]
-            out
-          }
-        )
-      }
 
       for (method in baseline_methods) {
         if (budget_left() < max(2, time_budget * 0.05)) break
@@ -294,10 +488,10 @@ tl_auto_ml <- function(data, formula, task = "auto",
         message("  Training: ", model_name)
 
         result <- safe_train(function() {
-          model <- tl_model(reduced_data, formula_reduced, method = method)
+          model <- tl_model(reduced$data, reduced$formula, method = method)
           model$reduction_info <- list(
             reduction_model = reduced$reduction_model,
-            n_components = n_components
+            n_components = reduced$n_components
           )
           # Carry the projection so predict() can apply it to raw new data
           model$feature_transform <- list(
@@ -306,8 +500,8 @@ tl_auto_ml <- function(data, formula, task = "auto",
             response = response_var
           )
           scored <- evaluate_model(
-            model, data, formula_reduced, method, model_name,
-            transform = pca_transform
+            model, data, reduced$formula, method, model_name,
+            transform = reduced$transform
           )
           list(model = model, scored = scored)
         }, model_name)
@@ -328,44 +522,13 @@ tl_auto_ml <- function(data, formula, task = "auto",
     message("\n[3/4] Training models with cluster features...")
 
     tryCatch({
-      response_var <- all.vars(formula)[1]
-      k <- if (task == "classification") {
-        length(unique(data[[response_var]]))
-      } else {
-        3
-      }
+      # One cluster per observed class. Counting unique() values counted a
+      # missing response as a class of its own.
+      k <- if (task == "classification") n_classes else 3
 
-      data_clustered <- tl_add_cluster_features(
-        data, response = response_var,
-        method = "kmeans", k = k
+      clustered <- tl_automl_cluster_variant(
+        data, formula, response_var, predictor_vars, k = k
       )
-      cluster_column <- "cluster_kmeans"
-
-      # Refit the centroids inside every fold, for the same reason as the
-      # PCA variants above
-      cluster_transform <- function(train_rows) {
-        fold_clusters <- tl_model(
-          train_rows[, setdiff(names(train_rows), response_var),
-                     drop = FALSE],
-          method = "kmeans", k = k
-        )
-
-        fold_levels <- tl_cluster_levels(fold_clusters)
-
-        list(
-          apply = function(rows) {
-            assignments <- predict(
-              fold_clusters,
-              new_data = rows[, setdiff(names(rows), response_var),
-                              drop = FALSE]
-            )
-            rows[["cluster_kmeans"]] <- factor(
-              assignments$cluster, levels = fold_levels
-            )
-            rows
-          }
-        )
-      }
 
       for (method in baseline_methods) {
         if (budget_left() < max(2, time_budget * 0.05)) break
@@ -374,18 +537,18 @@ tl_auto_ml <- function(data, formula, task = "auto",
         message("  Training: ", model_name)
 
         result <- safe_train(function() {
-          model <- tl_model(data_clustered, formula, method = method)
+          model <- tl_model(clustered$data, clustered$formula, method = method)
           # Carry the clustering so predict() can assign new rows to it
           model$feature_transform <- list(
             kind = "cluster",
-            cluster_model = attr(data_clustered, "cluster_model"),
-            column = cluster_column,
-            levels = levels(data_clustered[[cluster_column]]),
+            cluster_model = clustered$cluster_model,
+            column = clustered$column,
+            levels = clustered$levels,
             response = response_var
           )
           scored <- evaluate_model(
-            model, data, formula, method, model_name,
-            transform = cluster_transform
+            model, data, clustered$formula, method, model_name,
+            transform = clustered$transform
           )
           list(model = model, scored = scored)
         }, model_name)
@@ -560,24 +723,26 @@ create_leaderboard <- function(results, metric, task, eval_kinds = NULL) {
   )
 
   # Sort: ascending for error metrics, descending for accuracy metrics.
-  # Anything not recognised as an error metric would be treated as
-  # higher-is-better and hand back the worst model as the winner, so
-  # refuse rather than guess.
-  error_metrics <- c("rmse", "mae", "mse", "mape", "logloss", "mlogloss")
-  score_metrics <- c("accuracy", "precision", "recall", "f1",
-                     "auc", "roc_auc", "pr_auc", "rsq", "kap")
+  # A guessed direction for a metric tidylearn does not know hands back
+  # the worst model as the winner whenever the guess is wrong, so refuse
+  # instead. tl_auto_ml() checks its metric up front; this guards direct
+  # callers.
+  higher_better <- tl_metric_higher_better(metric)
 
-  if (metric %in% error_metrics) {
-    leaderboard <- leaderboard |> dplyr::arrange(score)
-  } else if (metric %in% score_metrics) {
-    leaderboard <- leaderboard |> dplyr::arrange(dplyr::desc(score))
-  } else {
+  if (is.na(higher_better)) {
+    known <- c(tl_known_metrics(TRUE), tl_known_metrics(FALSE))
     stop(
       "Cannot rank models by '", metric, "': tidylearn does not know ",
       "whether higher or lower is better. Use one of: ",
-      paste(sort(c(error_metrics, score_metrics)), collapse = ", "), ".",
+      paste(sort(known), collapse = ", "), ".",
       call. = FALSE
     )
+  }
+
+  if (higher_better) {
+    leaderboard <- leaderboard |> dplyr::arrange(dplyr::desc(.data$score))
+  } else {
+    leaderboard <- leaderboard |> dplyr::arrange(.data$score)
   }
 
   leaderboard
@@ -623,18 +788,23 @@ print.tidylearn_automl <- function(x, ...) {
 #'
 #' @param data A data frame
 #' @param response Optional response variable for colored visualizations
-#' @param max_components Maximum PCA components to compute (default: 5)
-#' @param k_range Range of k values for clustering (default: 2:6)
+#' @param max_components Maximum number of PCA components to keep (default:
+#'   5), or fewer if the data has fewer numeric columns
+#' @param k_range Range of k values for clustering (default: 2:6). Each is
+#'   a whole number from 2 to one less than the number of rows, the range a
+#'   silhouette is defined over.
 #' @return A list with class \code{"tidylearn_eda"} containing:
 #'   \describe{
 #'     \item{data}{The original data frame.}
 #'     \item{response}{The response variable name, or \code{NULL}.}
-#'     \item{pca}{The fitted PCA model.}
+#'     \item{pca}{The fitted PCA model, keeping the first
+#'       \code{max_components} components, as
+#'       \code{prcomp(rank. = max_components)} would.}
 #'     \item{optimal_k}{List with optimal cluster count results.}
 #'     \item{kmeans}{The fitted k-means model.}
 #'     \item{hclust}{The fitted hierarchical clustering model.}
 #'     \item{summary}{List with \code{n_obs}, \code{n_vars},
-#'       \code{n_components}, and \code{best_k}.}
+#'       \code{n_components} (the number kept), and \code{best_k}.}
 #'   }
 #' @export
 #' @examples
@@ -645,6 +815,32 @@ print.tidylearn_automl <- function(x, ...) {
 tl_explore <- function(data, response = NULL,
                        max_components = 5,
                        k_range = 2:6) {
+  if (!is.numeric(max_components) || length(max_components) != 1L ||
+        is.na(max_components) || max_components < 1 ||
+        max_components != round(max_components)) {
+    stop(
+      "'max_components' must be a single whole number of at least 1; got ",
+      tl_describe_value(max_components), ".",
+      call. = FALSE
+    )
+  }
+
+  # A silhouette compares each point's cluster with the nearest other one,
+  # so it needs at least two clusters and one row more than clusters. k = 1
+  # failed inside the scoring with "incorrect number of dimensions".
+  max_k <- nrow(data) - 1
+  if (!is.numeric(k_range) || length(k_range) == 0 || anyNA(k_range) ||
+        any(k_range != round(k_range)) || any(k_range < 2) ||
+        any(k_range > max_k)) {
+    stop(
+      "'k_range' must hold whole numbers from 2 to ", max_k, "; got ",
+      if (length(k_range) == 0) "nothing" else paste(k_range, collapse = ", "),
+      ". A silhouette needs at least two clusters, and fewer clusters ",
+      "than rows.",
+      call. = FALSE
+    )
+  }
+
   message("Running Exploratory Data Analysis...")
 
   # 1. Dimensionality Reduction
@@ -656,6 +852,10 @@ tl_explore <- function(data, response = NULL,
   }
 
   pca_result <- tl_model(predictor_data, method = "pca")
+  n_components <- min(
+    as.integer(max_components), ncol(pca_result$fit$model$rotation)
+  )
+  pca_result <- tl_keep_components(pca_result, n_components)
 
   # 2. Optimal clustering
   message("[2/4] Finding optimal clusters...")
@@ -683,7 +883,7 @@ tl_explore <- function(data, response = NULL,
       summary = list(
         n_obs = nrow(data),
         n_vars = ncol(predictor_data),
-        n_components = max_components,
+        n_components = n_components,
         best_k = k_best
       )
     ),
@@ -708,8 +908,9 @@ print.tidylearn_eda <- function(x, ...) {
   cat("Variables:", x$summary$n_vars, "\n")
   cat("Optimal clusters:", x$summary$best_k, "\n\n")
 
-  cat("PCA Variance Explained (first 5 components):\n")
-  print(head(x$pca$fit$variance, 5))
+  cat("PCA Variance Explained (first ", x$summary$n_components,
+      " components):\n", sep = "")
+  print(x$pca$fit$variance_explained)
 
   cat("\nCluster sizes (k =", x$summary$best_k, "):\n")
   print(table(x$kmeans$fit$clusters$cluster))
@@ -732,6 +933,16 @@ plot.tidylearn_eda <- function(x, ...) {
   # Get PCA scores for visualization
   pca_scores <- x$pca$fit$scores
   clusters <- x$kmeans$fit$clusters$cluster
+
+  if (!all(c("PC1", "PC2") %in% names(pca_scores))) {
+    stop(
+      "plot() draws the first two principal components, but this analysis ",
+      "kept ", x$summary$n_components, ". Run tl_explore() with ",
+      "max_components of at least 2, on data with two or more numeric ",
+      "columns.",
+      call. = FALSE
+    )
+  }
 
   # Create plot data
   plot_data <- data.frame(
@@ -762,6 +973,35 @@ plot.tidylearn_eda <- function(x, ...) {
 
   print(p)
   invisible(x)
+}
+
+#' Keep the leading components of a fitted PCA model
+#'
+#' What \code{prcomp(rank. = n)} returns, applied after the fit: the
+#' rotation, the scores and the loadings keep their first \code{n}
+#' components, and the standard deviations keep all of them, as prcomp()
+#' does. The variance table keeps the first \code{n} rows, whose cumulative
+#' share is still of the total variance.
+#'
+#' @param pca_model A \code{tl_model(method = "pca")} model
+#' @param n The number of components to keep
+#' @return \code{pca_model}, trimmed
+#' @keywords internal
+#' @noRd
+tl_keep_components <- function(pca_model, n) {
+  keep <- seq_len(n)
+  pc_cols <- paste0("PC", keep)
+
+  fit <- pca_model$fit
+  fit$model$rotation <- fit$model$rotation[, keep, drop = FALSE]
+  fit$model$x <- fit$model$x[, keep, drop = FALSE]
+  fit$scores <- fit$scores[, c(".obs_id", pc_cols)]
+  fit$loadings <- fit$loadings[, c("variable", pc_cols)]
+  fit$variance_explained <- fit$variance_explained[keep, ]
+
+  pca_model$fit <- fit
+  pca_model$spec$n_components <- n
+  pca_model
 }
 
 #' Find optimal number of clusters
@@ -801,17 +1041,22 @@ tl_optimal_clusters <- function(data, k_range = 2:6, method = "silhouette") {
 
 #' Transfer Learning Workflow
 #'
-#' Use unsupervised pre-training (e.g., autoencoder
-#' features) before supervised learning
+#' Use unsupervised pre-training before supervised learning: the
+#' predictors the formula names are projected onto their principal
+#' components, and the supervised model is fitted on the component scores.
 #'
 #' @param data Training data
-#' @param formula Model formula
-#' @param pretrain_method Pre-training method: "pca", "autoencoder"
+#' @param formula Model formula, or a string that parses as one. The PCA is
+#'   fitted on the numeric predictors it names.
+#' @param pretrain_method Pre-training method. Only \code{"pca"} is
+#'   available: \code{predict()} has to project new rows, and PCA is the
+#'   reduction that can.
 #' @param supervised_method Supervised learning method (default:
 #'   \code{"tree"}, which handles both regression and classification with
 #'   any number of classes). \code{"logistic"} is binary-only and errors
 #'   on a response with more than two levels.
-#' @param ... Additional arguments
+#' @param ... Additional arguments passed to
+#'   \code{\link{tl_reduce_dimensions}}, such as \code{n_components}
 #' @return A list with class \code{"tidylearn_transfer"} containing:
 #'   \describe{
 #'     \item{pretrain_model}{The fitted dimensionality reduction model.}
@@ -827,15 +1072,30 @@ tl_optimal_clusters <- function(data, k_range = 2:6, method = "silhouette") {
 #' }
 tl_transfer_learning <- function(data, formula, pretrain_method = "pca",
                                  supervised_method = "tree", ...) {
+  formula <- tl_as_formula(formula)
+
+  # "autoencoder" was documented and never implemented, and an MDS fit has
+  # no projection for new rows, so predict() on it always failed
+  if (!identical(pretrain_method, "pca")) {
+    stop(
+      "'pretrain_method' must be \"pca\", the one pre-training method that ",
+      "can project the new rows predict() is given; got ",
+      tl_describe_value(pretrain_method), ".",
+      call. = FALSE
+    )
+  }
+
   message("Transfer Learning Workflow")
   message("==========================")
 
   response_var <- all.vars(formula)[1]
+  predictor_vars <- tl_formula_predictors(formula, data)
 
-  # Phase 1: Unsupervised pre-training
+  # Phase 1: Unsupervised pre-training, on the predictors the formula names
   message("[Phase 1] Unsupervised pre-training with ", pretrain_method, "...")
   pretrain_model <- tl_reduce_dimensions(
-    data, response = response_var,
+    data[, c(predictor_vars, response_var), drop = FALSE],
+    response = response_var,
     method = pretrain_method, ...
   )
 
@@ -850,8 +1110,16 @@ tl_transfer_learning <- function(data, formula, pretrain_method = "pca",
                                        drop = FALSE]
   }
 
+  # The component scores replace the columns the formula's right-hand side
+  # names, so the model is fitted on the scores under the same response.
+  # Fitting the caller's formula worked only for `.`: an explicit
+  # right-hand side named columns the scores no longer had.
+  supervised_formula <- stats::reformulate(
+    setdiff(names(supervised_data), response_var),
+    response = formula[[2]]
+  )
   supervised_model <- tl_model(
-    supervised_data, formula,
+    supervised_data, supervised_formula,
     method = supervised_method
   )
 
