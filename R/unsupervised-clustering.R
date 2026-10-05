@@ -16,6 +16,7 @@
 #'   \item clusters: tibble with observation IDs and cluster assignments
 #'   \item centers: tibble of cluster centers
 #'   \item metrics: tibble with clustering quality metrics
+#'   \item sizes: integer vector of cluster sizes
 #'   \item model: original kmeans object
 #' }
 #'
@@ -27,13 +28,7 @@
 tidy_kmeans <- function(data, k, cols = NULL, nstart = 25, iter_max = 100,
                         algorithm = "Hartigan-Wong") {
 
-  # Select columns
-  if (!is.null(cols)) {
-    cols_enquo <- rlang::enquo(cols)
-    data_selected <- data |> dplyr::select(!!cols_enquo)
-  } else {
-    data_selected <- data |> dplyr::select(where(is.numeric))
-  }
+  data_selected <- tl_select_columns(data, rlang::enquo(cols))
 
   tl_check_complete_numeric(data_selected, "k-means")
 
@@ -119,12 +114,18 @@ augment_kmeans <- function(kmeans_obj, data) {
 #' @param metric Distance metric (default: "euclidean").
 #'   Use "gower" for mixed data types.
 #' @param cols Columns to include (tidy select). If NULL, uses all columns.
+#' @param ... Further arguments passed to \code{\link[cluster]{pam}}, such
+#'   as \code{nstart}, \code{variant} or starting \code{medoids}.
 #'
 #' @return A list of class "tidy_pam" containing:
 #' \itemize{
 #'   \item clusters: tibble with observation IDs and cluster assignments
-#'   \item medoids: tibble of medoid indices and values
-#'   \item silhouette: average silhouette width
+#'   \item medoids: tibble with one row per cluster: the medoid's row
+#'     position in the data (\code{medoid_index}, an integer) and, unless
+#'     \code{data} was a dist object, its values
+#'   \item silhouette_avg: average silhouette width
+#'   \item silhouette_data: the silhouette information \code{pam()}
+#'     returns (its \code{silinfo})
 #'   \item model: original pam object
 #' }
 #'
@@ -136,20 +137,16 @@ augment_kmeans <- function(kmeans_obj, data) {
 #' pam_result <- tidy_pam(mtcars, k = 3, metric = "gower")
 #'
 #' @export
-tidy_pam <- function(data, k, metric = "euclidean", cols = NULL) {
+tidy_pam <- function(data, k, metric = "euclidean", cols = NULL, ...) {
 
   # Handle dist object
   if (inherits(data, "dist")) {
     dist_mat <- data
     data_orig <- NULL
   } else {
-    # Select columns
-    if (!is.null(cols)) {
-      cols_enquo <- rlang::enquo(cols)
-      data_selected <- data |> dplyr::select(!!cols_enquo)
-    } else {
-      data_selected <- data
-    }
+    data_selected <- tl_select_columns(
+      data, rlang::enquo(cols), all_columns = TRUE
+    )
 
     # Compute distance
     if (metric == "gower") {
@@ -157,12 +154,13 @@ tidy_pam <- function(data, k, metric = "euclidean", cols = NULL) {
     } else {
       dist_mat <- tidy_dist(data_selected, method = metric)
     }
+    tl_check_complete_dist(dist_mat, "PAM")
 
     data_orig <- data_selected
   }
 
   # Perform PAM
-  pam_model <- cluster::pam(dist_mat, k = k, diss = TRUE)
+  pam_model <- cluster::pam(dist_mat, k = k, diss = TRUE, ...)
 
   # Create clusters tibble
   clusters_tbl <- tibble::tibble(
@@ -171,19 +169,24 @@ tidy_pam <- function(data, k, metric = "euclidean", cols = NULL) {
     cluster = as.integer(pam_model$clustering)
   )
 
+  # pam() reports the medoids by label when the distances carry labels, so
+  # a data frame with row names gave "Toyota Corona" where the same data as
+  # a tibble gave 21. id.med is the row position either way.
+  medoid_rows <- pam_model$id.med
+
   # Create medoids tibble
   if (!is.null(data_orig)) {
-    medoid_data <- data_orig[pam_model$medoids, , drop = FALSE]
+    medoid_data <- data_orig[medoid_rows, , drop = FALSE]
     medoids_tbl <- tibble::as_tibble(medoid_data) |>
       dplyr::mutate(
         cluster = seq_len(k),
-        medoid_index = pam_model$medoids,
+        medoid_index = medoid_rows,
         .before = 1
       )
   } else {
     medoids_tbl <- tibble::tibble(
       cluster = seq_len(k),
-      medoid_index = pam_model$medoids
+      medoid_index = medoid_rows
     )
   }
 
@@ -238,6 +241,8 @@ augment_pam <- function(pam_obj, data) {
 #' @param metric Distance metric (default: "euclidean")
 #' @param samples Number of samples to draw (default: 50)
 #' @param sampsize Sample size (default: min(n, 40 + 2*k))
+#' @param ... Further arguments passed to \code{\link[cluster]{clara}}, such
+#'   as \code{correct.d}, \code{pamLike} or \code{rngR}.
 #'
 #' @return A list of class \code{"tidy_clara"} containing:
 #' \itemize{
@@ -257,11 +262,11 @@ augment_pam <- function(pam_obj, data) {
 #'
 #' @export
 tidy_clara <- function(data, k, metric = "euclidean",
-                       samples = 50, sampsize = NULL) {
+                       samples = 50, sampsize = NULL, ...) {
 
   # Select numeric columns if data frame
   if (!inherits(data, "dist")) {
-    data_numeric <- data |> dplyr::select(where(is.numeric))
+    data_numeric <- tl_select_columns(data)
   } else {
     data_numeric <- data
   }
@@ -278,7 +283,8 @@ tidy_clara <- function(data, k, metric = "euclidean",
     k = k,
     metric = metric,
     samples = samples,
-    sampsize = sampsize
+    sampsize = sampsize,
+    ...
   )
 
   # Create clusters tibble
@@ -325,7 +331,8 @@ tidy_clara <- function(data, k, metric = "euclidean",
 #' @export
 calc_wss <- function(data, max_k = 10, nstart = 25) {
 
-  data_numeric <- data |> dplyr::select(where(is.numeric))
+  tl_check_whole_number(max_k, "max_k", min = 1)
+  data_numeric <- tl_select_columns(data)
   # Check before the loop: purrr wraps whatever kmeans() throws into
   # "In index: 2. Caused by error in `do_one()`", which buries it further.
   tl_check_complete_numeric(data_numeric, "The within-cluster sum of squares")
@@ -459,16 +466,14 @@ print.tidy_pam <- function(x, ...) {
 #' @keywords internal
 #' @noRd
 tl_fit_kmeans <- function(data, formula = NULL, k = 3, ...) {
-  # Extract variables to use
+  # Without a formula, tidy_kmeans() takes the numeric columns itself
+  data <- tl_ungroup(data)
   if (!is.null(formula)) {
-    vars <- get_formula_vars(formula, data)
-    data_for_km <- data[, vars, drop = FALSE]
-  } else {
-    data_for_km <- data |> dplyr::select(where(is.numeric))
+    data <- data[, tl_formula_columns(formula, data, "k-means"), drop = FALSE]
   }
 
   # Fit k-means using tidy_kmeans
-  km_result <- tidy_kmeans(data_for_km, k = k, ...)
+  km_result <- tidy_kmeans(data, k = k, ...)
 
   # Return in expected format
   list(
@@ -482,19 +487,21 @@ tl_fit_kmeans <- function(data, formula = NULL, k = 3, ...) {
 #' Fit PAM for tidylearn models
 #' @keywords internal
 #' @noRd
-tl_fit_pam <- function(data, formula = NULL, k = 3, ...) {
+tl_fit_pam <- function(data, formula = NULL, k = 3, metric = "euclidean",
+                       ...) {
   tl_check_packages("cluster")
 
-  # Extract variables to use
+  data <- tl_ungroup(data)
   if (!is.null(formula)) {
-    vars <- get_formula_vars(formula, data)
-    data_for_pam <- data[, vars, drop = FALSE]
-  } else {
-    data_for_pam <- data
+    vars <- tl_formula_columns(
+      formula, data, "PAM",
+      mixed_types = metric == "gower", alternative = "metric = \"gower\""
+    )
+    data <- data[, vars, drop = FALSE]
   }
 
   # Fit PAM using tidy_pam
-  pam_result <- tidy_pam(data_for_pam, k = k, ...)
+  pam_result <- tidy_pam(data, k = k, metric = metric, ...)
 
   # Return in expected format
   list(
@@ -511,16 +518,13 @@ tl_fit_pam <- function(data, formula = NULL, k = 3, ...) {
 tl_fit_clara <- function(data, formula = NULL, k = 3, ...) {
   tl_check_packages("cluster")
 
-  # Extract variables to use
+  data <- tl_ungroup(data)
   if (!is.null(formula)) {
-    vars <- get_formula_vars(formula, data)
-    data_for_clara <- data[, vars, drop = FALSE]
-  } else {
-    data_for_clara <- data
+    data <- data[, tl_formula_columns(formula, data, "CLARA"), drop = FALSE]
   }
 
   # Fit CLARA using tidy_clara
-  clara_result <- tidy_clara(data_for_clara, k = k, ...)
+  clara_result <- tidy_clara(data, k = k, ...)
 
   # Return in expected format
   list(

@@ -15,25 +15,44 @@ tl_dbscan_core_points <- function(data_matrix, eps, minPts) {
   lengths(neighbours$id) >= (minPts - 1)
 }
 
+#' Read a coordinate matrix as a data frame
+#'
+#' The k-NN and DBSCAN helpers accept a matrix of coordinates, as
+#' \code{dbscan::dbscan()} does, but handed it straight to
+#' \code{dplyr::select()}, which has no matrix method.
+#'
+#' @param data A matrix, data frame or dist object
+#' @return \code{data}, as a data frame when it was a matrix
+#' @keywords internal
+#' @noRd
+tl_as_coordinates <- function(data) {
+  if (is.matrix(data)) as.data.frame(data) else data
+}
+
 #' Tidy DBSCAN Clustering
 #'
 #' Performs density-based clustering with tidy output
 #'
-#' @param data A data frame, tibble, or distance matrix
+#' @param data A data frame, tibble, numeric matrix, or dist object
 #' @param eps Neighborhood radius (epsilon)
 #' @param minPts Minimum number of points to form a dense region (default: 5)
 #' @param cols Columns to include (tidy select).
-#'   If NULL, uses all numeric columns.
-#' @param distance Distance metric if data is not a
-#'   dist object (default: "euclidean")
+#'   If NULL, uses all numeric columns, or every column for
+#'   \code{distance = "gower"}.
+#' @param distance Distance metric if data is not a dist object (default:
+#'   "euclidean"): any method \code{\link[stats]{dist}} accepts, or "gower"
+#'   for mixed data types
 #'
 #' @return A list of class "tidy_dbscan" containing:
 #' \itemize{
-#'   \item clusters: tibble with observation IDs and
-#'     cluster assignments (0 = noise)
-#'   \item core_points: logical vector indicating core points
+#'   \item clusters: tibble with observation IDs, cluster assignments
+#'     (0 = noise), and the logical flags \code{is_noise} and
+#'     \code{is_core}
+#'   \item summary: tibble with each cluster's size and number of core
+#'     points
 #'   \item n_clusters: number of clusters (excluding noise)
 #'   \item n_noise: number of noise points
+#'   \item eps, minPts: the parameters used
 #'   \item model: original dbscan object
 #' }
 #'
@@ -60,16 +79,20 @@ tidy_dbscan <- function(data, eps, minPts = 5,
     data_matrix <- data
     n_obs <- attr(data, "Size")
   } else {
-    # Select columns
-    if (!is.null(cols)) {
-      cols_enquo <- rlang::enquo(cols)
-      data_selected <- data |> dplyr::select(!!cols_enquo)
-    } else {
-      data_selected <- data |> dplyr::select(where(is.numeric))
-    }
+    data <- tl_as_coordinates(data)
+    data_selected <- tl_select_columns(
+      data, rlang::enquo(cols), all_columns = distance == "gower"
+    )
+    n_obs <- nrow(data_selected)
 
-    data_matrix <- as.matrix(data_selected)
-    n_obs <- nrow(data_matrix)
+    # dbscan() searches Euclidean neighbourhoods on coordinates and takes
+    # any other metric as a dist object. Leaving `distance` unused gave the
+    # Euclidean clustering whatever metric was asked for.
+    data_matrix <- if (distance == "euclidean") {
+      as.matrix(data_selected)
+    } else {
+      tidy_dist(data_selected, method = distance)
+    }
   }
 
   # Perform DBSCAN
@@ -147,13 +170,8 @@ tidy_dbscan <- function(data, eps, minPts = 5,
 #' @export
 tidy_knn_dist <- function(data, k = 4, cols = NULL) {
 
-  # Select columns
-  if (!is.null(cols)) {
-    cols_enquo <- rlang::enquo(cols)
-    data_selected <- data |> dplyr::select(!!cols_enquo)
-  } else {
-    data_selected <- data |> dplyr::select(where(is.numeric))
-  }
+  data <- tl_as_coordinates(data)
+  data_selected <- tl_select_columns(data, rlang::enquo(cols))
 
   data_matrix <- as.matrix(data_selected)
 
@@ -174,7 +192,10 @@ tidy_knn_dist <- function(data, k = 4, cols = NULL) {
 #' Use k-NN distance plot to suggest eps value
 #'
 #' @param data A data frame or matrix
-#' @param minPts Minimum points parameter (used as k for k-NN)
+#' @param minPts The \code{minPts} you will pass to \code{\link{tidy_dbscan}}
+#'   (default: 5). The k-NN distance is read at \code{k = minPts - 1}, the
+#'   neighbours a core point needs besides itself, as
+#'   \code{\link[dbscan]{kNNdistplot}} does.
 #' @param method Method to suggest eps: "percentile" (default), "knee"
 #' @param percentile If method="percentile", which
 #'   percentile to use (default: 0.95)
@@ -195,8 +216,11 @@ suggest_eps <- function(data, minPts = 5,
                         method = "percentile",
                         percentile = 0.95) {
 
-  # Compute k-NN distances
-  knn_data <- tidy_knn_dist(data, k = minPts)
+  # frNN() and kNNdist() leave the point itself out, so a point with
+  # minPts - 1 neighbours within eps is core. Reading the distance at
+  # k = minPts suggested a radius for minPts + 1.
+  tl_check_whole_number(minPts, "minPts", min = 2)
+  knn_data <- tidy_knn_dist(data, k = minPts - 1)
 
   # Suggest eps based on method
   if (method == "percentile") {
@@ -229,7 +253,7 @@ suggest_eps <- function(data, minPts = 5,
 #'
 #' Visualize k-NN distances to help choose eps
 #'
-#' @param data A data frame or tidy_knn_dist result
+#' @param data A data frame, matrix, or tidy_knn_dist result
 #' @param k If data is a data frame, k for k-NN (default: 4)
 #' @param add_suggestion Add suggested eps line? (default: TRUE)
 #' @param percentile Percentile for suggestion (default: 0.95)
@@ -282,8 +306,10 @@ plot_knn_dist <- function(data, k = 4,
         "text",
         x = nrow(knn_data) * 0.7,
         y = eps_line * 1.1,
+        # %g, because a percentile such as 0.975 is no whole percent and
+        # %d refuses it; even 0.57 * 100 is 56.99999999999999
         label = sprintf(
-          "Suggested eps = %.3f\n(%d%% percentile)",
+          "Suggested eps = %.3f\n(%g%% percentile)",
           eps_line, percentile * 100
         ),
         color = "red"
@@ -347,7 +373,7 @@ augment_dbscan <- function(dbscan_obj, data) {
 #' @export
 explore_dbscan_params <- function(data, eps_values, minPts_values) {  # nolint
 
-  data_numeric <- data |> dplyr::select(where(is.numeric))
+  data_numeric <- tl_select_columns(tl_as_coordinates(data))
 
   # Create parameter grid
   param_grid <- expand.grid(
@@ -420,19 +446,25 @@ print.tidy_dbscan <- function(x, ...) {
 #' Fit DBSCAN for tidylearn models
 #' @keywords internal
 #' @noRd
-tl_fit_dbscan <- function(data, formula = NULL, eps = 0.5, minPts = 5, ...) {
+tl_fit_dbscan <- function(data, formula = NULL, eps = 0.5, minPts = 5,
+                          distance = "euclidean", ...) {
   tl_check_packages("dbscan")
 
-  # Extract variables to use
+  # Without a formula, tidy_dbscan() picks the columns its distance can use
+  data <- tl_ungroup(data)
   if (!is.null(formula)) {
-    vars <- get_formula_vars(formula, data)
-    data_for_db <- data[, vars, drop = FALSE]
-  } else {
-    data_for_db <- data |> dplyr::select(where(is.numeric))
+    vars <- tl_formula_columns(
+      formula, data, "DBSCAN",
+      mixed_types = distance == "gower",
+      alternative = "distance = \"gower\""
+    )
+    data <- data[, vars, drop = FALSE]
   }
 
   # Fit DBSCAN using tidy_dbscan
-  db_result <- tidy_dbscan(data_for_db, eps = eps, minPts = minPts, ...)
+  db_result <- tidy_dbscan(
+    data, eps = eps, minPts = minPts, distance = distance, ...
+  )
 
   # Return in expected format
   list(

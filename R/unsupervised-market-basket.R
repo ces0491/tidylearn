@@ -10,12 +10,25 @@
 #' @param target Type of association mined: "rules"
 #'   (default), "frequent itemsets",
 #'   "maximally frequent itemsets"
+#' @param control A list of algorithmic controls for
+#'   \code{\link[arules]{apriori}}. The mining trace is off unless the list
+#'   sets \code{verbose = TRUE}; any other entries are passed as given.
+#' @param ... Further arguments passed to \code{\link[arules]{apriori}}:
+#'   \code{appearance}, to restrict where items may appear, or more mining
+#'   parameters, such as \code{smax} or \code{maxtime}, which it adds to
+#'   the ones above.
 #'
-#' @return A list of class "tidy_rules" containing:
+#' @return A list of class "tidy_apriori" containing:
 #' \itemize{
-#'   \item rules_tbl: tibble of rules with lhs, rhs, and quality measures
-#'   \item rules: original rules object
+#'   \item rules_tbl: tibble of rules, as \code{\link{tidy_rules}} returns
+#'     it, or \code{NULL} for an itemset target
+#'   \item rules: original arules object, rules or itemsets
 #'   \item parameters: parameters used
+#'   \item n_rules: number of rules, or of itemsets for an itemset target
+#'   \item itemsets_tbl: for an itemset target only, a tibble with
+#'     \code{itemset_id}, \code{itemset} (its label), \code{size}, the
+#'     quality measures, and \code{items}, a list column holding each
+#'     itemset's items
 #' }
 #'
 #' @examples
@@ -33,7 +46,8 @@
 #'
 #' @export
 tidy_apriori <- function(transactions, support = 0.01, confidence = 0.5,
-                         minlen = 2, maxlen = 10, target = "rules") {
+                         minlen = 2, maxlen = 10, target = "rules",
+                         control = list(verbose = FALSE), ...) {
 
 
   # Check if arules is installed
@@ -48,22 +62,30 @@ tidy_apriori <- function(transactions, support = 0.01, confidence = 0.5,
     target = target
   )
 
-  # Run Apriori
-  rules_obj <- arules::apriori(transactions, parameter = params)
-
-  # Convert to tidy format if rules
-  if (target == "rules") {
-    rules_tbl <- tidy_rules(rules_obj)
-  } else {
-    rules_tbl <- NULL
+  # arules prints about 20 lines of trace on every call by default. A
+  # control list that leaves verbose out keeps it off here.
+  if (is.list(control)) {
+    control <- utils::modifyList(list(verbose = FALSE), control)
   }
 
+  # Run Apriori
+  rules_obj <- arules::apriori(
+    transactions, parameter = params, control = control, ...
+  )
+
+  # Itemsets have no sides to tidy. rules_tbl stays NULL for them, and the
+  # helpers that read it say so rather than fail on the NULL.
+  is_rules <- inherits(rules_obj, "rules")
+
   result <- list(
-    rules_tbl = rules_tbl,
+    rules_tbl = if (is_rules) tidy_rules(rules_obj) else NULL,
     rules = rules_obj,
     parameters = params,
     n_rules = length(rules_obj)
   )
+  if (!is_rules) {
+    result$itemsets_tbl <- tl_tidy_itemsets(rules_obj)
+  }
 
   class(result) <- c("tidy_apriori", "list")
   result
@@ -74,8 +96,14 @@ tidy_apriori <- function(transactions, support = 0.01, confidence = 0.5,
 #'
 #' @param rules A rules object from arules
 #'
-#' @return A tibble with columns \code{rule_id}, \code{lhs}, \code{rhs}, and
-#'   quality measures (e.g., \code{support}, \code{confidence}, \code{lift}).
+#' @return A tibble with columns \code{rule_id}, \code{lhs}, \code{rhs},
+#'   the quality measures (e.g., \code{support}, \code{confidence},
+#'   \code{lift}), and the list columns \code{lhs_items} and
+#'   \code{rhs_items}, each rule's items on that side as a character
+#'   vector. The \code{lhs} and \code{rhs} labels are for reading; the
+#'   helpers that match items read the lists, since an item name can hold
+#'   the comma that separates items in a label. An empty rule set gives a
+#'   zero-row tibble with the same columns.
 #'
 #' @examples
 #' \donttest{
@@ -93,24 +121,48 @@ tidy_rules <- function(rules) {
   # Check if arules is installed
   tl_check_packages("arules")
 
-  if (length(rules) == 0) {
-    return(tibble::tibble())
+  if (!inherits(rules, "rules")) {
+    stop(
+      "'rules' must be an arules rules object, such as the $rules element ",
+      "of a tidy_apriori() result mined with target = \"rules\". Got an ",
+      "object of class ", paste(class(rules), collapse = "/"), ".",
+      call. = FALSE
+    )
   }
 
-  # Extract LHS and RHS as character
-  lhs <- arules::labels(arules::lhs(rules))
-  rhs <- arules::labels(arules::rhs(rules))
+  n_rules <- length(rules)
+
+  # labels() of an empty rule set is "{}", one label for no rules, so the
+  # sides are read only when there are rules. An empty set used to return
+  # a tibble with no columns at all, which every helper downstream failed
+  # on.
+  if (n_rules == 0) {
+    lhs <- character(0)
+    rhs <- character(0)
+    lhs_items <- list()
+    rhs_items <- list()
+  } else {
+    lhs_side <- arules::lhs(rules)
+    rhs_side <- arules::rhs(rules)
+    lhs <- arules::labels(lhs_side)
+    rhs <- arules::labels(rhs_side)
+    lhs_items <- arules::LIST(lhs_side)
+    rhs_items <- arules::LIST(rhs_side)
+  }
 
   # Get quality measures
   quality_df <- arules::quality(rules)
 
-  # Combine into tibble
+  # Combine into tibble. The item lists go last, so a printed table still
+  # leads with the labels and measures.
   rules_tbl <- tibble::tibble(
-    rule_id = seq_along(lhs),
+    rule_id = seq_len(n_rules),
     lhs = lhs,
     rhs = rhs
   ) |>
     dplyr::bind_cols(tibble::as_tibble(quality_df))
+  rules_tbl$lhs_items <- lhs_items
+  rules_tbl$rhs_items <- rhs_items
 
   rules_tbl
 }
@@ -120,13 +172,17 @@ tidy_rules <- function(rules) {
 #'
 #' View rules sorted by various quality measures
 #'
-#' @param rules_obj A tidy_apriori object or rules object
-#' @param by Sort by: "support", "confidence", "lift" (default), "count"
+#' @param rules_obj A tidy_apriori object, an arules rules or itemsets
+#'   object, or a tibble of rules
+#' @param by Sort by: "support", "confidence", "lift" (default), "count".
+#'   Itemsets have no lift, so for them the default sorts by support.
 #' @param n Number of rules to display (default: 10)
-#' @param decreasing Sort in decreasing order? (default: TRUE)
+#' @param decreasing If TRUE (default), the \code{n} rules with the
+#'   highest values of \code{by}, highest first; if FALSE, the \code{n}
+#'   with the lowest, lowest first, as in arules' \code{head(by = )}.
 #'
-#' @return A tibble of the top \code{n} rules sorted by the specified quality
-#'   measure.
+#' @return A tibble of the \code{n} rules ranked highest (or, with
+#'   \code{decreasing = FALSE}, lowest) by the quality measure \code{by}.
 #'
 #' @examples
 #' \donttest{
@@ -142,32 +198,39 @@ inspect_rules <- function(rules_obj, by = "lift", n = 10, decreasing = TRUE) {
 
   # Handle different input types
   if (inherits(rules_obj, "tidy_apriori")) {
-    rules_tbl <- rules_obj$rules_tbl
+    rules_tbl <- if (inherits(rules_obj$rules, "rules")) {
+      rules_obj$rules_tbl
+    } else {
+      rules_obj$itemsets_tbl %||% tl_tidy_itemsets(rules_obj$rules)
+    }
   } else if (inherits(rules_obj, "rules")) {
     rules_tbl <- tidy_rules(rules_obj)
+  } else if (inherits(rules_obj, "itemsets")) {
+    rules_tbl <- tl_tidy_itemsets(rules_obj)
   } else if (is.data.frame(rules_obj)) {
-    rules_tbl <- rules_obj
+    rules_tbl <- tl_ungroup(rules_obj)
   } else {
     stop("rules_obj must be a tidy_apriori object, rules object, or tibble")
   }
 
-  # Sort and select top n
-  if (by %in% names(rules_tbl)) {
-    rules_tbl <- rules_tbl |>
-      dplyr::arrange(dplyr::desc(!!rlang::sym(by))) |>
-      dplyr::slice(seq_len(min(n, nrow(rules_tbl))))
+  if (missing(by) && !"lift" %in% names(rules_tbl)) {
+    by <- "support"
+  }
 
-    if (!decreasing) {
-      rules_tbl <- rules_tbl |>
-        dplyr::arrange(!!rlang::sym(by))
+  # Sort in the requested direction before taking n, as arules' head(by = )
+  # does. Sorting descending first and reversing afterwards returned the n
+  # highest rules in ascending order.
+  if (by %in% names(rules_tbl)) {
+    rules_tbl <- if (decreasing) {
+      dplyr::arrange(rules_tbl, dplyr::desc(.data[[by]]))
+    } else {
+      dplyr::arrange(rules_tbl, .data[[by]])
     }
   } else {
     warning("Sorting column not found, returning first n rules")
-    rules_tbl <- rules_tbl |>
-      dplyr::slice(seq_len(min(n, nrow(rules_tbl))))
   }
 
-  rules_tbl
+  utils::head(rules_tbl, n)
 }
 
 
@@ -175,8 +238,11 @@ inspect_rules <- function(rules_obj, by = "lift", n = 10, decreasing = TRUE) {
 #'
 #' Subset rules containing specific items
 #'
-#' @param rules_obj A tidy_apriori object or tibble of rules
-#' @param item Character; item to filter by
+#' @param rules_obj A tidy_apriori object, an arules rules object, or a
+#'   tibble of rules from \code{\link{tidy_rules}}, which must keep its
+#'   \code{lhs_items} and \code{rhs_items} columns
+#' @param item Character; one item name, matched against whole items, so
+#'   "coffee" does not match "instant coffee"
 #' @param where Character; "lhs", "rhs", or "both" (default: "both")
 #'
 #' @return A tibble of rules containing the specified \code{item} in the
@@ -194,29 +260,20 @@ inspect_rules <- function(rules_obj, by = "lift", n = 10, decreasing = TRUE) {
 #' @export
 filter_rules_by_item <- function(rules_obj, item, where = "both") {
 
-  # Get rules tibble
-  if (inherits(rules_obj, "tidy_apriori")) {
-    rules_tbl <- rules_obj$rules_tbl
-  } else {
-    rules_tbl <- rules_obj
-  }
+  rules_tbl <- tl_rules_table(rules_obj)
+  item <- tl_check_item(item)
+
+  in_lhs <- tl_rules_holding(rules_tbl, item, "lhs")
+  in_rhs <- tl_rules_holding(rules_tbl, item, "rhs")
 
   # Filter based on location
-  if (where == "lhs") {
-    filtered <- rules_tbl |>
-      dplyr::filter(grepl(item, lhs, fixed = TRUE))
-  } else if (where == "rhs") {
-    filtered <- rules_tbl |>
-      dplyr::filter(grepl(item, rhs, fixed = TRUE))
-  } else {
-    filtered <- rules_tbl |>
-      dplyr::filter(
-        grepl(item, lhs, fixed = TRUE) |
-          grepl(item, rhs, fixed = TRUE)
-      )
-  }
+  keep <- switch(where,
+    lhs = in_lhs,
+    rhs = in_rhs,
+    in_lhs | in_rhs
+  )
 
-  filtered
+  rules_tbl[keep, , drop = FALSE]
 }
 
 
@@ -224,8 +281,11 @@ filter_rules_by_item <- function(rules_obj, item, where = "both") {
 #'
 #' Find items frequently purchased with a given item
 #'
-#' @param rules_obj A tidy_apriori object
-#' @param item Character; item to find associations for
+#' @param rules_obj A tidy_apriori object, an arules rules object, or a
+#'   tibble of rules from \code{\link{tidy_rules}}, which must keep its
+#'   \code{lhs_items} and \code{rhs_items} columns
+#' @param item Character; one item name to find associations for, matched
+#'   against whole items
 #' @param min_lift Minimum lift threshold (default: 1.5)
 #' @param top_n Number of top associations to return (default: 10)
 #'
@@ -244,24 +304,19 @@ filter_rules_by_item <- function(rules_obj, item, where = "both") {
 #' @export
 find_related_items <- function(rules_obj, item, min_lift = 1.5, top_n = 10) {
 
-  # Get rules tibble
-  if (inherits(rules_obj, "tidy_apriori")) {
-    rules_tbl <- rules_obj$rules_tbl
-  } else {
-    rules_tbl <- rules_obj
-  }
+  rules_tbl <- tl_rules_table(rules_obj)
+  item <- tl_check_item(item)
 
   # Filter rules containing the item
-  related <- rules_tbl |>
-    dplyr::filter(
-      grepl(item, lhs, fixed = TRUE) |
-        grepl(item, rhs, fixed = TRUE)
-    ) |>
-    dplyr::filter(lift >= min_lift) |>
-    dplyr::arrange(dplyr::desc(lift)) |>
-    dplyr::slice(seq_len(min(top_n, dplyr::n())))
+  involves <- tl_rules_holding(rules_tbl, item, "lhs") |
+    tl_rules_holding(rules_tbl, item, "rhs")
 
-  related
+  related <- rules_tbl[
+    involves & rules_tbl$lift >= min_lift, , drop = FALSE
+  ] |>
+    dplyr::arrange(dplyr::desc(.data$lift))
+
+  utils::head(related, top_n)
 }
 
 
@@ -269,7 +324,8 @@ find_related_items <- function(rules_obj, item, min_lift = 1.5, top_n = 10) {
 #'
 #' Get summary statistics about rules
 #'
-#' @param rules_obj A tidy_apriori object or rules tibble
+#' @param rules_obj A tidy_apriori object, an arules rules object, or a
+#'   rules tibble
 #'
 #' @return A list with \code{n_rules} and summary statistics (\code{min},
 #'   \code{max}, \code{mean}, \code{median}) for \code{support},
@@ -287,14 +343,8 @@ find_related_items <- function(rules_obj, item, min_lift = 1.5, top_n = 10) {
 #' @export
 summarize_rules <- function(rules_obj) {
 
-  # Get rules tibble
-  if (inherits(rules_obj, "tidy_apriori")) {
-    rules_tbl <- rules_obj$rules_tbl
-    n_rules <- rules_obj$n_rules
-  } else {
-    rules_tbl <- rules_obj
-    n_rules <- nrow(rules_tbl)
-  }
+  rules_tbl <- tl_rules_table(rules_obj)
+  n_rules <- nrow(rules_tbl)
 
   if (n_rules == 0) {
     return(list(n_rules = 0, message = "No rules found"))
@@ -330,16 +380,19 @@ summarize_rules <- function(rules_obj) {
 #'
 #' Create visualizations of association rules
 #'
-#' @param rules_obj A tidy_apriori object, rules object, or rules tibble
-#' @param method Visualization method: "scatter"
-#'   (default), "graph", "grouped", "paracoord"
-#' @param top_n Number of top rules to visualize (default: 50)
+#' @param rules_obj A tidy_apriori object or an arules rules object. A
+#'   table of rules is refused: the plots need the rules object.
+#' @param method Visualization method: "scatter" (default), drawn by
+#'   tidylearn, or a method of \pkg{arulesViz}'s \code{plot()}, such as
+#'   "graph", "grouped", "matrix" or "paracoord"
+#' @param top_n Number of rules to visualize, those with the highest lift
+#'   (default: 50)
 #' @param ... Additional arguments passed to plot() for rules visualization
 #'
-#' @return A \code{\link[ggplot2]{ggplot}} object when
-#'   \code{method = "scatter"}.
-#'   For other methods, the plot is produced as a side effect via
-#'   \pkg{arulesViz}.
+#' @return For \code{method = "scatter"}, a \code{\link[ggplot2]{ggplot}}
+#'   object. Other methods return what \pkg{arulesViz}'s \code{plot()}
+#'   returns: a ggplot object for "graph", "grouped" and "matrix", and for
+#'   "paracoord", which draws with grid, a grid \code{vpPath}.
 #'
 #' @examples
 #' \donttest{
@@ -356,6 +409,9 @@ visualize_rules <- function(rules_obj, method = "scatter", top_n = 50, ...) {
   # Get rules object
   if (inherits(rules_obj, "tidy_apriori")) {
     rules <- rules_obj$rules
+    if (!inherits(rules, "rules")) {
+      tl_stop_itemsets(rules_obj)
+    }
   } else if (inherits(rules_obj, "rules")) {
     rules <- rules_obj
   } else if (is.data.frame(rules_obj)) {
@@ -367,10 +423,11 @@ visualize_rules <- function(rules_obj, method = "scatter", top_n = 50, ...) {
     stop("rules_obj must be a tidy_apriori or rules object")
   }
 
-  # Subset to top n rules
-  if (length(rules) > top_n) {
-    rules <- head(rules, top_n)
-  }
+  # Keep the top_n rules by lift. utils::head() falls through to its
+  # default method on an S4 rule set, which kept the first top_n in mining
+  # order while the subtitle called them the top ones.
+  by_lift <- order(arules::quality(rules)$lift, decreasing = TRUE)
+  rules <- rules[utils::head(by_lift, top_n)]
 
   # Create visualization based on method
   if (method == "scatter") {
@@ -388,7 +445,11 @@ visualize_rules <- function(rules_obj, method = "scatter", top_n = 50, ...) {
       ggplot2::scale_color_gradient(low = "lightblue", high = "red") +
       ggplot2::labs(
         title = "Association Rules - Support vs Confidence",
-        subtitle = sprintf("Top %d rules (colored by lift)", nrow(rules_tbl)),
+        subtitle = if (nrow(rules_tbl) == 0) {
+          "No rules to plot"
+        } else {
+          sprintf("Top %d rules by lift", nrow(rules_tbl))
+        },
         x = "Support",
         y = "Confidence"
       ) +
@@ -415,14 +476,18 @@ visualize_rules <- function(rules_obj, method = "scatter", top_n = 50, ...) {
 #'
 #' Get product recommendations based on basket contents
 #'
-#' @param rules_obj A tidy_apriori object
+#' @param rules_obj A tidy_apriori object, an arules rules object, or a
+#'   tibble of rules from \code{\link{tidy_rules}}, which must keep its
+#'   \code{lhs_items} and \code{rhs_items} columns
 #' @param basket Character vector of items in current basket
 #' @param top_n Number of recommendations to return (default: 5)
 #' @param min_confidence Minimum confidence threshold (default: 0.5)
 #'
 #' @return A tibble with columns \code{rhs} (recommended item),
 #'   \code{confidence}, \code{lift}, and \code{support}, sorted by lift in
-#'   descending order.
+#'   descending order. A rule is used when the basket holds its whole
+#'   left-hand side and none of its right-hand side, and each product is
+#'   listed once, from its highest-lift rule.
 #'
 #' @examples
 #' \donttest{
@@ -441,27 +506,36 @@ recommend_products <- function(rules_obj, basket,
                                top_n = 5,
                                min_confidence = 0.5) {
 
-  # Get rules tibble
-  if (inherits(rules_obj, "tidy_apriori")) {
-    rules_tbl <- rules_obj$rules_tbl
-  } else {
-    rules_tbl <- rules_obj
-  }
+  rules_tbl <- tl_rules_table(rules_obj)
+  basket <- as.character(basket)
 
-  # Find rules where LHS matches basket items
-  recommendations <- rules_tbl |>
-    dplyr::filter(confidence >= min_confidence) |>
-    dplyr::filter(sapply(lhs, function(rule_lhs) {
-      # Check if all items in LHS are in basket
-      rule_items <- strsplit(gsub("[{}]", "", rule_lhs), ",")[[1]]
-      rule_items <- trimws(rule_items)
-      all(rule_items %in% basket)
-    })) |>
-    dplyr::arrange(dplyr::desc(lift)) |>
-    dplyr::select(rhs, confidence, lift, support) |>
-    dplyr::slice(seq_len(min(top_n, dplyr::n())))
+  # A rule fires when the basket holds its whole left-hand side, and is
+  # worth suggesting only for what the basket lacks: rules recommending an
+  # item already in it used to be returned, one of them four times over
+  fires <- vapply(
+    tl_rule_items(rules_tbl, "lhs"),
+    function(items) all(items %in% basket),
+    logical(1), USE.NAMES = FALSE
+  )
+  adds <- vapply(
+    tl_rule_items(rules_tbl, "rhs"),
+    function(items) !any(items %in% basket),
+    logical(1), USE.NAMES = FALSE
+  )
 
-  recommendations
+  recommendations <- rules_tbl[
+    fires & adds & rules_tbl$confidence >= min_confidence, , drop = FALSE
+  ] |>
+    dplyr::arrange(dplyr::desc(.data$lift))
+
+  # Several rules can suggest the same product; keep its highest-lift rule
+  recommendations <- recommendations[
+    !duplicated(recommendations$rhs_items), , drop = FALSE
+  ]
+
+  recommendations |>
+    dplyr::select("rhs", "confidence", "lift", "support") |>
+    utils::head(top_n)
 }
 
 
@@ -483,16 +557,49 @@ recommend_products <- function(rules_obj, basket,
 #'
 #' @export
 print.tidy_apriori <- function(x, ...) {
+  # An itemset result has no rules table, confidence or lift. Printing it
+  # as rules gave nine min/max warnings, "Support: Inf - -Inf", and then
+  # failed on the missing table.
+  is_rules <- inherits(x$rules, "rules")
+
   cat("Tidy Apriori Results\n")
   cat("====================\n\n")
   cat("Parameters:\n")
   cat("  Minimum support:   ", x$parameters$supp, "\n")
-  cat("  Minimum confidence:", x$parameters$conf, "\n")
-  cat("  Rule length:       ",
-      x$parameters$minlen, "-",
-      x$parameters$maxlen, "\n\n")
+  if (is_rules) {
+    cat("  Minimum confidence:", x$parameters$conf, "\n")
+    cat("  Rule length:       ",
+        x$parameters$minlen, "-",
+        x$parameters$maxlen, "\n\n")
+  } else {
+    cat("  Target:            ", x$parameters$target, "\n")
+    cat("  Itemset size:      ",
+        x$parameters$minlen, "-",
+        x$parameters$maxlen, "\n\n")
+  }
 
   cat("Results:\n")
+
+  if (!is_rules) {
+    cat("  Number of itemsets:", x$n_rules, "\n\n")
+
+    if (x$n_rules > 0) {
+      itemsets_tbl <- x$itemsets_tbl %||% tl_tidy_itemsets(x$rules)
+      cat("Support:",
+          sprintf("%.4f - %.4f (mean: %.4f)",
+                  min(itemsets_tbl$support),
+                  max(itemsets_tbl$support),
+                  mean(itemsets_tbl$support)), "\n\n")
+
+      cat("Top 5 itemsets by support:\n")
+      top <- inspect_rules(x, by = "support", n = 5)
+      print(top[setdiff(names(top), "items")])
+    }
+
+    cat("\nUse inspect_rules() to view more itemsets\n")
+    return(invisible(x))
+  }
+
   cat("  Number of rules:", x$n_rules, "\n\n")
 
   if (x$n_rules > 0) {
@@ -516,11 +623,172 @@ print.tidy_apriori <- function(x, ...) {
                 summary$lift$mean), "\n\n")
 
     cat("Top 5 rules by lift:\n")
-    print(inspect_rules(x, by = "lift", n = 5))
+    top <- inspect_rules(x, by = "lift", n = 5)
+    # The labels say what the item lists hold; the lists are for matching
+    print(top[setdiff(names(top), c("lhs_items", "rhs_items"))])
   }
 
   cat("\nUse inspect_rules() to view more rules\n")
   cat("Use visualize_rules() to create visualizations\n")
 
   invisible(x)
+}
+
+
+# ---- helpers ---------------------------------------------------------
+
+#' Tidy a set of frequent itemsets
+#'
+#' @param itemsets An arules itemsets object
+#' @return A tibble with \code{itemset_id}, \code{itemset} (the label),
+#'   \code{size}, the quality measures, and the list column \code{items}
+#' @keywords internal
+#' @noRd
+tl_tidy_itemsets <- function(itemsets) {
+  n_itemsets <- length(itemsets)
+
+  # As for rules, labels() of an empty set is a single "{}"
+  if (n_itemsets == 0) {
+    labels <- character(0)
+    items <- list()
+  } else {
+    labels <- arules::labels(itemsets)
+    items <- arules::LIST(arules::items(itemsets))
+  }
+
+  itemsets_tbl <- tibble::tibble(
+    itemset_id = seq_len(n_itemsets),
+    itemset = labels,
+    size = lengths(items)
+  ) |>
+    dplyr::bind_cols(tibble::as_tibble(arules::quality(itemsets)))
+  itemsets_tbl$items <- items
+
+  itemsets_tbl
+}
+
+#' The rules table a market-basket helper works on
+#'
+#' The helpers take a tidy_apriori() result, an arules rules object, or a
+#' table of rules. A result saved before tidy_rules() added the item lists
+#' has them rebuilt from the rules it carries.
+#'
+#' @param rules_obj What the caller passed
+#' @return A tibble of rules
+#' @keywords internal
+#' @noRd
+tl_rules_table <- function(rules_obj) {
+  if (inherits(rules_obj, "tidy_apriori")) {
+    if (!inherits(rules_obj$rules, "rules")) {
+      tl_stop_itemsets(rules_obj)
+    }
+    rules_tbl <- rules_obj$rules_tbl
+    if (!all(c("lhs_items", "rhs_items") %in% names(rules_tbl))) {
+      rules_tbl <- tidy_rules(rules_obj$rules)
+    }
+    return(rules_tbl)
+  }
+
+  if (inherits(rules_obj, "rules")) {
+    return(tidy_rules(rules_obj))
+  }
+
+  if (is.data.frame(rules_obj)) {
+    return(tl_ungroup(rules_obj))
+  }
+
+  stop(
+    "'rules_obj' must be a tidy_apriori() result, an arules rules object, ",
+    "or a table of rules from tidy_rules(). Got an object of class ",
+    paste(class(rules_obj), collapse = "/"), ".",
+    call. = FALSE
+  )
+}
+
+#' Refuse an itemset result where rules are needed
+#'
+#' An itemset result's rules table is NULL, which the rule helpers used to
+#' fail on with messages that named neither the table nor the cause.
+#'
+#' @param rules_obj A tidy_apriori result mined for itemsets
+#' @keywords internal
+#' @noRd
+tl_stop_itemsets <- function(rules_obj) {
+  stop(
+    "'rules_obj' holds itemsets (target = \"", rules_obj$parameters$target,
+    "\"), not rules. Mine with target = \"rules\" for this; the itemsets ",
+    "are in $itemsets_tbl, and inspect_rules() reads them.",
+    call. = FALSE
+  )
+}
+
+#' One side's item lists, for matching
+#'
+#' Matching reads the item lists tidy_rules() adds. grepl() on the labels
+#' matched "coffee" inside "instant coffee", and splitting a label on ","
+#' cut an item such as "salt, iodised" in two.
+#'
+#' @param rules_tbl A rules table
+#' @param side "lhs" or "rhs"
+#' @return A list of character vectors, one per rule
+#' @keywords internal
+#' @noRd
+tl_rule_items <- function(rules_tbl, side) {
+  if (!all(c("lhs_items", "rhs_items") %in% names(rules_tbl))) {
+    stop(
+      "Matching items needs the lhs_items and rhs_items columns that ",
+      "tidy_rules() adds, and this table of rules lacks them. Pass the ",
+      "tidy_apriori() result itself, or keep those columns when filtering ",
+      "its rules_tbl.",
+      call. = FALSE
+    )
+  }
+
+  rules_tbl[[paste0(side, "_items")]]
+}
+
+#' Which rules hold an item on one side
+#'
+#' @param rules_tbl A rules table
+#' @param item A single item name
+#' @param side "lhs" or "rhs"
+#' @return A logical vector, one per rule
+#' @keywords internal
+#' @noRd
+tl_rules_holding <- function(rules_tbl, item, side) {
+  vapply(
+    tl_rule_items(rules_tbl, side),
+    function(items) item %in% items,
+    logical(1), USE.NAMES = FALSE
+  )
+}
+
+#' Refuse anything but a single item name
+#'
+#' grepl() used only the first element of a vector, with a warning; item
+#' matching on a vector would quietly mean "any of these" instead.
+#'
+#' @param item The caller's item
+#' @return The item, as a character string
+#' @keywords internal
+#' @noRd
+tl_check_item <- function(item) {
+  if (is.factor(item)) {
+    item <- as.character(item)
+  }
+
+  if (!is.character(item) || length(item) != 1 || is.na(item)) {
+    got <- if (length(item) == 0) {
+      "nothing"
+    } else {
+      paste(utils::head(as.character(item), 5), collapse = ", ")
+    }
+    stop(
+      "'item' must be a single item name, such as \"whole milk\". Got: ",
+      got, ".",
+      call. = FALSE
+    )
+  }
+
+  item
 }

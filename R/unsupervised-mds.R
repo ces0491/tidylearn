@@ -32,7 +32,7 @@ tidy_mds <- function(data, method = "classical",
   if (inherits(data, "dist")) {
     dist_mat <- data
   } else {
-    data_matrix <- as.matrix(data |> dplyr::select(where(is.numeric)))
+    data_matrix <- as.matrix(tl_select_columns(data))
     dist_mat <- stats::dist(data_matrix, method = distance)
   }
 
@@ -106,6 +106,7 @@ tidy_mds_classical <- function(dist_mat, ndim = 2, add_rownames = TRUE) {
   if (!inherits(dist_mat, "dist")) {
     stop("dist_mat must be a dist object")
   }
+  tl_check_mds_ndim(ndim, dist_mat)
 
   # Perform classical MDS
   mds_result <- stats::cmdscale(dist_mat, k = ndim, eig = TRUE)
@@ -113,8 +114,10 @@ tidy_mds_classical <- function(dist_mat, ndim = 2, add_rownames = TRUE) {
   # Extract configuration
   config_matrix <- mds_result$points
 
-  # Create tibble
-  colnames(config_matrix) <- paste0("Dim", 1:ndim)
+  # cmdscale() keeps only dimensions with a positive eigenvalue, with a
+  # warning, so it can return fewer than ndim. Naming ndim columns failed
+  # on the mismatch.
+  colnames(config_matrix) <- paste0("Dim", seq_len(ncol(config_matrix)))
 
   if (add_rownames && !is.null(attr(dist_mat, "Labels"))) {
     config_tbl <- tibble::as_tibble(config_matrix, .name_repair = "minimal") |>
@@ -123,11 +126,11 @@ tidy_mds_classical <- function(dist_mat, ndim = 2, add_rownames = TRUE) {
     config_tbl <- tibble::as_tibble(config_matrix)
   }
 
-  # Calculate GOF (goodness of fit)
+  # Goodness of fit: the share of the absolute eigenvalue sum held by the
+  # dimensions returned. cmdscale() computes it over the dimensions it kept,
+  # where summing eigenvalues[1:ndim] would count ones it dropped.
   eigenvalues <- mds_result$eig
-  total_var <- sum(abs(eigenvalues))
-  retained_var <- sum(eigenvalues[1:ndim])
-  gof <- retained_var / total_var
+  gof <- mds_result$GOF[1]
 
   result <- list(
     config = config_tbl,
@@ -173,13 +176,14 @@ tidy_mds_smacof <- function(dist_mat, ndim = 2, type = "ratio", ...) {
   if (!inherits(dist_mat, "dist")) {
     stop("dist_mat must be a dist object")
   }
+  tl_check_mds_ndim(ndim, dist_mat)
 
   # Perform SMACOF
   mds_result <- smacof::mds(dist_mat, ndim = ndim, type = type, ...)
 
   # Extract configuration
   config_matrix <- mds_result$conf
-  colnames(config_matrix) <- paste0("Dim", 1:ndim)
+  colnames(config_matrix) <- paste0("Dim", seq_len(ncol(config_matrix)))
 
   if (!is.null(attr(dist_mat, "Labels"))) {
     config_tbl <- tibble::as_tibble(config_matrix) |>
@@ -230,13 +234,14 @@ tidy_mds_sammon <- function(dist_mat, ndim = 2, ...) {
   if (!inherits(dist_mat, "dist")) {
     stop("dist_mat must be a dist object")
   }
+  tl_check_mds_ndim(ndim, dist_mat)
 
   # Perform Sammon mapping
   mds_result <- MASS::sammon(dist_mat, k = ndim, trace = FALSE, ...)
 
   # Extract configuration
   config_matrix <- mds_result$points
-  colnames(config_matrix) <- paste0("Dim", 1:ndim)
+  colnames(config_matrix) <- paste0("Dim", seq_len(ncol(config_matrix)))
 
   if (!is.null(attr(dist_mat, "Labels"))) {
     config_tbl <- tibble::as_tibble(config_matrix) |>
@@ -285,13 +290,14 @@ tidy_mds_kruskal <- function(dist_mat, ndim = 2, ...) {
   if (!inherits(dist_mat, "dist")) {
     stop("dist_mat must be a dist object")
   }
+  tl_check_mds_ndim(ndim, dist_mat)
 
   # Perform isoMDS
   mds_result <- MASS::isoMDS(dist_mat, k = ndim, trace = FALSE, ...)
 
   # Extract configuration
   config_matrix <- mds_result$points
-  colnames(config_matrix) <- paste0("Dim", 1:ndim)
+  colnames(config_matrix) <- paste0("Dim", seq_len(ncol(config_matrix)))
 
   if (!is.null(attr(dist_mat, "Labels"))) {
     config_tbl <- tibble::as_tibble(config_matrix) |>
@@ -418,7 +424,9 @@ print.tidy_mds <- function(x, ...) {
   cat("Tidy MDS Analysis\n")
   cat("=================\n\n")
   cat("Method:", x$method, "\n")
-  cat("Dimensions:", ncol(x$config) - 1, "\n")
+  # Count the Dim columns: .obs_id is there only when the distances
+  # carried labels, so ncol() - 1 undercounted a fit on a tibble
+  cat("Dimensions:", sum(grepl("^Dim[0-9]+$", names(x$config))), "\n")
   cat("Observations:", nrow(x$config), "\n")
 
   if (!is.na(x$stress)) {
@@ -441,20 +449,57 @@ print.tidy_mds <- function(x, ...) {
 }
 
 
-#' Fit MDS for tidylearn models
+#' Refuse a dimension count MDS cannot return
+#'
+#' @param ndim The number of dimensions asked for
+#' @param dist_mat The distances being scaled; n points span at most n - 1
+#'   dimensions
 #' @keywords internal
 #' @noRd
-tl_fit_mds <- function(data, formula = NULL, k = 2, method = "classical", ...) {
-  # Extract variables to use
+tl_check_mds_ndim <- function(ndim, dist_mat) {
+  tl_check_whole_number(ndim, "ndim", min = 1, max = attr(dist_mat, "Size") - 1)
+}
+
+#' Fit MDS for tidylearn models
+#'
+#' tl_model()'s own \code{method} argument holds "mds", so the variant is
+#' chosen with \code{mds_method}. The dimension count can be given as
+#' \code{ndim}, the name tidy_mds() uses, or as \code{k}; passing ndim used
+#' to reach tidy_mds() a second time.
+#' @keywords internal
+#' @noRd
+tl_fit_mds <- function(data, formula = NULL, k = NULL, ndim = NULL,
+                       mds_method = "classical", ...) {
+  variants <- c("classical", "metric", "nonmetric", "sammon", "kruskal")
+  if (!is.character(mds_method) || length(mds_method) != 1 ||
+        !mds_method %in% variants) {
+    stop(
+      "'mds_method' must be one of ",
+      paste0("\"", variants, "\"", collapse = ", "), ". Got: ",
+      paste(utils::head(as.character(mds_method), 5), collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
+  if (!is.null(k) && !is.null(ndim) &&
+        !identical(as.numeric(k), as.numeric(ndim))) {
+    stop(
+      "'k' and 'ndim' both set the number of MDS dimensions, and they ",
+      "disagree (", paste(k, collapse = ", "), " and ",
+      paste(ndim, collapse = ", "), "). Pass one of them.",
+      call. = FALSE
+    )
+  }
+  ndim <- ndim %||% k %||% 2
+
+  # Without a formula, tidy_mds() takes the numeric columns itself
+  data <- tl_ungroup(data)
   if (!is.null(formula)) {
-    vars <- get_formula_vars(formula, data)
-    data_for_mds <- data[, vars, drop = FALSE]
-  } else {
-    data_for_mds <- data |> dplyr::select(where(is.numeric))
+    data <- data[, tl_formula_columns(formula, data, "MDS"), drop = FALSE]
   }
 
   # Fit MDS using tidy_mds
-  mds_result <- tidy_mds(data_for_mds, method = method, ndim = k, ...)
+  mds_result <- tidy_mds(data, method = mds_method, ndim = ndim, ...)
 
   # Return in expected format
   list(

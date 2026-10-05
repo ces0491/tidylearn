@@ -1,8 +1,48 @@
+#' Cluster labels as the integer codes cluster::silhouette() needs
+#'
+#' \code{silhouette()} calls \code{round()} on the labels, so a factor
+#' failed with "'round' not meaningful for factors" -- among them
+#' \code{augment_kmeans()}'s own cluster column -- and character labels
+#' failed too. Labels that are already whole numbers, such as the
+#' augment functions' factor of "1", "2", ..., keep their values, so 0
+#' still marks DBSCAN noise and a factor gives the result of the integer
+#' vector it came from. Other labels are numbered in level order for a
+#' factor and sorted order otherwise.
+#'
+#' @param clusters Cluster labels: numeric, factor or character
+#' @return A list: \code{codes}, the labels as whole numbers;
+#'   \code{labels}, the label behind each code, or NULL when the codes are
+#'   the labels themselves
+#' @keywords internal
+#' @noRd
+tl_cluster_codes <- function(clusters) {
+  if (is.numeric(clusters)) {
+    return(list(codes = clusters, labels = NULL))
+  }
+
+  values <- as.character(clusters)
+  observed <- !is.na(values)
+  as_number <- suppressWarnings(as.numeric(values[observed]))
+  if (!anyNA(as_number) && all(as_number == round(as_number))) {
+    return(list(codes = suppressWarnings(as.numeric(values)), labels = NULL))
+  }
+
+  labels <- if (is.factor(clusters)) {
+    levels(droplevels(clusters))
+  } else {
+    sort(unique(values[observed]))
+  }
+  list(codes = match(values, labels), labels = labels)
+}
+
 #' Tidy Silhouette Analysis
 #'
 #' Compute silhouette statistics for cluster validation
 #'
-#' @param clusters Vector of cluster assignments
+#' @param clusters Vector of cluster assignments: numeric, factor or
+#'   character. Numeric labels, or labels that read as whole numbers (such
+#'   as the \code{cluster} factor from \code{augment_kmeans()}), are kept
+#'   as they are; other labels are reported as given.
 #' @param dist_mat Distance matrix (dist object)
 #'
 #' @return A list of class "tidy_silhouette" containing:
@@ -27,7 +67,18 @@ tidy_silhouette <- function(clusters, dist_mat) {
   }
 
   # Compute silhouette
-  sil <- cluster::silhouette(clusters, dist_mat)
+  codes <- tl_cluster_codes(clusters)
+  sil <- cluster::silhouette(codes$codes, dist_mat)
+
+  # silhouette() returns NA in place of a table outside 2 to n - 1
+  # clusters, which failed below as "incorrect number of dimensions"
+  if (!is.matrix(sil)) {
+    stop(
+      "Silhouette widths need at least 2 clusters and fewer clusters than ",
+      "observations; 'clusters' has ", length(unique(codes$codes)), ".",
+      call. = FALSE
+    )
+  }
 
   # Create silhouette tibble
   sil_tbl <- tibble::as_tibble(sil[, 1:3]) |>
@@ -37,6 +88,16 @@ tidy_silhouette <- function(clusters, dist_mat) {
       sil_width = sil_width
     ) |>
     dplyr::mutate(.id = rownames(sil) %||% seq_len(nrow(sil)), .before = 1)
+
+  # Report labels that were not numbers as they were given
+  if (!is.null(codes$labels)) {
+    relabel <- function(code) {
+      label <- codes$labels[code]
+      if (is.factor(clusters)) factor(label, levels = codes$labels) else label
+    }
+    sil_tbl$cluster <- relabel(sil_tbl$cluster)
+    sil_tbl$neighbor <- relabel(sil_tbl$neighbor)
+  }
 
   # Calculate average by cluster
   cluster_avg <- sil_tbl |>
@@ -84,8 +145,13 @@ tidy_silhouette_analysis <- function(data, max_k = 10, method = "kmeans",
                                      nstart = 25, dist_method = "euclidean",
                                      linkage_method = "average") {
 
-  data_numeric <- data |> dplyr::select(where(is.numeric))
+  data_numeric <- tl_select_columns(data)
   tl_check_complete_numeric(data_numeric, "Silhouette analysis")
+  # silhouette() is defined for 2 to n - 1 clusters, and 2:max_k runs
+  # backwards below 2
+  tl_check_whole_number(
+    max_k, "max_k", min = 2, max = nrow(data_numeric) - 1
+  )
   dist_mat <- stats::dist(data_numeric, method = dist_method)
 
   # Compute silhouette for k = 2 to max_k
@@ -207,9 +273,13 @@ plot_silhouette <- function(sil_obj) {
 #' @return A list of class \code{"tidy_gap"} containing:
 #' \itemize{
 #'   \item gap_data: tibble with gap statistics for each k
-#'   \item k_firstSEmax: optimal k via firstSEmax method (most conservative)
-#'   \item k_globalmax: optimal k via globalmax method
-#'   \item k_firstmax: optimal k via firstmax method
+#'   \item k_firstSEmax: optimal k via \code{\link[cluster]{maxSE}}'s
+#'     firstSEmax method, the smallest k within one standard error of the
+#'     first local maximum (most conservative)
+#'   \item k_globalmax: optimal k via the globalmax method, the k with the
+#'     largest gap (most liberal)
+#'   \item k_firstmax: optimal k via the firstmax method, the first local
+#'     maximum of the gap
 #'   \item recommended_k: recommended k (uses firstSEmax)
 #'   \item model: the \code{\link[cluster]{clusGap}} result
 #' }
@@ -225,7 +295,9 @@ tidy_gap_stat <- function(data, FUN_cluster = NULL,  # nolint
                           max_k = 10, B = 50,  # nolint
                           nstart = 25) {
 
-  data_numeric <- data |> dplyr::select(where(is.numeric))
+  # clusGap() needs at least two cluster counts to compare
+  tl_check_whole_number(max_k, "max_k", min = 2)
+  data_numeric <- tl_select_columns(data)
   tl_check_complete_numeric(data_numeric, "The gap statistic")
 
   # Use cluster::clusGap
@@ -259,7 +331,11 @@ tidy_gap_stat <- function(data, FUN_cluster = NULL,  # nolint
                                 gap_result$Tab[, "SE.sim"],
                                 method = "globalmax")
 
-  k_firstmax <- which.max(gap_result$Tab[, "gap"])
+  # which.max() is maxSE()'s "globalmax", so it made k_firstmax a copy of
+  # k_globalmax; the first local maximum is a rule of its own
+  k_firstmax <- cluster::maxSE(gap_result$Tab[, "gap"],
+                               gap_result$Tab[, "SE.sim"],
+                               method = "firstmax")
 
   result <- list(
     gap_data = gap_tbl,
@@ -366,14 +442,18 @@ plot_gap_stat <- function(gap_obj, show_methods = FALSE) {
 #'
 #' Comprehensive validation metrics for a clustering result
 #'
-#' @param clusters Vector of cluster assignments
+#' @param clusters Vector of cluster assignments: numeric, factor or
+#'   character. A label of 0 marks noise, as \code{\link{tidy_dbscan}}
+#'   reports it: noise points are left out of every measure and counted in
+#'   \code{n_noise}.
 #' @param data Original data frame (for WSS calculation)
 #' @param dist_mat Distance matrix (for silhouette)
 #'
 #' @return A single-row tibble with columns \code{k}, \code{min_size},
-#'   \code{max_size}, \code{avg_size}, and optionally \code{avg_silhouette},
-#'   \code{min_silhouette} (if \code{dist_mat} provided), and \code{total_wss}
-#'   (if \code{data} provided).
+#'   \code{max_size}, \code{avg_size}, \code{n_noise}, and optionally
+#'   \code{avg_silhouette}, \code{min_silhouette} (if \code{dist_mat}
+#'   provided; \code{NA} for a single cluster), and \code{total_wss} (if
+#'   \code{data} provided).
 #'
 #' @examples
 #' \donttest{
@@ -387,37 +467,54 @@ calc_validation_metrics <- function(clusters, data = NULL, dist_mat = NULL) {
 
   metrics <- list()
 
+  # DBSCAN labels noise 0. k always left it out, but the sizes, silhouette
+  # and WSS counted it as one more cluster, so every measure is taken over
+  # the clustered points alone.
+  codes <- tl_cluster_codes(clusters)$codes
+  noise <- !is.na(codes) & codes == 0
+  kept <- codes[!noise]
+
   # Number of clusters
-  k <- length(unique(clusters[clusters != 0]))  # Exclude noise (0) if present
+  k <- length(unique(kept))
   metrics$k <- k
 
   # Cluster sizes
-  cluster_sizes <- table(clusters)
-  metrics$min_size <- min(cluster_sizes)
-  metrics$max_size <- max(cluster_sizes)
-  metrics$avg_size <- mean(cluster_sizes)
+  cluster_sizes <- table(kept)
+  metrics$min_size <- if (k > 0) min(cluster_sizes) else NA_integer_
+  metrics$max_size <- if (k > 0) max(cluster_sizes) else NA_integer_
+  metrics$avg_size <- if (k > 0) mean(cluster_sizes) else NA_real_
+  metrics$n_noise <- sum(noise)
 
-  # Silhouette if distance matrix provided
+  # Silhouette if distance matrix provided. silhouette() returns NA in
+  # place of a table outside 2 to n - 1 clusters.
   if (!is.null(dist_mat)) {
-    sil <- cluster::silhouette(clusters, dist_mat)
-    metrics$avg_silhouette <- mean(sil[, 3])
-    metrics$min_silhouette <- min(sil[, 3])
+    sil <- NA
+    if (k >= 2) {
+      kept_dist <- if (any(noise)) {
+        stats::as.dist(as.matrix(dist_mat)[!noise, !noise, drop = FALSE])
+      } else {
+        dist_mat
+      }
+      sil <- cluster::silhouette(kept, kept_dist)
+    }
+    metrics$avg_silhouette <- if (is.matrix(sil)) mean(sil[, 3]) else NA_real_
+    metrics$min_silhouette <- if (is.matrix(sil)) min(sil[, 3]) else NA_real_
   }
 
   # WSS if data provided
   if (!is.null(data)) {
-    data_numeric <- data |> dplyr::select(where(is.numeric))
+    data_numeric <- tl_select_columns(data)[!noise, , drop = FALSE]
 
     # Total within-cluster sum of squares
-    wss <- sum(sapply(unique(clusters), function(cl) {
-      cluster_data <- data_numeric[clusters == cl, , drop = FALSE]
+    wss <- sum(vapply(unique(kept), function(cl) {
+      cluster_data <- data_numeric[kept == cl, , drop = FALSE]
       if (nrow(cluster_data) > 1) {
         center <- colMeans(cluster_data)
         sum((t(cluster_data) - center)^2)
       } else {
         0
       }
-    }))
+    }, numeric(1)))
 
     metrics$total_wss <- wss
   }
@@ -428,7 +525,8 @@ calc_validation_metrics <- function(clusters, data = NULL, dist_mat = NULL) {
 
 #' Compare Multiple Clustering Results
 #'
-#' @param cluster_list Named list of cluster assignment vectors
+#' @param cluster_list Named list of cluster assignment vectors. An entry
+#'   without a name is reported as \code{clustering_<position>}.
 #' @param data Original data
 #' @param dist_mat Distance matrix
 #'
@@ -446,15 +544,28 @@ calc_validation_metrics <- function(clusters, data = NULL, dist_mat = NULL) {
 #' @export
 compare_clusterings <- function(cluster_list, data, dist_mat = NULL) {
 
+  if (!is.list(cluster_list)) {
+    stop(
+      "'cluster_list' must be a list of cluster assignment vectors, one ",
+      "per clustering, such as list(kmeans = km$cluster, pam = pm$clustering).",
+      call. = FALSE
+    )
+  }
+
+  # Mapping over names(cluster_list) returned a 0 x 0 tibble for an unnamed
+  # list, and failed on an entry left unnamed in a named one
+  method_names <- names(cluster_list) %||% rep("", length(cluster_list))
+  unnamed <- is.na(method_names) | method_names == ""
+  method_names[unnamed] <- paste0("clustering_", which(unnamed))
+
   if (is.null(dist_mat)) {
-    data_numeric <- data |> dplyr::select(where(is.numeric))
+    data_numeric <- tl_select_columns(data)
     dist_mat <- stats::dist(data_numeric)
   }
 
-  comparison <- purrr::map_dfr(names(cluster_list), function(name) {
-    clusters <- cluster_list[[name]]
-    metrics <- calc_validation_metrics(clusters, data, dist_mat)
-    metrics |> dplyr::mutate(method = name, .before = 1)
+  comparison <- purrr::map_dfr(seq_along(cluster_list), function(i) {
+    metrics <- calc_validation_metrics(cluster_list[[i]], data, dist_mat)
+    metrics |> dplyr::mutate(method = method_names[i], .before = 1)
   })
 
   comparison
@@ -514,10 +625,12 @@ print.tidy_gap <- function(x, ...) {
   cat("==================\n\n")
   cat("Recommended k:", x$recommended_k, "(firstSEmax method)\n\n")
 
+  # The rules nest, firstSEmax <= firstmax <= globalmax, which orders the
+  # labels
   cat("Alternative methods:\n")
   cat("  firstSEmax: k =", x$k_firstSEmax, "(most conservative)\n")
-  cat("  globalmax:  k =", x$k_globalmax, "(middle ground)\n")
-  cat("  firstmax:   k =", x$k_firstmax, "(most liberal)\n\n")
+  cat("  firstmax:   k =", x$k_firstmax, "(middle ground)\n")
+  cat("  globalmax:  k =", x$k_globalmax, "(most liberal)\n\n")
 
   cat("Gap Statistics (first 10):\n")
   print(head(x$gap_data, 10))

@@ -9,13 +9,15 @@
 #' @param distance Distance metric if data is not a
 #'   dist object (default: "euclidean")
 #' @param cols Columns to include (tidy select).
-#'   If NULL, uses all numeric columns.
+#'   If NULL, uses all numeric columns, or every column for
+#'   \code{distance = "gower"}.
 #'
 #' @return A list of class "tidy_hclust" containing:
 #' \itemize{
 #'   \item model: hclust object
 #'   \item dist: distance matrix used
 #'   \item method: linkage method used
+#'   \item distance_method: distance metric used
 #'   \item data: original data (for plotting)
 #' }
 #'
@@ -36,16 +38,15 @@ tidy_hclust <- function(data, method = "average",
     dist_mat <- data
     data_orig <- NULL
   } else {
-    # Select columns
-    if (!is.null(cols)) {
-      cols_enquo <- rlang::enquo(cols)
-      data_selected <- data |> dplyr::select(!!cols_enquo)
-    } else {
-      data_selected <- data |> dplyr::select(where(is.numeric))
-    }
+    # Gower handles factors, so with no selection it takes every column.
+    # Taking only the numeric ones left the factors out of a Gower distance.
+    data_selected <- tl_select_columns(
+      data, rlang::enquo(cols), all_columns = distance == "gower"
+    )
 
     # Compute distance
     dist_mat <- tidy_dist(data_selected, method = distance)
+    tl_check_complete_dist(dist_mat, "Hierarchical clustering")
     data_orig <- data_selected
   }
 
@@ -98,10 +99,20 @@ tidy_cutree <- function(hclust_obj, k = NULL, h = NULL) {
     stop("Either k or h must be specified")
   }
 
-  # Cut tree
+  # cutree() takes a vector of k or h and returns a matrix, one column per
+  # cut, which flattened into one row per observation per cut
   if (!is.null(k)) {
+    tl_check_whole_number(k, "k", min = 1)
     clusters <- stats::cutree(hc_model, k = k)
   } else {
+    if (!is.numeric(h) || length(h) != 1 || !is.finite(h)) {
+      stop(
+        "'h' must be a single number, the height to cut the tree at. ",
+        "Got: ", paste(utils::head(as.character(h), 5), collapse = ", "),
+        ".",
+        call. = FALSE
+      )
+    }
     clusters <- stats::cutree(hc_model, h = h)
   }
 
@@ -140,14 +151,22 @@ augment_hclust <- function(hclust_obj, data, k = NULL, h = NULL) {
 
   cluster_assignments <- tidy_cutree(hclust_obj, k = k, h = h)
 
-  # Add clusters to data
-  data |>
-    dplyr::mutate(.row_id = dplyr::row_number()) |>
-    dplyr::left_join(
-      cluster_assignments |> dplyr::mutate(.row_id = dplyr::row_number()),
-      by = ".row_id"
-    ) |>
-    dplyr::select(-.row_id, -.obs_id)
+  # Attach by position. A join on row_number() numbered a grouped tibble's
+  # rows within each group, so it attached other rows' clusters, and data
+  # of another length was padded with NA or cut short without a word.
+  n_tree <- nrow(cluster_assignments)
+  if (nrow(data) != n_tree) {
+    stop(
+      "augment_hclust() adds one cluster per observation the tree was ",
+      "built on: the tree has ", n_tree, ", but 'data' has ", nrow(data),
+      " rows. Pass the data the tree was built from.",
+      call. = FALSE
+    )
+  }
+
+  dplyr::bind_cols(
+    data, tibble::tibble(cluster = cluster_assignments$cluster)
+  )
 }
 
 
@@ -237,6 +256,12 @@ optimal_hclust_k <- function(hclust_obj, method = "silhouette", max_k = 10) {
   hc_model <- hclust_obj$model
 
   if (method == "silhouette") {
+    # silhouette() is defined for 2 to n - 1 clusters and returns NA
+    # outside them, which failed below as "incorrect number of dimensions"
+    tl_check_whole_number(
+      max_k, "max_k", min = 2, max = length(hc_model$order) - 1
+    )
+
     # Compute silhouette for k = 2 to max_k
     sil_widths <- purrr::map_dbl(2:max_k, function(k) {
       clusters <- stats::cutree(hc_model, k = k)
@@ -334,17 +359,20 @@ print.tidy_hclust <- function(x, ...) {
 tl_fit_hclust <- function(data, formula = NULL,
                           method = "average",
                           distance = "euclidean", ...) {
-  # Extract variables to use
+  # Without a formula, tidy_hclust() picks the columns its distance can use
+  data <- tl_ungroup(data)
   if (!is.null(formula)) {
-    vars <- get_formula_vars(formula, data)
-    data_for_hc <- data[, vars, drop = FALSE]
-  } else {
-    data_for_hc <- data |> dplyr::select(where(is.numeric))
+    vars <- tl_formula_columns(
+      formula, data, "Hierarchical clustering",
+      mixed_types = distance == "gower",
+      alternative = "distance = \"gower\""
+    )
+    data <- data[, vars, drop = FALSE]
   }
 
   # Fit hierarchical clustering using tidy_hclust
   hc_result <- tidy_hclust(
-    data_for_hc, method = method,
+    data, method = method,
     distance = distance, ...
   )
 

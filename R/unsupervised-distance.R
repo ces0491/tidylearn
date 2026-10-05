@@ -7,7 +7,8 @@
 #'   (default: "euclidean"). Options: "euclidean",
 #'   "manhattan", "maximum", "gower"
 #' @param cols Columns to include (tidy select).
-#'   If NULL, uses all numeric columns.
+#'   If NULL, uses all numeric columns, or every column for
+#'   \code{method = "gower"}.
 #' @param ... Additional arguments passed to distance functions
 #'
 #' @return A \code{\link[stats]{dist}} object containing the computed
@@ -21,13 +22,11 @@
 #' @export
 tidy_dist <- function(data, method = "euclidean", cols = NULL, ...) {
 
-  # Select columns
-  if (!is.null(cols)) {
-    cols_enquo <- rlang::enquo(cols)
-    data_selected <- data |> dplyr::select(!!cols_enquo)
-  } else {
-    data_selected <- data
-  }
+  # Every column to begin with: Gower reads factors as they are, and the
+  # other methods keep the numeric ones below
+  data_selected <- tl_select_columns(
+    data, rlang::enquo(cols), all_columns = TRUE
+  )
 
   # Compute distance based on method
   if (method == "gower") {
@@ -51,7 +50,9 @@ tidy_dist <- function(data, method = "euclidean", cols = NULL, ...) {
 #'   weights (default: equal weights)
 #'
 #' @return A \code{\link[stats]{dist}} object containing Gower distances, with
-#'   the \code{method} attribute set to \code{"gower"}.
+#'   the \code{method} attribute set to \code{"gower"}. A pair of rows with
+#'   no variable observed in both has no defined distance and is \code{NA},
+#'   as in \code{\link[cluster]{daisy}}.
 #'
 #' @details
 #' Gower distance handles mixed data types:
@@ -177,11 +178,15 @@ tidy_gower <- function(data, weights = NULL) {
         total_dist <- total_dist + weights[k] * d_k
       }
 
-      # Average over valid variables
-      if (valid_vars > 0) {
-        dist_matrix[i, j] <- total_dist / valid_vars
-        dist_matrix[j, i] <- dist_matrix[i, j]  # Symmetric
+      # Average over valid variables. A pair with no variable observed in
+      # both has no distance, so it is NA, as in cluster::daisy(); the
+      # matrix's starting 0 would make the two rows identical.
+      dist_matrix[i, j] <- if (valid_vars > 0) {
+        total_dist / valid_vars
+      } else {
+        NA_real_
       }
+      dist_matrix[j, i] <- dist_matrix[i, j]  # Symmetric
     }
   }
 
@@ -259,7 +264,7 @@ compare_distances <- function(
     data,
     methods = c("euclidean", "manhattan", "maximum")) {
 
-  data_numeric <- data |> dplyr::select(where(is.numeric))
+  data_numeric <- tl_select_columns(data)
 
   dist_list <- purrr::map(methods, function(method) {
     tidy_dist(data = data_numeric, method = method)
@@ -267,4 +272,175 @@ compare_distances <- function(
   names(dist_list) <- methods
 
   dist_list
+}
+
+
+# ---- input handling shared by the unsupervised routines --------------
+
+#' Drop dplyr grouping from an unsupervised routine's input
+#'
+#' dplyr adds a grouped tibble's grouping variables back to any column
+#' selection ("Adding missing grouping variables"), so selecting the
+#' numeric columns of \code{group_by(iris, Species)} returned Species as
+#' well: clara clustered on its factor codes, the distances coerced it to
+#' NA, and kmeans failed outright. None of these routines has a per-group
+#' meaning, so the grouping is ignored.
+#'
+#' @param data Anything; only a data frame is changed
+#' @return \code{data}, ungrouped when it is a data frame
+#' @keywords internal
+#' @noRd
+tl_ungroup <- function(data) {
+  if (is.data.frame(data)) dplyr::ungroup(data) else data
+}
+
+#' Choose the columns an unsupervised routine works on
+#'
+#' @param data A data frame
+#' @param cols The caller's \code{cols} argument, captured with
+#'   \code{rlang::enquo()}. Testing the argument itself with
+#'   \code{is.null()} evaluates it, and a bare column name is not an object
+#'   in the caller's environment: \code{cols = c(Sepal.Length)} failed with
+#'   "object 'Sepal.Length' not found".
+#' @param all_columns When \code{cols} is empty, TRUE keeps every column
+#'   (Gower distance reads factors) and FALSE the numeric ones
+#' @return The selected columns of the ungrouped data
+#' @keywords internal
+#' @noRd
+tl_select_columns <- function(data, cols = rlang::quo(NULL),
+                              all_columns = FALSE) {
+  data <- tl_ungroup(data)
+
+  if (!rlang::quo_is_null(cols)) {
+    return(dplyr::select(data, !!cols))
+  }
+
+  if (all_columns) data else dplyr::select(data, where(is.numeric))
+}
+
+#' Columns a one-sided formula selects for an unsupervised method
+#'
+#' \code{get_formula_vars()} reads \code{~ .} as every numeric column,
+#' which suits the methods that do arithmetic on the columns. Gower
+#' distance is defined for factors too, so there a dot stands for every
+#' column, less any the formula subtracts.
+#'
+#' A column the formula names but the method cannot use is reported, since
+#' it was asked for by name; it used to be dropped without a message.
+#' Columns a dot expanded to are not reported, since for these methods the
+#' dot means the numeric columns.
+#'
+#' @param formula A one-sided formula
+#' @param data The ungrouped training data
+#' @param what The method, as the warning should name it
+#' @param mixed_types TRUE when the method uses non-numeric columns
+#' @param alternative The argument that would let the method use them,
+#'   for the warning, or NULL when there is none
+#' @return Column names to fit on
+#' @keywords internal
+#' @noRd
+tl_formula_columns <- function(formula, data, what, mixed_types = FALSE,
+                               alternative = NULL) {
+  vars <- get_formula_vars(formula, data)
+
+  if (mixed_types) {
+    if ("." %in% all.vars(formula)) {
+      labels <- attr(stats::terms(formula, data = data), "term.labels")
+      vars <- unique(unlist(lapply(
+        labels, function(label) all.vars(str2lang(label))
+      )))
+    }
+    return(vars)
+  }
+
+  named <- intersect(intersect(vars, all.vars(formula)), names(data))
+  dropped <- named[!vapply(data[named], is.numeric, logical(1))]
+
+  if (length(dropped) > 0) {
+    it <- if (length(dropped) == 1) "it" else "them"
+    warning(
+      what, " uses only numeric columns, so it ignored the formula's ",
+      "non-numeric column", if (length(dropped) > 1) "s", ": ",
+      paste(dropped, collapse = ", "), ". Remove ", it, " from the formula",
+      if (is.null(alternative)) {
+        paste0(", or convert ", it, " to numbers first.")
+      } else {
+        paste0(", or pass ", alternative, ", which can use ", it, ".")
+      },
+      call. = FALSE
+    )
+  }
+
+  vars
+}
+
+#' Refuse a count argument that is not one whole number in range
+#'
+#' Ranges such as \code{2:max_k} run backwards when the bound is too small
+#' -- \code{2:1} is \code{c(2, 1)} -- and a vector \code{k} makes
+#' \code{cutree()} return a matrix, so a bad count surfaced far from the
+#' argument that caused it.
+#'
+#' @param x The value passed
+#' @param arg The argument's name, for the message
+#' @param min,max The accepted range
+#' @return \code{TRUE}, invisibly
+#' @keywords internal
+#' @noRd
+tl_check_whole_number <- function(x, arg, min = 1, max = Inf) {
+  ok <- is.numeric(x) && length(x) == 1L && is.finite(x) &&
+    x == round(x) && x >= min && x <= max
+
+  if (!ok) {
+    got <- if (length(x) == 0) {
+      "nothing"
+    } else {
+      paste(utils::head(as.character(x), 5), collapse = ", ")
+    }
+    stop(
+      "'", arg, "' must be a single whole number of at least ", min,
+      if (is.finite(max)) paste0(" and at most ", max),
+      ". Got: ", got, ".",
+      call. = FALSE
+    )
+  }
+
+  invisible(TRUE)
+}
+
+#' Refuse a distance matrix with undefined entries
+#'
+#' A pair of rows with no variable observed in both has no distance:
+#' \code{stats::dist()} and \code{tidy_gower()} return NA for it, as
+#' \code{cluster::daisy()} does. \code{pam()} rejects that with "NA values
+#' in the dissimilarity matrix not allowed" and \code{hclust()} with
+#' "NA/NaN/Inf in foreign function call", neither of which says which rows
+#' or why.
+#'
+#' @param dist_mat A dist object
+#' @param what The method, for the message
+#' @return \code{TRUE}, invisibly, when every distance is defined
+#' @keywords internal
+#' @noRd
+tl_check_complete_dist <- function(dist_mat, what) {
+  if (!anyNA(dist_mat)) {
+    return(invisible(TRUE))
+  }
+
+  undefined <- which(is.na(as.matrix(dist_mat)), arr.ind = TRUE)
+  undefined <- undefined[undefined[, 1] < undefined[, 2], , drop = FALSE]
+  shown <- utils::head(seq_len(nrow(undefined)), 3)
+
+  stop(
+    what, " cannot use undefined distances: ", nrow(undefined),
+    if (nrow(undefined) == 1) " pair of rows has" else " pairs of rows have",
+    " no variable observed in both (",
+    paste(
+      sprintf("rows %d and %d", undefined[shown, 1], undefined[shown, 2]),
+      collapse = "; "
+    ),
+    if (nrow(undefined) > length(shown)) "; ..." else "",
+    "). Drop or impute the missing values in those rows first.",
+    call. = FALSE
+  )
 }
