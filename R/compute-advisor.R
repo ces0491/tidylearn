@@ -20,11 +20,18 @@
 #'   optional when `x` is a fitted model (defaults to the model's
 #'   training data).
 #' @param formula Optional formula. Used to determine the number of
-#'   effective predictors. Ignored when `x` is a fitted model.
-#' @param hyperparams Named list of hyperparameters that affect runtime
-#'   (e.g. `list(nrounds = 1000)` for xgboost, `list(epochs = 50,
-#'   units = 256)` for deep learning). Missing entries fall back to
-#'   per-method defaults.
+#'   effective predictors: the terms it expands to against `data`, so
+#'   `y ~ . - id` counts every column but `y` and `id`. Ignored when `x`
+#'   is a fitted model.
+#' @param hyperparams Named list of hyperparameters that affect runtime:
+#'   `degree` (polynomial), `ntree` (forest), `n.trees` (boost), `nrounds`
+#'   (xgboost), `size` and `maxit` (nn), and `epochs` and `hidden_layers`
+#'   (deep), e.g. `list(nrounds = 1000)` or
+#'   `list(epochs = 50, hidden_layers = c(64, 32))`. Each must be a
+#'   positive number, or a vector of them for `hidden_layers`. Missing
+#'   entries take the defaults of the method's fit function, so the
+#'   estimate is for the fit [tl_model()] would run; other entries are
+#'   ignored.
 #' @param gpu_check Optional `tidylearn_gpu_check` object. If omitted,
 #'   `tl_check_gpu()` is called once internally.
 #' @param ... Unused, reserved for method-specific extensions.
@@ -42,9 +49,10 @@
 #' print(advice)
 #'
 #' \donttest{
-#' # Dispatching on a fitted model requires the backend to be installed
+#' # Dispatching on a fitted model requires the backend to be installed.
+#' # CRAN asks examples to use at most two threads.
 #' if (requireNamespace("xgboost", quietly = TRUE)) {
-#'   model <- tl_model(iris, Species ~ ., method = "xgboost")
+#'   model <- tl_model(iris, Species ~ ., method = "xgboost", nthread = 2)
 #'   tl_compute_advisor(model)
 #' }
 #' }
@@ -79,6 +87,7 @@ tl_compute_advisor.character <- function(x,
   if (!is.list(hyperparams)) {
     stop("'hyperparams' must be a list.", call. = FALSE)
   }
+  tl_check_advisor_hyperparams(method, hyperparams)
   if (is.null(gpu_check)) {
     gpu_check <- tl_check_gpu()
   } else if (!inherits(gpu_check, "tidylearn_gpu_check")) {
@@ -90,7 +99,13 @@ tl_compute_advisor.character <- function(x,
 
   n_rows <- nrow(data)
   n_cols <- tl_effective_p_internal(data, formula)
-  est_size_mb <- (n_rows * n_cols * 8) / 1e6
+
+  # Doubles from here on. Rows times predictors is an integer product,
+  # which overflowed to NA past 2^31 - 1 (1e7 rows by 250 predictors) and
+  # failed the advisor on exactly the inputs it exists to size.
+  rows_num <- as.numeric(n_rows)
+  cols_num <- as.numeric(n_cols)
+  est_size_mb <- (rows_num * cols_num * 8) / 1e6
 
   problem <- list(
     method      = method,
@@ -100,13 +115,13 @@ tl_compute_advisor.character <- function(x,
   )
 
   local_cpu <- tl_estimate_local_cpu_internal(
-    method, n_rows, n_cols, hyperparams
+    method, rows_num, cols_num, hyperparams
   )
   local_gpu <- tl_estimate_local_gpu_internal(
-    method, n_rows, n_cols, hyperparams, gpu_check
+    method, rows_num, cols_num, hyperparams, gpu_check
   )
   cloud <- tl_estimate_cloud_internal(
-    method, n_rows, n_cols, hyperparams, est_size_mb
+    method, rows_num, cols_num, hyperparams, est_size_mb
   )
 
   rec <- tl_recommend_internal(local_cpu, local_gpu, cloud)
@@ -184,36 +199,97 @@ tl_compute_advisor.default <- function(x, ...) {
   svm         = list(cpu_const = 5e-7,  ram_mult = 6, gpu_speedup = 1)
 )
 
-# Returns the number of complexity units for a given method, given
-# data dimensions and (optional) hyperparameters. Sensible defaults
-# match the underlying package defaults where possible.
-tl_method_complexity_internal <- function(method, n_rows, n_cols, hyp) {
-  pull <- function(name, default) {
-    val <- hyp[[name]]
-    if (is.null(val) || !is.numeric(val) || length(val) != 1L) default else val
+# The hyperparameters each method's runtime estimate reads
+.tl_advisor_hyperparams <- list(
+  polynomial = "degree",
+  forest     = "ntree",
+  boost      = "n.trees",
+  xgboost    = "nrounds",
+  nn         = c("size", "maxit"),
+  deep       = c("epochs", "hidden_layers")
+)
+
+# Refuse a runtime hyperparameter that is not a positive number. NA made
+# every estimate NA and failed far from the cause ("attempt to select
+# less than one element"), and a negative value gave a negative runtime.
+# Only the names the method's estimate reads are checked: tl_model()
+# forwards every fit argument here.
+tl_check_advisor_hyperparams <- function(method, hyp) {
+  for (name in .tl_advisor_hyperparams[[method]]) {
+    value <- hyp[[name]]
+    if (is.null(value)) {
+      next
+    }
+
+    layers <- identical(name, "hidden_layers")
+    valid <- is.numeric(value) && length(value) >= 1L &&
+      (layers || length(value) == 1L) &&
+      all(is.finite(value)) && all(value > 0)
+
+    if (!valid) {
+      stop(
+        "Hyperparameter '", name, "' must be ",
+        if (layers) "positive numbers" else "a single positive number",
+        "; got ", paste(deparse(value), collapse = ""), ".",
+        call. = FALSE
+      )
+    }
   }
+  invisible(TRUE)
+}
+
+# A runtime hyperparameter: the caller's value, or the default of the
+# tl_fit_*() function that would run. Read from its formals so the two
+# cannot drift apart, as they had for "deep" (10 epochs of 128 units
+# against tl_fit_deep()'s 30 epochs through layers of 32 and 16) and
+# "nn" (a layer of 10 against tl_fit_nn()'s 5).
+tl_advisor_param <- function(method, name, hyp) {
+  value <- hyp[[name]]
+  if (!is.null(value)) {
+    return(value)
+  }
+  fit_fn <- get(paste0("tl_fit_", method), mode = "function")
+  eval(formals(fit_fn)[[name]], baseenv())
+}
+
+# Returns the number of complexity units for a given method, given
+# data dimensions and (optional) hyperparameters. Hyperparameters not
+# supplied take the defaults of the method's fit function.
+tl_method_complexity_internal <- function(method, n_rows, n_cols, hyp) {
+  # Doubles: rows times columns overflows an integer past 2^31 - 1
+  n_rows <- as.numeric(n_rows)
+  n_cols <- as.numeric(n_cols)
+  param <- function(name) tl_advisor_param(method, name, hyp)
 
   switch(
     method,
     "linear"      = n_rows * n_cols^2,
-    "polynomial"  = n_rows * n_cols^2 * pull("degree", 2)^2,
+    "polynomial"  = n_rows * n_cols^2 * param("degree")^2,
     "logistic"    = n_rows * n_cols^2 * 5,
     "ridge"       = n_rows * n_cols * 100,
     "lasso"       = n_rows * n_cols * 100,
     "elastic_net" = n_rows * n_cols * 100,
     "tree"        = n_rows * log2(n_rows + 1) * n_cols,
-    "forest"      = n_rows * sqrt(n_cols) * pull("ntree", 500) *
+    "forest"      = n_rows * sqrt(n_cols) * param("ntree") *
       log2(n_rows + 1),
-    "boost"       = n_rows * n_cols * pull("n.trees", 100),
-    "xgboost"     = n_rows * n_cols * pull("nrounds", 100),
-    "nn"          = n_rows * n_cols * pull("size", 10) * pull("maxit", 100),
-    "deep"        = n_rows * n_cols * pull("epochs", 10) * pull("units", 128),
+    "boost"       = n_rows * n_cols * param("n.trees"),
+    "xgboost"     = n_rows * n_cols * param("nrounds"),
+    "nn"          = n_rows * n_cols * param("size") * param("maxit"),
+    # Per row and epoch, one multiply-add for every weight between
+    # consecutive layers: inputs, each hidden layer, then one output
+    "deep"        = {
+      layers <- param("hidden_layers")
+      n_rows * param("epochs") * sum(c(n_cols, layers) * c(layers, 1))
+    },
     "svm"         = n_rows^2 * n_cols,
     n_rows * n_cols
   )
 }
 
-# Number of effective predictors for runtime estimation.
+# Number of effective predictors for runtime estimation: the terms the
+# formula expands to against the data. all.vars() on the right-hand side
+# read y ~ . - id as two predictors, "." and id, and y ~ 1 as every
+# column but one.
 tl_effective_p_internal <- function(data, formula) {
   if (is.null(formula)) {
     return(max(ncol(data) - 1L, 1L))
@@ -222,17 +298,14 @@ tl_effective_p_internal <- function(data, formula) {
     formula <- stats::as.formula(formula)
   }
 
-  rhs <- if (length(formula) == 3L) formula[[3]] else formula[[2]]
-  rhs_vars <- all.vars(rhs)
-
-  if (length(rhs_vars) == 0L || identical(rhs_vars, ".")) {
-    return(max(ncol(data) - 1L, 1L))
-  }
-  length(rhs_vars)
+  labels <- attr(stats::terms(formula, data = data), "term.labels")
+  max(length(labels), 1L)
 }
 
 # Local CPU runtime + RAM + feasibility heuristic.
 tl_estimate_local_cpu_internal <- function(method, n_rows, n_cols, hyp) {
+  n_rows <- as.numeric(n_rows)
+  n_cols <- as.numeric(n_cols)
   profile <- .tl_method_profiles[[method]]
   complexity <- tl_method_complexity_internal(method, n_rows, n_cols, hyp)
   cores_raw <- parallel::detectCores(logical = FALSE)

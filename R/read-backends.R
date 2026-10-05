@@ -37,12 +37,12 @@ NULL
 #'
 #' @return A \code{tidylearn_data} object containing the query results.
 #'
-#' @examples
-#' \donttest{
-#' # conn <- DBI::dbConnect(RSQLite::SQLite(), "my_database.sqlite")
-#' # data <- tl_read_db(conn, "SELECT * FROM my_table")
-#' # DBI::dbDisconnect(conn)
-#' }
+#' @examplesIf requireNamespace("RSQLite", quietly = TRUE)
+#' # RSQLite imports DBI, so both are available here
+#' conn <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+#' DBI::dbWriteTable(conn, "cars", mtcars)
+#' tl_read_db(conn, "SELECT mpg, cyl, hp FROM cars WHERE cyl = 6")
+#' DBI::dbDisconnect(conn)
 #'
 #' @export
 tl_read_db <- function(conn, query, ...) {
@@ -80,10 +80,15 @@ tl_read_db <- function(conn, query, ...) {
 #'
 #' @return A \code{tidylearn_data} object containing the query results.
 #'
-#' @examples
-#' \donttest{
-#' # data <- tl_read_sqlite("my_database.sqlite", "SELECT * FROM my_table")
-#' }
+#' @examplesIf requireNamespace("RSQLite", quietly = TRUE)
+#' # RSQLite imports DBI, so both are available here
+#' path <- tempfile(fileext = ".sqlite")
+#' conn <- DBI::dbConnect(RSQLite::SQLite(), path)
+#' DBI::dbWriteTable(conn, "cars", mtcars)
+#' DBI::dbDisconnect(conn)
+#'
+#' tl_read_sqlite(path, "SELECT mpg, cyl, hp FROM cars WHERE cyl = 6")
+#' unlink(path)
 #'
 #' @export
 tl_read_sqlite <- function(path, query, ...) {
@@ -116,25 +121,36 @@ tl_read_sqlite <- function(path, query, ...) {
 #'
 #' @param dsn A PostgreSQL connection string (e.g.,
 #'   \code{"postgres://user:pass@host:port/dbname"}), or the database host if
-#'   using named parameters.
+#'   using named parameters. Percent-encode special characters in the user
+#'   name and password (\code{@} as \code{\%40}). Query parameters such as
+#'   \code{?sslmode=require} are passed to libpq as connection keywords.
 #' @param query A SQL query string.
 #' @param dbname Database name (if not in \code{dsn}).
 #' @param user Username (if not in \code{dsn}).
-#' @param password Password (if not in \code{dsn}).
+#' @param password Password (if not in \code{dsn}), which keeps it out of
+#'   the connection string.
 #' @param port Port number. Default is 5432.
 #' @param ... Additional arguments passed to \code{DBI::dbConnect()}.
 #'
 #' @return A \code{tidylearn_data} object containing the query results.
 #'
 #' @examples
-#' \donttest{
-#' # data <- tl_read_postgres(
-#' #   dsn = "localhost",
-#' #   query = "SELECT * FROM my_table",
-#' #   dbname = "mydb",
-#' #   user = "myuser",
-#' #   password = "mypass"
-#' # )
+#' \dontrun{
+#' # Needs a running PostgreSQL server
+#' tl_read_postgres(
+#'   dsn = "localhost",
+#'   query = "SELECT * FROM my_table",
+#'   dbname = "mydb",
+#'   user = "myuser",
+#'   password = Sys.getenv("PGPASSWORD")
+#' )
+#'
+#' # The same connection as a URL, with the password still kept out of it
+#' tl_read_postgres(
+#'   "postgres://myuser@localhost:5432/mydb?sslmode=require",
+#'   query = "SELECT * FROM my_table",
+#'   password = Sys.getenv("PGPASSWORD")
+#' )
 #' }
 #'
 #' @export
@@ -152,12 +168,18 @@ tl_read_postgres <- function(dsn, query, dbname = NULL, user = NULL,
     if (!is.null(conn)) DBI::dbDisconnect(conn)
   }, add = TRUE)
 
-  # Parse connection string if provided
-  if (grepl("^postgres(ql)?://", dsn)) {
+  # Parse connection string if provided. RPostgres hands its extra
+  # arguments to libpq as connection keywords, and libpq has no "dsn"
+  # keyword, so the URL is taken apart here as tl_read_mysql() does.
+  if (grepl("^postgres(ql)?://", dsn, ignore.case = TRUE)) {
+    parsed <- tl_parse_db_url(dsn)
+    conn_args <- c(
+      tl_db_url_args(parsed, dbname, user, password, port),
+      parsed$params,
+      list(...)
+    )
     conn <- tryCatch(
-      DBI::dbConnect(
-        RPostgres::Postgres(), dsn = dsn, ...
-      ),
+      do.call(DBI::dbConnect, c(list(RPostgres::Postgres()), conn_args)),
       error = function(e) {
         stop(
           "Failed to connect to PostgreSQL: ",
@@ -197,7 +219,7 @@ tl_read_postgres <- function(dsn, query, dbname = NULL, user = NULL,
 
   # Redact before the DSN becomes an attribute of the returned object:
   # print.tidylearn_data() shows it and saveRDS() persists it
-  source_desc <- if (grepl("^postgres", dsn)) {
+  source_desc <- if (grepl("^postgres", dsn, ignore.case = TRUE)) {
     dsn
   } else {
     paste0("postgres://", dsn)
@@ -216,25 +238,31 @@ tl_read_postgres <- function(dsn, query, dbname = NULL, user = NULL,
 #'
 #' @param dsn A MySQL connection string (e.g.,
 #'   \code{"mysql://user:pass@host:port/dbname"}), or the database host if
-#'   using named parameters.
+#'   using named parameters. Percent-encode special characters in the user
+#'   name and password (\code{@} as \code{\%40}). Query parameters are
+#'   refused, because \pkg{RMariaDB} ignores arguments it does not know;
+#'   pass its \code{dbConnect()} arguments, such as \code{ssl.ca},
+#'   through \code{...}.
 #' @param query A SQL query string.
 #' @param dbname Database name (if not in \code{dsn}).
 #' @param user Username (if not in \code{dsn}).
-#' @param password Password (if not in \code{dsn}).
-#' @param port Port number. Default is 3306.
+#' @param password Password (if not in \code{dsn}), which keeps it out of
+#'   the connection string.
+#' @param port Port number (if not in \code{dsn}). Default is 3306.
 #' @param ... Additional arguments passed to \code{DBI::dbConnect()}.
 #'
 #' @return A \code{tidylearn_data} object containing the query results.
 #'
 #' @examples
-#' \donttest{
-#' # data <- tl_read_mysql(
-#' #   dsn = "localhost",
-#' #   query = "SELECT * FROM my_table",
-#' #   dbname = "mydb",
-#' #   user = "myuser",
-#' #   password = "mypass"
-#' # )
+#' \dontrun{
+#' # Needs a running MySQL or MariaDB server
+#' tl_read_mysql(
+#'   dsn = "localhost",
+#'   query = "SELECT * FROM my_table",
+#'   dbname = "mydb",
+#'   user = "myuser",
+#'   password = Sys.getenv("MYSQL_PWD")
+#' )
 #' }
 #'
 #' @export
@@ -253,18 +281,26 @@ tl_read_mysql <- function(dsn, query, dbname = NULL, user = NULL,
   }, add = TRUE)
 
   # Parse connection string or use named params
-  if (grepl("^mysql://", dsn)) {
+  if (grepl("^mysql://", dsn, ignore.case = TRUE)) {
     parsed <- tl_parse_db_url(dsn)
+    # Passed on, a parameter such as ssl-mode=REQUIRED would be ignored by
+    # RMariaDB and the connection made without the TLS asked for
+    if (length(parsed$params) > 0L) {
+      stop(
+        "MySQL connection strings cannot carry query parameters (",
+        paste(names(parsed$params), collapse = ", "), "). RMariaDB ",
+        "ignores arguments it does not know, so they would be dropped ",
+        "without a word. Pass the matching RMariaDB::dbConnect() ",
+        "arguments, such as ssl.ca, through '...' instead.",
+        call. = FALSE
+      )
+    }
+    conn_args <- c(
+      tl_db_url_args(parsed, dbname, user, password, port),
+      list(...)
+    )
     conn <- tryCatch(
-      DBI::dbConnect(
-        RMariaDB::MariaDB(),
-        host = parsed$host,
-        dbname = parsed$dbname,
-        user = parsed$user,
-        password = parsed$password,
-        port = parsed$port %||% 3306L,
-        ...
-      ),
+      do.call(DBI::dbConnect, c(list(RMariaDB::MariaDB()), conn_args)),
       error = function(e) {
         stop(
           "Failed to connect to MySQL: ",
@@ -302,7 +338,11 @@ tl_read_mysql <- function(dsn, query, dbname = NULL, user = NULL,
     warning("Query returned 0 rows.", call. = FALSE)
   }
 
-  source_desc <- if (grepl("^mysql", dsn)) dsn else paste0("mysql://", dsn)
+  source_desc <- if (grepl("^mysql", dsn, ignore.case = TRUE)) {
+    dsn
+  } else {
+    paste0("mysql://", dsn)
+  }
   new_tidylearn_data(
     data, source = tl_redact_db_url(source_desc), format = "mysql"
   )
@@ -316,18 +356,27 @@ tl_read_mysql <- function(dsn, query, dbname = NULL, user = NULL,
 #'
 #' @param project Google Cloud project ID.
 #' @param query A SQL query string (Standard SQL).
-#' @param dataset Optional default dataset for unqualified table names.
+#' @param dataset Optional default dataset for unqualified table names,
+#'   in \code{project}.
 #' @param ... Additional arguments passed to
 #'   \code{bigrquery::bq_project_query()}.
 #'
 #' @return A \code{tidylearn_data} object containing the query results.
 #'
 #' @examples
-#' \donttest{
-#' # data <- tl_read_bigquery(
-#' #   project = "my-project",
-#' #   query = "SELECT * FROM `my_dataset.my_table` LIMIT 1000"
-#' # )
+#' \dontrun{
+#' # Needs Google Cloud credentials
+#' tl_read_bigquery(
+#'   project = "my-project",
+#'   query = "SELECT * FROM `my_dataset.my_table` LIMIT 1000"
+#' )
+#'
+#' # Unqualified table names resolve against `dataset`
+#' tl_read_bigquery(
+#'   project = "my-project",
+#'   query = "SELECT * FROM my_table LIMIT 1000",
+#'   dataset = "my_dataset"
+#' )
 #' }
 #'
 #' @export
@@ -347,8 +396,21 @@ tl_read_bigquery <- function(project, query, dataset = NULL, ...) {
     }
   }
 
+  if (!is.null(dataset) && (!is.character(dataset) || length(dataset) != 1L ||
+                              is.na(dataset) || !nzchar(dataset))) {
+    stop("'dataset' must be a single dataset name.", call. = FALSE)
+  }
+
+  # bq_project_query() passes its dots to bq_perform_query(), whose
+  # default_dataset is what unqualified table names resolve against. The
+  # dataset used to label the result and nothing else.
+  query_args <- list(...)
+  if (!is.null(dataset) && is.null(query_args[["default_dataset"]])) {
+    query_args$default_dataset <- bigrquery::bq_dataset(project, dataset)
+  }
+
   tb <- tryCatch(
-    bigrquery::bq_project_query(project, query, ...),
+    do.call(bigrquery::bq_project_query, c(list(project, query), query_args)),
     error = function(e) {
       stop("BigQuery query failed: ", e$message,
            "\nCheck your project ID, query, and authentication.",
@@ -379,23 +441,38 @@ tl_read_bigquery <- function(project, query, dataset = NULL, ...) {
 #' credentials.
 #'
 #' @param source An S3 URI (e.g., \code{"s3://bucket/path/to/file.csv"}).
+#'   Zip archives are not read from S3: download the object and read it
+#'   with \code{tl_read_zip()}.
 #' @param format Optional format override for the downloaded file. If
 #'   \code{NULL}, auto-detected from the S3 key extension.
 #' @param region AWS region. If \code{NULL}, uses the default from your AWS
 #'   configuration.
 #' @param ... Additional arguments passed to the format-specific reader.
+#' @param trust_rds Logical. Read an \code{.rds}, \code{.rdata} or
+#'   \code{.rda} object on R older than 4.4.0? Those versions can run code
+#'   embedded in a crafted file as it is read (CVE-2024-27322), so such
+#'   objects are refused there unless this is \code{TRUE}. It has no
+#'   effect on R 4.4.0 or later. Default \code{FALSE}.
+#'
+#' @section Reading R serialisation files:
+#' An \code{.rds} or \code{.rdata} object is rebuilt with \code{readRDS()}
+#' or \code{load()}, which recreate whatever R objects the file describes.
+#' Read them only from a bucket you trust, on any version of R.
 #'
 #' @return A \code{tidylearn_data} object containing the downloaded data.
 #'
 #' @examples
-#' \donttest{
-#' # data <- tl_read_s3("s3://my-bucket/data/sales.csv")
-#' # data <- tl_read_s3("s3://my-bucket/data/results.parquet")
+#' \dontrun{
+#' # Needs AWS credentials
+#' tl_read_s3("s3://my-bucket/data/sales.csv")
+#' tl_read_s3("s3://my-bucket/data/results.parquet", region = "eu-west-1")
 #' }
 #'
 #' @export
-tl_read_s3 <- function(source, format = NULL, region = NULL, ...) {
+tl_read_s3 <- function(source, format = NULL, region = NULL, ...,
+                       trust_rds = FALSE) {
   tl_check_packages("paws.storage")
+  tl_check_trust_rds(trust_rds)
 
   # Parse s3:// URI. Guard the length first: strsplit(character(0), ...)
   # is an empty list, so [[1]] was "subscript out of bounds" rather than
@@ -411,7 +488,7 @@ tl_read_s3 <- function(source, format = NULL, region = NULL, ...) {
          call. = FALSE)
   }
 
-  s3_path <- sub("^s3://", "", source)
+  s3_path <- sub("^s3://", "", source, ignore.case = TRUE)
   parts <- strsplit(s3_path, "/", fixed = TRUE)[[1]]
 
   if (length(parts) < 2) {
@@ -425,6 +502,11 @@ tl_read_s3 <- function(source, format = NULL, region = NULL, ...) {
 
   # Detect format from key extension
   if (is.null(format)) {
+    if (tolower(tools::file_ext(key)) == "zip") {
+      stop("tl_read_s3() cannot read a zip archive. Download it, then ",
+           "read the local copy with tl_read_zip().",
+           call. = FALSE)
+    }
     format <- tryCatch(
       tl_detect_format(key),
       error = function(e) {
@@ -434,6 +516,9 @@ tl_read_s3 <- function(source, format = NULL, region = NULL, ...) {
       }
     )
   }
+
+  # Before anything is downloaded, and before credentials are needed
+  tl_check_remote_rds(format, "S3", trust_rds)
 
   # Create S3 client
   config <- list()
@@ -487,46 +572,55 @@ tl_read_s3 <- function(source, format = NULL, region = NULL, ...) {
 #' \code{tidylearn_data} object. Accepts either a full GitHub URL or a
 #' \code{owner/repo} shorthand with a file path.
 #'
-#' @param source A GitHub URL or \code{"owner/repo"} string.
+#' @param source A GitHub URL or \code{"owner/repo"} string. A URL is either
+#'   a file page (\code{https://github.com/<owner>/<repo>/blob/<ref>/<path>},
+#'   with or without \code{www.} and a query such as \code{?raw=true}) or a
+#'   raw file (\code{https://raw.githubusercontent.com/...}), whose query is
+#'   kept for the download. Zip archives are not read from GitHub: download
+#'   the file and read it with \code{tl_read_zip()}.
 #' @param path Path to the file within the repository (required when
 #'   \code{source} is \code{"owner/repo"} format).
 #' @param ref Branch, tag, or commit SHA. Default is \code{"main"}.
 #' @param ... Additional arguments passed to the format-specific reader.
+#' @param trust_rds Logical. Read an \code{.rds}, \code{.rdata} or
+#'   \code{.rda} file on R older than 4.4.0? Those versions can run code
+#'   embedded in a crafted file as it is read (CVE-2024-27322), so such
+#'   files are refused there unless this is \code{TRUE}. It has no effect
+#'   on R 4.4.0 or later. Default \code{FALSE}.
+#'
+#' @section Reading R serialisation files:
+#' An \code{.rds} or \code{.rdata} file is rebuilt with \code{readRDS()} or
+#' \code{load()}, which recreate whatever R objects the file describes.
+#' Read them only from a repository you trust, on any version of R.
 #'
 #' @return A \code{tidylearn_data} object containing the downloaded data.
 #'
 #' @examples
-#' \donttest{
-#' # data <- tl_read_github("user/repo", path = "data/file.csv")
-#' # data <- tl_read_github(
-#' #   "https://github.com/user/repo/blob/main/data/file.csv"
-#' # )
+#' \dontrun{
+#' # Downloads over the network
+#' tl_read_github("user/repo", path = "data/file.csv")
+#' tl_read_github("https://github.com/user/repo/blob/main/data/file.csv")
 #' }
 #'
 #' @export
-tl_read_github <- function(source, path = NULL, ref = "main", ...) {
-  # Build raw URL
-  if (grepl("^https?://github\\.com", source)) {
-    # Convert GitHub blob URL to raw URL
-    raw_url <- sub("github\\.com", "raw.githubusercontent.com", source)
-    raw_url <- sub("/blob/", "/", raw_url)
-  } else if (grepl("^https?://raw\\.githubusercontent\\.com", source)) {
-    raw_url <- source
-  } else {
-    # owner/repo shorthand
-    if (is.null(path)) {
-      stop("'path' is required when 'source' is in 'owner/repo' format.",
-           call. = FALSE)
-    }
-    raw_url <- paste0(
-      "https://raw.githubusercontent.com/",
-      source, "/", ref, "/", path
-    )
+tl_read_github <- function(source, path = NULL, ref = "main", ...,
+                           trust_rds = FALSE) {
+  tl_check_trust_rds(trust_rds)
+  raw_url <- tl_github_raw_url(source, path, ref)
+
+  # The file name is the URL's path without its query, which a link
+  # copied from GitHub often carries (?raw=true)
+  file_name <- basename(sub("[?#].*$", "", raw_url))
+
+  if (tolower(tools::file_ext(file_name)) == "zip") {
+    stop("tl_read_github() cannot read a zip archive. Download it, then ",
+         "read the local copy with tl_read_zip().",
+         call. = FALSE)
   }
 
   # Detect format from the URL file extension
   format <- tryCatch(
-    tl_detect_format(basename(raw_url)),
+    tl_detect_format(file_name),
     error = function(e) {
       stop("Cannot detect file format from GitHub URL. ",
            "The file must have a recognizable extension (csv, json, etc.).",
@@ -534,13 +628,15 @@ tl_read_github <- function(source, path = NULL, ref = "main", ...) {
     }
   )
 
+  tl_check_remote_rds(format, "GitHub", trust_rds)
+
   # Download to temp file
-  ext <- tools::file_ext(raw_url)
+  ext <- tools::file_ext(file_name)
   tmp <- tempfile(fileext = paste0(".", ext))
   on.exit(unlink(tmp), add = TRUE)
 
   tryCatch(
-    utils::download.file(raw_url, tmp, mode = "wb", quiet = TRUE),
+    tl_download_file(raw_url, tmp),
     error = function(e) {
       stop("Failed to download from GitHub: ", e$message,
            "\nURL: ", raw_url,
@@ -573,29 +669,52 @@ tl_read_github <- function(source, path = NULL, ref = "main", ...) {
 #' configured (\code{pip install kaggle}).
 #'
 #' @param source A Kaggle dataset slug (e.g., \code{"user/dataset-name"}) or a
-#'   Kaggle URL.
+#'   Kaggle URL. A URL may point at any tab of the dataset or competition
+#'   page (\code{/data}, \code{/code}, \code{/versions/2}) and may carry a
+#'   query; a competition URL is read as a competition without
+#'   \code{type} being set.
 #' @param file The specific file to read from the dataset. If \code{NULL} and
 #'   the dataset contains exactly one file, it is read automatically.
-#' @param dest Directory to download files to. The default is a fresh
-#'   per-dataset directory under \code{tempdir()}; supply a path to keep
-#'   the download.
+#' @param dest Directory to keep the download in. The default is a fresh
+#'   per-dataset directory under \code{tempdir()}. A supplied \code{dest}
+#'   receives this download's files, replacing files of the same name;
+#'   nothing else in it is read, unpacked or changed.
 #' @param type Either \code{"dataset"} (default) or \code{"competition"}.
+#'   Left unset, a competition URL in \code{source} sets it.
 #' @param ... Additional arguments passed to the format-specific reader.
 #'
 #' @return A \code{tidylearn_data} object containing the downloaded data.
 #'
 #' @examples
-#' \donttest{
-#' # data <- tl_read_kaggle("zillow/zecon", file = "Zip_time_series.csv")
-#' # data <- tl_read_kaggle("titanic", file = "train.csv", type = "competition")
+#' \dontrun{
+#' # Needs the Kaggle CLI and Kaggle credentials
+#' tl_read_kaggle("zillow/zecon", file = "Zip_time_series.csv")
+#' tl_read_kaggle("titanic", file = "train.csv", type = "competition")
+#' tl_read_kaggle("https://www.kaggle.com/competitions/titanic/data",
+#'                file = "train.csv")
 #' }
 #'
 #' @export
 tl_read_kaggle <- function(source, file = NULL, dest = NULL,
                            type = "dataset", ...) {
-  # Parse Kaggle URL to slug if needed
-  if (grepl("kaggle\\.com", source)) {
-    source <- tl_parse_kaggle_url(source)
+  if (!is.character(type) || length(type) != 1L ||
+        !type %in% c("dataset", "competition")) {
+    stop("'type' must be \"dataset\" or \"competition\".", call. = FALSE)
+  }
+
+  # A pasted URL names its own kind. The slug was the URL's last two path
+  # segments, so a link copied from a tab such as /data named another
+  # owner's dataset, and a competition link failed as a dataset slug.
+  if (tl_is_kaggle_url(source)) {
+    parsed <- tl_parse_kaggle_url(source)
+    if (missing(type)) {
+      type <- parsed$type
+    } else if (!identical(type, parsed$type)) {
+      stop("'", source, "' is a Kaggle ", parsed$type, " URL, but type = \"",
+           type, "\". Leave 'type' unset or pass type = \"", parsed$type,
+           "\".", call. = FALSE)
+    }
+    source <- parsed$slug
   }
 
   # Validate before anything is interpolated into a command line, and
@@ -614,14 +733,18 @@ tl_read_kaggle <- function(source, file = NULL, dest = NULL,
   # Check Kaggle CLI is installed
   tl_check_kaggle_cli()
 
-  # Download into a directory of our own unless the caller named one.
-  # Sharing tempdir() across calls meant list.files() below could match
-  # a data file left by an earlier download and return it as this
-  # dataset -- the wrong data, with no indication anything was amiss.
-  if (is.null(dest)) {
-    dest <- file.path(tempdir(), paste0("tl_kaggle_", tl_slug_key(source)))
-    unlink(dest, recursive = TRUE, force = TRUE)
-    dir.create(dest, recursive = TRUE, showWarnings = FALSE)
+  # Download into a directory of our own, emptied first, even when the
+  # caller names one. Sharing tempdir() across calls let list.files()
+  # below return a file an earlier download left behind as this dataset.
+  # Sharing the caller's folder unpacked every zip in it -- an unrelated
+  # archive overwrote the user's files -- and a stale archive's members,
+  # re-extracted and so the newest files, were returned in place of this
+  # download.
+  staging <- file.path(tempdir(), paste0("tl_kaggle_", tl_slug_key(source)))
+  unlink(staging, recursive = TRUE, force = TRUE)
+  dir.create(staging, recursive = TRUE, showWarnings = FALSE)
+  if (!is.null(dest)) {
+    on.exit(unlink(staging, recursive = TRUE, force = TRUE), add = TRUE)
   }
 
   # Download the dataset. Quote the caller-derived values: a slug is
@@ -629,11 +752,11 @@ tl_read_kaggle <- function(source, file = NULL, dest = NULL,
   # destination path may legitimately contain spaces.
   if (type == "competition") {
     args <- c("competitions", "download", "-c", shQuote(source),
-              "-p", shQuote(dest))
+              "-p", shQuote(staging))
     if (!is.null(file)) args <- c(args, "-f", shQuote(file))
   } else {
     args <- c("datasets", "download", "-d", shQuote(source),
-              "-p", shQuote(dest), "--unzip")
+              "-p", shQuote(staging), "--unzip")
     if (!is.null(file)) args <- c(args, "-f", shQuote(file))
   }
 
@@ -653,17 +776,28 @@ tl_read_kaggle <- function(source, file = NULL, dest = NULL,
   # Competition downloads arrive as a zip. The dataset endpoint takes
   # --unzip; the competition endpoint has no such flag, so unpack here or
   # the search below finds no data file at all.
-  tl_unzip_kaggle_archives(dest)
+  tl_unzip_kaggle_archives(staging)
+
+  # Kept before reading, so the download survives a file that cannot be
+  # read
+  if (!is.null(dest)) {
+    tl_keep_kaggle_download(staging, dest)
+  }
 
   # Find the downloaded file
   if (!is.null(file)) {
-    downloaded <- file.path(dest, file)
+    downloaded <- file.path(staging, file)
+    if (!file.exists(downloaded)) {
+      stop("File '", file, "' is not in the Kaggle download. It holds: ",
+           paste(list.files(staging, recursive = TRUE), collapse = ", "),
+           call. = FALSE)
+    }
   } else {
-    # Find files in dest that match common data formats
+    # Find files in the download that match common data formats
     data_exts <- c("csv", "tsv", "json", "parquet", "xlsx", "xls")
     pattern <- paste0("\\.(", paste(data_exts, collapse = "|"), ")$")
     candidates <- list.files(
-      dest, pattern = pattern, full.names = TRUE, recursive = TRUE
+      staging, pattern = pattern, full.names = TRUE, recursive = TRUE
     )
     candidates <- candidates[order(file.mtime(candidates), decreasing = TRUE)]
 
@@ -678,11 +812,6 @@ tl_read_kaggle <- function(source, file = NULL, dest = NULL,
     }
 
     downloaded <- candidates[1]
-  }
-
-  if (!file.exists(downloaded)) {
-    stop("Downloaded file not found: '", downloaded, "'.",
-         call. = FALSE)
   }
 
   # Detect format and read
@@ -703,6 +832,123 @@ tl_read_kaggle <- function(source, file = NULL, dest = NULL,
 }
 
 # ---- Internal helpers ----
+
+#' Download a URL to a local file
+#'
+#' The one place a reader fetches over HTTP, so tests can stand in for
+#' the network.
+#'
+#' @param url The URL to fetch.
+#' @param destfile Where to write it.
+#' @return The status from \code{utils::download.file()}, invisibly.
+#' @keywords internal
+#' @noRd
+tl_download_file <- function(url, destfile) {
+  invisible(utils::download.file(url, destfile, mode = "wb", quiet = TRUE))
+}
+
+#' Can reading an R serialisation file run code embedded in it?
+#'
+#' Before R 4.4.0, \code{readRDS()} and \code{load()} rebuilt promises
+#' stored in the file, so a crafted file ran code as soon as the object
+#' was used (CVE-2024-27322).
+#'
+#' @return A single logical.
+#' @keywords internal
+#' @noRd
+tl_unserialize_runs_code <- function() {
+  getRversion() < "4.4.0"
+}
+
+#' Validate a trust_rds argument
+#' @param trust_rds The value supplied.
+#' @keywords internal
+#' @noRd
+tl_check_trust_rds <- function(trust_rds) {
+  if (!is.logical(trust_rds) || length(trust_rds) != 1L || is.na(trust_rds)) {
+    stop("'trust_rds' must be TRUE or FALSE.", call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
+#' Refuse a downloaded R serialisation file where reading it can run code
+#'
+#' Called before the download, so nothing is fetched for a refused file.
+#'
+#' @param format The detected format.
+#' @param where The source, for the message: "GitHub" or "S3".
+#' @param trust_rds The caller's opt-in.
+#' @keywords internal
+#' @noRd
+tl_check_remote_rds <- function(format, where, trust_rds) {
+  if (format %in% c("rds", "rdata") && !isTRUE(trust_rds) &&
+        tl_unserialize_runs_code()) {
+    stop(
+      "Reading an .rds or .rdata file from ", where, " hands downloaded ",
+      "bytes to R's deserialiser, and on R ", getRversion(), " a crafted ",
+      "file can run code as it is read (CVE-2024-27322, fixed in R ",
+      "4.4.0). Pass trust_rds = TRUE if you trust the source, or upgrade R.",
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
+}
+
+#' The raw-file URL for a GitHub source
+#'
+#' The host is read from the parsed URL, and the owner and repository from
+#' the path's segments. A rewrite by substitution took "www.github.com"
+#' for owner/repo shorthand and, for an owner called "blob", removed the
+#' owner's name in place of the /blob/ segment.
+#'
+#' @param source A GitHub URL or "owner/repo" string.
+#' @param path,ref As for tl_read_github().
+#' @return The URL to download.
+#' @keywords internal
+#' @noRd
+tl_github_raw_url <- function(source, path, ref) {
+  if (!is.character(source) || length(source) != 1L || is.na(source)) {
+    stop("'source' must be a single GitHub URL or \"owner/repo\" string.",
+         call. = FALSE)
+  }
+
+  if (!tl_has_scheme(source)) {
+    # owner/repo shorthand
+    if (is.null(path)) {
+      stop("'path' is required when 'source' is in 'owner/repo' format.",
+           call. = FALSE)
+    }
+    return(paste0(
+      "https://raw.githubusercontent.com/", source, "/", ref, "/", path
+    ))
+  }
+
+  host <- tl_url_host(source)
+  if (identical(host, "raw.githubusercontent.com")) {
+    # A private file's access token is in the query, so it stays
+    return(source)
+  }
+  if (!host %in% c("github.com", "www.github.com")) {
+    stop("'", source, "' is not a GitHub URL. tl_read_github() reads ",
+         "github.com file links and raw.githubusercontent.com files.",
+         call. = FALSE)
+  }
+
+  # github.com/<owner>/<repo>/blob/<ref>/<path>, or raw in place of blob.
+  # The query (?raw=true, ?plain=1) only steers GitHub's page.
+  page <- sub("^[A-Za-z][A-Za-z0-9+.-]*://[^/]*", "", source)
+  page <- sub("[?#].*$", "", page)
+  segments <- strsplit(page, "/", fixed = TRUE)[[1]]
+  segments <- segments[nzchar(segments)]
+  if (length(segments) < 5L || !segments[3] %in% c("blob", "raw")) {
+    stop("'", source, "' is not a link to a file on GitHub. Expected ",
+         "https://github.com/<owner>/<repo>/blob/<ref>/<path>.",
+         call. = FALSE)
+  }
+
+  paste0("https://raw.githubusercontent.com/",
+         paste(segments[-3], collapse = "/"))
+}
 
 #' Refuse a Kaggle slug that is not one
 #'
@@ -807,6 +1053,22 @@ tl_unzip_kaggle_archives <- function(dest) {
     dest, pattern = "\\.zip$", full.names = TRUE, ignore.case = TRUE
   )
   for (archive in archives) {
+    members <- tryCatch(
+      utils::unzip(archive, list = TRUE)$Name,
+      error = function(e) {
+        warning("Could not unpack '", basename(archive), "': ",
+                conditionMessage(e), call. = FALSE)
+        NULL
+      }
+    )
+    if (is.null(members)) {
+      next
+    }
+
+    # Outside the tryCatch below, which turns unzip()'s complaints into
+    # warnings: a member that would land outside `dest` stops the read
+    tl_refuse_unsafe_zip(archive, members)
+
     tryCatch(
       utils::unzip(archive, exdir = dest),
       warning = function(w) {
@@ -820,6 +1082,31 @@ tl_unzip_kaggle_archives <- function(dest) {
     )
   }
   invisible(TRUE)
+}
+
+#' Copy a finished Kaggle download into the caller's folder
+#'
+#' Files of the same name are replaced, as a download into that folder
+#' would replace them; nothing else there is touched.
+#'
+#' @param staging The directory the download was made in.
+#' @param dest The caller's folder.
+#' @return The copied paths, invisibly.
+#' @keywords internal
+#' @noRd
+tl_keep_kaggle_download <- function(staging, dest) {
+  files <- list.files(staging, recursive = TRUE)
+  targets <- file.path(dest, files)
+  for (folder in unique(dirname(targets))) {
+    dir.create(folder, recursive = TRUE, showWarnings = FALSE)
+  }
+
+  copied <- file.copy(file.path(staging, files), targets, overwrite = TRUE)
+  if (!all(copied)) {
+    warning("Could not copy ", paste(files[!copied], collapse = ", "),
+            " into '", dest, "'.", call. = FALSE)
+  }
+  invisible(targets)
 }
 
 #' Check that the Kaggle CLI is installed
@@ -841,20 +1128,56 @@ tl_check_kaggle_cli <- function() {
   invisible(TRUE)
 }
 
-#' Parse a Kaggle URL into a dataset slug
+#' Is a source a Kaggle URL rather than a slug?
+#'
+#' A link pasted without its scheme ("www.kaggle.com/datasets/...") counts:
+#' it was read as a URL before, and a slug cannot contain "kaggle.com/".
+#'
+#' @param source The source as given.
+#' @return A single logical.
+#' @keywords internal
+#' @noRd
+tl_is_kaggle_url <- function(source) {
+  is.character(source) && length(source) == 1L && !is.na(source) &&
+    (tl_has_scheme(source) ||
+       grepl("^(www\\.)?kaggle\\.com/", source, ignore.case = TRUE))
+}
+
+#' Parse a Kaggle URL into a slug and a type
+#'
+#' The dataset is the two path segments after /datasets/, the competition
+#' the one after /competitions/. Anything further is a tab of the page
+#' (/data, /code, /versions/2), and a query or fragment is not part of the
+#' path at all.
+#'
+#' @param url A Kaggle URL, with or without its scheme.
+#' @return A list with \code{slug} and \code{type} (\code{"dataset"} or
+#'   \code{"competition"}).
 #' @keywords internal
 #' @noRd
 tl_parse_kaggle_url <- function(url) {
-  # https://www.kaggle.com/datasets/user/dataset-name
-  # https://www.kaggle.com/competitions/competition-name
-  if (grepl("/datasets/", url)) {
-    parts <- regmatches(url, regexpr("[^/]+/[^/]+$", url))
-  } else if (grepl("/competitions/", url)) {
-    parts <- regmatches(url, regexpr("[^/]+$", url))
-  } else {
-    stop("Cannot parse Kaggle URL: '", url, "'.", call. = FALSE)
+  with_scheme <- if (tl_has_scheme(url)) url else paste0("https://", url)
+  if (!tl_is_kaggle_host(tl_url_host(with_scheme))) {
+    stop("'", url, "' is not a Kaggle URL.", call. = FALSE)
   }
-  parts
+
+  path <- sub("[?#].*$", "",
+              sub("^[A-Za-z][A-Za-z0-9+.-]*://[^/?#]*", "", with_scheme))
+  segments <- strsplit(path, "/", fixed = TRUE)[[1]]
+  segments <- segments[nzchar(segments)]
+
+  if (length(segments) >= 3L && segments[1] == "datasets") {
+    return(list(slug = paste(segments[2:3], collapse = "/"),
+                type = "dataset"))
+  }
+  if (length(segments) >= 2L && segments[1] == "competitions") {
+    return(list(slug = segments[2], type = "competition"))
+  }
+
+  stop("Cannot parse Kaggle URL: '", url, "'. Expected a dataset link ",
+       "such as https://www.kaggle.com/datasets/<owner>/<dataset> or a ",
+       "competition link such as https://www.kaggle.com/competitions/<name>.",
+       call. = FALSE)
 }
 
 #' Strip credentials out of a database connection string
@@ -865,8 +1188,10 @@ tl_parse_kaggle_url <- function(url) {
 #' error string.
 #'
 #' @param url A connection string, or any other source description
-#' @return The same string with any \code{user:password@@} userinfo
-#'   replaced by \code{user:***@@}; non-URL input is returned unchanged
+#' @return The same string with the password in any
+#'   \code{user:password@@} userinfo, \code{password=} query parameter or
+#'   libpq keyword replaced by \code{***}; input with no password is
+#'   returned unchanged
 #' @keywords internal
 #' @noRd
 tl_redact_db_url <- function(url) {
@@ -874,9 +1199,12 @@ tl_redact_db_url <- function(url) {
     return(url)
   }
 
-  # scheme://user:password@rest  ->  scheme://user:***@rest
+  # scheme://user:password@rest  ->  scheme://user:***@rest. The user
+  # name may be empty, the scheme is case-insensitive, and the password
+  # runs to the last '@' before any query: an unencoded '@' is still part
+  # of it.
   redacted <- sub(
-    "^([a-z][a-z0-9+.-]*://)([^:@/]+):([^@/]*)@",
+    "^([A-Za-z][A-Za-z0-9+.-]*://)([^:@/]*):([^?#]*)@",
     "\\1\\2:***@",
     url,
     perl = TRUE
@@ -884,31 +1212,100 @@ tl_redact_db_url <- function(url) {
 
   # A bare "user:password@host" with no scheme is also accepted by the
   # backends below, so cover that shape too
-  sub("^([^:@/]+):([^@/]*)@", "\\1:***@", redacted, perl = TRUE)
+  redacted <- sub("^([^:@/]+):([^@/]*)@", "\\1:***@", redacted, perl = TRUE)
+
+  # A password given as a query parameter, or as a keyword in a libpq
+  # connection string made of space-separated key=value pairs
+  gsub(
+    "(^|[?&;[:space:]])(password|passwd|pwd)=[^&;#[:space:]]*",
+    "\\1\\2=***",
+    redacted,
+    ignore.case = TRUE,
+    perl = TRUE
+  )
 }
 
 #' Parse a database connection URL
+#'
+#' The query string is split off first, since a parameter such as
+#' \code{?ssl-mode=REQUIRED} was otherwise read as part of the database
+#' name. Credentials and the database name are percent-decoded.
+#'
+#' @param url A URL such as \code{postgres://user:password@@host:port/dbname}.
+#' @return A list with \code{user}, \code{password}, \code{host}, \code{port}
+#'   and \code{dbname} (each \code{NULL} when absent, bar the host), and
+#'   \code{params}, a named list of the decoded query parameters.
 #' @keywords internal
 #' @noRd
 tl_parse_db_url <- function(url) {
+  query <- if (grepl("?", url, fixed = TRUE)) sub("^[^?]*\\?", "", url) else ""
+  query <- sub("#.*$", "", query)
+  main <- sub("[?#].*$", "", url)
+
   # mysql://user:password@host:port/dbname
   # postgres://user:password@host:port/dbname
   pattern <- paste0(
-    "^[a-z]+://(?:([^:@]+)(?::([^@]*))?@)?",
-    "([^:/]+)(?::([0-9]+))?(?:/(.+))?$"
+    "^[A-Za-z][A-Za-z0-9+.-]*://(?:([^:@/]*)(?::([^@]*))?@)?",
+    "([^:/@]+)(?::([0-9]+))?(?:/(.+))?$"
   )
-  m <- regmatches(url, regexec(pattern, url))[[1]]
+  m <- regmatches(main, regexec(pattern, main, perl = TRUE))[[1]]
 
   if (length(m) == 0) {
-    stop("Cannot parse database URL: '", tl_redact_db_url(url), "'.",
+    stop("Cannot parse database URL: '", tl_redact_db_url(url), "'. ",
+         "Expected scheme://user:password@host:port/dbname. ",
+         "Percent-encode special characters in the user name and ",
+         "password, such as '@' as %40.",
          call. = FALSE)
   }
 
+  decoded <- function(x) if (nzchar(x)) utils::URLdecode(x) else NULL
+
   list(
-    user = if (nzchar(m[2])) m[2] else NULL,
-    password = if (nzchar(m[3])) m[3] else NULL,
+    user = decoded(m[2]),
+    password = decoded(m[3]),
     host = m[4],
     port = if (nzchar(m[5])) as.integer(m[5]) else NULL,
-    dbname = if (nzchar(m[6])) m[6] else NULL
+    dbname = decoded(m[6]),
+    params = tl_parse_url_query(query)
   )
+}
+
+#' Split a URL query string into decoded parameters
+#'
+#' @param query The text after '?', without a fragment.
+#' @return A named list of values; \code{list()} when there are none.
+#' @keywords internal
+#' @noRd
+tl_parse_url_query <- function(query) {
+  pairs <- strsplit(query, "&", fixed = TRUE)[[1]]
+  pairs <- pairs[nzchar(pairs)]
+  if (length(pairs) == 0L) {
+    return(list())
+  }
+
+  keys <- utils::URLdecode(sub("=.*$", "", pairs))
+  values <- ifelse(grepl("=", pairs, fixed = TRUE),
+                   sub("^[^=]*=", "", pairs), "")
+  stats::setNames(as.list(utils::URLdecode(values)), keys)
+}
+
+#' Connection arguments from a parsed URL, with named arguments as fallback
+#'
+#' What the URL carries wins; a named argument fills a part it leaves out,
+#' which keeps a password out of the connection string.
+#'
+#' @param parsed The result of \code{tl_parse_db_url()}.
+#' @param dbname,user,password,port The reader's named arguments.
+#' @return A named list for \code{DBI::dbConnect()}, without empty entries.
+#' @keywords internal
+#' @noRd
+tl_db_url_args <- function(parsed, dbname, user, password, port) {
+  args <- list(
+    host     = parsed$host,
+    port     = parsed$port %||% port,
+    dbname   = parsed$dbname %||% dbname,
+    user     = parsed$user %||% user,
+    password = parsed$password %||% password
+  )
+  Filter(Negate(is.null), args)
 }

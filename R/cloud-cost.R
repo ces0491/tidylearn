@@ -51,15 +51,28 @@ tl_cloud_timeout_seconds <- function(est_seconds,
     stop("'est_seconds' must be a single non-negative number.",
          call. = FALSE)
   }
-  if (!is.numeric(timeout_cap) || length(timeout_cap) != 1L ||
-        is.na(timeout_cap) || timeout_cap <= 0) {
-    stop("'timeout_cap' must be a single positive number of seconds.",
-         call. = FALSE)
-  }
+  tl_cloud_check_timeout_cap(timeout_cap)
 
   wanted <- ceiling(est_seconds * .tl_cloud_timeout_factor)
 
   as.integer(min(timeout_cap, max(.tl_cloud_timeout_floor, wanted)))
+}
+
+#' Validate a timeout cap
+#'
+#' Infinite is refused along with zero and negatives: the cap is what
+#' keeps the timeout below Modal's own 24-hour ceiling.
+#'
+#' @param timeout_cap The value supplied.
+#' @keywords internal
+#' @noRd
+tl_cloud_check_timeout_cap <- function(timeout_cap) {
+  if (!is.numeric(timeout_cap) || length(timeout_cap) != 1L ||
+        !is.finite(timeout_cap) || timeout_cap <= 0) {
+    stop("'timeout_cap' must be a single positive number of seconds.",
+         call. = FALSE)
+  }
+  invisible(TRUE)
 }
 
 #' Worst-case cost of a cloud job
@@ -92,6 +105,10 @@ tl_cloud_worst_case_cost <- function(timeout_seconds, tier_name) {
 #'   produced nothing;
 #' * a worst-case cost above `max_cost`.
 #'
+#' Warns when the cap cuts the timeout below the usual multiple of the
+#' estimate, since a job that runs a little long is then killed having
+#' billed for the whole timeout.
+#'
 #' @param advice A `tidylearn_compute_advice` object.
 #' @param max_cost Maximum acceptable worst-case spend, in USD.
 #' @param timeout_cap Maximum timeout, in seconds.
@@ -112,9 +129,18 @@ tl_cloud_check_budget <- function(advice,
     stop("'max_cost' must be a single positive number of dollars.",
          call. = FALSE)
   }
+  # Checked before the comparison below, which NA reached as an if()
+  # condition and -1 passed as if it were a cap
+  tl_cloud_check_timeout_cap(timeout_cap)
 
   cloud <- advice$cloud
   est_seconds <- cloud$est_seconds
+
+  if (!is_finite_num(est_seconds) || est_seconds < 0) {
+    stop("The advice has no cloud runtime estimate, so no timeout or ",
+         "worst-case cost can be set for the job.",
+         call. = FALSE)
+  }
 
   if (est_seconds >= timeout_cap) {
     stop(
@@ -129,6 +155,23 @@ tl_cloud_check_budget <- function(advice,
   }
 
   timeout_seconds <- tl_cloud_timeout_seconds(est_seconds, timeout_cap)
+
+  # A 3599 s estimate under the 3600 s default cap got one second of
+  # headroom on an order-of-magnitude estimate. The ratio is rounded down
+  # so that 2.998x never reads as the full 3x.
+  if (timeout_seconds < ceiling(est_seconds * .tl_cloud_timeout_factor)) {
+    headroom <- floor(timeout_seconds / est_seconds * 10) / 10
+    warning(
+      "The ", tl_cloud_format_duration(timeout_cap), " timeout cap leaves ",
+      format(headroom, nsmall = 1), "x headroom over this fit's estimate of ",
+      tl_cloud_format_duration(est_seconds), ", short of the ",
+      .tl_cloud_timeout_factor, "x a rough estimate needs. A job that runs ",
+      "long is killed at the cap and bills for the full timeout. Raise ",
+      "'timeout_cap' to give it room.",
+      call. = FALSE
+    )
+  }
+
   worst_case <- tl_cloud_worst_case_cost(timeout_seconds,
                                          cloud$tier_name)
 

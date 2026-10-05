@@ -125,6 +125,43 @@ test_that("budget arguments are validated", {
   )
 })
 
+test_that("the timeout cap is validated before it is used", {
+  # timeout_cap = NA reached an if() and failed with "missing value where
+  # TRUE/FALSE needed"; -1 was compared with the estimate as if it were a
+  # cap
+  for (cap in list(NA, -1, 0, Inf, "3600", c(60, 120))) {
+    expect_error(
+      tl_cloud_check_budget(fake_advice(100), timeout_cap = cap),
+      "'timeout_cap' must be a single positive number of seconds",
+      info = deparse(cap)
+    )
+  }
+  expect_error(
+    tl_cloud_check_budget(fake_advice(NA_real_)),
+    "The advice has no cloud runtime estimate"
+  )
+})
+
+test_that("a cap that cuts the timeout's headroom is flagged", {
+  # An estimate of 3599 s got a 3600 s timeout -- one second of headroom on
+  # an order-of-magnitude estimate -- without a word
+  expect_warning(
+    budget <- tl_cloud_check_budget(fake_advice(3599)),
+    "leaves 1.0x headroom over this fit's estimate"
+  )
+  expect_equal(budget$timeout_seconds, 3600L)
+
+  # 3600 / 1201 is 2.998, rounded down so it never reads as the full 3x
+  expect_warning(
+    tl_cloud_check_budget(fake_advice(1201)),
+    "leaves 2.9x headroom"
+  )
+
+  # The full 3x fits inside the cap, so nothing to flag
+  expect_no_warning(budget <- tl_cloud_check_budget(fake_advice(1200)))
+  expect_equal(budget$timeout_seconds, 3600L)
+})
+
 # ---- Formatting ----
 
 test_that("durations and costs read sensibly", {

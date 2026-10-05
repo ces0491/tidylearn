@@ -86,8 +86,10 @@ test_that("only bare host names may be added", {
   on.exit(suppressMessages(tl_cloud_allow_host(NULL)))
 
   # A single label would open an entire TLD.
-  expect_error(tl_cloud_allow_host("com"), "single label")
-  expect_error(tl_cloud_allow_host("localhost"), "single label")
+  expect_error(tl_cloud_allow_host("com"), "too broad to allow")
+  expect_error(tl_cloud_allow_host("localhost"), "too broad to allow")
+  expect_error(tl_cloud_allow_host("fits..example.com"), "an empty label")
+  expect_error(tl_cloud_allow_host(".example.com"), "an empty label")
 
   # URLs, ports, paths and wildcards are not host names.
   expect_error(tl_cloud_allow_host("https://x.example.com"), "bare host")
@@ -100,6 +102,28 @@ test_that("only bare host names may be added", {
   expect_error(tl_cloud_allow_host(NA_character_), "non-empty host names")
   expect_error(tl_cloud_allow_host(character(0)), "non-empty host names")
   expect_error(tl_cloud_allow_host(42), "non-empty host names")
+})
+
+test_that("a public suffix cannot be opened", {
+  suppressMessages(tl_cloud_allow_host(NULL))
+  on.exit(suppressMessages(tl_cloud_allow_host(NULL)))
+
+  # Two-label names passed, so allowing co.uk, github.io or ngrok.io let
+  # every site registered under them -- attacker.co.uk -- through as an
+  # upload destination
+  for (host in c("co.uk", "github.io", "ngrok.io", "example.com")) {
+    expect_error(tl_cloud_allow_host(host), "too broad to allow", info = host)
+  }
+  expect_false(tl_is_allowed_host("attacker.co.uk"))
+  expect_false(tl_is_allowed_host("attacker.github.io"))
+
+  # The endpoint's own host is still accepted, under such a suffix too,
+  # and opens nothing beside it
+  suppressMessages(tl_cloud_allow_host(c("fits.example.com",
+                                         "api.mycompany.co.uk")))
+  expect_true(tl_is_allowed_host("api.mycompany.co.uk"))
+  expect_false(tl_is_allowed_host("attacker.co.uk"))
+  expect_false(tl_is_allowed_host("mycompany.co.uk"))
 })
 
 test_that("a configured endpoint on an added host validates", {

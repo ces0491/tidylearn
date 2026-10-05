@@ -1,13 +1,15 @@
 #' Detect local GPU availability for tidylearn methods
 #'
 #' Reports whether the local machine has a CUDA-capable GPU and which
-#' tidylearn backends (`xgboost`, `keras`, `tensorflow`, `torch`) are
-#' positioned to use it. Detection is intentionally cheap: it parses
-#' `nvidia-smi` output and checks which R packages are installed, but
-#' does not load Python or fit a model. A backend reported as
-#' `gpu_likely_works = TRUE` may still fall back to CPU if it was not
-#' compiled or configured with CUDA support — confirm with a small
-#' real fit before relying on it for production workloads.
+#' tidylearn backends (`xgboost`, `keras`, `tensorflow`) are positioned
+#' to use it. Detection is intentionally cheap: it parses `nvidia-smi`
+#' output, giving up with a warning if `nvidia-smi` has not answered
+#' within 10 seconds, and reads which R packages are installed from the
+#' library without loading them, so it neither starts Python nor fits a
+#' model. A backend reported as `gpu_likely_works = TRUE` may still fall
+#' back to CPU if it was not compiled or configured with CUDA support —
+#' confirm with a small real fit before relying on it for production
+#' workloads.
 #'
 #' Apple MPS (Metal Performance Shaders) is intentionally not detected
 #' in this iteration; see the issue tracker for the MPS feature request.
@@ -36,8 +38,7 @@ tl_check_gpu <- function(verbose = FALSE) {
   backends <- list(
     xgboost    = tl_check_backend_gpu("xgboost", cuda),
     tensorflow = tl_check_backend_gpu("tensorflow", cuda),
-    keras      = tl_check_backend_gpu("keras", cuda),
-    torch      = tl_check_backend_gpu("torch", cuda)
+    keras      = tl_check_backend_gpu("keras", cuda)
   )
 
   any_gpu <- isTRUE(cuda$driver_present) &&
@@ -85,11 +86,14 @@ tl_check_gpu <- function(verbose = FALSE) {
 #'
 #' Cheap probe — runs `nvidia-smi` if it exists on PATH, parses the device
 #' name and driver version. Returns a sentinel list when `nvidia-smi` is
-#' absent, errors, or produces no output. Does not load Python.
+#' absent, errors, produces no output, or does not answer within
+#' `timeout` seconds (with a warning in that case). Does not load Python.
 #'
+#' @param timeout Seconds to wait for `nvidia-smi`. A hung driver
+#'   otherwise held up every `compute = "auto"` fit for as long as it hung.
 #' @keywords internal
 #' @noRd
-tl_detect_cuda_internal <- function() {
+tl_detect_cuda_internal <- function(timeout = 10) {
   na_result <- list(
     driver_present = FALSE,
     device_count   = 0L,
@@ -110,21 +114,33 @@ tl_detect_cuda_internal <- function() {
           "--query-gpu=name,driver_version",
           "--format=csv,noheader"
         ),
-        stdout = TRUE, stderr = FALSE
+        stdout = TRUE, stderr = FALSE, timeout = timeout
       )
     ),
     error = function(e) NULL
   )
 
+  # system2() attaches a "status" attribute on a non-zero exit, and
+  # reports a timeout as status 124 with no output. A machine with the
+  # binary installed but the driver unloaded prints its error to stdout
+  # and exits non-zero -- without this check that error text would be
+  # parsed as a device name and reported as a working GPU.
+  exit_status <- attr(out, "status")
+  if (identical(as.integer(exit_status), 124L)) {
+    warning(
+      "nvidia-smi did not answer within ", timeout,
+      ngettext(timeout, " second", " seconds"), ", so no GPU is reported ",
+      "and GPU paths fall back to CPU. Check that the NVIDIA driver is ",
+      "responding.",
+      call. = FALSE
+    )
+    return(na_result)
+  }
+
   if (is.null(out) || length(out) == 0L) {
     return(na_result)
   }
 
-  # system2() attaches a "status" attribute on a non-zero exit. A machine
-  # with the binary installed but the driver unloaded prints its error to
-  # stdout and exits non-zero -- without this check that error text would
-  # be parsed as a device name and reported as a working GPU.
-  exit_status <- attr(out, "status")
   if (!is.null(exit_status) && !identical(as.integer(exit_status), 0L)) {
     return(na_result)
   }
@@ -157,7 +173,12 @@ tl_detect_cuda_internal <- function() {
 #' @keywords internal
 #' @noRd
 tl_check_backend_gpu <- function(pkg, cuda) {
-  installed <- requireNamespace(pkg, quietly = TRUE)
+  # Read from the library rather than by loading the namespace:
+  # requireNamespace() took seconds for xgboost, and loading keras ran its
+  # .onLoad, which sets TF_USE_LEGACY_KERAS for the rest of the session.
+  # Keep this function free of tidylearn internals: a test runs its source
+  # in a fresh R session to check that it loads nothing.
+  installed <- nzchar(system.file(package = pkg))
   if (!installed) {
     return(list(
       installed        = FALSE,
@@ -202,9 +223,6 @@ tl_check_backend_gpu <- function(pkg, cuda) {
     "keras"      = paste(
       "GPU support requires the underlying TensorFlow backend with",
       "CUDA enabled."
-    ),
-    "torch"      = paste(
-      "GPU support requires the torch R package to bundle CUDA libs."
     ),
     "GPU support depends on backend-specific configuration."
   )
