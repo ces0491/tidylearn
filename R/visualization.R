@@ -11,14 +11,23 @@ NULL
 
 #' Plot feature importance across multiple models
 #'
+#' Each model's importance is on its own 0-100 scale. A factor predictor
+#' appears once, under its own name, for every model: the largest of its
+#' design columns stands for it where a method ranks those columns
+#' separately (ridge, lasso, elastic net and xgboost). A predictor a model
+#' was given but did not use scores zero for that model; one it was never
+#' given has no bar for it. Features are ranked on their mean importance
+#' over the models that were given them.
+#'
 #' @param ... tidylearn model objects to compare
 #' @param top_n Number of top features to display (default: 10)
-#' @param names Optional character vector of model names
+#' @param names Optional character vector of model names, one unique name
+#'   per model
 #' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @examples
 #' \donttest{
-#' m1 <- tl_model(iris, Species ~ ., method = "forest")
-#' m2 <- tl_model(iris, Species ~ ., method = "boost")
+#' m1 <- tl_model(iris, Sepal.Length ~ ., method = "forest")
+#' m2 <- tl_model(iris, Sepal.Length ~ ., method = "boost")
 #' tl_plot_importance_comparison(m1, m2, names = c("Forest", "Boost"))
 #' }
 #' @export
@@ -26,42 +35,14 @@ tl_plot_importance_comparison <- function(..., top_n = 10, names = NULL) {
   # Get models
   models <- list(...)
 
-  # Get model names if not provided
-  if (is.null(names)) {
-    names <- paste0("Model ", seq_along(models))
-  } else if (length(names) != length(models)) {
-    stop("Length of 'names' must match the number of models", call. = FALSE)
-  }
+  # The bars are keyed on these names, so two models sharing one were
+  # drawn in the same places
+  names <- tl_comparison_names(
+    models, names %||% paste0("Model ", seq_along(models))
+  )
 
   # Extract importance for each model
-  all_importance <- purrr::map2_dfr(models, names, function(model, name) {
-    # Check model type
-    if (model$spec$method %in% c("tree", "forest", "boost", "xgboost")) {
-      # Tree-based models
-      imp_data <- tl_extract_importance(model)
-
-      # Add model name
-      imp_data$model <- name
-
-      imp_data
-    } else if (model$spec$method %in% c("ridge", "lasso", "elastic_net")) {
-      # Regularized regression
-      imp_data <- tl_get_importance_regularized(model)
-
-      # Add model name
-      imp_data$model <- name
-
-      imp_data
-    } else {
-      warning(
-        "Importance extraction not implemented for model type: ",
-        model$spec$method,
-        call. = FALSE
-      )
-      NULL
-    }
-  })
-
+  all_importance <- purrr::map2_dfr(models, names, tl_comparison_importance)
 
   # This used to evaluate NULL without returning it, so the function
   # carried on and failed inside dplyr with "object 'feature' not found"
@@ -73,13 +54,9 @@ tl_plot_importance_comparison <- function(..., top_n = 10, names = NULL) {
     )
   }
 
-  # A feature a model did not use scores zero for it. Left missing, the
-  # average ran over only the models that kept the feature, so one a lasso
-  # dropped outranked one both models used.
-  all_importance <- all_importance |>
-    tidyr::complete(feature, model, fill = list(importance = 0))
-
-  # Find top features across all models
+  # Find top features across all models. Each model has a row for every
+  # predictor it was given, at zero where it did not use one, so a feature
+  # a lasso dropped does not outrank one both models used.
   top_features <- all_importance |>
     dplyr::group_by(.data[["feature"]]) |>
     dplyr::summarize(
@@ -94,7 +71,9 @@ tl_plot_importance_comparison <- function(..., top_n = 10, names = NULL) {
   plot_data <- all_importance |>
     dplyr::filter(.data[["feature"]] %in% top_features)
 
-  # Create the plot
+  # Create the plot. A feature only some models were given has fewer bars,
+  # and preserving the single-bar width keeps a lone bar from filling the
+  # whole slot.
   p <- ggplot2::ggplot(
     plot_data,
     ggplot2::aes(
@@ -103,7 +82,9 @@ tl_plot_importance_comparison <- function(..., top_n = 10, names = NULL) {
       fill = model
     )
   ) +
-    ggplot2::geom_col(position = "dodge") +
+    ggplot2::geom_col(
+      position = ggplot2::position_dodge(preserve = "single")
+    ) +
     ggplot2::coord_flip() +
     ggplot2::labs(
       title = "Feature Importance Comparison",
@@ -116,10 +97,149 @@ tl_plot_importance_comparison <- function(..., top_n = 10, names = NULL) {
   p
 }
 
+#' One model's importance for the comparison, one row per predictor
+#'
+#' rpart, randomForest and gbm name a factor predictor by its column
+#' (\code{Species}); glmnet and xgboost name its design columns
+#' (\code{Speciesversicolor}, \code{Speciesvirginica}). Filling zeros across
+#' the two namings said the lasso gave \code{Species} nothing and the forest
+#' gave the dummies nothing. Each name is mapped to the formula term it
+#' came from, and a term takes its largest column, so every model reports
+#' on the same names. A predictor the model was given and did not rank
+#' scores zero; one it was never given gets no row, so it draws no bar for
+#' this model and does not pull down the predictor's average.
+#'
+#' @param model A tidylearn model.
+#' @param name The model's name in the comparison.
+#' @return A tibble of \code{feature}, \code{model} and \code{importance},
+#'   or NULL for a method with no importance.
+#' @keywords internal
+#' @noRd
+tl_comparison_importance <- function(model, name) {
+  method <- model$spec$method
+  if (method %in% c("tree", "forest", "boost", "xgboost")) {
+    imp <- tl_extract_importance(model)
+  } else if (method %in% c("ridge", "lasso", "elastic_net")) {
+    imp <- tl_get_importance_regularized(model)
+  } else {
+    warning(
+      "Importance extraction not implemented for model type: ", method,
+      call. = FALSE
+    )
+    return(NULL)
+  }
+
+  # An empty importance used to drop the model from the comparison with
+  # nothing to say why
+  if (nrow(imp) == 0) {
+    warning(
+      "Model '", name, "' has no feature with non-zero importance: ",
+      tl_no_importance_reason(model), ". Its bars are all zero.",
+      call. = FALSE
+    )
+  }
+
+  mapped <- tl_importance_terms(model, imp$feature)
+  by_term <- vapply(
+    split(imp$importance, mapped$feature_terms), max, numeric(1)
+  )
+
+  features <- union(mapped$terms, names(by_term))
+  importance <- unname(by_term[features])
+  importance[is.na(importance)] <- 0
+
+  tibble::tibble(feature = features, model = name, importance = importance)
+}
+
+#' The formula term each importance name belongs to
+#'
+#' @param model A tidylearn supervised model.
+#' @param features Feature names an importance extractor returned.
+#' @return A list: \code{terms}, the model's term labels (the predictors it
+#'   was given), and \code{feature_terms}, the term each of
+#'   \code{features} belongs to. A name that matches no term is kept as it
+#'   is.
+#' @keywords internal
+#' @noRd
+tl_importance_terms <- function(model, features) {
+  formula <- model$spec$formula
+  labels <- attr(stats::terms(formula, data = model$data), "term.labels")
+  # randomForest rebuilds its frame with data.frame(), which turns a
+  # non-syntactic name into a syntactic one
+  term_of <- c(
+    stats::setNames(labels, labels),
+    stats::setNames(labels, make.names(labels))
+  )
+
+  if (!all(features %in% names(term_of))) {
+    # Design-matrix columns: "assign" gives the term each column came from
+    frame <- stats::model.frame(formula, data = model$data)
+    design_terms <- stats::terms(frame)
+    design <- stats::model.matrix(design_terms, frame)
+    assign <- attr(design, "assign")
+    in_term <- assign > 0
+    term_of <- c(
+      term_of,
+      stats::setNames(
+        attr(design_terms, "term.labels")[assign[in_term]],
+        colnames(design)[in_term]
+      )
+    )
+  }
+
+  feature_terms <- unname(term_of[features])
+  unmatched <- is.na(feature_terms)
+  feature_terms[unmatched] <- features[unmatched]
+  list(terms = labels, feature_terms = feature_terms)
+}
+
+#' Why a model has no feature importance
+#'
+#' @param model A tidylearn model.
+#' @return A phrase for an error or warning message.
+#' @keywords internal
+#' @noRd
+tl_no_importance_reason <- function(model) {
+  method <- model$spec$method
+  if (method == "tree") {
+    "the tree has no splits"
+  } else if (method %in% c("ridge", "lasso", "elastic_net")) {
+    "the penalty dropped every predictor from this model"
+  } else {
+    "the fit did not use any predictor"
+  }
+}
+
+#' Rescale importance so the largest value is 100
+#'
+#' Permutation importance is negative for a feature that does worse than
+#' noise, and can be negative for every feature at once. Dividing by the
+#' largest value, then itself negative, reversed the ranking: \%IncMSE of
+#' -6.20, -0.87 and -6.61 became 709, 100 and 756. With no positive value
+#' the largest magnitude sets the scale instead, which keeps the wrapped
+#' package's order.
+#'
+#' @param x Numeric importance values.
+#' @return \code{x} rescaled, or unchanged when every value is zero.
+#' @keywords internal
+#' @noRd
+tl_rescale_importance <- function(x) {
+  scale <- if (any(x > 0, na.rm = TRUE)) {
+    max(x, na.rm = TRUE)
+  } else {
+    max(abs(x), 0, na.rm = TRUE)
+  }
+  if (scale == 0) {
+    return(x)
+  }
+  100 * x / scale
+}
+
 #' Extract importance from a tree-based model
 #'
 #' @param model A tidylearn model object
-#' @return A data frame with feature importance values
+#' @return A data frame with feature importance values, rescaled so the
+#'   largest is 100. Empty for a tree with no splits.
 #' @keywords internal
 tl_extract_importance <- function(model) {
   # Get the model
@@ -127,14 +247,15 @@ tl_extract_importance <- function(model) {
   method <- model$spec$method
 
   if (method == "tree") {
-    # Decision tree importance
-    # Get variable importance from rpart
-    imp <- fit$variable.importance
+    # rpart leaves variable.importance NULL for a tree with no splits, and
+    # a tibble of two NULL columns has neither column
+    imp <- fit$variable.importance %||%
+      stats::setNames(numeric(0), character(0))
 
     # Create a data frame for plotting
     importance_df <- tibble::tibble(
       feature = names(imp),
-      importance = as.vector(imp)
+      importance = unname(imp)
     )
   } else if (method == "forest") {
     # Random forest importance
@@ -159,7 +280,7 @@ tl_extract_importance <- function(model) {
 
     importance_df <- tibble::tibble(
       feature = rownames(imp),
-      importance = imp[, measure]
+      importance = unname(imp[, measure])
     )
   } else if (method == "xgboost") {
     # Gain: each feature's share of the loss reduction across its splits
@@ -189,11 +310,7 @@ tl_extract_importance <- function(model) {
     )
   }
 
-  # Normalize importance to 0-100 scale
-  importance_df <- importance_df |>
-    dplyr::mutate(
-      importance = 100 * .data[["importance"]] / max(.data[["importance"]])
-    )
+  importance_df$importance <- tl_rescale_importance(importance_df$importance)
 
   importance_df
 }
@@ -223,8 +340,11 @@ tl_get_importance_regularized <- function(model, lambda = "1se") {
   # predictors by their units: hp / 100 made hp 100 times as important
   # without changing a single prediction. Scale each by its predictor's
   # standard deviation in the design matrix the model was fitted on.
+  # The intercept is dropped by name: a formula with - 1 has none, and
+  # dropping the first column took the first predictor's SD with it
   frame <- stats::model.frame(model$spec$formula, data = model$data)
-  design <- stats::model.matrix(stats::terms(frame), frame)[, -1, drop = FALSE]
+  design <- stats::model.matrix(stats::terms(frame), frame)
+  design <- design[, colnames(design) != "(Intercept)", drop = FALSE]
   predictor_sd <- apply(design, 2, stats::sd)
   coefs$importance <- abs(coefs$estimate) * unname(predictor_sd[coefs$term])
 
@@ -235,17 +355,9 @@ tl_get_importance_regularized <- function(model, lambda = "1se") {
     dplyr::summarise(importance = max(.data$importance), .groups = "drop") |>
     dplyr::filter(.data[["importance"]] > 0)
 
-  # A penalty large enough to drop every predictor leaves nothing to rank;
-  # rescaling an empty column would warn that max() returned -Inf
-  if (nrow(importance_df) == 0) {
-    return(importance_df)
-  }
-
-  # Normalize importance to 0-100 scale
-  importance_df <- importance_df |>
-    dplyr::mutate(
-      importance = 100 * .data[["importance"]] / max(.data[["importance"]])
-    )
+  # A penalty large enough to drop every predictor leaves nothing to rank,
+  # and an empty column comes back empty
+  importance_df$importance <- tl_rescale_importance(importance_df$importance)
 
   importance_df
 }
@@ -386,8 +498,33 @@ tl_plot_cv_results <- function(cv_results, metrics = NULL) {
 
   # Filter metrics if specified
   if (!is.null(metrics)) {
+    available <- unique(fold_metrics$metric)
+    if (!any(metrics %in% available)) {
+      stop(
+        "None of the requested metrics is in the cross-validation ",
+        "results. Available: ", paste(available, collapse = ", "), ".",
+        call. = FALSE
+      )
+    }
+    absent <- setdiff(metrics, available)
+    if (length(absent) > 0) {
+      warning(
+        "Metric(s) not in the cross-validation results: ",
+        paste(absent, collapse = ", "), ". Available: ",
+        paste(available, collapse = ", "), ".",
+        call. = FALSE
+      )
+    }
+
     fold_metrics <- fold_metrics |>
       dplyr::filter(.data[["metric"]] %in% metrics)
+    # The mean lines are a layer of their own. Left unfiltered they gave
+    # every metric the folds scored a panel, with a mean line and nothing
+    # else in it.
+    if (!is.null(summary_data)) {
+      summary_data <- summary_data |>
+        dplyr::filter(.data[["metric"]] %in% metrics)
+    }
   }
 
   # Create the plot
@@ -427,12 +564,10 @@ tl_plot_cv_results <- function(cv_results, metrics = NULL) {
 #'   (if NULL, uses training data)
 #' @param ... Additional arguments
 #' @return A \code{\link[shiny]{shinyApp}} object.
-#' @examples
+#' @examplesIf all(sapply(c("shiny", "shinydashboard", "DT"), requireNamespace))
 #' \donttest{
-#' if (requireNamespace("shiny")) {
-#'   model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
-#'   app <- tl_dashboard(model)
-#' }
+#' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+#' app <- tl_dashboard(model)
 #' }
 #' @export
 tl_dashboard <- function(model, new_data = NULL, ...) {
@@ -611,32 +746,7 @@ tl_dashboard <- function(model, new_data = NULL, ...) {
 
     # Predictions
     output$predictions_table <- DT::renderDT({
-      # Get actual values
-      actuals <- new_data[[model$spec$response_var]]
-
-      if (model$spec$is_classification) {
-        # Classification
-        pred_class <- predict(model, new_data, type = "class")$.pred
-        pred_prob <- predict(model, new_data, type = "prob")
-
-        # Combine into a data frame
-        results <- cbind(
-          data.frame(actual = actuals, predicted = pred_class),
-          pred_prob
-        )
-      } else {
-        # Regression
-        predictions <- predict(model, new_data)$.pred
-
-        # Combine into a data frame
-        results <- data.frame(
-          actual = actuals,
-          predicted = predictions,
-          residual = actuals - predictions
-        )
-      }
-
-      DT::datatable(results,
+      DT::datatable(tl_dashboard_predictions(model, new_data),
                     options = list(pageLength = 10),
                     rownames = FALSE)
     })
@@ -665,14 +775,32 @@ tl_dashboard <- function(model, new_data = NULL, ...) {
     # Residuals plot (for regression)
     output$residuals_plot <- shiny::renderPlot({
       if (!model$spec$is_classification) {
-        tl_plot_residuals(model, new_data)
+        tl_dashboard_residuals_plot(model, new_data)
       }
     })
 
-    # Diagnostics plots (for regression)
+    # Diagnostics plots (for regression). They read an lm fit's
+    # standardised residuals, leverage and Cook's distance, and failed
+    # inside rstandard() for every other method.
     output$diagnostics_plot <- shiny::renderPlot({
       if (!model$spec$is_classification) {
-        tl_plot_diagnostics(model)
+        shiny::validate(
+          shiny::need(
+            inherits(model$fit, "lm"),
+            paste0(
+              "Diagnostic plots are available for linear and polynomial ",
+              "models only."
+            )
+          ),
+          shiny::need(
+            requireNamespace("gridExtra", quietly = TRUE),
+            paste0(
+              "The diagnostic plots need the gridExtra package. Install it ",
+              "with: install.packages(\"gridExtra\")"
+            )
+          )
+        )
+        tl_dashboard_diagnostics_plot(model)
       }
     })
 
@@ -716,6 +844,90 @@ tl_dashboard_importance_plot <- function(model) {
   }
 }
 
+#' Rows for the dashboard's predictions table
+#'
+#' The observed values are the formula's left-hand side evaluated on the
+#' data, the scale the model predicts on. Read from the raw column, a
+#' \code{log(mpg) ~ wt + hp} model listed mpg beside predictions of
+#' log(mpg), and residuals that subtracted one from the other.
+#'
+#' @param model A tidylearn supervised model.
+#' @param new_data The data the dashboard evaluates on.
+#' @return A data frame of \code{actual} and \code{predicted}, with
+#'   \code{residual} for regression and one probability column per class
+#'   for classification.
+#' @keywords internal
+#' @noRd
+tl_dashboard_predictions <- function(model, new_data) {
+  actuals <- tl_observed_response(model, new_data)
+
+  if (model$spec$is_classification) {
+    pred_class <- predict(model, new_data, type = "class")$.pred
+    pred_prob <- predict(model, new_data, type = "prob")
+    cbind(
+      data.frame(actual = actuals, predicted = pred_class),
+      pred_prob
+    )
+  } else {
+    predictions <- unname(predict(model, new_data)$.pred)
+    data.frame(
+      actual = actuals,
+      predicted = predictions,
+      residual = actuals - predictions
+    )
+  }
+}
+
+#' Residual plot for the dashboard's residuals panel
+#'
+#' The panel called \code{tl_plot_residuals(model, new_data)}, which takes
+#' a plot type as its second argument, and failed with "the condition has
+#' length > 1" for every regression model. The residuals are computed from
+#' predictions on the dashboard's data, as the predictions table computes
+#' them, so they exist for every method.
+#'
+#' @param model A tidylearn regression model.
+#' @param new_data The data the dashboard evaluates on.
+#' @return A ggplot of residuals against predicted values.
+#' @keywords internal
+#' @noRd
+tl_dashboard_residuals_plot <- function(model, new_data) {
+  predicted <- unname(predict(model, new_data)$.pred)
+  plot_data <- tibble::tibble(
+    predicted = predicted,
+    residual = tl_observed_response(model, new_data) - predicted
+  )
+  plot_data <- plot_data[stats::complete.cases(plot_data), ]
+
+  ggplot2::ggplot(
+    plot_data,
+    ggplot2::aes(x = .data$predicted, y = .data$residual)
+  ) +
+    ggplot2::geom_point(alpha = 0.6) +
+    ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+    ggplot2::labs(
+      title = "Residuals vs Predicted Values",
+      x = "Predicted values",
+      y = "Residuals"
+    ) +
+    ggplot2::theme_minimal()
+}
+
+#' The four regression diagnostics, arranged for the dashboard
+#'
+#' \code{tl_plot_diagnostics()} returns its four plots as a list.
+#' \code{renderPlot()} printed the list, and each print replaced the plot
+#' before it, so the panel showed only the last.
+#'
+#' @param model A tidylearn model whose fit is an \code{lm}.
+#' @return The arranged \code{gtable}, invisibly. The plots are drawn as a
+#'   side effect.
+#' @keywords internal
+#' @noRd
+tl_dashboard_diagnostics_plot <- function(model) {
+  gridExtra::grid.arrange(grobs = tl_plot_diagnostics(model), ncol = 2)
+}
+
 #' Bin number for each of n ranked rows
 #'
 #' Spreads the rows over the bins as evenly as they divide, so every bin
@@ -755,30 +967,51 @@ tl_bin_index <- function(n, bins) {
 #' cumulative total into NA and empty the chart. Those rows are left out,
 #' with a warning giving the count.
 #'
+#' The observed classes are read against the model's, so the positive
+#' class is the model's second class. Read from the data, a test factor
+#' whose levels had been reordered ranked the rows by the other class's
+#' probability. A row of a class the model never saw is left out, and
+#' \code{tl_align_classes()} says so.
+#'
 #' @param model A binary classification model.
 #' @param new_data Data to score.
-#' @param actuals The response as a two-level factor.
+#' @param model_levels The model's two classes.
 #' @return A tibble of \code{prob} and \code{actual}, sorted by
 #'   \code{prob} descending, where \code{actual} is the tie-group response
 #'   rate for the positive (second) class.
 #' @keywords internal
 #' @noRd
-tl_ranked_response <- function(model, new_data, actuals) {
+tl_ranked_response <- function(model, new_data, model_levels) {
+  observed <- tl_observed_response(model, new_data)
+  aligned <- tl_align_classes(observed, model_levels)
+
   probs <- predict(model, new_data, type = "prob")
-  pos_class <- levels(actuals)[2]
+  pos_class <- model_levels[2]
   pos_probs <- probs[[pos_class]]
 
-  usable <- !is.na(actuals) & !is.na(pos_probs)
-  if (!all(usable)) {
+  missing <- is.na(observed) | (aligned$keep & is.na(pos_probs))
+  if (any(missing)) {
     warning(
-      sum(!usable), " row(s) with a missing response or predicted ",
+      sum(missing), " row(s) with a missing response or predicted ",
       "probability are left out of the chart.",
       call. = FALSE
     )
   }
 
+  usable <- aligned$keep & !is.na(pos_probs)
   prob <- pos_probs[usable]
-  actual <- as.numeric(actuals[usable] == pos_class)
+  actual <- as.numeric(aligned$actuals[usable] == pos_class)
+
+  # Every cumulative share divides by the number of responders, so with
+  # none the chart is 0 / 0 throughout
+  if (!any(actual == 1)) {
+    stop(
+      "Lift and gain need at least one responder, and the scored rows ",
+      "have no row of the positive class ('", pos_class, "').",
+      call. = FALSE
+    )
+  }
+
   ord <- order(prob, decreasing = TRUE)
   prob <- prob[ord]
   actual <- actual[ord]
@@ -821,16 +1054,14 @@ tl_plot_lift <- function(model, new_data = NULL, bins = 10, ...) {
     new_data <- model$data
   }
 
-  # Get actual values
-  response_var <- model$spec$response_var
-  actuals <- new_data[[response_var]]
-  if (!is.factor(actuals)) {
-    actuals <- factor(actuals)
-  }
+  # Binary is a property of the model. Counted from the data, a test split
+  # that still declared a class the training rows dropped made a binary
+  # model look multiclass.
+  model_levels <- tl_model_classes(model)
 
   # For binary classification
-  if (length(levels(actuals)) == 2) {
-    ordered_data <- tl_ranked_response(model, new_data, actuals)
+  if (length(model_levels) == 2) {
+    ordered_data <- tl_ranked_response(model, new_data, model_levels)
 
     # Calculate lift by decile. tl_bin_index() splits the rows into the
     # number of bins asked for; rounding the bin size up gave 32 rows in 10
@@ -929,16 +1160,12 @@ tl_plot_gain <- function(model, new_data = NULL, bins = 10, ...) {
     new_data <- model$data
   }
 
-  # Get actual values
-  response_var <- model$spec$response_var
-  actuals <- new_data[[response_var]]
-  if (!is.factor(actuals)) {
-    actuals <- factor(actuals)
-  }
+  # Binary is a property of the model, as in tl_plot_lift()
+  model_levels <- tl_model_classes(model)
 
   # For binary classification
-  if (length(levels(actuals)) == 2) {
-    ordered_data <- tl_ranked_response(model, new_data, actuals)
+  if (length(model_levels) == 2) {
+    ordered_data <- tl_ranked_response(model, new_data, model_levels)
 
     # Calculate cumulative metrics
     bin <- tl_bin_index(nrow(ordered_data), bins)
@@ -1026,8 +1253,10 @@ tl_plot_gain <- function(model, new_data = NULL, bins = 10, ...) {
 #'
 #' @param data A data frame with cluster assignments
 #' @param cluster_col Name of cluster column (default: "cluster")
-#' @param x_col X-axis variable (if NULL, uses first numeric column)
-#' @param y_col Y-axis variable (if NULL, uses second numeric column)
+#' @param x_col X-axis variable (if NULL, uses the first numeric column
+#'   other than \code{cluster_col})
+#' @param y_col Y-axis variable (if NULL, uses the second numeric column
+#'   other than \code{cluster_col})
 #' @param centers Optional data frame of cluster centers
 #' @param title Plot title
 #' @param color_noise_black If TRUE, color noise points (cluster 0) black
@@ -1048,8 +1277,18 @@ plot_clusters <- function(data,
                           title = "Cluster Plot",
                           color_noise_black = TRUE) {
 
-  # Find numeric columns if not specified
-  numeric_cols <- names(data)[sapply(data, is.numeric)]
+  # Find numeric columns if not specified. Integer cluster labels are
+  # numeric too, and as the first numeric column they became the x axis.
+  numeric_cols <- setdiff(
+    names(data)[vapply(data, is.numeric, logical(1))], cluster_col
+  )
+  if (length(numeric_cols) == 0 && (is.null(x_col) || is.null(y_col))) {
+    stop(
+      "plot_clusters() needs a numeric column other than the cluster ",
+      "column to plot, or 'x_col' and 'y_col'.",
+      call. = FALSE
+    )
+  }
 
   if (is.null(x_col)) {
     x_col <- numeric_cols[1]
@@ -1169,7 +1408,7 @@ plot_elbow <- function(wss_data, add_line = FALSE, suggested_k = NULL) {
 #'
 #' @return The return value of \code{\link[gridExtra]{grid.arrange}}, a
 #'   \code{\link[gtable]{gtable}} drawn as a side effect.
-#' @examples
+#' @examplesIf requireNamespace("gridExtra", quietly = TRUE)
 #' \donttest{
 #' df <- iris[, 1:4]
 #' df$km3 <- kmeans(df, 3)$cluster
@@ -1301,7 +1540,9 @@ plot_variance_explained <- function(variance_tbl, threshold = 0.8) {
 #'
 #' Enhanced dendrogram with colored cluster rectangles
 #'
-#' @param hclust_obj Hierarchical clustering object (hclust or tidy_hclust)
+#' @param hclust_obj Hierarchical clustering object: an \code{hclust}, a
+#'   \code{tidy_hclust}, or a tidylearn model fitted with
+#'   \code{method = "hclust"}
 #' @param k Number of clusters to highlight
 #' @param title Plot title
 #'
@@ -1317,7 +1558,18 @@ plot_dendrogram <- function(hclust_obj,
                             k = NULL,
                             title = "Hierarchical Clustering Dendrogram") {
 
-  if (inherits(hclust_obj, "tidy_hclust")) {
+  # A tidylearn model reached plot() whole, which dispatched to
+  # plot.tidylearn_model() and failed on the main and xlab arguments
+  if (inherits(hclust_obj, "tidylearn_model")) {
+    if (!identical(hclust_obj$spec$method, "hclust")) {
+      stop(
+        "plot_dendrogram() needs a model fitted with method = \"hclust\", ",
+        "not \"", hclust_obj$spec$method, "\".",
+        call. = FALSE
+      )
+    }
+    hc <- hclust_obj$fit$model
+  } else if (inherits(hclust_obj, "tidy_hclust")) {
     hc <- hclust_obj$model
   } else {
     hc <- hclust_obj
@@ -1341,10 +1593,13 @@ plot_dendrogram <- function(hclust_obj,
 #' @param cluster_col Cluster column name
 #' @param validation_metrics Optional tibble of validation metrics
 #'
-#' @return Invisibly returns a list of \code{\link[ggplot2]{ggplot}} objects.
-#'   The combined plot grid is drawn as a side effect via
-#'   \code{\link[gridExtra]{grid.arrange}}.
-#' @examples
+#' @return Invisibly returns a named list of the
+#'   \code{\link[ggplot2]{ggplot}} objects drawn: \code{clusters}, the
+#'   scatter plot, when the data has two numeric columns besides
+#'   \code{cluster_col}; \code{sizes}; and \code{metrics}, when
+#'   \code{validation_metrics} is given. The combined plot grid is drawn as
+#'   a side effect via \code{\link[gridExtra]{grid.arrange}}.
+#' @examplesIf requireNamespace("gridExtra", quietly = TRUE)
 #' \donttest{
 #' df <- iris[, 1:4]
 #' df$cluster <- kmeans(df, 3)$cluster
@@ -1357,10 +1612,14 @@ create_cluster_dashboard <- function(data,
 
   plots <- list()
 
-  # 1. Cluster scatter plot (first two numeric columns)
-  numeric_cols <- names(data)[sapply(data, is.numeric)]
+  # 1. Cluster scatter plot (first two numeric columns besides the
+  # clusters). Skipped, it used to leave a NULL in the list that
+  # grid.arrange() could not draw.
+  numeric_cols <- setdiff(
+    names(data)[vapply(data, is.numeric, logical(1))], cluster_col
+  )
   if (length(numeric_cols) >= 2) {
-    plots[[1]] <- plot_clusters(
+    plots$clusters <- plot_clusters(
       data, cluster_col = cluster_col,
       x_col = numeric_cols[1],
       y_col = numeric_cols[2]
@@ -1368,26 +1627,28 @@ create_cluster_dashboard <- function(data,
   }
 
   # 2. Cluster sizes
-  plots[[2]] <- plot_cluster_sizes(data[[cluster_col]])
+  plots$sizes <- plot_cluster_sizes(data[[cluster_col]])
 
   # 3. If validation metrics provided, create metrics plot
   if (!is.null(validation_metrics)) {
-    # Create a text plot with metrics
-    fmt <- paste0(
-      "Validation Metrics\n\n",
-      "Number of Clusters: %d\n",
-      "Avg Silhouette: %.3f\n",
-      "Min Size: %d\nMax Size: %d"
-    )
-    metrics_text <- sprintf(
-      fmt,
-      validation_metrics$k,
-      validation_metrics$avg_silhouette %||% NA,
-      validation_metrics$min_size,
-      validation_metrics$max_size
+    # calc_validation_metrics() has no silhouette without a distance
+    # matrix, and reading the absent column warned and printed NA
+    silhouette <- if ("avg_silhouette" %in% names(validation_metrics)) {
+      sprintf("Avg Silhouette: %.3f", validation_metrics$avg_silhouette)
+    }
+    metrics_text <- paste(
+      c(
+        "Validation Metrics",
+        "",
+        sprintf("Number of Clusters: %d", validation_metrics$k),
+        silhouette,
+        sprintf("Min Size: %d", validation_metrics$min_size),
+        sprintf("Max Size: %d", validation_metrics$max_size)
+      ),
+      collapse = "\n"
     )
 
-    plots[[3]] <- ggplot2::ggplot() +
+    plots$metrics <- ggplot2::ggplot() +
       ggplot2::annotate(
         "text", x = 0.5, y = 0.5,
         label = metrics_text, size = 5

@@ -50,20 +50,77 @@ tl_gt_theme <- function(gt_tbl, title = NULL,
 
 #' Build model info string for table footnotes
 #' @param model A tidylearn model object
+#' @param n The number of rows the table describes: by default, the rows
+#'   the fit used
 #' @return Character string describing the model
 #' @keywords internal
 #' @noRd
-tl_model_info <- function(model) {
+tl_model_info <- function(model, n = tl_fit_rows(model)) {
   method <- model$spec$method
   if (model$spec$paradigm == "supervised") {
     task <- if (model$spec$is_classification) "classification" else "regression"
     # deparse() splits a long formula across strings, which made two notes
     formula_text <- paste(deparse(model$spec$formula), collapse = " ")
     paste0("tidylearn | ", method, " (", task, ") | ", formula_text,
-           " | n = ", nrow(model$data))
+           " | n = ", n)
   } else {
-    paste0("tidylearn | ", method, " | n = ", nrow(model$data))
+    paste0("tidylearn | ", method, " | n = ", n)
   }
+}
+
+#' Rows a fitted model was trained on
+#'
+#' The table notes reported \code{nrow(model$data)}, which counts the rows
+#' a fit dropped: \code{lm()} fitted \code{Ozone ~ Temp + Wind} on 116 of
+#' airquality's 153 rows.
+#'
+#' @param model A tidylearn model.
+#' @return The number of training rows the fit used.
+#' @keywords internal
+#' @noRd
+tl_fit_rows <- function(model) {
+  fit <- model$fit
+  n <- switch(
+    model$spec$method,
+    # rpart drops a row missing the response but keeps one missing a
+    # predictor, which model.frame()'s count would leave out. Its root node
+    # counts the rows it kept.
+    tree = fit$frame$n[1],
+    forest = length(fit$predicted),
+    boost = fit$nTrain,
+    tryCatch(stats::nobs(fit), error = function(e) NULL)
+  )
+  if (is.numeric(n) && length(n) == 1L && !is.na(n)) n else nrow(model$data)
+}
+
+#' Rows a table scored
+#'
+#' \code{tl_evaluate()} leaves out a row whose response or prediction is
+#' missing, and one of a class the model was not trained on, so the count
+#' is of the rows left rather than the rows passed in. The rows are read
+#' as \code{tl_evaluate()} reads them: the response is the formula's
+#' left-hand side, and with no \code{new_data} \code{predict()} is left to
+#' read the stored rows itself.
+#'
+#' @param model A tidylearn model.
+#' @param new_data The rows passed for scoring, or NULL for the stored rows.
+#' @return The number of rows scored.
+#' @keywords internal
+#' @noRd
+tl_scored_rows <- function(model, new_data = NULL) {
+  rows <- new_data %||% model$data
+  if (!inherits(model, "tidylearn_supervised")) {
+    return(nrow(rows))
+  }
+  observed <- tl_observed_response(model, rows)
+  type <- if (model$spec$is_classification) "class" else "response"
+  predicted <- predict(model, new_data, type = type)$.pred
+
+  scored <- !is.na(observed) & !is.na(predicted)
+  if (model$spec$is_classification) {
+    scored <- scored & as.character(observed) %in% tl_model_classes(model)
+  }
+  sum(scored)
 }
 
 # ── Main dispatcher ──────────────────────────────────────────────────────────
@@ -80,7 +137,7 @@ tl_model_info <- function(model) {
 #' @param ... Additional arguments passed to the underlying table function
 #' @return A \code{\link[gt]{gt}} table object.
 #' @export
-#' @examples
+#' @examplesIf requireNamespace("gt", quietly = TRUE)
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
 #' tl_table(model)
@@ -172,9 +229,10 @@ tl_table_unsupervised <- function(model, type = "auto", ...) {
 #' @param new_data Optional test data. If NULL, uses training data.
 #' @param digits Number of decimal places (default: 4)
 #' @param ... Additional arguments passed to \code{tl_evaluate}
-#' @return A \code{\link[gt]{gt}} table object.
+#' @return A \code{\link[gt]{gt}} table object. Its source note counts the
+#'   rows scored.
 #' @export
-#' @examples
+#' @examplesIf requireNamespace("gt", quietly = TRUE)
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
 #' tl_table_metrics(model)
@@ -183,6 +241,7 @@ tl_table_metrics <- function(model, new_data = NULL, digits = 4, ...) {
   tl_check_packages("gt")
 
   eval_results <- tl_evaluate(model, new_data = new_data, ...)
+  scored <- tl_scored_rows(model, new_data)
 
   eval_results |>
     dplyr::mutate(
@@ -194,7 +253,7 @@ tl_table_metrics <- function(model, new_data = NULL, digits = 4, ...) {
     gt::fmt_number(columns = "value", decimals = digits) |>
     tl_gt_theme(
       title = "Model Evaluation Metrics",
-      source_note = tl_model_info(model)
+      source_note = tl_model_info(model, n = scored)
     )
 }
 
@@ -218,7 +277,7 @@ tl_table_metrics <- function(model, new_data = NULL, digits = 4, ...) {
 #' @return A \code{\link[gt]{gt}} table object.
 #' @seealso \code{\link{tl_coefficients}} for the underlying tibble.
 #' @export
-#' @examples
+#' @examplesIf requireNamespace("gt", quietly = TRUE)
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
 #' tl_table_coefficients(model)
@@ -372,9 +431,11 @@ tl_table_coefficients <- function(model, lambda = "1se", digits = 4,
 #' @param model A tidylearn classification model
 #' @param new_data Optional test data. If NULL, uses training data.
 #' @param ... Additional arguments (currently unused)
-#' @return A \code{\link[gt]{gt}} table object.
+#' @return A \code{\link[gt]{gt}} table object, with a row and a column for
+#'   each class the model was trained on. Rows of a class the model never
+#'   saw are left out, with a warning.
 #' @export
-#' @examples
+#' @examplesIf requireNamespace("gt", quietly = TRUE)
 #' \donttest{
 #' model <- tl_model(iris, Species ~ ., method = "forest")
 #' tl_table_confusion(model)
@@ -389,14 +450,19 @@ tl_table_confusion <- function(model, new_data = NULL, ...) {
 
   if (is.null(new_data)) new_data <- model$data
 
-  response_var <- model$spec$response_var
-  actuals <- new_data[[response_var]]
-  if (!is.factor(actuals)) actuals <- factor(actuals)
+  # Read against the model's classes, in the model's order. A test split
+  # that still declared a class the training rows dropped gave that class
+  # a row of zeros, and reordered levels reordered the matrix.
+  class_levels <- tl_model_classes(model)
+  observed <- tl_observed_response(model, new_data)
+  aligned <- tl_align_classes(observed, class_levels)
+  actuals <- aligned$actuals
   predicted <- predict(model, new_data, type = "class")$.pred
 
   # table() drops a row missing either value, so the counts summed to
-  # fewer rows than were passed in, with nothing to say so
-  incomplete <- is.na(actuals) | is.na(predicted)
+  # fewer rows than were passed in, with nothing to say so. A row of a
+  # class the model never saw is reported by tl_align_classes().
+  incomplete <- is.na(observed) | (aligned$keep & is.na(predicted))
   if (any(incomplete)) {
     warning(
       sum(incomplete), " row(s) with a missing response or prediction are ",
@@ -405,7 +471,10 @@ tl_table_confusion <- function(model, new_data = NULL, ...) {
     )
   }
 
-  cm <- table(Actual = actuals, Predicted = predicted)
+  cm <- table(
+    Actual = actuals,
+    Predicted = factor(as.character(predicted), levels = class_levels)
+  )
   cm_df <- as.data.frame.matrix(cm)
   cm_df$Actual <- rownames(cm_df)
   cm_df <- cm_df |> dplyr::select("Actual", dplyr::everything())
@@ -415,11 +484,10 @@ tl_table_confusion <- function(model, new_data = NULL, ...) {
     gt::tab_stubhead(label = "Actual") |>
     tl_gt_theme(
       title = "Confusion Matrix",
-      source_note = tl_model_info(model)
+      source_note = tl_model_info(model, n = sum(cm))
     )
 
   # Highlight diagonal (correct predictions)
-  class_levels <- levels(actuals)
   for (cls in class_levels) {
     if (cls %in% colnames(cm_df)) {
       gt_tbl <- gt_tbl |>
@@ -444,7 +512,7 @@ tl_table_confusion <- function(model, new_data = NULL, ...) {
 #' @param ... Additional arguments (currently unused)
 #' @return A \code{\link[gt]{gt}} table object.
 #' @export
-#' @examples
+#' @examplesIf requireNamespace("gt", quietly = TRUE)
 #' \donttest{
 #' model <- tl_model(iris, Species ~ ., method = "forest")
 #' tl_table_importance(model)
@@ -464,8 +532,8 @@ tl_table_importance <- function(model, top_n = 20, digits = 2, ...) {
   }
 
   if (nrow(imp_df) == 0) {
-    stop("No feature has non-zero importance: the penalty dropped every ",
-         "predictor from this model.", call. = FALSE)
+    stop("No feature has non-zero importance: ",
+         tl_no_importance_reason(model), ".", call. = FALSE)
   }
 
   imp_df <- imp_df |>
@@ -500,7 +568,7 @@ tl_table_importance <- function(model, top_n = 20, digits = 2, ...) {
 #' @param ... Additional arguments (currently unused)
 #' @return A \code{\link[gt]{gt}} table object.
 #' @export
-#' @examples
+#' @examplesIf requireNamespace("gt", quietly = TRUE)
 #' \donttest{
 #' model <- tl_model(iris[, 1:4], method = "pca")
 #' tl_table_variance(model)
@@ -549,7 +617,7 @@ tl_table_variance <- function(model, n_components = NULL, digits = 4, ...) {
 #' @param ... Additional arguments (currently unused)
 #' @return A \code{\link[gt]{gt}} table object.
 #' @export
-#' @examples
+#' @examplesIf requireNamespace("gt", quietly = TRUE)
 #' \donttest{
 #' model <- tl_model(iris[, 1:4], method = "pca")
 #' tl_table_loadings(model)
@@ -587,8 +655,9 @@ tl_table_loadings <- function(model, n_components = NULL, digits = 3, ...) {
 
 #' Formatted cluster summary table
 #'
-#' Produces a styled gt table showing cluster sizes and mean feature values.
-#' Supports kmeans, pam, clara, dbscan, and hclust models.
+#' Produces a styled gt table showing cluster sizes and mean feature values
+#' for the columns the clustering used. Supports kmeans, pam, clara, dbscan,
+#' and hclust models.
 #'
 #' @param model A tidylearn clustering model object
 #' @param k For hclust models, the number of clusters to cut (default: 3)
@@ -596,7 +665,7 @@ tl_table_loadings <- function(model, n_components = NULL, digits = 3, ...) {
 #' @param ... Additional arguments (currently unused)
 #' @return A \code{\link[gt]{gt}} table object.
 #' @export
-#' @examples
+#' @examplesIf requireNamespace("gt", quietly = TRUE)
 #' \donttest{
 #' model <- tl_model(iris[, 1:4], method = "kmeans", k = 3)
 #' tl_table_clusters(model)
@@ -619,8 +688,8 @@ tl_table_clusters <- function(model, k = 3, digits = 2, ...) {
       dplyr::left_join(cluster_counts, by = "cluster")
   } else if (method == "hclust") {
     clusters <- stats::cutree(model$fit$model, k = k)
-    data_with_clusters <- model$data |>
-      dplyr::select(where(is.numeric)) |>
+    data_with_clusters <- model$data[, tl_cluster_fit_columns(model),
+                                     drop = FALSE] |>
       dplyr::mutate(cluster = as.integer(clusters))
     summary_tbl <- data_with_clusters |>
       dplyr::group_by(.data$cluster) |>
@@ -632,8 +701,8 @@ tl_table_clusters <- function(model, k = 3, digits = 2, ...) {
       )
   } else if (method == "dbscan") {
     cluster_assignments <- model$fit$clusters
-    data_with_clusters <- model$data |>
-      dplyr::select(where(is.numeric)) |>
+    data_with_clusters <- model$data[, tl_cluster_fit_columns(model),
+                                     drop = FALSE] |>
       dplyr::mutate(cluster = cluster_assignments$cluster)
     summary_tbl <- data_with_clusters |>
       dplyr::group_by(.data$cluster) |>
@@ -672,6 +741,28 @@ tl_table_clusters <- function(model, k = 3, digits = 2, ...) {
     )
 }
 
+#' Columns a clustering fit used
+#'
+#' The fit takes the formula's variables, or the whole frame without a
+#' formula, and keeps the numeric ones. The hclust and dbscan tables
+#' averaged every numeric column of the data instead, including columns
+#' the formula left out.
+#'
+#' @param model A tidylearn clustering model.
+#' @return Names of the columns the fit clustered on.
+#' @keywords internal
+#' @noRd
+tl_cluster_fit_columns <- function(model) {
+  data <- model$data
+  formula <- model$spec$formula
+  vars <- if (is.null(formula)) {
+    names(data)
+  } else {
+    intersect(get_formula_vars(formula, data), names(data))
+  }
+  vars[vapply(data[vars], is.numeric, logical(1))]
+}
+
 # ── Standalone comparison function ───────────────────────────────────────────
 
 #' Compare multiple models in a formatted table
@@ -684,9 +775,10 @@ tl_table_clusters <- function(model, k = 3, digits = 2, ...) {
 #'   training data of the first model.
 #' @param names Optional character vector of model names
 #' @param digits Number of decimal places (default: 4)
-#' @return A \code{\link[gt]{gt}} table object.
+#' @return A \code{\link[gt]{gt}} table object. Its source note counts the
+#'   rows scored, per model when the models scored different rows.
 #' @export
-#' @examples
+#' @examplesIf requireNamespace("gt", quietly = TRUE)
 #' \donttest{
 #' m1 <- tl_model(mtcars, mpg ~ ., method = "linear")
 #' m2 <- tl_model(mtcars, mpg ~ ., method = "lasso")
@@ -722,6 +814,15 @@ tl_table_comparison <- function(..., new_data = NULL,
     eval_res
   })
 
+  # Models with different predictors can score different rows of the same
+  # data, so each count is given when they differ
+  scored <- vapply(models, tl_scored_rows, integer(1), new_data = new_data)
+  n_note <- if (length(unique(scored)) == 1L) {
+    scored[[1]]
+  } else {
+    paste0(scored, " (", names, ")", collapse = ", ")
+  }
+
   wide_results <- results |>
     dplyr::mutate(
       metric = gsub("_", " ", .data$metric),
@@ -736,6 +837,6 @@ tl_table_comparison <- function(..., new_data = NULL,
     tl_gt_theme(
       title = "Model Comparison",
       subtitle = paste0(length(models), " models compared"),
-      source_note = paste0("tidylearn | n = ", nrow(new_data))
+      source_note = paste0("tidylearn | n = ", n_note)
     )
 }
