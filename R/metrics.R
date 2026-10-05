@@ -950,14 +950,7 @@ tl_cv <- function(data, formula, method, folds = 5, metrics = NULL,
   n <- nrow(data)
   # A fractional count went through rep(seq_len(folds)), which truncates
   # it: folds = 2.5 ran two folds without a word
-  if (!is.numeric(folds) || length(folds) != 1L || is.na(folds) ||
-        folds != round(folds) || folds < 2 || folds > n) {
-    stop(
-      "'folds' must be a whole number between 2 and nrow(data) (", n,
-      "). Got: ", tl_describe_value(folds), ".",
-      call. = FALSE
-    )
-  }
+  tl_check_folds(folds, data)
 
   # An argument with one value per row of `data` reached every fold whole,
   # and the fit failed on "variable lengths differ". tl_compare_cv()
@@ -1026,13 +1019,7 @@ tl_cv <- function(data, formula, method, folds = 5, metrics = NULL,
       tidylearn_no_scored_rows = function(e) {
         warning(
           "Fold ", i, " is left out of the summary, since ",
-          if (is.null(e$reason)) {
-            "it has no rows to score."
-          } else {
-            paste0(
-              "none of its ", e$n_rows, " rows can be scored: ", e$reason, "."
-            )
-          },
+          tl_unscored_fold_reason(e),
           call. = FALSE
         )
         tibble::tibble(
