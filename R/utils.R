@@ -233,6 +233,44 @@ tl_normalise_response <- function(y) {
   droplevels(y)
 }
 
+#' Read observed classes against the levels a model was trained on
+#'
+#' \code{tl_normalise_response()} cleans the training response, but data
+#' scored later never passes through it: a test split of
+#' \code{iris[iris$Species != "setosa", ]} still declares setosa, so
+#' yardstick refused truth and estimate as having different levels, and the
+#' ROC and lift plots read the binary model as multiclass. A test factor
+#' whose levels were merely reordered silently moved the positive class.
+#' Everything that scores a classification model reads the observed classes
+#' through here, so the levels -- and with them the positive class, the
+#' second level -- follow the model rather than the data.
+#'
+#' A class the model never saw (one a CV training fold happened to miss) has
+#' no prediction or probability column to compare with, so those rows are
+#' left out of the scoring, with a warning naming the classes.
+#'
+#' @param actuals Observed classes: factor, character, logical or numeric
+#' @param model_levels The model's classes, \code{model$spec$response_levels}
+#' @return A list: \code{actuals}, a factor with levels \code{model_levels};
+#'   \code{keep}, a logical vector, FALSE where the class is missing or one
+#'   the model was not trained on
+#' @keywords internal
+#' @noRd
+tl_align_classes <- function(actuals, model_levels) {
+  observed <- as.character(actuals)
+  unseen <- !is.na(observed) & !observed %in% model_levels
+  if (any(unseen)) {
+    warning(
+      sum(unseen), " row(s) belong to a class the model was not trained ",
+      "on (", paste(unique(observed[unseen]), collapse = ", "), ") and ",
+      "are left out of the scoring.",
+      call. = FALSE
+    )
+  }
+  aligned <- factor(observed, levels = model_levels)
+  list(actuals = aligned, keep = !is.na(aligned))
+}
+
 #' Identify rows usable for prediction
 #'
 #' Several upstream predict methods default to \code{na.omit} and return a

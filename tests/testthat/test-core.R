@@ -92,6 +92,33 @@ test_that("tl_version returns package version", {
   expect_s3_class(version, "package_version")
 })
 
+test_that("tl_align_classes() reads observed classes against the model's", {
+  # Declared but unused levels drop out, and the model's order wins
+  observed <- factor(c("virginica", "versicolor"),
+                     levels = c("virginica", "setosa", "versicolor"))
+  aligned <- tidylearn:::tl_align_classes(observed, c("versicolor", "virginica"))
+  expect_identical(levels(aligned$actuals), c("versicolor", "virginica"))
+  expect_identical(as.character(aligned$actuals), c("virginica", "versicolor"))
+  expect_identical(aligned$keep, c(TRUE, TRUE))
+
+  # A 0/1 numeric response reads against the character levels the spec holds
+  aligned <- tidylearn:::tl_align_classes(c(0, 1, 1), c("0", "1"))
+  expect_identical(as.character(aligned$actuals), c("0", "1", "1"))
+
+  # Missing values are not scored, without a warning of their own
+  expect_no_warning(
+    aligned <- tidylearn:::tl_align_classes(c("a", NA), c("a", "b"))
+  )
+  expect_identical(aligned$keep, c(TRUE, FALSE))
+
+  # A class the model never saw is left out, and the warning names it
+  expect_warning(
+    aligned <- tidylearn:::tl_align_classes(c("a", "c", "c"), c("a", "b")),
+    "2 row\\(s\\) belong to a class the model was not trained on \\(c\\)"
+  )
+  expect_identical(aligned$keep, c(TRUE, FALSE, FALSE))
+})
+
 test_that("magrittr's %>% stays exported for existing user code", {
   # The package itself pipes with |>. The re-export is kept so code that
   # used %>% after library(tidylearn) alone does not break.
