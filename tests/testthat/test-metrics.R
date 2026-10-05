@@ -216,6 +216,91 @@ test_that("tl_evaluate drops incomplete rows for every classification metric", {
   )
 })
 
+test_that("tl_evaluate refuses when no row can be scored", {
+  # Zero rows, or rows that are all incomplete, came back as NaN accuracy,
+  # rmse and mae without a message
+  regression <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+  classifier <- tl_model(iris, Species ~ ., method = "tree")
+
+  expect_error(
+    tl_evaluate(regression, mtcars[0, ]),
+    "'new_data' has no rows, so there is nothing to score",
+    class = "tidylearn_no_scored_rows"
+  )
+  expect_error(
+    tl_evaluate(classifier, iris[0, ], metrics = c("accuracy", "auc")),
+    "'new_data' has no rows, so there is nothing to score",
+    class = "tidylearn_no_scored_rows"
+  )
+
+  no_predictor <- mtcars[1:5, ]
+  no_predictor$wt <- NA_real_
+  expect_error(
+    tl_evaluate(regression, no_predictor),
+    paste0(
+      "None of the 5 rows of the evaluation data can be scored: 5 have no ",
+      "prediction, which happens wherever a predictor is missing\\."
+    ),
+    class = "tidylearn_no_scored_rows"
+  )
+
+  no_response <- iris[c(1, 51, 101), ]
+  no_response$Species[] <- NA
+  expect_error(
+    tl_evaluate(classifier, no_response),
+    paste0(
+      "None of the 3 rows of the evaluation data can be scored: 3 are ",
+      "missing the response\\."
+    ),
+    class = "tidylearn_no_scored_rows"
+  )
+
+  binary <- tl_model(droplevels(iris[51:150, ]), Species ~ ., method = "tree")
+  expect_warning(
+    expect_error(
+      tl_evaluate(binary, iris[1:4, ]),
+      paste0(
+        "None of the 4 rows of the evaluation data can be scored: 4 belong ",
+        "to a class the model was not trained on\\."
+      ),
+      class = "tidylearn_no_scored_rows"
+    ),
+    "4 row\\(s\\) belong to a class the model was not trained on"
+  )
+
+  # A single row that can be scored is enough
+  partial <- mtcars[1:5, ]
+  partial$wt[1:4] <- NA
+  ev <- tl_evaluate(regression, partial, metrics = "mae")
+  expect_equal(
+    ev$value,
+    unname(abs(predict(regression, partial[5, ])$.pred - partial$mpg[5]))
+  )
+})
+
+test_that("tl_calc_classification_metrics refuses when nothing can be scored", {
+  # accuracy came back NaN without a message
+  two_classes <- c("a", "b")
+  expect_error(
+    tl_calc_classification_metrics(
+      factor(two_classes), factor(c(NA, NA), levels = two_classes)
+    ),
+    paste0(
+      "None of the 2 observations can be scored: each is missing its ",
+      "observed class, its prediction or a probability\\."
+    ),
+    class = "tidylearn_no_scored_rows"
+  )
+  expect_error(
+    tl_calc_classification_metrics(
+      factor(character(0), levels = two_classes),
+      factor(character(0), levels = two_classes)
+    ),
+    "'actuals' is empty, so there is nothing to score",
+    class = "tidylearn_no_scored_rows"
+  )
+})
+
 # ---- models fitted on engineered features ------------------------------
 
 test_that("a model fitted on PCA features can be evaluated on its own data", {

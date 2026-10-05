@@ -456,6 +456,28 @@ test_that("tl_cv reports NA auc for a fold that holds one class", {
   )
 })
 
+test_that("tl_cv leaves out a fold none of whose rows can be scored", {
+  # tl_evaluate() refuses such a fold, and one fold is no reason to stop
+  # the run. Its scores came back NaN without a word.
+  rows <- cv_fold_rows(32, 4, seed = 6)
+  d <- mtcars
+  d$wt[rows[[2]]] <- NA
+
+  set.seed(6)
+  expect_warning(
+    cv <- tl_cv(d, mpg ~ wt + hp, method = "linear", folds = 4,
+                metrics = "rmse"),
+    paste0(
+      "Fold 2 is left out of the summary, since none of its 8 rows can be ",
+      "scored: 8 have no prediction"
+    )
+  )
+  values <- fold_values(cv, "rmse")
+  expect_true(is.na(values[2]))
+  expect_true(all(is.finite(values[-2])))
+  expect_equal(cv$summary$mean, mean(values[-2]))
+})
+
 test_that("tl_cv keeps a one-column data frame a data frame", {
   # Row-subsetting a one-column frame without drop = FALSE returned a
   # vector, and tl_model() refused it: "'data' must be a data frame"

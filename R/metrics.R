@@ -23,7 +23,9 @@ NULL
 #'
 #' A row missing its observed class, its prediction or one of its
 #' probabilities is dropped before anything is computed, so every metric
-#' describes the same rows.
+#' describes the same rows. With no row left -- \code{actuals} empty, or
+#' every row incomplete -- there is nothing to score, and it is an error
+#' of class \code{tidylearn_no_scored_rows}.
 #'
 #' @param actuals Observed classes: a factor, or a character, logical or
 #'   numeric vector.
@@ -105,6 +107,23 @@ tl_calc_classification_metrics <- function(
   complete <- aligned$keep & !is.na(predicted)
   if (!is.null(predicted_probs)) {
     complete <- complete & stats::complete.cases(predicted_probs)
+  }
+  # With nothing left, accuracy came back NaN without a message
+  if (!any(complete)) {
+    tl_stop_no_scored_rows(
+      if (length(complete) == 0L) {
+        "'actuals' is empty, so there is nothing to score."
+      } else {
+        paste0(
+          "None of the ", length(complete), " observations can be scored: ",
+          "each is missing its observed class, its prediction or a ",
+          "probability."
+        )
+      },
+      n_rows = length(complete)
+    )
+  }
+  if (!is.null(predicted_probs)) {
     predicted_probs <- predicted_probs[complete, , drop = FALSE]
   }
   actuals <- actuals[complete]
@@ -303,16 +322,14 @@ tl_ranking_metrics <- function(actuals, probs, wanted) {
   undefined <- length(present) < 2L
   named <- paste(wanted, collapse = " and ")
 
+  # tl_calc_classification_metrics() refuses rows that hold no class at
+  # all, so an undefined area here means exactly one class
   if (undefined) {
     one <- length(wanted) == 1L
     warning(
-      named, if (one) " is" else " are", " undefined when ",
-      if (length(present) == 0L) {
-        "no rows are left to score"
-      } else {
-        paste0("the scored rows hold a single class (\"", present, "\")")
-      },
-      ", so ", if (one) "it is" else "they are", " NA.",
+      named, if (one) " is" else " are", " undefined when the scored rows ",
+      "hold a single class (\"", present, "\"), so ",
+      if (one) "it is" else "they are", " NA.",
       call. = FALSE
     )
   }
@@ -590,6 +607,86 @@ tl_check_metric_names <- function(metrics, is_classification) {
   invisible(TRUE)
 }
 
+#' The metrics tl_evaluate() computes when none are named
+#'
+#' @param is_classification Whether the task is classification
+#' @return A character vector of metric names
+#' @keywords internal
+#' @noRd
+tl_default_metrics <- function(is_classification) {
+  if (is_classification) "accuracy" else c("rmse", "mae", "rsq")
+}
+
+#' Signal that no row is left to score
+#'
+#' An error with a class of its own, so resampling code can leave a fold
+#' with nothing to score out of its summary instead of stopping the run.
+#'
+#' @param message The message
+#' @param n_rows The number of rows offered for scoring
+#' @param reason Why none of them could be scored, for a caller composing
+#'   its own message, or NULL
+#' @keywords internal
+#' @noRd
+tl_stop_no_scored_rows <- function(message, n_rows, reason = NULL) {
+  stop(structure(
+    class = c("tidylearn_no_scored_rows", "error", "condition"),
+    list(message = message, call = NULL, n_rows = n_rows, reason = reason)
+  ))
+}
+
+#' Refuse to score when every row has been dropped
+#'
+#' A row without a response or a prediction is dropped before any metric is
+#' computed, and so is a row of a class the model was not trained on. With
+#' none left, the metrics came back NaN or NA without naming the cause.
+#'
+#' @param no_response,no_prediction,unseen Logical vectors with an element
+#'   per scored row: the response is missing; the prediction, or one of its
+#'   probabilities, is missing; the class is one the model was not trained
+#'   on
+#' @return `TRUE`, invisibly, when at least one row can be scored
+#' @keywords internal
+#' @noRd
+tl_check_scored_rows <- function(no_response, no_prediction, unseen = FALSE) {
+  # A predict method returning the wrong number of rows is reported where
+  # the lengths are compared, not here
+  if (length(no_prediction) != length(no_response) ||
+        any(!(no_response | no_prediction | unseen))) {
+    return(invisible(TRUE))
+  }
+
+  count <- function(flags, one, several, what) {
+    n <- sum(flags)
+    if (n == 0) NULL else paste0(n, if (n == 1) one else several, what)
+  }
+  reasons <- c(
+    count(no_response, " is", " are", " missing the response"),
+    count(
+      unseen, " belongs", " belong", " to a class the model was not trained on"
+    ),
+    count(
+      no_prediction, " has", " have",
+      " no prediction, which happens wherever a predictor is missing"
+    )
+  )
+  last <- length(reasons)
+  reason <- if (last > 2L) {
+    paste0(paste(reasons[-last], collapse = ", "), " and ", reasons[last])
+  } else {
+    paste(reasons, collapse = " and ")
+  }
+
+  n_rows <- length(no_response)
+  tl_stop_no_scored_rows(
+    paste0(
+      "None of the ", n_rows, " rows of the evaluation data can be scored: ",
+      reason, "."
+    ),
+    n_rows = n_rows, reason = reason
+  )
+}
+
 #' The classes a classification model was trained on
 #'
 #' @param object A supervised tidylearn classification model
@@ -673,6 +770,11 @@ tl_observed_response <- function(object, new_data) {
 #' \code{"auc"} and \code{"pr_auc"} when the scored rows hold a single
 #' class or lack one.
 #'
+#' With no row left to score -- \code{new_data} has no rows, or every row
+#' is dropped -- it is an error of class \code{tidylearn_no_scored_rows},
+#' naming the reason. \code{\link{tl_cv}} catches that class and leaves the
+#' fold out.
+#'
 #' @param object A tidylearn model object
 #' @param new_data Optional new data for evaluation
 #'   (if NULL, uses training data)
@@ -706,7 +808,7 @@ tl_evaluate <- function(object, new_data = NULL, metrics = NULL, ...) {
 
   is_classification <- isTRUE(object$spec$is_classification)
   if (is.null(metrics)) {
-    metrics <- if (is_classification) "accuracy" else c("rmse", "mae", "rsq")
+    metrics <- tl_default_metrics(is_classification)
   }
   tl_check_metric_names(metrics, is_classification)
 
@@ -720,6 +822,15 @@ tl_evaluate <- function(object, new_data = NULL, metrics = NULL, ...) {
     new_data <- object$data
   }
   actuals <- tl_observed_response(object, new_data)
+  if (nrow(new_data) == 0L) {
+    tl_stop_no_scored_rows(
+      paste0(
+        "'new_data' has no rows, so there is nothing to score. Check the ",
+        "split or filter that produced it."
+      ),
+      n_rows = 0L
+    )
+  }
 
   predict_as <- function(type) {
     predict(object, new_data = predict_data, type = type, ...)
@@ -754,6 +865,16 @@ tl_evaluate <- function(object, new_data = NULL, metrics = NULL, ...) {
       predicted_probs <- predict_as("prob")
     }
 
+    no_prediction <- is.na(predicted)
+    if (!is.null(predicted_probs)) {
+      no_prediction <- no_prediction | !stats::complete.cases(predicted_probs)
+    }
+    tl_check_scored_rows(
+      no_response = is.na(actuals),
+      no_prediction = no_prediction,
+      unseen = !is.na(actuals) & !aligned$keep
+    )
+
     tl_calc_classification_metrics(
       actuals = aligned$actuals,
       predicted = predicted,
@@ -762,6 +883,10 @@ tl_evaluate <- function(object, new_data = NULL, metrics = NULL, ...) {
     )
   } else {
     predicted <- extract_pred("response")
+    tl_check_scored_rows(
+      no_response = is.na(actuals),
+      no_prediction = is.na(predicted)
+    )
 
     tl_calc_regression_metrics(
       actuals = actuals,
@@ -807,7 +932,8 @@ tl_evaluate <- function(object, new_data = NULL, metrics = NULL, ...) {
 #'       \code{metric}, \code{mean}, and \code{sd} summarizing
 #'       performance across folds. A metric undefined on a fold -- auc
 #'       on a fold holding one class -- is \code{NA} there and left out
-#'       of the mean and sd.}
+#'       of the mean and sd. So is every metric of a fold none of whose
+#'       rows can be scored, with a warning giving the reason.}
 #'   }
 #' @examples
 #' \donttest{
@@ -891,8 +1017,32 @@ tl_cv <- function(data, formula, method, folds = 5, metrics = NULL,
       tl_model(train_data, fold_formula, method = method, ...)
     )
 
-    # Evaluate
-    eval_result <- tl_evaluate(model, new_data = test_data, metrics = metrics)
+    # Evaluate. tl_evaluate() refuses a fold with no row it can score --
+    # every predictor missing, say -- and one such fold is no reason to
+    # stop the run, so it is left out of the summary like any undefined
+    # score.
+    eval_result <- tryCatch(
+      tl_evaluate(model, new_data = test_data, metrics = metrics),
+      tidylearn_no_scored_rows = function(e) {
+        warning(
+          "Fold ", i, " is left out of the summary, since ",
+          if (is.null(e$reason)) {
+            "it has no rows to score."
+          } else {
+            paste0(
+              "none of its ", e$n_rows, " rows can be scored: ", e$reason, "."
+            )
+          },
+          call. = FALSE
+        )
+        tibble::tibble(
+          metric = metrics %||% tl_default_metrics(
+            isTRUE(model$spec$is_classification)
+          ),
+          value = NA_real_
+        )
+      }
+    )
 
     cv_results[[i]] <- eval_result
     test_sizes[i] <- nrow(test_data)
