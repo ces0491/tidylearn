@@ -83,6 +83,13 @@ test_that("exponentiate is refused where coefficients are not log odds", {
   )
 })
 
+test_that("the exponentiate refusal names the response as written", {
+  # For log(mpg) ~ wt it said the model was "of mpg on its own scale"
+  logged <- tl_model(mtcars, log(mpg) ~ wt, method = "linear")
+  expect_error(tl_coefficients(logged, exponentiate = TRUE),
+               "'linear' models log\\(mpg\\) here, not the log odds")
+})
+
 test_that("a term the fit could not estimate is still a row", {
   collinear <- transform(mtcars, wt_doubled = wt * 2)
   model <- tl_model(collinear, mpg ~ wt + wt_doubled, method = "linear")
@@ -104,6 +111,44 @@ test_that("a term the fit could not estimate is still a row", {
   expect_true(is.na(aliased$conf_low))
 })
 
+test_that("two terms with the same name keep their own statistics", {
+  # A factor `a` with level "b" makes the term ab, which is also the name of
+  # a numeric column. The statistics were matched to terms by name, so both
+  # summary() rows landed on the first ab and the second had none.
+  set.seed(3)
+  d <- data.frame(
+    y = stats::rnorm(40),
+    a = factor(sample(c("x", "b"), 40, TRUE), levels = c("x", "b")),
+    ab = stats::rnorm(40)
+  )
+  model <- tl_model(d, y ~ a + ab, method = "linear")
+  coefs <- tl_coefficients(model, conf_int = TRUE)
+  reference <- summary(model$fit)$coefficients
+
+  expect_identical(coefs$term, c("(Intercept)", "ab", "ab"))
+  expect_equal(coefs$estimate, unname(reference[, "Estimate"]))
+  expect_equal(coefs$std_error, unname(reference[, "Std. Error"]))
+  expect_equal(coefs$statistic, unname(reference[, "t value"]))
+  expect_equal(coefs$p_value, unname(reference[, "Pr(>|t|)"]))
+  # By hand: confint() looks the standard errors up by name as well, so it
+  # gives the second ab the first one's interval
+  crit <- stats::qt(0.975, df = stats::df.residual(model$fit))
+  by_hand <- reference[, "Estimate"] - crit * reference[, "Std. Error"]
+  expect_equal(coefs$conf_low, unname(by_hand))
+
+  # An aliased term among them still takes no statistics of its own
+  d$ab_doubled <- d$ab * 2
+  aliased <- tl_coefficients(tl_model(d, y ~ a + ab + ab_doubled,
+                                      method = "linear"))
+  expect_identical(aliased$term, c("(Intercept)", "ab", "ab", "ab_doubled"))
+  expect_equal(aliased$std_error[1:3], unname(reference[, "Std. Error"]))
+  expect_true(is.na(aliased$std_error[4]))
+
+  skip_if_not_installed("gt")
+  tbl <- tl_table_coefficients(model)[["_data"]]
+  expect_equal(tbl$std_error, unname(reference[, "Std. Error"]))
+})
+
 test_that("regularised models report the penalty and no interval", {
   model <- tl_model(mtcars, mpg ~ wt + hp + disp, method = "lasso")
   coefs <- tl_coefficients(model)
@@ -117,6 +162,44 @@ test_that("regularised models report the penalty and no interval", {
 
   at_value <- tl_coefficients(model, lambda = 0.5)
   expect_identical(at_value$lambda[[1]], 0.5)
+})
+
+test_that("regularised coefficients are those of the fit cv.glmnet() scored", {
+  # The model was a second glmnet() run along cv.glmnet()'s penalties. It
+  # agreed with cv.glmnet()'s own fit only to the solver's tolerance, so on
+  # mtcars the predictions at lambda_1se differed by up to 0.004.
+  set.seed(1)
+  model <- tl_model(mtcars, mpg ~ ., method = "lasso")
+  cv <- attr(model$fit, "cv_results")
+
+  expect_equal(tl_coefficients(model)$estimate,
+               as.vector(stats::coef(cv, s = "lambda.1se")))
+  expect_equal(tl_coefficients(model, lambda = "min")$estimate,
+               as.vector(stats::coef(cv, s = "lambda.min")))
+  x <- as.matrix(mtcars[, -1])
+  expect_equal(predict(model, mtcars)$.pred,
+               as.vector(stats::predict(cv, newx = x, s = "lambda.1se")))
+})
+
+test_that("a penalty that keeps no predictor says it dropped them all", {
+  # When cross-validation chooses the largest penalty, every slope is zero.
+  # The refit at that penalty left one at about -6e-17, which importance
+  # rescaled to 100 and the coefficient table did not grey out.
+  set.seed(3)
+  d <- data.frame(y = stats::rnorm(40), a = stats::rnorm(40),
+                  b = stats::rnorm(40), c = stats::rnorm(40))
+  model <- tl_model(d, y ~ ., method = "lasso")
+  # the intercept-only model is the one chosen here
+  expect_equal(attr(model$fit, "lambda_1se"), max(model$fit$lambda))
+
+  coefs <- tl_coefficients(model)
+  expect_identical(coefs$estimate[coefs$term != "(Intercept)"], c(0, 0, 0))
+  expect_error(tl_plot_importance_regularized(model),
+               "the penalty dropped every predictor")
+
+  skip_if_not_installed("gt")
+  expect_error(tl_table_importance(model),
+               "the penalty dropped every predictor")
 })
 
 test_that("an interval on a shrunk coefficient is refused, not faked", {
@@ -154,6 +237,8 @@ test_that("tl_coefficients validates its own arguments", {
                "between 0 and 1")
   expect_error(tl_coefficients(model, conf_int = TRUE, level = 0),
                "between 0 and 1")
+  # Checked without an interval too, as documented
+  expect_error(tl_coefficients(model, level = 95), "between 0 and 1")
 })
 
 test_that("the gt table formats the same numbers the tibble carries", {
@@ -252,11 +337,36 @@ test_that("an empty interaction cell is the aliased row the docs describe", {
   expect_true(is.na(coefs$estimate[coefs$term == "fb:gv"]))
 })
 
-test_that("a model fitted at several penalties says so", {
+test_that("a sequence of penalties is cross-validated down to one", {
+  # Fitted as a path with no penalty chosen, the model could not predict:
+  # predict() and tl_evaluate() failed asking for a lambda that predict()
+  # does not take
+  set.seed(1)
   model <- tl_model(mtcars, mpg ~ wt + hp + disp, method = "lasso",
                     lambda = c(1, 0.1))
+  cv <- attr(model$fit, "cv_results")
+  expect_equal(model$fit$lambda, c(1, 0.1))
+  expect_identical(attr(model$fit, "lambda_1se"), cv$lambda.1se)
+  expect_identical(attr(model$fit, "lambda_min"), cv$lambda.min)
+
+  x <- as.matrix(mtcars[, c("wt", "hp", "disp")])
+  preds <- as.vector(stats::predict(cv, newx = x, s = "lambda.1se"))
+  expect_equal(predict(model, mtcars)$.pred, preds)
+  expect_equal(tl_coefficients(model)$estimate,
+               as.vector(stats::coef(cv, s = "lambda.1se")))
+  rmse <- tl_evaluate(model, metrics = "rmse")
+  expect_equal(rmse$value[rmse$metric == "rmse"],
+               sqrt(mean((mtcars$mpg - preds)^2)))
+})
+
+test_that("a model that chose no single penalty says so", {
+  # A model fitted at several penalties before they were cross-validated
+  # stored all of them as its "1se" penalty
+  model <- tl_model(mtcars, mpg ~ wt + hp + disp, method = "lasso",
+                    lambda = 0.5)
+  attr(model$fit, "lambda_1se") <- c(1, 0.1)
   expect_error(tl_coefficients(model), "several penalties")
-  expect_equal(tl_coefficients(model, lambda = 0.1)$lambda[[1]], 0.1)
+  expect_equal(tl_coefficients(model, lambda = 0.5)$lambda[[1]], 0.5)
 })
 
 test_that("predictions come from the coefficients tl_coefficients() reports", {

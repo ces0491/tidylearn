@@ -36,8 +36,9 @@ NULL
 #'   \code{\link{tl_model}}.
 #' @param conf_int Whether to add \code{conf_low} and \code{conf_high}
 #'   columns (default \code{FALSE}). Not available for regularised methods.
-#' @param level Confidence level for the interval (default 0.95). Ignored
-#'   unless \code{conf_int = TRUE}.
+#' @param level Confidence level for the interval (default 0.95), a number
+#'   strictly between 0 and 1. Used only when \code{conf_int = TRUE}, but
+#'   checked either way, so a percentage such as \code{95} is an error.
 #' @param exponentiate Whether to report \code{estimate} and the interval on
 #'   the odds scale rather than the log-odds scale (default \code{FALSE}).
 #'   Only meaningful for a classification model, whose coefficients are log
@@ -105,11 +106,14 @@ tl_coefficients <- function(model, conf_int = FALSE, level = 0.95,
   # Exponentiating turns a log-odds coefficient into an odds ratio. On a
   # regression coefficient it produces a number with no interpretation, so
   # refuse rather than return one.
+  # The left-hand side as written: the response's column name called a
+  # model of log(mpg) a model of mpg
   if (exponentiate && !isTRUE(model$spec$is_classification)) {
     stop(
       "'exponentiate' reports odds ratios, which needs coefficients on the ",
-      "log-odds scale.\n'", method, "' models ", model$spec$response_var,
-      " on its own scale here, so exponentiating it\nwould not mean anything.",
+      "log-odds scale.\n'", method, "' models ",
+      deparse1(model$spec$formula[[2]]), " here, not the log odds of a ",
+      "class, so there is no\nodds ratio to report.",
       call. = FALSE
     )
   }
@@ -165,8 +169,12 @@ tl_coef_summary <- function(model, conf_int, level, exponentiate) {
     p_value = NA_real_
   )
 
-  estimated <- match(rownames(coef_mat), coef_tbl$term)
-  if (anyNA(estimated)) {
+  # summary() keeps the estimable coefficients in their original order and
+  # drops only the aliased (NA) ones, so its rows line up by position.
+  # Matching by name gave two terms that share one -- a factor a with level
+  # b beside a numeric column ab -- the first one's statistics.
+  estimated <- which(!is.na(estimates))
+  if (!identical(names(estimates)[estimated], rownames(coef_mat))) {
     stop("could not match every summary() row to a model term. ",
          "Please report this with a reproducible example.", call. = FALSE)
   }

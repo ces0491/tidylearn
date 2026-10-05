@@ -31,41 +31,11 @@ tl_fit_linear <- function(data, formula, ...) {
 #' @return A fitted polynomial regression model
 #' @keywords internal
 tl_fit_polynomial <- function(data, formula, degree = 2, ...) {
-  # Parse the formula to get the response and predictor variables
-  terms <- stats::terms(formula, data = data)
-  response_var <- all.vars(formula)[1]
-  predictor_vars <- attr(terms, "term.labels")
-
-  # Create a new formula with polynomial terms
-  poly_formula <- paste(response_var, "~")
-
-  for (i in seq_along(predictor_vars)) {
-    var <- predictor_vars[i]
-    # Check if this is an interaction term or has special characters
-    if (grepl(":", var) || grepl("\\*", var) || grepl("^I\\(", var)) {
-      # Keep interaction terms as they are
-      poly_formula <- paste(
-        poly_formula, var,
-        ifelse(i < length(predictor_vars), "+", "")
-      )
-    } else {
-      # Create polynomial term
-      poly_term <- paste0(
-        "poly(", var,
-        ", degree = ", degree,
-        ", raw = TRUE)"
-      )
-      poly_formula <- paste(
-        poly_formula, poly_term,
-        ifelse(i < length(predictor_vars), "+", "")
-      )
-    }
-  }
-
   # Fit the polynomial model
   poly_model <- tl_fit_by_value(
     stats::lm, "lm",
-    list(formula = as.formula(poly_formula), data = data, ...)
+    list(formula = tl_polynomial_formula(formula, data, degree),
+         data = data, ...)
   )
 
   # Store original formula and degree for future reference
@@ -73,6 +43,65 @@ tl_fit_polynomial <- function(data, formula, degree = 2, ...) {
   attr(poly_model, "poly_degree") <- degree
 
   poly_model
+}
+
+#' Replace each numeric main effect with its polynomial
+#'
+#' The formula is edited rather than rebuilt. Pasting a new one together
+#' from the response's variable name and the term labels fitted
+#' \code{log(mpg) ~ wt} as a model of \code{mpg}, dropped \code{offset()}
+#' terms and \code{- 1}, put a factor into \code{poly()} -- which fitted
+#' it on its integer codes -- and wrapped an existing \code{poly(wt, 3)} in
+#' a second one.
+#'
+#' Terms left as written: interactions, factors and other non-numeric
+#' terms, \code{I()} terms, and anything that is already a matrix such as
+#' \code{poly()} or a spline basis.
+#'
+#' @param formula The model formula.
+#' @param data The training data, to expand a \code{.} and to tell which
+#'   terms are numeric.
+#' @param degree The polynomial degree.
+#' @return The edited formula, in the original formula's environment.
+#' @keywords internal
+#' @noRd
+tl_polynomial_formula <- function(formula, data, degree) {
+  model_terms <- stats::terms(formula, data = data)
+  # Expanded against the data, so a term inside `.` can be replaced
+  expanded <- stats::formula(model_terms)
+  env <- environment(formula)
+
+  main_effects <- attr(model_terms, "term.labels")[
+    attr(model_terms, "order") == 1L
+  ]
+  to_poly <- Filter(function(label) {
+    term <- str2lang(label)
+    if (is.call(term) && identical(term[[1]], as.name("I"))) {
+      return(FALSE)
+    }
+    value <- tryCatch(eval(term, data, env), error = function(e) NULL)
+    is.numeric(value) && is.null(dim(value))
+  }, main_effects)
+
+  if (length(to_poly) == 0L) {
+    return(expanded)
+  }
+
+  # One update() for every term: done one term at a time, update() put the
+  # variables of an interaction such as wt:hp in a new order and renamed
+  # its coefficient
+  edit <- quote(.)
+  for (label in to_poly) {
+    edit <- call("-", edit, str2lang(label))
+  }
+  for (label in to_poly) {
+    edit <- call("+", edit, call(
+      "poly", str2lang(label), degree = degree, raw = TRUE
+    ))
+  }
+  edited <- stats::update(expanded, call("~", edit))
+  environment(edited) <- env
+  edited
 }
 
 
@@ -88,6 +117,20 @@ tl_fit_polynomial <- function(data, formula, degree = 2, ...) {
 #'   stat_qq stat_qq_line
 #' @keywords internal
 tl_plot_diagnostics <- function(model, which = 1:4, ...) {
+  # Leverage, Cook's distance and standardised residuals are lm and glm
+  # quantities. Other fits failed inside rstandard() with a dispatch error
+  # that named neither the plot nor the method. The wording is the one
+  # plot() uses for the same refusal.
+  if (!inherits(model$fit, "lm")) {
+    stop(
+      "Diagnostic plots need a model fitted by lm() or glm() -- method ",
+      "\"linear\", \"polynomial\" or \"logistic\" -- but this is a \"",
+      model$spec$method, "\" model. Use type = \"actual_predicted\" or ",
+      "\"residuals\" instead.",
+      call. = FALSE
+    )
+  }
+
   # Get residuals and fitted values
   fitted_vals <- fitted(model$fit)
   residuals <- residuals(model$fit)
@@ -225,19 +268,31 @@ tl_plot_actual_predicted <- function(model,
     new_data <- model$data
   }
 
-  # Get actual and predicted values
-  actuals <- new_data[[model$spec$response_var]]
-  predictions <- predict(model, new_data)$.pred
+  # Get actual and predicted values, the actuals on the scale the model was
+  # fitted on: the raw column put mpg against predictions of log(mpg), and
+  # the correlation in the subtitle compared the two scales
+  actuals <- tl_observed_response(model, new_data)
+  predictions <- unname(predict(model, new_data)$.pred)
+
+  # A single missing value turned both statistics into NA
+  complete <- !is.na(actuals) & !is.na(predictions)
+  if (!all(complete)) {
+    warning(
+      sum(!complete), " row(s) with a missing response or prediction are ",
+      "left out of the plot.",
+      call. = FALSE
+    )
+  }
 
   # Create data frame for plotting
   plot_data <- tibble::tibble(
-    actual = actuals,
-    predicted = predictions
+    actual = actuals[complete],
+    predicted = predictions[complete]
   )
 
   # Calculate correlation
-  corr <- round(cor(actuals, predictions), 3)
-  r_squared <- round(cor(actuals, predictions)^2, 3)
+  corr <- round(cor(plot_data$actual, plot_data$predicted), 3)
+  r_squared <- round(cor(plot_data$actual, plot_data$predicted)^2, 3)
 
   # Create the plot
   p <- ggplot2::ggplot(
@@ -275,14 +330,7 @@ tl_plot_actual_predicted <- function(model,
 #' @keywords internal
 tl_plot_residuals <- function(model, type = "fitted", ...) {
   # Get residuals and fitted values
-  fitted_vals <- fitted(model$fit)
-  residuals <- residuals(model$fit)
-
-  # Create data frame for plotting
-  plot_data <- tibble::tibble(
-    fitted = fitted_vals,
-    residuals = residuals
-  )
+  plot_data <- tl_fit_residuals(model)
 
   # Create the plot based on type
   if (type == "fitted") {
@@ -317,11 +365,10 @@ tl_plot_residuals <- function(model, type = "fitted", ...) {
       ) +
       ggplot2::theme_minimal()
   } else if (type == "predicted") {
-    # Get predictions
-    predictions <- predict(model, model$data)$.pred
-
-    # Add to plot data
-    plot_data$predicted <- predictions
+    # The predictions for the rows the fit used are its fitted values.
+    # Predicting model$data again covered every row, one more than the
+    # residuals whenever lm() had dropped one with a missing value.
+    plot_data$predicted <- plot_data$fitted
 
     p <- ggplot2::ggplot(
       plot_data,
@@ -347,6 +394,47 @@ tl_plot_residuals <- function(model, type = "fitted", ...) {
   }
 
   p
+}
+
+#' Fitted values and residuals for the residual plots
+#'
+#' An lm or glm fit carries its own. Other fits -- glmnet, trees, forests
+#' and the rest -- do not: \code{fitted()} on a glmnet fit is \code{NULL},
+#' so the plot was returned and failed when printed. Their residuals come
+#' from predictions on the training data instead, against the response on
+#' the scale it was fitted on.
+#'
+#' @param model A tidylearn model.
+#' @return A tibble of \code{fitted} and \code{residuals}, one row per
+#'   training row the fit could use.
+#' @keywords internal
+#' @noRd
+tl_fit_residuals <- function(model) {
+  fit <- model$fit
+  if (inherits(fit, "lm")) {
+    return(tibble::tibble(
+      fitted = unname(stats::fitted(fit)),
+      residuals = unname(stats::residuals(fit))
+    ))
+  }
+
+  if (isTRUE(model$spec$is_classification)) {
+    stop(
+      "Residual plots are for regression models, and this \"",
+      model$spec$method, "\" model is a classifier. Use type = \"confusion\" ",
+      "or \"roc\" instead.",
+      call. = FALSE
+    )
+  }
+
+  actual <- tl_observed_response(model, model$data)
+  predicted <- unname(predict(model, model$data)$.pred)
+  # Without the rows the fit itself dropped for a missing value
+  used <- !is.na(actual) & !is.na(predicted)
+  tibble::tibble(
+    fitted = predicted[used],
+    residuals = actual[used] - predicted[used]
+  )
 }
 
 #' Create confidence and prediction interval plots
@@ -380,12 +468,29 @@ tl_plot_intervals <- function(model,
     )
   }
 
-  # Get actual values
-  x_var <- all.vars(model$spec$formula)[-1][1]
-  y_var <- model$spec$response_var
+  # The intervals come from predict.lm(). glmnet, trees and the other
+  # methods have none, and passing interval = to them failed inside the
+  # backend -- glmnet asked for a newx argument the caller never had.
+  if (!inherits(model$fit, "lm") || inherits(model$fit, "glm")) {
+    stop(
+      "Interval plots need a \"linear\" or \"polynomial\" model, whose lm() ",
+      "fit gives\nconfidence and prediction intervals. This is a \"",
+      model$spec$method, "\" model.",
+      call. = FALSE
+    )
+  }
+
+  # The first predictor of the expanded formula: all.vars() on y ~ . gives
+  # "." itself, which is not a column
+  x_var <- get_formula_vars(model$spec$formula, model$data)[1]
+  if (is.na(x_var)) {
+    stop("Interval plots need a predictor to plot against, and ",
+         deparse1(model$spec$formula), " has none.", call. = FALSE)
+  }
+  y_label <- deparse1(model$spec$formula[[2]])
 
   # Sort data by x variable for smooth curves
-  sorted_data <- new_data[order(new_data[[x_var]]), ]
+  sorted_data <- new_data[order(new_data[[x_var]]), , drop = FALSE]
 
   # Calculate confidence and prediction intervals from the raw model
   conf_int <- stats::predict(model$fit, newdata = sorted_data,
@@ -396,13 +501,33 @@ tl_plot_intervals <- function(model,
   # Create plot data
   plot_data <- tibble::tibble(
     x = sorted_data[[x_var]],
-    y = sorted_data[[y_var]],
     pred = conf_int[, "fit"],
     conf_lower = conf_int[, "lwr"],
     conf_upper = conf_int[, "upr"],
     pred_lower = pred_int[, "lwr"],
     pred_upper = pred_int[, "upr"]
   )
+  # The observed points on the scale the bands are on: the raw column drew
+  # mpg against bands for log(mpg). Data to predict on may not carry the
+  # response, and then the bands are drawn alone.
+  observed <- if (model$spec$response_var %in% names(sorted_data)) {
+    tl_observed_response(model, sorted_data)
+  }
+  if (!is.null(observed)) {
+    plot_data$y <- observed
+  }
+
+  # A row with no prediction has nothing to draw in any layer, and ggplot
+  # warned about it once per layer when the plot was printed
+  predicted <- !is.na(plot_data$x) & !is.na(plot_data$pred)
+  if (!all(predicted)) {
+    warning(
+      sum(!predicted), " row(s) with a missing predictor value are left out ",
+      "of the plot.",
+      call. = FALSE
+    )
+    plot_data <- plot_data[predicted, , drop = FALSE]
+  }
 
   # Create the plot
   p <- ggplot2::ggplot(
@@ -426,11 +551,15 @@ tl_plot_intervals <- function(model,
     ggplot2::geom_line(
       ggplot2::aes(y = pred),
       color = "blue", linewidth = 1
-    ) +
-    # Actual points
-    ggplot2::geom_point(
-      ggplot2::aes(y = y), alpha = 0.6
-    ) +
+    )
+  if (!is.null(observed)) {
+    # Actual points. A row missing only its response keeps its band.
+    p <- p + ggplot2::geom_point(
+      data = plot_data[!is.na(plot_data$y), , drop = FALSE],
+      ggplot2::aes(y = .data$y), alpha = 0.6
+    )
+  }
+  p <- p +
     ggplot2::labs(
       title = paste0(
         "Regression with ", level * 100,
@@ -441,7 +570,7 @@ tl_plot_intervals <- function(model,
         "Light band: Prediction interval"
       ),
       x = x_var,
-      y = y_var
+      y = y_label
     ) +
     ggplot2::theme_minimal()
 
