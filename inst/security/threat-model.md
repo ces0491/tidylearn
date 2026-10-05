@@ -397,13 +397,19 @@ the destination.
 - The allowlist defaults to Modal's own domains (`*.modal.run`, and
   `modal.com` for API hosts). Modal customers serving Web Functions from
   a custom domain extend it with `tl_cloud_allow_host()`.
+- `*.modal.run` matches every Modal workspace's endpoints, not only the
+  user's own, so an endpoint pointed at someone else's workspace passes
+  this check. Binding the endpoint to the user's workspace is recorded as
+  open in [Section 7](#7-open-questions).
 - Extension is a **per-session function call**, never an option or an
   environment variable. A shared `.Rprofile` or an inherited environment
   must not be able to add an upload destination without the user having
   written the call. Additions are not persisted and die with the session.
 - Added hosts are validated as bare host names. URLs, ports, paths and
-  wildcards are refused, as is any single-label name — `"com"` would
-  otherwise open an entire TLD and defeat this control completely.
+  wildcards are refused, as is any name of fewer than three labels:
+  `"com"` would open a TLD, and a two-label public suffix such as
+  `"co.uk"` every site under it. tidylearn carries no copy of the Public
+  Suffix List, so a public suffix of three or more labels still passes.
 - Host matching is anchored on a leading dot, for default and added
   hosts alike, so a host is matched only by itself and its subdomains.
 - The pre-upload summary distinguishes a Modal host from a host added
@@ -428,6 +434,9 @@ the destination.
   `fits.example.com` allowed, `example.com`, `evil-fits.example.com` and
   `fits.example.com.evil.test` all remain refused.
 - Tests confirm `https` is still required on an added host.
+- Tests confirm two-label names such as `co.uk`, `github.io` and
+  `example.com` are refused, and that allowing `api.mycompany.co.uk` admits
+  neither `mycompany.co.uk` nor `attacker.co.uk`.
 - `grep -rn 'request(' R/` confirms every request is constructed through
   the validating helper.
 - Code review confirms redirect-following is disabled on data-carrying
@@ -631,6 +640,10 @@ These are commitments deferred to the Modal-integration PR:
 - Logging cadence: at what verbosity level (`verbose = 0/1/2`) does
   the upload-summary print, and at what level (if any) is it
   suppressed?
+- Binding the endpoint to the user's own Modal workspace. `*.modal.run`
+  matches every workspace's endpoints, so the host check in
+  [T9](#t9-egress-to-a-non-modal-host) does not stop data going to an
+  endpoint in someone else's workspace.
 
 Two questions listed here previously are now settled and described above:
 the endpoint is read from the `TIDYLEARN_MODAL_ENDPOINT` environment
@@ -640,6 +653,11 @@ via `tl_cloud_allow_host()` under the constraints in
 
 ## 8. Revision history
 
+- **2026-10-05** — [T9](#t9-egress-to-a-non-modal-host): an added host
+  needs at least three labels, because a two-label public suffix such as
+  `co.uk` admitted every site registered under it. Recorded that
+  `*.modal.run` matches every Modal workspace, and added binding to the
+  user's own workspace to [Section 7](#7-open-questions).
 - **2026-08-06** — added [T10](#t10-runaway-spend-and-orphaned-jobs),
   runaway spend and orphaned jobs, and removed the out-of-scope line that
   dismissed quota exhaustion as a usability concern. A submitted Modal

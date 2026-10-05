@@ -215,10 +215,10 @@ That empty result is the honest answer rather than a failure. `whole milk`
 appears in about a quarter of all baskets, so very little follows it with 50%
 confidence.
 
-`min_confidence` filters the rules you already mined, so raising the ceiling
-means re-mining, not re-filtering. `rules` above was mined at
-`confidence = 0.5`, and no amount of filtering will produce a rule that was
-never generated:
+`min_confidence` filters the rules you already mined, so lowering the
+confidence floor below the one you mined at means mining again. `rules`
+above was mined at `confidence = 0.5`, and no amount of filtering will
+produce a rule that was never generated:
 
 ```{r}
 broad <- tidy_apriori(
