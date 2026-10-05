@@ -9,6 +9,10 @@
   magrittr's `%>%` is still re-exported, so existing code that pipes with
   it after `library(tidylearn)` keeps working.
 
+* tidylearn requires ggplot2 3.4.0 or later. The plots set line widths
+  with the `linewidth` aesthetic, which ggplot2 3.3 ignores with an
+  unknown-parameter warning and draws at the default width.
+
 ## New Features
 
 * `tl_coefficients()` returns a model's coefficients as a tibble, with
@@ -44,7 +48,8 @@
 
 * `tl_table_coefficients()` gained `conf_int`, `level` and `exponentiate`,
   passed through to `tl_coefficients()`. Existing calls produce the same
-  table as before, apart from the `lambda` change below. With
+  table as before, apart from the `lambda` change and the rows for
+  aliased terms, both described below. With
   `exponentiate = TRUE` a regularised table ranks terms by the size of the
   log odds ratio: ranked by the odds ratio itself, a term the penalty
   dropped (1) sorted above a strong negative effect (0.02).
@@ -77,7 +82,8 @@
   a single row. `sample()` on one number draws from `1:n`, so that
   stratum drew a row from elsewhere in the data -- sometimes one already
   drawn -- and left its own row in test. On `mtcars` stratified by `mpg`,
-  most of whose values occur once, the split returned 43 rows from 32.
+  most of whose values occur once, the split with `seed = 1` returned 43
+  rows from 32.
 
 * `tl_compare_cv()` refits each model with the arguments it was built
   with. It refitted from the formula and method alone, so every model was
@@ -152,7 +158,7 @@
   decided separately against a half-zeroed matrix, so for a chain
   `x1 - x2 - x3` it dropped `x1` and `x3` and kept `x2`, the one feature
   correlated with both. Features are now removed one at a time, the most
-  correlated pair first, as `caret::findCorrelation()` does.
+  correlated pair first.
 
 * `tl_prepare_data()` processes only the formula's predictors. It read
   the formula for the response alone, so `y ~ . - id` one-hot encoded
@@ -289,13 +295,12 @@
   `NA`, and it refuses a formula with no response, whose first predictor it
   treated as the response.
 
-* The interaction functions keep an `offset()` in the formula. Rebuilding
-  the formula from its terms dropped it, so `tl_test_interactions()` and
-  `tl_auto_interactions()` tested and refitted models without the offset,
-  and `tl_interaction_effects()` failed with `object 'disp' not found`.
-  `tl_plot_interaction()` on a `y ~ . - x` model failed the same way,
-  because its prediction grid left out the removed column the model
-  still evaluates.
+* `tl_test_interactions()` and `tl_auto_interactions()` no longer treat
+  the variable inside an `offset()` as a candidate predictor. For
+  `mpg ~ wt + hp + offset(log(disp))`, `tl_test_interactions()` also
+  tested `hp:disp` and `wt:disp`, and `tl_auto_interactions()` could add
+  an interaction with the offset's variable, returning formulas such as
+  `y ~ a + b + a:e + offset(log(e))`.
 
 * `tl_interaction_effects()` refuses a constant `var`, which failed with
   `subscript out of bounds`, and `tl_plot_interaction()` refuses a `type`
@@ -349,7 +354,7 @@
   `plot_type` must be one of "scatter", ... and had got "scatter".
 
 * The cluster table no longer counts dbscan's noise points as a cluster,
-  averages around missing values in hclust and dbscan tables, and a long
+  now averages hclust and dbscan tables around missing values, and a long
   formula no longer splits a table's source note in two.
   `tl_table_coefficients()` warns about arguments it does not use.
 
@@ -376,8 +381,8 @@
 
 ## Documentation
 
-* The hex logo and the pkgdown favicons have sharp corners, in line with
-  other R package hex stickers. The artwork is otherwise unchanged.
+* The hex logo has sharp corners, in line with other R package hex
+  stickers. The artwork is otherwise unchanged.
 
 * `PACKAGE_ARCHITECTURE.md`'s four links into the README were 404s on the
   documentation site. pkgdown rewrote `README.md#...` to `README.html`, a
