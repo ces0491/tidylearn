@@ -111,6 +111,15 @@ test_that("a term the fit could not estimate is still a row", {
   expect_true(is.na(aliased$conf_low))
 })
 
+test_that("a model with no coefficients still has a term column", {
+  # names() of an empty coefficient vector is NULL, which dropped the column
+  coefs <- tl_coefficients(tl_model(mtcars, mpg ~ 0, method = "linear"))
+  expect_identical(names(coefs),
+                   c("term", "estimate", "std_error", "statistic", "p_value"))
+  expect_equal(nrow(coefs), 0)
+  expect_type(coefs$term, "character")
+})
+
 test_that("two terms with the same name keep their own statistics", {
   # A factor `a` with level "b" makes the term ab, which is also the name of
   # a numeric column. The statistics were matched to terms by name, so both

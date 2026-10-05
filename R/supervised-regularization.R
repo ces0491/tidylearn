@@ -99,7 +99,8 @@ tl_fit_elastic_net <- function(data, formula,
 #' @param cv_folds Number of folds for cross-validation
 #'   (default: 5)
 #' @param ... Additional arguments to pass to glmnet() or cv.glmnet(). A
-#'   name neither function takes is an error.
+#'   name neither function takes is an error, as are \code{x}, \code{y},
+#'   \code{family} and \code{nfolds}, which tidylearn sets itself.
 #' @param weights Optional case weights, one per row of \code{data}
 #' @param foldid Optional fold for each row of \code{data}, for the
 #'   cross-validation that chooses lambda
@@ -204,8 +205,18 @@ tl_fit_regularized <- function(data, formula,
 
   # Determine the appropriate family based on problem type
   if (is_classification) {
-    if (!is.factor(y)) {
-      y <- factor(y)
+    # The classes of the rows being fitted. A class whose every row has a
+    # missing value is gone from the model frame but stays a level, and
+    # glmnet stops on "one multinomial or binomial class has 1 or 0
+    # observations; not allowed".
+    y <- tl_normalise_response(y)
+    if (nlevels(y) < 2L) {
+      stop(
+        "ridge, lasso and elastic_net need rows of at least two classes, ",
+        "but\nthe rows left once those with missing values are dropped are ",
+        "all\n'", levels(y), "'.",
+        call. = FALSE
+      )
     }
 
     if (length(levels(y)) == 2) {
@@ -280,6 +291,10 @@ tl_fit_regularized <- function(data, formula,
   attr(model, "tl_terms") <- design_terms
   attr(model, "tl_xlevels") <- design_xlevels
   attr(model, "tl_colnames") <- colnames(x_mat)
+  # Each design column's standard deviation over the rows fitted, in design
+  # order, for importance to scale the coefficients by. Recomputed from
+  # model$data it would include the rows dropped for a missing value.
+  attr(model, "tl_x_sd") <- apply(x_mat, 2, stats::sd)
   if (is_classification) {
     attr(model, "response_levels") <- levels(y)
   }
@@ -293,7 +308,8 @@ tl_fit_regularized <- function(data, formula,
 #' names they do not know, so a misspelt \code{standardise = FALSE} changed
 #' nothing while the model's \code{$spec$args} recorded it as used. A
 #' cross-validation argument at a single penalty reached \code{glmnet()}
-#' alone and went the same way.
+#' alone and went the same way. The arguments tidylearn sets itself are
+#' refused as well, with what sets them.
 #'
 #' @param arg_names Names of the arguments in \code{...}.
 #' @param cross_validate Whether \code{cv.glmnet()} will run.
@@ -306,6 +322,25 @@ tl_check_glmnet_args <- function(arg_names, cross_validate, foldid_given) {
   arg_names <- arg_names[arg_names != ""]
   fit_args <- setdiff(names(formals(glmnet::glmnet)), "...")
   cv_args <- setdiff(names(formals(glmnet::cv.glmnet)), "...")
+
+  # Passed again beside tidylearn's own value, these failed with R's
+  # "formal argument matched by multiple actual arguments"
+  set_here <- c(
+    x = "tidylearn sets 'x' and 'y' from the formula and data",
+    y = "tidylearn sets 'x' and 'y' from the formula and data",
+    family = paste0(
+      "tidylearn sets 'family' from the response: gaussian for a numeric ",
+      "response,\nbinomial for two classes, multinomial for more"
+    ),
+    nfolds = "tidylearn sets 'nfolds' from cv_folds; pass cv_folds instead"
+  )
+  owned <- intersect(arg_names, names(set_here))
+  if (length(owned) > 0) {
+    stop(
+      paste(unique(set_here[owned]), collapse = ".\n"), ".",
+      call. = FALSE
+    )
+  }
 
   unknown <- setdiff(arg_names, c(fit_args, cv_args))
   if (length(unknown) > 0) {
@@ -361,6 +396,23 @@ tl_plot_regularization_path <- function(model,
                                         ...) {
   # Extract the glmnet model
   fit <- model$fit
+
+  # A path runs through the penalties fitted. At a single penalty each term
+  # was one point, so no line was drawn.
+  if (length(fit$lambda) < 2L) {
+    stop(
+      "The regularization path needs a model fitted along several ",
+      "penalties,\nbut this one was fitted at the single penalty lambda = ",
+      signif(fit$lambda, 4), ".\nFit it with lambda = NULL, or a sequence ",
+      "of penalties, to draw a path;\ntl_coefficients() gives the ",
+      "coefficients at this one.",
+      call. = FALSE
+    )
+  }
+  # Every model fitted along several penalties is cross-validated now. One
+  # fitted by an earlier version may not be, and has no lambda.min or
+  # lambda.1se to mark.
+  cross_validated <- !is.null(attr(fit, "cv_results"))
 
   # One row per term and penalty. A multinomial fit has a path per class,
   # and its coef() is a list of matrices that as.matrix() could not use.
@@ -426,16 +478,6 @@ tl_plot_regularization_path <- function(model,
       # `size` on a line is deprecated since ggplot2 3.4.0
       ggplot2::aes(alpha = .data$is_top, linewidth = .data$is_top)
     ) +
-    ggplot2::geom_vline(
-      xintercept = lambda_min,
-      linetype = "dashed",
-      color = "blue"
-    ) +
-    ggplot2::geom_vline(
-      xintercept = lambda_1se,
-      linetype = "dashed",
-      color = "red"
-    ) +
     ggplot2::scale_x_log10(
       expand = ggplot2::expansion(mult = c(left_expand, 0.02))
     ) +
@@ -456,14 +498,30 @@ tl_plot_regularization_path <- function(model,
     ggplot2::coord_cartesian(clip = "off") +
     ggplot2::labs(
       title = "Regularization Path",
-      subtitle = paste0(
+      subtitle = if (cross_validated) {
         "Blue: lambda.min, Red: lambda.1se"
-      ),
+      } else {
+        "No cross-validation ran, so no lambda.min or lambda.1se is marked"
+      },
       x = "Lambda (log scale)",
       y = "Coefficients"
     ) +
     ggplot2::theme_minimal() +
     ggplot2::theme(legend.position = "none")
+
+  if (cross_validated) {
+    p <- p +
+      ggplot2::geom_vline(
+        xintercept = lambda_min,
+        linetype = "dashed",
+        color = "blue"
+      ) +
+      ggplot2::geom_vline(
+        xintercept = lambda_1se,
+        linetype = "dashed",
+        color = "red"
+      )
+  }
 
   if (by_class) {
     # A panel per class, each on its own scale

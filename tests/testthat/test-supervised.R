@@ -568,6 +568,79 @@ test_that("subset chooses the rows a glmnet model is fitted on", {
                as.vector(stats::coef(reference)))
 })
 
+test_that("a glmnet fit records each design column's spread on its rows", {
+  # Importance scales a coefficient by its predictor's standard deviation,
+  # and could only take it from every row of model$data -- including rows
+  # the fit dropped for a missing value
+  d <- mtcars
+  d$wt[1:4] <- NA
+  model <- tl_model(d, mpg ~ wt + hp + factor(cyl), method = "lasso",
+                    lambda = 0.1)
+  used <- stats::model.matrix(mpg ~ wt + hp + factor(cyl), d)[, -1]
+  expect_equal(nrow(used), 28)
+  expect_identical(names(attr(model$fit, "tl_x_sd")),
+                   attr(model$fit, "tl_colnames"))
+  expect_equal(unname(attr(model$fit, "tl_x_sd")),
+               unname(apply(used, 2, stats::sd)))
+
+  # In design order, so two columns that share a name keep their own
+  set.seed(3)
+  dup <- data.frame(
+    y = stats::rnorm(40),
+    a = factor(sample(c("x", "b"), 40, TRUE), levels = c("x", "b")),
+    ab = stats::rnorm(40), z = stats::rnorm(40)
+  )
+  model <- tl_model(dup, y ~ a + ab + z, method = "ridge", lambda = 0.1)
+  expect_identical(names(attr(model$fit, "tl_x_sd")), c("ab", "ab", "z"))
+  expect_equal(unname(attr(model$fit, "tl_x_sd")),
+               c(stats::sd(dup$a == "b"), stats::sd(dup$ab), stats::sd(dup$z)))
+})
+
+test_that("arguments tidylearn sets for glmnet are refused by name", {
+  # They reached cv.glmnet() a second time and failed with R's "formal
+  # argument "nfolds" matched by multiple actual arguments"
+  expect_error(
+    tl_model(mtcars, mpg ~ wt + hp, method = "lasso", nfolds = 4),
+    "tidylearn sets 'nfolds' from cv_folds"
+  )
+  expect_error(
+    tl_model(mtcars, mpg ~ wt + hp, method = "lasso", family = "poisson"),
+    "tidylearn sets 'family' from the response"
+  )
+  # The number of folds is cv_folds
+  set.seed(1)
+  four <- tl_model(mtcars, mpg ~ wt + hp, method = "lasso", cv_folds = 4,
+                   keep = TRUE)
+  expect_equal(sort(unique(attr(four$fit, "cv_results")$foldid)), 1:4)
+})
+
+test_that("a class the fitted rows lack is dropped from a glmnet response", {
+  # Missing predictor values removed every setosa row, which left setosa as
+  # an empty level, and glmnet stopped on a class with no observations
+  d <- iris
+  d$Sepal.Width[d$Species == "setosa"] <- NA
+  set.seed(1)
+  model <- tl_model(d, Species ~ ., method = "lasso")
+  expect_identical(attr(model$fit, "response_levels"),
+                   c("versicolor", "virginica"))
+  expect_s3_class(model$fit, "lognet")
+
+  rows <- d[d$Species != "setosa", ]
+  x <- as.matrix(rows[, 1:4])
+  cv <- attr(model$fit, "cv_results")
+  expect_equal(
+    predict(model, rows, type = "prob")$virginica,
+    as.vector(stats::predict(cv, newx = x, s = "lambda.1se",
+                             type = "response"))
+  )
+
+  # One class left is nothing to tell apart
+  one_left <- iris
+  one_left$Sepal.Width[one_left$Species != "virginica"] <- NA
+  expect_error(tl_model(one_left, Species ~ ., method = "lasso"),
+               "need rows of at least two classes")
+})
+
 test_that("a single design column is refused in tidylearn's words", {
   # glmnet's "x should be a matrix with 2 or more columns" names an
   # argument the caller never passed
@@ -854,6 +927,27 @@ test_that("labelled paths are drawn in the accent colour", {
   for (i in vlines) {
     expect_equal(nrow(ggplot2::layer_data(p, i)), 1)
   }
+})
+
+test_that("a regularisation path needs more than one penalty", {
+  # Fitted at one lambda, every term was a single point, so no line was
+  # drawn, under a subtitle naming a lambda.min and lambda.1se that no
+  # cross-validation had chosen
+  single <- tl_model(mtcars, mpg ~ wt + hp + disp, method = "lasso",
+                     lambda = 0.5)
+  expect_error(tl_plot_regularization_path(single),
+               "fitted at the single penalty lambda = 0.5")
+
+  # A path with no cross-validation behind it, as a model fitted along a
+  # sequence of penalties by an earlier version, marks no lambda.min or
+  # lambda.1se
+  set.seed(1)
+  path_only <- tl_model(mtcars, mpg ~ wt + hp + disp, method = "lasso")
+  attr(path_only$fit, "cv_results") <- NULL
+  p <- tl_plot_regularization_path(path_only)
+  expect_false(any(vapply(p$layers, function(l) inherits(l$geom, "GeomVline"),
+                          logical(1))))
+  expect_match(p$labels$subtitle, "No cross-validation")
 })
 
 test_that("the regularisation path draws a multiclass model class by class", {

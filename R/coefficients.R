@@ -160,9 +160,12 @@ tl_coef_summary <- function(model, conf_int, level, exponentiate) {
   fit <- model$fit
   coef_mat <- summary(fit)$coefficients
   estimates <- stats::coef(fit)
+  # names() of a model with no coefficients, such as y ~ 0, is NULL, and
+  # tibble() dropped the column it was given
+  term_names <- names(estimates) %||% character(0)
 
   coef_tbl <- tibble::tibble(
-    term = names(estimates),
+    term = term_names,
     estimate = unname(estimates),
     std_error = NA_real_,
     statistic = NA_real_,
@@ -174,7 +177,8 @@ tl_coef_summary <- function(model, conf_int, level, exponentiate) {
   # Matching by name gave two terms that share one -- a factor a with level
   # b beside a numeric column ab -- the first one's statistics.
   estimated <- which(!is.na(estimates))
-  if (!identical(names(estimates)[estimated], rownames(coef_mat))) {
+  if (!identical(term_names[estimated],
+                 rownames(coef_mat) %||% character(0))) {
     stop("could not match every summary() row to a model term. ",
          "Please report this with a reproducible example.", call. = FALSE)
   }
