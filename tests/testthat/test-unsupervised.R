@@ -329,6 +329,39 @@ test_that("tidy_dist dispatches to tidy_gower for method = 'gower'", {
   expect_equal(attr(d1, "method"), "gower")
 })
 
+test_that("standardize_data standardises a rowwise tibble over its columns", {
+  # mutate() on a rowwise tibble works one row at a time, and a single
+  # value has no spread, so every standardised value came back NaN
+  rows <- dplyr::rowwise(tibble::as_tibble(iris[1:10, 1:4]))
+  std <- standardize_data(rows)
+  expect_equal(std$Sepal.Length, as.numeric(scale(iris$Sepal.Length[1:10])))
+  expect_equal(std$Petal.Width, as.numeric(scale(iris$Petal.Width[1:10])))
+  expect_s3_class(std, "rowwise_df")
+
+  # Centring alone gave 0 for every row, and scaling alone NA
+  centred <- standardize_data(rows, scale = FALSE)
+  expect_equal(
+    centred$Sepal.Width,
+    iris$Sepal.Width[1:10] - mean(iris$Sepal.Width[1:10])
+  )
+
+  # A rowwise identifier keeps its values, as it does under mutate()
+  with_id <- dplyr::rowwise(
+    tibble::tibble(id = 1:5, x = c(1, 2, 3, 4, 10)), id
+  )
+  std_id <- standardize_data(with_id)
+  expect_equal(std_id$id, 1:5)
+  expect_equal(std_id$x, as.numeric(scale(c(1, 2, 3, 4, 10))))
+  expect_equal(dplyr::group_vars(std_id), "id")
+
+  # A grouped tibble is still standardised within each group
+  grouped <- standardize_data(dplyr::group_by(iris, Species))
+  expect_equal(
+    grouped$Sepal.Length[iris$Species == "setosa"],
+    as.numeric(scale(iris$Sepal.Length[iris$Species == "setosa"]))
+  )
+})
+
 test_that("unsupervised methods work with formula", {
   # PCA with formula
   model <- tl_model(
@@ -535,6 +568,38 @@ test_that("the gap statistic says why it cannot run from a distance alone", {
   # Silhouette works from the distances, and still does
   expect_type(
     optimal_hclust_k(hc, method = "silhouette", max_k = 4)$optimal_k, "double"
+  )
+})
+
+test_that("the gap statistic refuses a Gower tree built on factor columns", {
+  # clusGap() draws its reference data uniformly over each numeric column,
+  # so the refit dropped the factors and scored clusterings the tree never
+  # made, without a word
+  set.seed(9)
+  mixed <- data.frame(
+    num = stats::rnorm(20),
+    fac = factor(rep(c("a", "b"), each = 10))
+  )
+  hc <- tidy_hclust(mixed, distance = "gower")
+  expect_error(
+    optimal_hclust_k(hc, method = "gap", max_k = 4),
+    "on the non-numeric column: fac. Use method = \"silhouette\""
+  )
+
+  # Silhouette works from the tree's own distances
+  expect_equal(optimal_hclust_k(hc, max_k = 4)$k_range, 2:4)
+
+  # A Gower tree on numeric columns, and a Euclidean tree whose data holds a
+  # factor it never used, can still use the gap statistic
+  numeric_gower <- tidy_hclust(USArrests[1:25, ], distance = "gower")
+  expect_equal(
+    nrow(optimal_hclust_k(numeric_gower, method = "gap", max_k = 3)$gap_data),
+    3L
+  )
+  euclidean <- tidy_hclust(mixed, cols = c(num, fac))
+  expect_equal(
+    nrow(optimal_hclust_k(euclidean, method = "gap", max_k = 3)$gap_data),
+    3L
   )
 })
 
@@ -931,6 +996,16 @@ test_that("tidy_clara and tidy_pam pass further options to cluster", {
   expect_identical(pam$medoids$medoid_index, c(1L, 51L, 101L))
 })
 
+test_that("tidy_clara refuses a distance matrix and points to PAM", {
+  # A branch passed dist objects straight to clara(), which samples
+  # observations and takes no distances, so it failed inside cluster
+  expect_error(
+    tidy_clara(stats::dist(iris[, 1:4]), k = 3),
+    "Use tidy_pam\\(\\), which takes a dist object"
+  )
+  expect_s3_class(tidy_clara(iris[, 1:4], k = 3), "tidy_clara")
+})
+
 # ---- validation ------------------------------------------------------
 
 test_that("validation metrics leave DBSCAN noise out of every measure", {
@@ -1094,6 +1169,42 @@ test_that("MDS validates ndim and reports the dimensions it returned", {
     suppressWarnings(
       stats::cmdscale(stats::dist(flat), k = 3, eig = TRUE)$GOF[1]
     )
+  )
+})
+
+test_that("tidy_mds takes a Gower distance", {
+  # `distance` went straight to stats::dist(), which has no "gower":
+  # "invalid distance method"
+  set.seed(9)
+  mixed <- data.frame(
+    num = stats::rnorm(20),
+    fac = factor(rep(c("a", "b"), each = 10))
+  )
+  reference <- stats::cmdscale(cluster::daisy(mixed, metric = "gower"), k = 2)
+
+  # Compared through the configuration's own distances, which a flipped
+  # axis does not change
+  mds <- tidy_mds(mixed, distance = "gower")
+  expect_equal(
+    as.vector(stats::dist(mds$config[c("Dim1", "Dim2")])),
+    as.vector(stats::dist(reference))
+  )
+
+  # Through tl_model() the formula's factor is used rather than reported
+  expect_no_warning(
+    fit <- tl_model(mixed, ~ num + fac, method = "mds", distance = "gower")
+  )
+  expect_equal(
+    as.vector(stats::dist(fit$fit$points[c("Dim1", "Dim2")])),
+    as.vector(stats::dist(reference))
+  )
+
+  # Undefined distances are refused by name, where cmdscale() said only
+  # "NA values not allowed in 'd'"
+  expect_error(
+    tidy_mds(data.frame(x = c(1, NA, 3, 4), y = c(NA, 2, 5, 6)),
+             distance = "gower"),
+    "MDS cannot use undefined distances: 1 pair of rows has no variable"
   )
 })
 

@@ -7,7 +7,9 @@
 #'   "metric", "nonmetric", "sammon", or "kruskal"
 #' @param ndim Number of dimensions for output (default: 2)
 #' @param distance Character; distance metric if data is
-#'   not already a dist object (default: "euclidean")
+#'   not already a dist object (default: "euclidean"): any method
+#'   \code{\link[stats]{dist}} accepts, on the numeric columns, or "gower"
+#'   (see \code{\link{tidy_gower}}), on every column
 #' @param ... Additional arguments passed to specific MDS functions
 #'
 #' @return A list of class "tidy_mds" containing:
@@ -28,12 +30,27 @@ tidy_mds <- function(data, method = "classical",
                      ndim = 2, distance = "euclidean",
                      ...) {
 
-  # Convert to distance matrix if needed
+  # Convert to distance matrix if needed. tidy_dist() sends "gower" to
+  # tidy_gower(), over every column, and the other metrics to stats::dist()
+  # on the numeric ones; stats::dist() alone refused "gower" as an invalid
+  # distance method.
   if (inherits(data, "dist")) {
     dist_mat <- data
   } else {
-    data_matrix <- as.matrix(tl_select_columns(data))
-    dist_mat <- stats::dist(data_matrix, method = distance)
+    dist_mat <- tidy_dist(data, method = distance)
+
+    # cmdscale() refuses undefined distances without saying which; smacof
+    # gives them no weight, and sammon() and isoMDS() take them alongside
+    # a starting configuration
+    if (method == "classical") {
+      tl_check_complete_dist(
+        dist_mat, "Classical MDS",
+        alternative = paste0(
+          "use method = \"metric\" or \"nonmetric\", which leave undefined ",
+          "distances out"
+        )
+      )
+    }
   }
 
   # sammon() and isoMDS() divide by the observed distances, so a pair of
@@ -469,7 +486,8 @@ tl_check_mds_ndim <- function(ndim, dist_mat) {
 #' @keywords internal
 #' @noRd
 tl_fit_mds <- function(data, formula = NULL, k = NULL, ndim = NULL,
-                       mds_method = "classical", ...) {
+                       mds_method = "classical", distance = "euclidean",
+                       ...) {
   variants <- c("classical", "metric", "nonmetric", "sammon", "kruskal")
   if (!is.character(mds_method) || length(mds_method) != 1 ||
         !mds_method %in% variants) {
@@ -492,14 +510,21 @@ tl_fit_mds <- function(data, formula = NULL, k = NULL, ndim = NULL,
   }
   ndim <- ndim %||% k %||% 2
 
-  # Without a formula, tidy_mds() takes the numeric columns itself
+  # Without a formula, tidy_mds() picks the columns its distance can use
   data <- tl_ungroup(data)
   if (!is.null(formula)) {
-    data <- data[, tl_formula_columns(formula, data, "MDS"), drop = FALSE]
+    vars <- tl_formula_columns(
+      formula, data, "MDS",
+      mixed_types = distance == "gower",
+      alternative = "distance = \"gower\""
+    )
+    data <- data[, vars, drop = FALSE]
   }
 
   # Fit MDS using tidy_mds
-  mds_result <- tidy_mds(data, method = mds_method, ndim = ndim, ...)
+  mds_result <- tidy_mds(
+    data, method = mds_method, ndim = ndim, distance = distance, ...
+  )
 
   # Return in expected format
   list(

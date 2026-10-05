@@ -227,7 +227,10 @@ tidy_dendrogram <- function(hclust_obj, k = NULL, hang = 0.01, cex = 0.7) {
 #' Use silhouette or gap statistic to find optimal k
 #'
 #' @param hclust_obj A tidy_hclust object
-#' @param method Character; "silhouette" (default) or "gap"
+#' @param method Character; "silhouette" (default) or "gap". The gap
+#'   statistic resamples the observations' numeric columns, so it refuses a
+#'   tree built from a dist object, and one built with
+#'   \code{distance = "gower"} on non-numeric columns.
 #' @param max_k Maximum number of clusters to test (default: 10)
 #'
 #' @return A list containing:
@@ -287,6 +290,25 @@ optimal_hclust_k <- function(hclust_obj, method = "silhouette", max_k = 10) {
         "fitted from a distance matrix and did not keep them. Refit with ",
         "tidy_hclust(data) to use method = \"gap\", or use ",
         "method = \"silhouette\", which works from the distances alone.",
+        call. = FALSE
+      )
+    }
+
+    # clusGap() draws its reference data uniformly over the range of each
+    # numeric column, so the refit kept only those: a Gower tree's factors
+    # were dropped, and the gap scored clusterings the tree never made
+    non_numeric <- names(hclust_obj$data)[
+      !vapply(hclust_obj$data, is.numeric, logical(1))
+    ]
+    if (identical(hclust_obj$distance_method, "gower") &&
+          length(non_numeric) > 0) {
+      stop(
+        "The gap statistic draws its reference data uniformly over the ",
+        "range of each numeric column, so it cannot evaluate a tree built ",
+        "with distance = \"gower\" on the non-numeric column",
+        if (length(non_numeric) > 1) "s", ": ",
+        paste(non_numeric, collapse = ", "), ". Use method = \"silhouette\", ",
+        "which works from the tree's own distances.",
         call. = FALSE
       )
     }

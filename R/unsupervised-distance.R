@@ -213,7 +213,11 @@ tidy_gower <- function(data, weights = NULL) {
 #' @param scale Logical; scale variables to unit variance? (default: TRUE)
 #'
 #' @return A tibble with numeric variables centered and/or scaled as specified;
-#'   non-numeric columns are returned unchanged.
+#'   non-numeric columns are returned unchanged. A grouped tibble is
+#'   standardised within each group, as \code{dplyr::mutate()} works on it;
+#'   a rowwise tibble is standardised over its whole columns, since a single
+#'   value has no spread. Grouping and rowwise identifier columns are left
+#'   as they are.
 #'
 #' @examples
 #' \donttest{
@@ -223,23 +227,32 @@ tidy_gower <- function(data, weights = NULL) {
 #' @export
 standardize_data <- function(data, center = TRUE, scale = TRUE) {
 
-  data_std <- data |>
-    dplyr::mutate(
-      dplyr::across(
-        where(is.numeric),
-        ~ if (center && scale) {
-          as.numeric(base::scale(.x, center = TRUE, scale = TRUE))
-        } else if (center) {
-          .x - mean(.x, na.rm = TRUE)
-        } else if (scale) {
-          .x / stats::sd(.x, na.rm = TRUE)
-        } else {
-          .x
-        }
-      )
-    )
+  standardise <- function(x) {
+    if (center && scale) {
+      as.numeric(base::scale(x, center = TRUE, scale = TRUE))
+    } else if (center) {
+      x - mean(x, na.rm = TRUE)
+    } else if (scale) {
+      x / stats::sd(x, na.rm = TRUE)
+    } else {
+      x
+    }
+  }
 
-  data_std
+  # mutate() on a rowwise tibble works one row at a time, and one value has
+  # no spread, so every standardised value came back NaN. Its columns are
+  # standardised whole, and the rowwise structure is put back.
+  if (inherits(data, "rowwise_df")) {
+    ids <- dplyr::group_vars(data)
+    standardised <- dplyr::ungroup(data) |>
+      dplyr::mutate(dplyr::across(
+        where(is.numeric) & !dplyr::all_of(ids), standardise
+      ))
+    return(dplyr::rowwise(standardised, dplyr::all_of(ids)))
+  }
+
+  data |>
+    dplyr::mutate(dplyr::across(where(is.numeric), standardise))
 }
 
 
@@ -419,10 +432,11 @@ tl_check_whole_number <- function(x, arg, min = 1, max = Inf) {
 #'
 #' @param dist_mat A dist object
 #' @param what The method, for the message
+#' @param alternative A way round the gap, for the message, or NULL
 #' @return \code{TRUE}, invisibly, when every distance is defined
 #' @keywords internal
 #' @noRd
-tl_check_complete_dist <- function(dist_mat, what) {
+tl_check_complete_dist <- function(dist_mat, what, alternative = NULL) {
   if (!anyNA(dist_mat)) {
     return(invisible(TRUE))
   }
@@ -440,7 +454,8 @@ tl_check_complete_dist <- function(dist_mat, what) {
       collapse = "; "
     ),
     if (nrow(undefined) > length(shown)) "; ..." else "",
-    "). Drop or impute the missing values in those rows first.",
+    "). Drop or impute the missing values in those rows first",
+    if (is.null(alternative)) "." else paste0(", or ", alternative, "."),
     call. = FALSE
   )
 }

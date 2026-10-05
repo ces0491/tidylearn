@@ -236,7 +236,8 @@ augment_pam <- function(pam_obj, data) {
 #'
 #' Performs CLARA clustering (scalable version of PAM)
 #'
-#' @param data A data frame or tibble
+#' @param data A data frame or tibble. CLARA samples observations, so it
+#'   takes no distance matrix; use \code{\link{tidy_pam}} for a dist object.
 #' @param k Number of clusters
 #' @param metric Distance metric (default: "euclidean")
 #' @param samples Number of samples to draw (default: 50)
@@ -264,12 +265,20 @@ augment_pam <- function(pam_obj, data) {
 tidy_clara <- function(data, k, metric = "euclidean",
                        samples = 50, sampsize = NULL, ...) {
 
-  # Select numeric columns if data frame
-  if (!inherits(data, "dist")) {
-    data_numeric <- tl_select_columns(data)
-  } else {
-    data_numeric <- data
+  # clara() draws samples of observations and computes distances within
+  # each, so it takes no distance matrix. Handing one over failed inside
+  # cluster, after nrow() of the dist had already come back NULL.
+  if (inherits(data, "dist")) {
+    stop(
+      "tidy_clara() needs the observations: CLARA draws samples of rows and ",
+      "computes distances within each, so it cannot start from a distance ",
+      "matrix. Use tidy_pam(), which takes a dist object.",
+      call. = FALSE
+    )
   }
+
+  # Select numeric columns
+  data_numeric <- tl_select_columns(data)
 
   # Set default sampsize if not provided
   if (is.null(sampsize)) {
