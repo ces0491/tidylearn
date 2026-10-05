@@ -20,6 +20,10 @@ knitr::opts_chunk$set(
 library(tidylearn)
 library(dplyr)
 library(ggplot2)
+
+# k-means, CLARA and the gap statistic start from random draws. Seeding once
+# here makes the whole page reproduce when run from the top.
+set.seed(42)
 ```
 
 ## Two Ways In
@@ -227,8 +231,10 @@ sil$cluster_avg
 plot_silhouette(sil)
 ```
 
-Cluster 1 is clean; the other two are the *versicolor*/*virginica* boundary,
-and their scores say so without needing the labels.
+The *setosa* cluster is clean; the other two are the
+*versicolor*/*virginica* boundary, and their scores say so without needing
+the labels. k-means numbers its clusters arbitrarily; the table above shows
+which number *setosa* got.
 
 `calc_validation_metrics()` collects the summary numbers in one row:
 
@@ -303,14 +309,16 @@ sapply(linkages, function(m) {
 })
 ```
 
-Single linkage chains, so it puts almost everything in one cluster. That is a
-property of the linkage, not a finding about irises.
+Single linkage chains: its largest cluster takes 98 of the 150 rows, all of
+*versicolor* and nearly all of *virginica*, and leaves two rows as a cluster
+of their own. That is a property of the linkage, not a finding about irises.
 
 ## DBSCAN
 
 DBSCAN finds arbitrarily shaped clusters and labels sparse points as noise.
 It needs `eps` (the neighbourhood radius) and `minPts`. Rather than guessing,
-`suggest_eps()` reads it off the k-nearest-neighbour distance curve.
+`suggest_eps()` reads it off the k-nearest-neighbour distance curve, at
+`k = minPts - 1` because a core point's `minPts` includes the point itself.
 
 ```{r}
 eps_suggestion <- suggest_eps(iris[, 1:4], minPts = 5)
@@ -318,7 +326,7 @@ eps_suggestion$eps
 ```
 
 ```{r}
-plot_knn_dist(iris[, 1:4], k = 5)
+plot_knn_dist(iris[, 1:4], k = 4)
 ```
 
 The elbow in that curve is where points stop having close neighbours, which

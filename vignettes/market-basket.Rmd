@@ -238,9 +238,10 @@ recommend_products(
 )
 ```
 
-Confidence around 0.2 is weak on its own — one basket in five. Lift near 3.4
-is what makes these worth reading: eggs are three times more likely in a
-basket that already holds milk and butter than in a basket picked at random.
+These confidences are weak on their own: none of the suggestions follows in
+even half the baskets that hold milk and butter, which is why `rules` found
+nothing. Lift is what makes them worth reading: eggs, at the top, are more
+than three times as likely in such a basket as in a basket picked at random.
 For common items, mine wide and rank on lift.
 
 ## Visualising
@@ -253,16 +254,17 @@ visualize_rules(rules, method = "scatter", top_n = 200)
 ```
 
 Support on one axis against confidence on the other, coloured by lift, is the
-standard first look. Rules sitting well away from the main cloud are the ones
-to read.
+standard first look; `top_n` keeps the rules with the highest lift. Rules
+sitting well away from the main cloud are the ones to read.
 
 ```{r, eval = has_arules && has_arulesviz}
 visualize_rules(rules, method = "graph", top_n = 20)
 ```
 
-The graph method needs arulesViz and draws items as nodes with rules as
-edges, which is the more useful view once you have narrowed to a handful of
-rules worth reading.
+The graph method needs arulesViz. It draws each rule as a circle, sized by
+support and coloured by lift, with arrows in from its left-hand items and
+out to its right-hand item, which is the more useful view once you have
+narrowed to a handful of rules worth reading.
 
 ## From a Data Frame
 

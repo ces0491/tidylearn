@@ -19,9 +19,9 @@ knitr::opts_chunk$set(
 ## Introduction
 
 Every machine learning package in R has its own API and its own output
-format. tidylearn puts one signature over 20 of them: `tl_model()` picks the
-underlying package from the `method` you name, and whatever comes back is a
-tibble or a ggplot2 object.
+format. tidylearn puts one signature over 20 methods from 13 of them:
+`tl_model()` picks the underlying package from the `method` you name, and
+predictions, metrics and most plots come back as tibbles or ggplot2 objects.
 
 The algorithms are untouched. glmnet, randomForest, xgboost, e1071, cluster
 and dbscan do the fitting, and `model$fit` hands you the object they

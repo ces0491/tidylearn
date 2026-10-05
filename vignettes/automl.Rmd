@@ -17,11 +17,29 @@ knitr::opts_chunk$set(
   # useful at the console and noise in a document
   message = FALSE
 )
+
+# xgboost and the BLAS both parallelise. On 16 cores with a threaded BLAS
+# this page used 14.9 times as much CPU time as elapsed time, and 0.97 with
+# this cap; R CMD check times vignettes against a CPU-to-elapsed threshold
+# as it does the tests. Setting OMP_NUM_THREADS from here would do nothing,
+# because OpenMP and the BLAS read their thread counts when they load,
+# before this chunk runs. The runtime API changes the pools themselves, as
+# in tests/testthat.R.
+if (requireNamespace("RhpcBLASctl", quietly = TRUE)) {
+  RhpcBLASctl::blas_set_num_threads(2)
+  RhpcBLASctl::omp_set_num_threads(2)
+}
 ```
 
 ```{r setup}
 library(tidylearn)
 library(dplyr)
+
+# Cross-validation folds, forests and the k-means behind the cluster
+# features all draw random numbers. Seeding once here makes the page
+# reproduce when run from the top, unless a machine is slow enough to close
+# one of the time gates described below.
+set.seed(42)
 ```
 
 ## Introduction
@@ -111,7 +129,7 @@ names(binary_result$models)
 ```
 
 That call emits a run of `glm.fit: algorithm did not converge` warnings,
-which this chunk hides only because there are a dozen of them. They are worth
+which this chunk hides only because there are several of them. They are worth
 understanding rather than ignoring: *versicolor* and *virginica* overlap only
 slightly, and a three-fold split of 100 rows will sometimes produce a fold
 where the two are perfectly separable. Logistic regression has no finite
@@ -172,15 +190,24 @@ do.call(rbind, sweep)
 ```
 
 iris is 150 rows, so everything here is quick and the budget is barely
-touched. On data where a single forest fit takes ten seconds the same numbers
-look very different, so run the sweep on your own data.
+touched. What changes across the sweep is which of these gates each budget
+opens:
 
-Two things are worth knowing regardless of size:
+- The forest baseline, its PCA and cluster variants, and the advanced models
+  are only attempted when `time_budget >= 30`.
+- The PCA and cluster phases start only while more than 5 seconds and more
+  than 10% of the budget remain, and stop adding variants once fewer than 2
+  seconds or 5% are left. A budget of 5 seconds or less never reaches them.
+- The advanced phase starts only while more than 40% of the budget remains.
+- A model is cross-validated only while more than 30% of the budget remains
+  when it is scored. After that it is scored on the training data, and the
+  `evaluation` column says `"train"`.
 
-- The forest baseline and every advanced model are only attempted when
-  `time_budget >= 30`.
-- Cross-validation is the expensive step. `tl_cv(folds = 5)` fits five models
-  where a plain fit costs one, so `cv_folds` is the most effective lever.
+On data where a single forest fit takes ten seconds, the last three gates
+close early and the same budgets give very different results, so run the
+sweep on your own data. Cross-validation is the expensive step:
+`tl_cv(folds = 5)` fits five models where a plain fit costs one, so
+`cv_folds` is the most effective lever.
 
 ## Controlling the Search
 
@@ -304,8 +331,12 @@ message explaining why and never reaches the leaderboard. Run without
 `message = FALSE` to see which and why.
 
 A model that evaluates but produces no value for the chosen metric appears
-with an `NA` score. That usually means the metric is not one `tl_evaluate()`
-recognises for the task. If every score is `NA`, `tl_auto_ml()` warns and
+with an `NA` score. `tl_auto_ml()` refuses an unrecognised metric name before
+fitting anything, so an `NA` means the metric was undefined on the rows
+scored: `auc` needs rows of at least two classes, for instance, and is
+undefined on a fold that holds one. Cross-validation leaves such folds out of
+its average, so a cross-validated score is `NA` only when the metric was
+undefined in every fold. If every score is `NA`, `tl_auto_ml()` warns and
 returns the first model trained rather than pretending to have ranked them.
 
 ```{r}
@@ -346,11 +377,13 @@ mean(predict(tuned, new_data = split$test)$.pred == split$test$Species)
 ## Guidance
 
 1. **Start at `time_budget = 10`** to confirm the call is well formed, then
-   raise it. Nothing about a 10-second run tells you which model is best.
-2. **Lower `cv_folds` before lowering `time_budget`.** Going from 5 folds to
-   2 removes 60% of the evaluation cost and still gives out-of-sample
-   estimates. A 30-second budget at `cv_folds = 2` is more informative than
-   the same budget at the default 5, which will skip CV entirely.
+   raise it. Below 30 seconds the forest and the advanced models are never
+   tried, so a 10-second run cannot tell you which model is best.
+2. **Lower `cv_folds` before lowering `time_budget`.** When fits are slow,
+   the 30% gate above leaves the later models with training-set scores. Two
+   folds fit two models per evaluation instead of five and still give
+   out-of-sample estimates, which leaves more of the budget for
+   cross-validating the rest.
 3. **Preprocess first.** AutoML does not impute or scale.
 4. **Score on held-out data.** The leaderboard ranks; it does not report
    final performance.

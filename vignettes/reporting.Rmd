@@ -35,7 +35,9 @@ if (!has_gt) {
 ## Overview
 
 Two families turn a fitted model into something publishable. `plot()` and
-the `tl_plot_*()` functions return ggplot2 objects; `tl_table()` and the
+the `tl_plot_*()` functions return ggplot2 objects, with the exceptions
+listed under [Interactive Reporting with
+plotly](#interactive-reporting-with-plotly); `tl_table()` and the
 `tl_table_*()` functions return `gt` tables. Both dispatch on model type, so
 the same call covers a forest and a lasso fit, and both hand back an object
 you can keep editing rather than printed output you cannot.
@@ -203,8 +205,8 @@ tl_table_comparison(
 
 ## Interactive Reporting with plotly
 
-Every plot function returns a ggplot2 object, so `ggplotly()` takes any of
-them without special handling:
+Most plot functions return a ggplot2 object, and `ggplotly()` takes any of
+those without special handling:
 
 ```{r plotly, eval = FALSE}
 library(plotly)
@@ -213,6 +215,20 @@ ggplotly(plot(model_reg, type = "actual_predicted"))
 ggplotly(tidy_pca_biplot(pca, label_obs = TRUE))
 ggplotly(tl_plot_regularization_path(model_lasso))
 ```
+
+These do not return a single ggplot2 object:
+
+- `plot_dendrogram()`, which `plot()` uses for an hclust model,
+  `tl_plot_tree()` and `tl_plot_nn_architecture()` draw with base graphics.
+- `tl_plot_xgboost_tree()` returns a DiagrammeR widget,
+  `tl_plot_deep_architecture()` draws the keras model diagram, and
+  `visualize_rules(method = "paracoord")` draws with grid.
+- `tl_diagnostic_dashboard()` and `plot_cluster_comparison()` return an
+  arranged grid of panels. `plot(model, type = "diagnostics")` and
+  `create_cluster_dashboard()` return a list of ggplot2 objects, which
+  `ggplotly()` takes one at a time.
+- `plot()` on a `tl_explore()` result draws its plot and returns the
+  exploration result, and `tl_dashboard()` returns a Shiny app.
 
 ## Putting It Together
 
@@ -233,5 +249,7 @@ plot(model, type = "confusion")
 tl_table_importance(model, top_n = 4)
 ```
 
-Swap `method = "forest"` for `method = "tree"` or `method = "svm"` and the
-reporting code above works without modification.
+Swap `method = "forest"` for `method = "tree"` and the reporting code above
+works without modification. `tl_table_importance()` covers the tree-based
+and regularised methods only, so for a method such as `"svm"` or `"nn"`,
+leave out the last call.
