@@ -74,10 +74,11 @@ NULL
 #' Arguments in \code{...} are passed to the function the method wraps,
 #' except for these, which tidylearn takes itself:
 #' \describe{
-#'   \item{\code{"polynomial"}}{\code{degree} (default 2). Each term of the
-#'     formula is replaced by \code{poly(term, degree, raw = TRUE)} and the
-#'     result fitted with \code{lm()}; interactions and \code{I()} terms are
-#'     kept as written.}
+#'   \item{\code{"polynomial"}}{\code{degree} (default 2). Each numeric main
+#'     effect is replaced by \code{poly(term, degree, raw = TRUE)} and the
+#'     result fitted with \code{lm()}. Factor terms, interactions,
+#'     \code{I()} terms, the response as written, an \code{offset()} and
+#'     a removed intercept are kept as they are.}
 #'   \item{\code{"ridge"}, \code{"lasso"}, \code{"elastic_net"}}{
 #'     \code{alpha}, glmnet's mixing parameter (by default 0, 1 and 0.5);
 #'     \code{lambda}, a penalty to fit at, or \code{NULL} (the default) to
@@ -112,7 +113,12 @@ NULL
 #' \code{weights} and \code{subset} take values, one per row of
 #' \code{data} (such as \code{weights = data$w}), not column names. A
 #' \code{subset} is applied before the fit, and \code{$data} holds only
-#' the rows it selects.
+#' the rows it selects. Case weights are applied by every supervised method
+#' except \code{"svm"} and \code{"deep"}, which refuse them. An offset,
+#' written as \code{offset()} in the formula, is applied by
+#' \code{"linear"}, \code{"polynomial"} and \code{"logistic"}; the other
+#' methods refuse one, because their \code{predict()} would not add it
+#' back.
 #'
 #' @param data A data frame containing the training data
 #' @param formula A formula specifying the model. For
