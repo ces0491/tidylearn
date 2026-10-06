@@ -427,6 +427,64 @@ test_that("regularised importance scales each coefficient by its own column", {
                unname(100 * raw / max(raw)))
 })
 
+test_that("regularised importance keeps two design columns of one name apart", {
+  # A factor a with level b gives the design column ab, which a numeric
+  # column ab shares. Matched by name, both coefficients took the first
+  # column's standard deviation, and the two were merged into one row.
+  set.seed(3)
+  d <- data.frame(
+    y = rnorm(40),
+    a = factor(sample(c("x", "b"), 40, TRUE), levels = c("x", "b")),
+    ab = rnorm(40, sd = 5)
+  )
+  model <- tl_model(d, y ~ a + ab, method = "ridge", lambda = 0.1)
+  design <- stats::model.matrix(y ~ a + ab, d)[, -1]
+  expect_identical(colnames(design), c("ab", "ab"))
+  beta <- as.matrix(stats::coef(model$fit, s = 0.1))[-1, 1]
+  raw <- abs(beta) * apply(design, 2, stats::sd)
+
+  imp <- tl_get_importance_regularized(model)
+  expect_identical(imp$feature, c("ab", "ab"))
+  expect_equal(imp$importance, unname(100 * raw / max(raw)))
+
+  # In the comparison each column goes to its own term: the factor column
+  # to a, the numeric one to ab
+  tree <- tl_model(d, y ~ a + ab, method = "tree")
+  p <- tl_plot_importance_comparison(tree, model, names = c("Tree", "Ridge"))
+  ridge <- p$data[p$data$model == "Ridge", ]
+  expect_equal(ridge$importance[ridge$feature == "a"],
+               unname(100 * raw[1] / max(raw)))
+  expect_equal(ridge$importance[ridge$feature == "ab"],
+               unname(100 * raw[2] / max(raw)))
+})
+
+test_that("regularised importance uses the SDs the fit recorded", {
+  # The SDs came from every stored row, so a model fitted with subset was
+  # scaled by rows it never fitted. A fit that records its own SDs, on the
+  # rows it was fitted on, is scaled by those.
+  model <- tl_model(mtcars, mpg ~ wt + hp + qsec, method = "ridge",
+                    lambda = 0.5)
+  attr(model$fit, "tl_x_sd") <- c(wt = 2, hp = 1, qsec = 4)
+  beta <- as.matrix(stats::coef(model$fit, s = 0.5))[-1, 1]
+  raw <- abs(beta) * c(2, 1, 4)
+  imp <- tl_get_importance_regularized(model)
+  expect_equal(imp$importance[match(names(beta), imp$feature)],
+               unname(100 * raw / max(raw)))
+})
+
+test_that("regularised importance of a subset fit uses the fitted rows", {
+  model <- tl_model(mtcars, mpg ~ wt + hp + qsec, method = "ridge",
+                    lambda = 0.5, subset = 1:20)
+  skip_if(is.null(attr(model$fit, "tl_x_sd")),
+          "this fit does not record its design column SDs")
+  design <- stats::model.matrix(mpg ~ wt + hp + qsec, mtcars[1:20, ])[, -1]
+  beta <- as.matrix(stats::coef(model$fit, s = 0.5))[-1, 1]
+  raw <- abs(beta) * apply(design, 2, stats::sd)
+  imp <- tl_get_importance_regularized(model)
+  expect_equal(imp$importance[match(names(beta), imp$feature)],
+               unname(100 * raw / max(raw)))
+})
+
 test_that("a feature one model dropped counts as zero in the ranking", {
   lasso <- tl_model(mtcars, mpg ~ ., method = "lasso")
   tree <- tl_model(mtcars, mpg ~ ., method = "tree")

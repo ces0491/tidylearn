@@ -104,8 +104,9 @@ tl_plot_importance_comparison <- function(..., top_n = 10, names = NULL) {
 #' (\code{Speciesversicolor}, \code{Speciesvirginica}). Filling zeros across
 #' the two namings said the lasso gave \code{Species} nothing and the forest
 #' gave the dummies nothing. Each name is mapped to the formula term it
-#' came from, and a term takes its largest column, so every model reports
-#' on the same names. A predictor the model was given and did not rank
+#' came from -- by position for glmnet, whose design columns can share a
+#' name -- and a term takes its largest column, so every model reports on
+#' the same names. A predictor the model was given and did not rank
 #' scores zero; one it was never given gets no row, so it draws no bar for
 #' this model and does not pull down the predictor's average.
 #'
@@ -119,8 +120,21 @@ tl_comparison_importance <- function(model, name) {
   method <- model$spec$method
   if (method %in% c("tree", "forest", "boost", "xgboost")) {
     imp <- tl_extract_importance(model)
+    mapped <- tl_importance_terms(model, imp$feature)
   } else if (method %in% c("ridge", "lasso", "elastic_net")) {
-    imp <- tl_get_importance_regularized(model)
+    # Two design columns can share a name -- a factor a with level b beside
+    # a numeric column ab -- so a column's term comes from its position
+    by_column <- tl_glmnet_column_importance(model)
+    kept <- !is.na(by_column$importance) & by_column$importance > 0
+    imp <- tibble::tibble(
+      feature = by_column$column[kept],
+      importance = tl_rescale_importance(by_column$importance[kept])
+    )
+    mapped <- list(
+      terms = attr(stats::terms(model$spec$formula, data = model$data),
+                   "term.labels"),
+      feature_terms = tl_design_column_terms(model)[kept]
+    )
   } else {
     warning(
       "Importance extraction not implemented for model type: ", method,
@@ -139,7 +153,6 @@ tl_comparison_importance <- function(model, name) {
     )
   }
 
-  mapped <- tl_importance_terms(model, imp$feature)
   by_term <- vapply(
     split(imp$importance, mapped$feature_terms), max, numeric(1)
   )
@@ -326,40 +339,109 @@ tl_extract_importance <- function(model) {
 #'   multiclass model a predictor takes its largest value across classes.
 #' @keywords internal
 tl_get_importance_regularized <- function(model, lambda = "1se") {
-  # Extract the glmnet model
-  fit <- model$fit
+  by_column <- tl_glmnet_column_importance(model, lambda)
 
+  # A penalty large enough to drop every predictor leaves nothing to rank,
+  # and an empty column comes back empty
+  kept <- !is.na(by_column$importance) & by_column$importance > 0
+  tibble::tibble(
+    feature = by_column$column[kept],
+    importance = tl_rescale_importance(by_column$importance[kept])
+  )
+}
+
+#' Importance of each design column of a regularised model
+#'
+#' A coefficient is per unit of its predictor, so |coefficient| ranked
+#' predictors by their units: hp / 100 made hp 100 times as important
+#' without changing a single prediction. Each is scaled by its column's
+#' standard deviation.
+#'
+#' \code{coef()} lists the intercept and then the design columns in the
+#' order the model was fitted on them, once per class for a multinomial
+#' fit, so coefficients and standard deviations are matched by position.
+#' Matched by name, two columns sharing one -- a factor a with level b
+#' beside a numeric column ab -- both took the first column's standard
+#' deviation and were merged into one row.
+#'
+#' @param model A tidylearn regularised model.
+#' @param lambda As for \code{tl_get_importance_regularized()}.
+#' @return A tibble with one row per design column, in design order:
+#'   \code{column}, its name, and \code{importance}, |coefficient| x SD
+#'   before rescaling. A multiclass column takes its largest value across
+#'   classes.
+#' @keywords internal
+#' @noRd
+tl_glmnet_column_importance <- function(model, lambda = "1se") {
+  fit <- model$fit
   lambda_val <- tl_resolve_lambda(fit, lambda)
 
   # Coefficients at the selected lambda, stacked by class for a
   # multinomial fit, whose coef() is a list that as.matrix() could not use
   coefs <- tl_glmnet_coef_tbl(fit, lambda_val)
-  coefs <- coefs[coefs$term != "(Intercept)", , drop = FALSE]
+  class_of <- if ("class" %in% names(coefs)) {
+    coefs$class
+  } else {
+    rep("", nrow(coefs))
+  }
+  slope <- coefs$term != "(Intercept)"
+  coefs <- coefs[slope, , drop = FALSE]
+  class_of <- class_of[slope]
+  position <- stats::ave(seq_along(class_of), class_of, FUN = seq_along)
+  columns <- coefs$term[class_of == class_of[1]]
 
-  # A coefficient is per unit of its predictor, so |coefficient| ranked
-  # predictors by their units: hp / 100 made hp 100 times as important
-  # without changing a single prediction. Scale each by its predictor's
-  # standard deviation in the design matrix the model was fitted on.
+  column_sd <- tl_glmnet_column_sd(model)
+  if (length(column_sd) != length(columns)) {
+    stop("could not match every coefficient to a design column. ",
+         "Please report this with a reproducible example.", call. = FALSE)
+  }
+
+  # A multiclass predictor matters as much as its largest effect on any
+  # class
+  effect <- abs(coefs$estimate) * unname(column_sd)[position]
+  tibble::tibble(
+    column = columns,
+    importance = vapply(split(effect, position), max, numeric(1),
+                        USE.NAMES = FALSE)
+  )
+}
+
+#' Standard deviation of each design column of a regularised model
+#'
+#' The fit records them, in design-column order, on the rows it was fitted
+#' on. Computed from the stored data instead, they took in every row,
+#' including any that \code{subset} left out of the fit; that is still the
+#' fallback for a fit without the record.
+#'
+#' @param model A tidylearn regularised model.
+#' @return A numeric vector, one value per design column, in design order.
+#' @keywords internal
+#' @noRd
+tl_glmnet_column_sd <- function(model) {
+  recorded <- attr(model$fit, "tl_x_sd")
+  if (!is.null(recorded)) {
+    return(recorded)
+  }
+
   # The intercept is dropped by name: a formula with - 1 has none, and
   # dropping the first column took the first predictor's SD with it
   frame <- stats::model.frame(model$spec$formula, data = model$data)
   design <- stats::model.matrix(stats::terms(frame), frame)
   design <- design[, colnames(design) != "(Intercept)", drop = FALSE]
-  predictor_sd <- apply(design, 2, stats::sd)
-  coefs$importance <- abs(coefs$estimate) * unname(predictor_sd[coefs$term])
+  apply(design, 2, stats::sd)
+}
 
-  # A multiclass predictor matters as much as its largest effect on any
-  # class
-  importance_df <- coefs |>
-    dplyr::group_by(feature = .data$term) |>
-    dplyr::summarise(importance = max(.data$importance), .groups = "drop") |>
-    dplyr::filter(.data[["importance"]] > 0)
-
-  # A penalty large enough to drop every predictor leaves nothing to rank,
-  # and an empty column comes back empty
-  importance_df$importance <- tl_rescale_importance(importance_df$importance)
-
-  importance_df
+#' The formula term each design column of a model belongs to
+#'
+#' @param model A tidylearn supervised model.
+#' @return The term label of each design column, in design order.
+#' @keywords internal
+#' @noRd
+tl_design_column_terms <- function(model) {
+  frame <- stats::model.frame(model$spec$formula, data = model$data)
+  design_terms <- stats::terms(frame)
+  assign <- attr(stats::model.matrix(design_terms, frame), "assign")
+  attr(design_terms, "term.labels")[assign[assign > 0]]
 }
 
 #' Plot model comparison
