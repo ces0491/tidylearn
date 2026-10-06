@@ -673,8 +673,12 @@ tl_read_github <- function(source, path = NULL, ref = "main", ...,
 #'   page (\code{/data}, \code{/code}, \code{/versions/2}) and may carry a
 #'   query; a competition URL is read as a competition without
 #'   \code{type} being set.
-#' @param file The specific file to read from the dataset. If \code{NULL} and
-#'   the dataset contains exactly one file, it is read automatically.
+#' @param file The specific file to read from the dataset, as a path within
+#'   it; a file the CLI saved under its base name is found too. If
+#'   \code{NULL}, the download is searched for files these readers handle
+#'   (CSV, TSV, Excel, Parquet and JSON, with compressed CSV/TSV and
+#'   \code{.ndjson}); with several, the newest is read and a message names
+#'   it.
 #' @param dest Directory to keep the download in. The default is a fresh
 #'   per-dataset directory under \code{tempdir()}. A supplied \code{dest}
 #'   receives this download's files, replacing files of the same name;
@@ -784,20 +788,28 @@ tl_read_kaggle <- function(source, file = NULL, dest = NULL,
     tl_keep_kaggle_download(staging, dest)
   }
 
+  # The formats the switch below reads
+  kaggle_formats <- c("csv", "tsv", "excel", "parquet", "json")
+
   # Find the downloaded file
   if (!is.null(file)) {
-    downloaded <- file.path(staging, file)
-    if (!file.exists(downloaded)) {
+    # The CLI saves a single requested file under its base name, and an
+    # unpacked archive keeps the path it was given in, so look in both
+    # places: file = "data/train.csv" arrives as train.csv on its own
+    downloaded <- file.path(staging, c(file, basename(file)))
+    downloaded <- downloaded[file.exists(downloaded)][1]
+    if (is.na(downloaded)) {
       stop("File '", file, "' is not in the Kaggle download. It holds: ",
            paste(list.files(staging, recursive = TRUE), collapse = ", "),
            call. = FALSE)
     }
   } else {
-    # Find files in the download that match common data formats
-    data_exts <- c("csv", "tsv", "json", "parquet", "xlsx", "xls")
-    pattern <- paste0("\\.(", paste(data_exts, collapse = "|"), ")$")
+    # The extensions the readers below handle, from the table the
+    # directory and archive scans use: a list of its own here missed
+    # .ndjson, .xlsm and compressed CSV
     candidates <- list.files(
-      staging, pattern = pattern, full.names = TRUE, recursive = TRUE
+      staging, pattern = tl_scan_pattern(kaggle_formats), full.names = TRUE,
+      recursive = TRUE, ignore.case = TRUE
     )
     candidates <- candidates[order(file.mtime(candidates), decreasing = TRUE)]
 

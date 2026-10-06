@@ -61,7 +61,11 @@ tl_cloud_timeout_seconds <- function(est_seconds,
 #' Validate a timeout cap
 #'
 #' Infinite is refused along with zero and negatives: the cap is what
-#' keeps the timeout below Modal's own 24-hour ceiling.
+#' keeps the timeout below Modal's own 24-hour ceiling. A cap below the
+#' timeout floor is refused too, rather than letting either give way:
+#' honouring it set a timeout under the floor, which kills every job
+#' during cold start, and raising it to the floor would bill past the
+#' bound the caller set.
 #'
 #' @param timeout_cap The value supplied.
 #' @keywords internal
@@ -70,6 +74,12 @@ tl_cloud_check_timeout_cap <- function(timeout_cap) {
   if (!is.numeric(timeout_cap) || length(timeout_cap) != 1L ||
         !is.finite(timeout_cap) || timeout_cap <= 0) {
     stop("'timeout_cap' must be a single positive number of seconds.",
+         call. = FALSE)
+  }
+  if (timeout_cap < .tl_cloud_timeout_floor) {
+    stop("'timeout_cap' must be at least ", .tl_cloud_timeout_floor,
+         " seconds: a job killed sooner dies during cold start and bills ",
+         "for nothing useful.",
          call. = FALSE)
   }
   invisible(TRUE)
@@ -203,13 +213,15 @@ tl_cloud_check_budget <- function(advice,
 #' @keywords internal
 #' @noRd
 tl_cloud_format_duration <- function(seconds) {
+  # In full, as tl_format_number() writes it: paste0() gave a million
+  # hours as "1e+06 h"
   if (seconds < 60) {
-    return(paste0(round(seconds), "s"))
+    return(paste0(tl_format_number(seconds), "s"))
   }
   if (seconds < 3600) {
-    return(paste0(round(seconds / 60, 1), " min"))
+    return(paste0(tl_format_number(seconds / 60, 1, nsmall = 0), " min"))
   }
-  paste0(round(seconds / 3600, 1), " h")
+  paste0(tl_format_number(seconds / 3600, 1, nsmall = 0), " h")
 }
 
 #' Format a cost for user-facing messages
@@ -222,7 +234,7 @@ tl_cloud_format_cost <- function(usd) {
   if (usd < 0.01) {
     return("<$0.01")
   }
-  paste0("$", format(round(usd, 2), nsmall = 2, trim = TRUE))
+  paste0("$", tl_format_number(usd, 2))
 }
 
 #' Build the pre-upload summary
@@ -252,9 +264,9 @@ tl_cloud_upload_summary <- function(method, host, n_rows, n_cols,
     "Uploading to Modal:",
     paste0("  Method:        ", method),
     paste0("  Destination:   ", destination),
-    paste0("  Rows x cols:   ", format(n_rows, big.mark = ","), " x ",
-           n_cols),
-    paste0("  Estimated MB:  ", round(size_mb)),
+    paste0("  Rows x cols:   ", tl_format_number(n_rows), " x ",
+           tl_format_number(n_cols)),
+    paste0("  Estimated MB:  ", tl_format_number(size_mb)),
     paste0("  Modal tier:    ", budget$tier_label),
     paste0("  Estimated:     ", tl_cloud_format_duration(est_seconds),
            ", ", tl_cloud_format_cost(budget$expected_cost)),

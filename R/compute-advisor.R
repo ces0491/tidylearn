@@ -321,7 +321,7 @@ tl_estimate_local_cpu_internal <- function(method, n_rows, n_cols, hyp) {
   notes <- if (!feasible) {
     paste0(
       "Estimated peak RAM (~",
-      format(round(est_peak_ram_mb), big.mark = ","),
+      tl_format_number(est_peak_ram_mb),
       " MB) exceeds the 16 GB heuristic ceiling. May not fit on a ",
       "typical laptop."
     )
@@ -529,7 +529,7 @@ tl_estimate_cloud_internal <- function(method, n_rows, n_cols, hyp,
       caveats,
       paste0(
         "No Modal tier in the requested class has the estimated ~",
-        format(round(ram_needed_gb, 1), nsmall = 1),
+        tl_format_number(ram_needed_gb, 1),
         " GB RAM headroom; showing the largest available tier."
       )
     )
@@ -574,7 +574,7 @@ tl_recommend_internal <- function(cpu, gpu, cloud) {
       reasoning,
       paste0(
         "Local CPU infeasible: estimated peak RAM ~",
-        format(round(cpu$est_peak_ram_mb), big.mark = ","),
+        tl_format_number(cpu$est_peak_ram_mb),
         " MB exceeds laptop heuristic ceiling."
       )
     )
@@ -585,9 +585,9 @@ tl_recommend_internal <- function(cpu, gpu, cloud) {
           reasoning,
           paste0(
             "Recommend cloud tier '", cloud$tier_label,
-            "' (~", format(round(cloud$ram_needed_gb, 1), nsmall = 1),
+            "' (~", tl_format_number(cloud$ram_needed_gb, 1),
             " GB RAM needed). Estimated cost: $",
-            format(round(cloud$est_cost_usd, 2), nsmall = 2),
+            tl_format_number(cloud$est_cost_usd, 2),
             "."
           )
         )
@@ -609,7 +609,7 @@ tl_recommend_internal <- function(cpu, gpu, cloud) {
       recommendation = "cpu",
       reasoning = paste0(
         "Estimated local CPU runtime ~",
-        format(round(cpu_seconds, 1), nsmall = 1),
+        tl_format_number(cpu_seconds, 1),
         "s. Cloud cold-start (~45s) would dominate; just run it locally."
       )
     ))
@@ -625,7 +625,7 @@ tl_recommend_internal <- function(cpu, gpu, cloud) {
         recommendation = "gpu",
         reasoning = paste0(
           "Local GPU is ~",
-          format(round(speedup, 1), nsmall = 1),
+          tl_format_number(speedup, 1),
           "x faster than CPU here and is already available."
         )
       ))
@@ -640,9 +640,9 @@ tl_recommend_internal <- function(cpu, gpu, cloud) {
         recommendation = "cloud",
         reasoning = paste0(
           "Cloud tier '", cloud$tier_label, "' ~",
-          format(round(cloud_speedup, 1), nsmall = 1),
+          tl_format_number(cloud_speedup, 1),
           "x faster than local CPU. Estimated cost: $",
-          format(round(cloud$est_cost_usd, 2), nsmall = 2),
+          tl_format_number(cloud$est_cost_usd, 2),
           "."
         )
       ))
@@ -654,7 +654,7 @@ tl_recommend_internal <- function(cpu, gpu, cloud) {
     recommendation = "cpu",
     reasoning = paste0(
       "Estimated local CPU runtime ~",
-      format(round(cpu_seconds), big.mark = ","),
+      tl_format_number(cpu_seconds),
       "s. No meaningfully faster tier available."
     )
   )
@@ -664,6 +664,14 @@ tl_recommend_internal <- function(cpu, gpu, cloud) {
 
 is_finite_num <- function(x) {
   is.numeric(x) && length(x) == 1L && is.finite(x)
+}
+
+# A number for a message or printout, written out in full with thousands
+# separators. format() switches to scientific notation when that is
+# shorter, so a 40,000,000 MB peak printed as "4e+07".
+tl_format_number <- function(x, digits = 0, nsmall = digits) {
+  format(round(x, digits), nsmall = nsmall, big.mark = ",",
+         scientific = FALSE, trim = TRUE)
 }
 
 #' Print method for `tidylearn_compute_advice` objects
@@ -680,9 +688,9 @@ print.tidylearn_compute_advice <- function(x, ...) {
   cat("<tidylearn compute advice>\n")
   cat(
     "Problem:        ", x$problem$method,
-    " on ", format(x$problem$rows, big.mark = ","), " rows x ",
-    x$problem$cols, " cols ",
-    "(~", format(round(x$problem$est_size_mb, 1), nsmall = 1), " MB)\n",
+    " on ", tl_format_number(x$problem$rows), " rows x ",
+    tl_format_number(x$problem$cols), " cols ",
+    "(~", tl_format_number(x$problem$est_size_mb, 1), " MB)\n",
     sep = ""
   )
   cat("\n")
@@ -690,15 +698,15 @@ print.tidylearn_compute_advice <- function(x, ...) {
 
   fmt_seconds <- function(s) {
     if (!is_finite_num(s)) return("--")
-    if (s < 60)   return(paste0(format(round(s, 1), nsmall = 1), "s"))
-    if (s < 3600) return(paste0(format(round(s / 60, 1), nsmall = 1), "m"))
-    paste0(format(round(s / 3600, 1), nsmall = 1), "h")
+    if (s < 60)   return(paste0(tl_format_number(s, 1), "s"))
+    if (s < 3600) return(paste0(tl_format_number(s / 60, 1), "m"))
+    paste0(tl_format_number(s / 3600, 1), "h")
   }
 
   cat(sprintf(
     "  Local CPU:    %s   (peak RAM ~%s MB, %d cores)%s\n",
     fmt_seconds(x$local_cpu$est_seconds),
-    format(round(x$local_cpu$est_peak_ram_mb), big.mark = ","),
+    tl_format_number(x$local_cpu$est_peak_ram_mb),
     x$local_cpu$cores_used,
     if (!isTRUE(x$local_cpu$feasible)) "  [infeasible]" else ""
   ))
@@ -716,7 +724,7 @@ print.tidylearn_compute_advice <- function(x, ...) {
     "  Cloud:        %s   (~$%s)%s   %s\n",
     fmt_seconds(x$cloud$est_seconds),
     if (is_finite_num(x$cloud$est_cost_usd)) {
-      format(round(x$cloud$est_cost_usd, 2), nsmall = 2)
+      tl_format_number(x$cloud$est_cost_usd, 2)
     } else {
       "--"
     },

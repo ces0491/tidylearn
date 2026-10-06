@@ -576,6 +576,9 @@ tl_read_dir <- function(path, pattern = NULL, format = NULL,
     found <- list.files(path, pattern = tl_scan_pattern(),
                         recursive = recursive, ignore.case = TRUE)
   }
+  # Without recursion list.files() returns folders too, and a folder named
+  # like a data file (old.csv) was read as a directory into the result
+  found <- found[!dir.exists(file.path(path, found))]
   files <- file.path(path, found)
 
   if (length(files) == 0) {
@@ -1064,7 +1067,9 @@ tl_read_parquet <- function(path, ...) {
 #' Reads a JSON file into a \code{tidylearn_data} object. Expects the JSON to
 #' represent tabular data (array of objects or similar). A file with the
 #' \code{.ndjson} extension is read as newline-delimited JSON, one record
-#' per line. Requires the \pkg{jsonlite} package.
+#' per line, and so is a \code{.json} file that does not parse as a single
+#' document but does as one record per line. Requires the \pkg{jsonlite}
+#' package.
 #'
 #' @param path Path to a JSON file.
 #' @param flatten Logical. Automatically flatten nested data frames? Default is
@@ -1095,13 +1100,25 @@ tl_read_json <- function(path, flatten = TRUE, ...) {
 
   # fromJSON() reads a file as one document, so newline-delimited JSON
   # failed at the end of its first record with "trailing garbage"
+  read_lines <- function() {
+    lines <- jsonlite::stream_in(file(path), verbose = FALSE, ...)
+    if (isTRUE(flatten)) jsonlite::flatten(lines) else lines
+  }
+
   if (tolower(tools::file_ext(path)) == "ndjson") {
-    data <- jsonlite::stream_in(file(path), verbose = FALSE, ...)
-    if (isTRUE(flatten)) {
-      data <- jsonlite::flatten(data)
-    }
+    data <- read_lines()
   } else {
-    data <- jsonlite::fromJSON(path, flatten = flatten, ...)
+    # The same records are often saved under a .json name, so a file that
+    # fails as one document is tried line by line before giving up
+    data <- tryCatch(
+      jsonlite::fromJSON(path, flatten = flatten, ...),
+      error = function(e) {
+        tryCatch(read_lines(), error = function(e_lines) {
+          stop("Cannot read '", path, "' as JSON or as newline-delimited ",
+               "JSON: ", conditionMessage(e), call. = FALSE)
+        })
+      }
+    )
   }
 
   if (!is.data.frame(data)) {

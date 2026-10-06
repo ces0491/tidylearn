@@ -50,11 +50,16 @@ write_test_zip <- function(path, members) {
 
 # A stand-in for the Kaggle CLI, first on PATH for the rest of the calling
 # test. It answers --version. A competition download copies `archive`
-# into the -p directory as competition.zip; a dataset download writes
-# downloaded.csv there, as the real CLI's --unzip would. Every call is
-# appended to the log file it returns. It is an R script behind a
-# one-line launcher, so it behaves the same on every platform.
-local_fake_kaggle <- function(archive = NULL, env = parent.frame()) {
+# into the -p directory as competition.zip. A dataset download writes
+# `dataset_lines` there, as the real CLI's --unzip would: to
+# `dataset_file`, or, given -f, to that file's base name, which is where
+# the real CLI saves a single file. Every call is appended to the log
+# file it returns. It is an R script behind a one-line launcher, so it
+# behaves the same on every platform.
+local_fake_kaggle <- function(archive = NULL,
+                              dataset_file = "downloaded.csv",
+                              dataset_lines = c("who", "fresh_download"),
+                              env = parent.frame()) {
   bin <- withr::local_tempdir("fake_kaggle_", .local_envir = env)
   log <- file.path(bin, "calls.log")
   script <- file.path(bin, "kaggle.R")
@@ -72,8 +77,10 @@ local_fake_kaggle <- function(archive = NULL, env = parent.frame()) {
       ", file.path(dest, 'competition.zip'), overwrite = TRUE)"
     ),
     "} else {",
-    "  writeLines(c('who', 'fresh_download'),",
-    "             file.path(dest, 'downloaded.csv'))",
+    paste0("  name <- ", deparse(dataset_file)),
+    "  if ('-f' %in% args) name <- basename(args[which(args == '-f') + 1])",
+    paste0("  writeLines(", paste(deparse(dataset_lines), collapse = ""),
+           ", file.path(dest, name))"),
     "}"
   ), script)
 
@@ -524,6 +531,26 @@ test_that("tl_read reads newline-delimited JSON", {
   expect_equal(result$a, c(1L, 2L))
   expect_equal(result$b, c("x", "y"))
   expect_equal(attr(result, "tl_format"), "json")
+})
+
+test_that("JSON Lines saved as .json is read record by record", {
+  skip_if_not_installed("jsonlite")
+  # One record per line under a .json name failed as a single document
+  # with "parse error: trailing garbage"
+  path <- withr::local_tempfile(fileext = ".json")
+  writeLines(c('{"a":1,"b":"x"}', '{"a":2,"b":"y"}'), path)
+
+  result <- tl_read_json(path)
+  expect_equal(result$a, c(1L, 2L))
+  expect_equal(result$b, c("x", "y"))
+
+  # A file that is neither JSON nor JSON Lines is still an error
+  broken <- withr::local_tempfile(fileext = ".json")
+  writeLines(c("[", '  {"a": 1},', '  {"a": 2', "]"), broken)
+  expect_error(
+    tl_read_json(broken),
+    "as JSON or as newline-delimited JSON"
+  )
 })
 
 test_that("scans find .ndjson and compressed CSV, and leave .txt alone", {
@@ -1141,6 +1168,30 @@ test_that("tl_read_kaggle refuses a download whose members escape", {
   expect_false(file.exists(file.path(tempdir(), "escaped_kaggle.csv")))
 })
 
+test_that("tl_read_kaggle(file =) finds a file saved under its base name", {
+  skip_on_cran()
+  # The CLI saves a single requested file under its base name, so
+  # file = "data/train.csv" arrived as train.csv and was reported missing
+  local_fake_kaggle()
+
+  result <- suppressMessages(
+    tl_read_kaggle("owner/data-set", file = "data/train.csv")
+  )
+  expect_equal(result$who, "fresh_download")
+})
+
+test_that("tl_read_kaggle looks for every file type its readers handle", {
+  skip_on_cran()
+  # The search knew six extensions of its own, so a dataset holding only
+  # newline-delimited JSON had "no data files"
+  local_fake_kaggle(dataset_file = "rows.ndjson",
+                    dataset_lines = '{"who":"ndjson_rows"}')
+
+  result <- suppressMessages(tl_read_kaggle("owner/data-set"))
+  expect_equal(result$who, "ndjson_rows")
+  expect_equal(attr(result, "tl_format"), "kaggle+json")
+})
+
 # ---- tl_read_s3 (error path only) ----
 
 test_that("tl_read_s3 errors on invalid URI", {
@@ -1394,6 +1445,26 @@ test_that("a recursive scan labels each file by its path below the folder", {
     result$source_file[order(result$v)],
     c("2023/sales.csv", "2024/sales.csv")
   )
+})
+
+test_that("a folder named like a data file is not read as one", {
+  # Without recursion list.files() returns folders too, so a folder called
+  # old.csv was read as a directory and its rows mixed into the result
+  dir <- withr::local_tempdir()
+  dir.create(file.path(dir, "old.csv"))
+  write.csv(data.frame(v = 9), file.path(dir, "old.csv", "inner.csv"),
+            row.names = FALSE)
+  write.csv(data.frame(v = 1), file.path(dir, "a.csv"), row.names = FALSE)
+
+  scans <- list(
+    by_format = tl_read_dir(dir, format = "csv", .quiet = TRUE),
+    by_pattern = tl_read_dir(dir, pattern = "csv$", .quiet = TRUE),
+    everything = tl_read_dir(dir, .quiet = TRUE)
+  )
+  for (scan in names(scans)) {
+    expect_equal(scans[[scan]]$v, 1, info = scan)
+    expect_equal(scans[[scan]]$source_file, "a.csv", info = scan)
+  }
 })
 
 test_that("tl_read_dir errors on empty directory", {

@@ -126,6 +126,24 @@ test_that("a public suffix cannot be opened", {
   expect_false(tl_is_allowed_host("mycompany.co.uk"))
 })
 
+test_that("a host given with a trailing dot is stored without it", {
+  suppressMessages(tl_cloud_allow_host(NULL))
+  on.exit(suppressMessages(tl_cloud_allow_host(NULL)))
+
+  # "fits.example.com." is the same host written as a fully qualified
+  # name. It was stored with the dot, which no endpoint's host carries,
+  # so the addition matched nothing.
+  suppressMessages(tl_cloud_allow_host("fits.example.com."))
+  expect_true(tl_is_allowed_host("fits.example.com"))
+  expect_true("fits.example.com" %in% tl_cloud_allowed_hosts())
+  expect_false("fits.example.com." %in% tl_cloud_allowed_hosts())
+
+  # Only the one root dot goes: a further empty label is still refused,
+  # and a two-label name stays too broad without its dot
+  expect_error(tl_cloud_allow_host("fits.example.com.."), "an empty label")
+  expect_error(tl_cloud_allow_host("example.com."), "too broad to allow")
+})
+
 test_that("a configured endpoint on an added host validates", {
   skip_if_not_installed("httr2")
   on.exit(suppressMessages(tl_cloud_allow_host(NULL)))

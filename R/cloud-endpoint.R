@@ -23,8 +23,13 @@ NULL
 #' count is the rule: it refuses every two-label suffix, and a longer
 #' public suffix still passes.
 #'
+#' The trailing dot of a fully qualified name (`"fits.example.com."`) is
+#' dropped: an endpoint's host never carries it, so a host stored with it
+#' matched nothing.
+#'
 #' @param host A character vector of candidate host names.
-#' @return The hosts, lower-cased. Errors if any is unacceptable.
+#' @return The hosts, lower-cased and without a trailing dot. Errors if any
+#'   is unacceptable.
 #' @keywords internal
 #' @noRd
 tl_validate_host_name <- function(host) {
@@ -36,7 +41,7 @@ tl_validate_host_name <- function(host) {
     )
   }
 
-  host <- tolower(trimws(host))
+  host <- sub("\\.$", "", tolower(trimws(host)))
 
   for (h in host) {
     if (grepl("[/@?#*[:space:]]|://|:[0-9]+$", h)) {
@@ -49,7 +54,9 @@ tl_validate_host_name <- function(host) {
 
     labels <- strsplit(h, ".", fixed = TRUE)[[1]]
 
-    if (any(!nzchar(labels))) {
+    # strsplit() drops a final empty field, so a dot left at the end after
+    # the root dot was removed is checked for directly
+    if (any(!nzchar(labels)) || endsWith(h, ".")) {
       stop(
         "'", h, "' is not a valid host name: it has an empty label.",
         call. = FALSE

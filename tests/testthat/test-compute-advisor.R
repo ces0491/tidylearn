@@ -349,6 +349,21 @@ test_that("the advisor sizes inputs past the integer limit", {
   expect_equal(advice$recommendation, "cloud")
 })
 
+test_that("the advice writes large sizes out in full", {
+  # format() writes a round number in scientific notation when that is
+  # shorter, so a 40,000,000 MB peak printed as "4e+07" in the table, the
+  # reasoning and the notes
+  advice <- tl_compute_advisor("xgboost", fake_frame(1e9, 1250), y ~ .,
+                               gpu_check = fake_gpu_off)
+  output <- capture.output(print(advice))
+
+  expect_false(any(grepl("[0-9]e[+]", output)))
+  expect_true(any(grepl("(~10,000,000.0 MB)", output, fixed = TRUE)))
+  expect_true(any(grepl("peak RAM ~40,000,000 MB", output, fixed = TRUE)))
+  expect_match(advice$reasoning[1], "~40,000,000 MB", fixed = TRUE)
+  expect_match(advice$local_cpu$notes, "~40,000,000 MB", fixed = TRUE)
+})
+
 test_that("the advisor's defaults are the fit functions' own", {
   # The advisor assumed 10 epochs of 128 units for "deep" and a hidden
   # layer of 10 for "nn". tl_fit_deep() trains 30 epochs through layers of

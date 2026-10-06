@@ -142,6 +142,22 @@ test_that("the timeout cap is validated before it is used", {
   )
 })
 
+test_that("a cap below the timeout floor is refused", {
+  # A 30 s cap set a 30 s timeout, under the 60 s floor, so every job
+  # would be killed during cold start having billed for nothing useful
+  expect_error(
+    tl_cloud_timeout_seconds(10, timeout_cap = 30),
+    "'timeout_cap' must be at least 60 seconds"
+  )
+  expect_error(
+    tl_cloud_check_budget(fake_advice(10), timeout_cap = 30),
+    "'timeout_cap' must be at least 60 seconds"
+  )
+
+  # The floor itself is a usable cap
+  expect_equal(tl_cloud_timeout_seconds(10, timeout_cap = 60), 60L)
+})
+
 test_that("a cap that cuts the timeout's headroom is flagged", {
   # An estimate of 3599 s got a 3600 s timeout -- one second of headroom on
   # an order-of-magnitude estimate -- without a word
@@ -192,6 +208,25 @@ test_that("the summary states the destination and the worst case", {
 
   # Metadata only -- no row values anywhere (T6).
   expect_false(grepl("[0-9]+\\.[0-9]{4,}", txt))
+})
+
+test_that("large counts in the summary are written out in full", {
+  # format() writes a round number in scientific notation when that is
+  # shorter, so ten million rows read "1e+07"
+  budget <- tl_cloud_check_budget(fake_advice(120), max_cost = 5)
+  lines <- tl_cloud_upload_summary(
+    method = "xgboost", host = "ws--fit.modal.run",
+    n_rows = 1e7, n_cols = 1250, size_mb = 1e8,
+    budget = budget, est_seconds = 120
+  )
+  txt <- paste(lines, collapse = "\n")
+
+  expect_match(txt, "10,000,000 x 1,250", fixed = TRUE)
+  expect_match(txt, "Estimated MB:  100,000,000", fixed = TRUE)
+  expect_false(grepl("[0-9]e[+]", txt))
+
+  expect_equal(tl_cloud_format_cost(2e6), "$2,000,000.00")
+  expect_equal(tl_cloud_format_duration(3.6e9), "1,000,000 h")
 })
 
 test_that("a session-added destination is flagged in the summary", {
