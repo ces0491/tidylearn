@@ -4,10 +4,12 @@
 \alias{tl_read_s3}
 \title{Read from Amazon S3}
 \usage{
-tl_read_s3(source, format = NULL, region = NULL, ...)
+tl_read_s3(source, format = NULL, region = NULL, ..., trust_rds = FALSE)
 }
 \arguments{
-\item{source}{An S3 URI (e.g., \code{"s3://bucket/path/to/file.csv"}).}
+\item{source}{An S3 URI (e.g., \code{"s3://bucket/path/to/file.csv"}).
+Zip archives are not read from S3: download the object and read it
+with \code{tl_read_zip()}.}
 
 \item{format}{Optional format override for the downloaded file. If
 \code{NULL}, auto-detected from the S3 key extension.}
@@ -16,6 +18,12 @@ tl_read_s3(source, format = NULL, region = NULL, ...)
 configuration.}
 
 \item{...}{Additional arguments passed to the format-specific reader.}
+
+\item{trust_rds}{Logical. Read an \code{.rds}, \code{.rdata} or
+\code{.rda} object on R older than 4.4.0? Those versions can run code
+embedded in a crafted file as it is read (CVE-2024-27322), so such
+objects are refused there unless this is \code{TRUE}. It has no
+effect on R 4.4.0 or later. Default \code{FALSE}.}
 }
 \value{
 A \code{tidylearn_data} object containing the downloaded data.
@@ -26,10 +34,18 @@ object. The file format is auto-detected from the key's extension, or can be
 specified explicitly. Requires the \pkg{paws.storage} package and valid AWS
 credentials.
 }
+\section{Reading R serialisation files}{
+
+An \code{.rds} or \code{.rdata} object is rebuilt with \code{readRDS()}
+or \code{load()}, which recreate whatever R objects the file describes.
+Read them only from a bucket you trust, on any version of R.
+}
+
 \examples{
-\donttest{
-# data <- tl_read_s3("s3://my-bucket/data/sales.csv")
-# data <- tl_read_s3("s3://my-bucket/data/results.parquet")
+\dontrun{
+# Needs AWS credentials
+tl_read_s3("s3://my-bucket/data/sales.csv")
+tl_read_s3("s3://my-bucket/data/results.parquet", region = "eu-west-1")
 }
 
 }

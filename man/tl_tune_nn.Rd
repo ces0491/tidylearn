@@ -7,7 +7,7 @@
 tl_tune_nn(
   data,
   formula,
-  is_classification = FALSE,
+  is_classification = NULL,
   sizes = c(1, 2, 5, 10),
   decays = c(0, 0.001, 0.01, 0.1),
   folds = 5,
@@ -20,7 +20,10 @@ tl_tune_nn(
 \item{formula}{A formula specifying the model}
 
 \item{is_classification}{Logical indicating if this is a
-classification problem}
+classification problem. \code{NULL} (default) reads it from the
+response, as \code{\link{tl_model}} does: a factor or character
+response is classification. \code{FALSE} with such a response is an
+error.}
 
 \item{sizes}{Vector of hidden layer sizes to try}
 
@@ -28,13 +31,20 @@ classification problem}
 
 \item{folds}{Number of cross-validation folds (default: 5)}
 
-\item{...}{Additional arguments to pass to nnet()}
+\item{...}{Additional arguments to pass to nnet(). \code{maxit}
+(default 100) and \code{trace} (default \code{FALSE}) replace the
+values used otherwise. Arguments with one value per row --
+\code{weights}, \code{subset}, \code{offset}, \code{foldid},
+\code{strata} -- are refused, since each fold fits a subset of the
+rows.}
 }
 \value{
 A list with elements \code{model} (the best fitted \code{nnet}
 model), \code{best_size} (optimal hidden-layer size), \code{best_decay}
 (optimal weight decay), and \code{tuning_results} (a data frame of all
-parameter combinations and their cross-validated errors).
+parameter combinations and their cross-validated errors: the
+misclassification rate for classification, the mean squared error for
+regression).
 }
 \description{
 Tune a neural network model

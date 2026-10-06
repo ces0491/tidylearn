@@ -22,7 +22,8 @@ tl_read_dir(
 
 \item{format}{File format to read. If \code{NULL} and \code{pattern} is
 \code{NULL}, all recognized data files are read. If specified, only files
-with matching extensions are read.}
+with matching extensions are read. \code{.txt} files are read only
+when selected with \code{pattern}.}
 
 \item{recursive}{Logical. Should subdirectories be scanned? Default is
 \code{FALSE}.}
@@ -33,7 +34,8 @@ with matching extensions are read.}
 }
 \value{
 A \code{tidylearn_data} object with an additional
-\code{source_file} column identifying the origin of each row.
+\code{source_file} column giving each row's file as a path below
+\code{path}, such as \code{"2024/sales.csv"}.
 }
 \description{
 Scans a directory for files matching a pattern or format, reads each one,
@@ -41,15 +43,22 @@ and row-binds them into a single \code{tidylearn_data} object with a
 \code{source_file} column identifying the origin of each row.
 }
 \examples{
-\donttest{
-# Read all CSVs from a directory
-# data <- tl_read_dir("data/", format = "csv")
+dir <- tempfile("sales_")
+dir.create(file.path(dir, "2024"), recursive = TRUE)
+write.csv(mtcars[1:16, ], file.path(dir, "jan.csv"), row.names = FALSE)
+write.csv(mtcars[17:32, ], file.path(dir, "2024", "feb.csv"),
+          row.names = FALSE)
 
-# Read with pattern matching
-# data <- tl_read_dir("data/", pattern = "^sales_.*\\.csv$")
+# Only the top level unless asked to recurse
+tl_read_dir(dir, format = "csv")
 
-# Read all recognized data files recursively
-# data <- tl_read_dir("data/", recursive = TRUE)
-}
+# Files in subfolders are labelled by their path below dir
+all_months <- tl_read_dir(dir, recursive = TRUE, .quiet = TRUE)
+table(all_months$source_file)
+
+# Or select files by a regular expression
+tl_read_dir(dir, pattern = "^jan", .quiet = TRUE)
+
+unlink(dir, recursive = TRUE)
 
 }

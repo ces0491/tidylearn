@@ -10,7 +10,8 @@ tl_semisupervised(
   labeled_indices,
   cluster_method = "kmeans",
   supervised_method = "tree",
-  ...
+  ...,
+  cluster_args = list()
 )
 }
 \arguments{
@@ -21,22 +22,28 @@ or logical column.}
 
 \item{labeled_indices}{Indices of labeled observations}
 
-\item{cluster_method}{Clustering method for label propagation}
+\item{cluster_method}{Clustering method for label propagation:
+\code{"kmeans"} (default), \code{"pam"}, \code{"clara"} or
+\code{"hclust"}, whose tree is cut at k}
 
 \item{supervised_method}{Supervised learning method for the final
 model (default: \code{"tree"}, which handles any number of classes).
 \code{"logistic"} is binary-only and errors on a response with more
 than two levels.}
 
-\item{...}{Additional arguments}
+\item{...}{Additional arguments for the supervised model}
+
+\item{cluster_args}{A named list of arguments for the clustering step,
+such as \code{list(nstart = 5)} for k-means. k is set from the
+labelled classes and cannot be given here.}
 }
 \value{
 A tidylearn model object with additional class
 \code{"tidylearn_semisupervised"}, trained on pseudo-labeled data. The
 model includes a \code{semisupervised_info} element with
 \code{labeled_indices}, \code{cluster_model}, \code{label_mapping},
-and \code{n_unlabelled_dropped}, the number of rows left out because
-their cluster had no labelled observation.
+and \code{n_unlabelled_dropped}, the number of rows left out for
+having no label to train on.
 }
 \description{
 Train a supervised model with limited labels by first clustering the data
@@ -44,9 +51,14 @@ and propagating labels within clusters.
 }
 \details{
 Labels are propagated by majority vote within each cluster, so the
-response must be categorical. Rows in a cluster that holds no labelled
-observation have no label to take; they are left out of training, with
-a warning giving the count.
+response must be categorical. The rows are clustered on the predictors
+the formula names, into as many clusters as the labelled rows hold
+classes. A labelled row whose label is missing takes no part in the
+vote. Rows in a cluster where no labelled observation carries a label
+have no label to take, and labelled rows whose own label is missing
+have none either; both are left out of training, with a warning giving
+the counts. The pseudo-labels keep the response's level order, so the
+second level stays the positive class.
 }
 \examples{
 \donttest{

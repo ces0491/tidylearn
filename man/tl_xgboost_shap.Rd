@@ -10,16 +10,24 @@ tl_xgboost_shap(model, data = NULL, n_samples = 100, trees_idx = NULL)
 \item{model}{A tidylearn XGBoost model object}
 
 \item{data}{Data for SHAP value calculation
-(default: NULL, uses training data)}
+(default: NULL, uses training data). The response column is not
+needed.}
 
 \item{n_samples}{Number of samples to use (default: 100, NULL for all)}
 
-\item{trees_idx}{Trees to include (default: NULL, uses all trees)}
+\item{trees_idx}{Boosting rounds to include, as a run of consecutive
+rounds counted from 1 such as \code{1:20} (default: NULL, uses every
+round)}
 }
 \value{
-A data frame with one column of SHAP values per feature, a
-\code{BIAS} column, a \code{row_id} column, and the original data columns
-appended for reference.
+A data frame with one column of SHAP values per feature (the
+columns of the model's design matrix), a \code{BIAS} column and a
+\code{row_id} column giving the row of the (sampled) data each row
+explains. For a multiclass model there is one block of rows per class,
+told apart by a \code{class} column. The columns of \code{data} whose
+names are not already taken -- the response, and any factor predictor,
+whose SHAP columns are named after its levels -- are appended for
+reference.
 }
 \description{
 Generate SHAP values for XGBoost model interpretation
@@ -27,7 +35,7 @@ Generate SHAP values for XGBoost model interpretation
 \examples{
 \donttest{
 if (requireNamespace("xgboost", quietly = TRUE)) {
-  model <- tl_model(mtcars, mpg ~ ., method = "xgboost")
+  model <- tl_model(mtcars, mpg ~ ., method = "xgboost", nthread = 2)
   shap <- tl_xgboost_shap(model, n_samples = 20)
 }
 }

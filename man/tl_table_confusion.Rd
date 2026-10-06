@@ -14,15 +14,19 @@ tl_table_confusion(model, new_data = NULL, ...)
 \item{...}{Additional arguments (currently unused)}
 }
 \value{
-A \code{\link[gt]{gt}} table object.
+A \code{\link[gt]{gt}} table object, with a row and a column for
+each class the model was trained on. Rows of a class the model never
+saw are left out, with a warning.
 }
 \description{
 Produces a styled gt confusion matrix with correct predictions highlighted.
 Only available for classification models.
 }
 \examples{
+\dontshow{if (requireNamespace("gt", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \donttest{
 model <- tl_model(iris, Species ~ ., method = "forest")
 tl_table_confusion(model)
 }
+\dontshow{\}) # examplesIf}
 }

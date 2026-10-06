@@ -8,12 +8,17 @@ tl_default_param_grid(method, size = "medium", is_classification = TRUE)
 }
 \arguments{
 \item{method}{Model method ("tree", "forest",
-"boost", "svm", etc.)}
+"boost", "svm", "xgboost", etc.)}
 
 \item{size}{Grid size: "small", "medium", "large"}
 
-\item{is_classification}{Whether the task is
-classification or regression}
+\item{is_classification}{Whether the grid is for a classification task
+(the default) or a regression one. For regression, an \code{"svm"}
+grid also tunes \code{epsilon}, the width of the band within which
+e1071's regression SVM ignores errors, and the large \code{"forest"}
+grid centres \code{nodesize} on randomForest's regression default of
+5 rather than its classification default of 1. The other grids are
+the same for both tasks.}
 }
 \value{
 A named list of parameter values suitable for passing to
@@ -22,7 +27,10 @@ element is a numeric or character vector of candidate values for
 that hyperparameter, or for \code{"deep"}'s \code{hidden_layers} a list
 of layer-size vectors. The grid is built without the data, so a
 \code{"forest"} \code{mtry} can exceed the number of predictors; the
-tuners cap it. \code{"polynomial"} tunes \code{degree}.
+tuners cap it. \code{"polynomial"} tunes \code{degree}. The
+\code{"xgboost"} grids draw on the values \code{\link{tl_tune_xgboost}}
+searches by default, and add \code{nrounds}, which that function
+chooses by early stopping and \code{\link{tl_tune_grid}} has to tune.
 \code{"linear"} and \code{"logistic"} have no tuneable
 hyperparameter and return an empty list with a warning, as does an
 unknown method.
@@ -34,5 +42,6 @@ Create pre-defined parameter grids for common models
 \donttest{
 grid <- tl_default_param_grid("tree", size = "small")
 grid <- tl_default_param_grid("forest", size = "medium")
+grid <- tl_default_param_grid("svm", is_classification = FALSE)
 }
 }

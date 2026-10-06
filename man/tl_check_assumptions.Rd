@@ -17,10 +17,18 @@ tl_check_assumptions(model, test = TRUE, verbose = TRUE)
 A named list with one element per assumption checked
 (\code{linearity}, \code{independence}, \code{homoscedasticity},
 \code{normality}, \code{multicollinearity}, \code{outliers}), each
-containing \code{assumption} (character label), \code{check} (logical
-or \code{NULL}), \code{details} (character), and
-\code{recommendation} (character). An additional \code{overall} element
-summarises the number of assumptions checked, violated, and satisfied.
+containing \code{assumption} (character label), \code{check} (logical,
+\code{NA} when the test could not decide, or \code{NULL} when no test
+was run), \code{details} (character), and \code{recommendation}
+(character). An additional \code{overall} element summarises the
+number of assumptions checked, violated, and satisfied; an \code{NA} or
+\code{NULL} check counts as neither.
+
+Logistic regression assumes neither normal residuals nor a constant
+variance, so for a logistic model \code{normality} and
+\code{homoscedasticity} have a \code{NULL} check and a note saying so.
+For a factor, multicollinearity is judged on \code{GVIF^(1/Df)}, the
+generalised VIF on the scale of an ordinary one.
 }
 \description{
 Check model assumptions

@@ -31,7 +31,9 @@ classification problem}
 
 \item{trace}{Logical; whether to print progress (default: FALSE)}
 
-\item{...}{Additional arguments to pass to nnet()}
+\item{...}{Additional arguments to pass to nnet(), including case
+\code{weights}. For regression, \code{linout} replaces the default
+\code{TRUE}. An offset is refused: nnet leaves it out of the fit.}
 }
 \value{
 A fitted neural network model

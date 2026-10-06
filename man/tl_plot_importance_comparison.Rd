@@ -11,18 +11,25 @@ tl_plot_importance_comparison(..., top_n = 10, names = NULL)
 
 \item{top_n}{Number of top features to display (default: 10)}
 
-\item{names}{Optional character vector of model names}
+\item{names}{Optional character vector of model names, one unique name
+per model}
 }
 \value{
 A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
-Plot feature importance across multiple models
+Each model's importance is on its own 0-100 scale. A factor predictor
+appears once, under its own name, for every model: the largest of its
+design columns stands for it where a method ranks those columns
+separately (ridge, lasso, elastic net and xgboost). A predictor a model
+was given but did not use scores zero for that model; one it was never
+given has no bar for it. Features are ranked on their mean importance
+over the models that were given them.
 }
 \examples{
 \donttest{
-m1 <- tl_model(iris, Species ~ ., method = "forest")
-m2 <- tl_model(iris, Species ~ ., method = "boost")
+m1 <- tl_model(iris, Sepal.Length ~ ., method = "forest")
+m2 <- tl_model(iris, Sepal.Length ~ ., method = "boost")
 tl_plot_importance_comparison(m1, m2, names = c("Forest", "Boost"))
 }
 }

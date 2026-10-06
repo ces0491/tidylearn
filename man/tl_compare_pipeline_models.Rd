@@ -9,8 +9,8 @@ tl_compare_pipeline_models(pipeline, metrics = NULL)
 \arguments{
 \item{pipeline}{A tidylearn pipeline object with results}
 
-\item{metrics}{Character vector of metrics to compare
-(if NULL, uses all available)}
+\item{metrics}{Character vector of metrics to compare, each one the
+pipeline scored (if NULL, uses all available)}
 }
 \value{
 A \code{\link[ggplot2]{ggplot}} object showing a faceted bar

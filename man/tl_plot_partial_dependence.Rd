@@ -17,7 +17,12 @@ variables (default: 20)}
 \item{...}{Additional arguments}
 }
 \value{
-A \code{\link[ggplot2]{ggplot}} object.
+A \code{\link[ggplot2]{ggplot}} object. Its data has a
+\code{var_value} column and the mean prediction over the model's
+training rows, \code{y}, at each value. For classification, \code{y}
+is a mean class probability and a \code{class} column says which
+class: the positive class (the second level) alone for a two-class
+model, and every class, one line each, for more.
 }
 \description{
 Plot partial dependence for tree-based models

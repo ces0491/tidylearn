@@ -11,7 +11,11 @@ tl_fit_regularized(
   alpha = 0,
   lambda = NULL,
   cv_folds = 5,
-  ...
+  ...,
+  weights = NULL,
+  foldid = NULL,
+  subset = NULL,
+  offset = NULL
 )
 }
 \arguments{
@@ -25,13 +29,26 @@ classification problem}
 \item{alpha}{Mixing parameter (0 for Ridge, 1 for Lasso,
 between 0-1 for Elastic Net)}
 
-\item{lambda}{Regularization parameter (if NULL, uses
-cross-validation to select)}
+\item{lambda}{Regularization parameter: a single penalty to fit at, or
+\code{NULL} (the default) or a sequence of penalties, from which
+cross-validation chooses one}
 
 \item{cv_folds}{Number of folds for cross-validation
 (default: 5)}
 
-\item{...}{Additional arguments to pass to glmnet()}
+\item{...}{Additional arguments to pass to glmnet() or cv.glmnet(). A
+name neither function takes is an error, as are \code{x}, \code{y},
+\code{family} and \code{nfolds}, which tidylearn sets itself.}
+
+\item{weights}{Optional case weights, one per row of \code{data}}
+
+\item{foldid}{Optional fold for each row of \code{data}, for the
+cross-validation that chooses lambda}
+
+\item{subset}{Optional rows of \code{data} to fit on}
+
+\item{offset}{Not supported: glmnet would need the offset again at
+every prediction. An error if supplied.}
 }
 \value{
 A fitted regularized regression model

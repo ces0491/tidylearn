@@ -18,13 +18,23 @@ tl_pipeline(
 
 \item{formula}{A formula specifying the model}
 
-\item{preprocessing}{A list of preprocessing steps}
+\item{preprocessing}{A named list of preprocessing switches, each
+\code{TRUE} or \code{FALSE}: \code{impute_missing} (default
+\code{TRUE}) replaces missing predictor values with the training
+median or mode; \code{standardize} (default \code{TRUE}) centres and
+scales numeric predictors, leaving alone any column the formula uses
+inside a function call such as \code{log()}, \code{poly()} or
+\code{offset()}, so those terms are computed on the column's own
+scale; \code{dummy_encode} (default \code{TRUE}) only records that
+categorical predictors are encoded by each model's fitting function,
+and cannot be set to \code{FALSE}.}
 
 \item{models}{A list of models to train}
 
 \item{evaluation}{A list of evaluation criteria}
 
-\item{...}{Additional arguments}
+\item{...}{Not used. Anything passed here is an error, so a misspelt
+argument such as \code{evalution} is reported rather than ignored.}
 }
 \value{
 A \code{tidylearn_pipeline} object (S3 list) with components

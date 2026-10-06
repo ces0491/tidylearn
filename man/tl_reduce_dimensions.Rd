@@ -2,7 +2,7 @@
 % Please edit documentation in R/integration.R
 \name{tl_reduce_dimensions}
 \alias{tl_reduce_dimensions}
-\title{Integration Functions: Combining Supervised and Unsupervised Learning}
+\title{Feature Engineering via Dimensionality Reduction}
 \usage{
 tl_reduce_dimensions(
   data,
@@ -17,9 +17,11 @@ tl_reduce_dimensions(
 
 \item{response}{Response variable name (will be preserved)}
 
-\item{method}{Dimensionality reduction method: "pca", "mds"}
+\item{method}{Dimensionality reduction method: "pca" or "mds"}
 
-\item{n_components}{Number of components to retain}
+\item{n_components}{Number of components to retain, at most the number
+the method computes: one per numeric column for PCA, and \code{k}
+(default 2, passed through \code{...}) for MDS. NULL keeps them all.}
 
 \item{...}{Additional arguments for the dimensionality reduction method}
 }
@@ -35,11 +37,6 @@ model.}
 }
 }
 \description{
-These functions demonstrate the power of tidylearn's unified approach by
-seamlessly integrating supervised and unsupervised learning techniques.
-Feature Engineering via Dimensionality Reduction
-}
-\details{
 Use PCA, MDS, or other dimensionality reduction as a preprocessing step
 for supervised learning. This can improve model performance
 and interpretability.

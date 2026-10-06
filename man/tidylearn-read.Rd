@@ -16,17 +16,21 @@ the data source.
 Supported file formats:
 \itemize{
 \item \strong{CSV}: \code{.csv} files via \pkg{readr}
-(with base R fallback)
+(with base R fallback), and \code{.txt} files named directly
 \item \strong{TSV}: \code{.tsv} files via \pkg{readr}
 (with base R fallback)
 \item \strong{Excel}: \code{.xls}, \code{.xlsx},
 \code{.xlsm} files via \pkg{readxl}
 \item \strong{Parquet}: \code{.parquet} files via \pkg{nanoparquet}
-\item \strong{JSON}: \code{.json} files via \pkg{jsonlite}
+\item \strong{JSON}: \code{.json} files, and newline-delimited
+\code{.ndjson} files, via \pkg{jsonlite}
 \item \strong{RDS}: \code{.rds} files via base \code{readRDS()}
 \item \strong{RData}: \code{.rdata}, \code{.rda}
 files via base \code{load()}
 }
+CSV and TSV files compressed with gzip, bzip2 or xz
+(\code{data.csv.gz}) are recognised by the extension under the
+compression one.
 
 Supported databases (via \pkg{DBI}):
 \itemize{
@@ -42,6 +46,7 @@ Supported cloud/API sources:
 \item \strong{GitHub}: raw file download from repositories
 \item \strong{Kaggle}: dataset download via Kaggle CLI
 }
+Other web URLs are not read; download the file first.
 
 Multi-file reading:
 \itemize{
@@ -52,5 +57,13 @@ optional pattern/format filtering and recursive scanning
 \code{.zip} files
 }
 When combining multiple files, a \code{source_file} column is added to
-identify the origin of each row.
+identify the origin of each row: the file's path below the directory
+or archive it came from, or, for paths given directly, below the
+deepest folder they share. Files in one folder are labelled by their
+bare names.
+
+Directory and archive scans read the extensions listed above except
+\code{.txt}, which in a folder is as likely to hold notes as data.
+Name a \code{.txt} file directly, or select it with \code{pattern},
+to read it.
 }

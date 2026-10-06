@@ -22,8 +22,14 @@ as a \code{tidylearn_data} object. The connection is automatically closed
 when done. Requires \pkg{DBI} and \pkg{RSQLite}.
 }
 \examples{
-\donttest{
-# data <- tl_read_sqlite("my_database.sqlite", "SELECT * FROM my_table")
-}
+\dontshow{if (requireNamespace("RSQLite", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+# RSQLite imports DBI, so both are available here
+path <- tempfile(fileext = ".sqlite")
+conn <- DBI::dbConnect(RSQLite::SQLite(), path)
+DBI::dbWriteTable(conn, "cars", mtcars)
+DBI::dbDisconnect(conn)
 
+tl_read_sqlite(path, "SELECT mpg, cyl, hp FROM cars WHERE cyl = 6")
+unlink(path)
+\dontshow{\}) # examplesIf}
 }

@@ -7,8 +7,10 @@
 tl_read(source, ..., format = NULL, .quiet = FALSE)
 }
 \arguments{
-\item{source}{A file path, URL, connection string, directory path, or a
-character vector of multiple file paths.}
+\item{source}{A file path, a GitHub or Kaggle URL, an \code{s3://} URI,
+a database connection string, a directory path, or a character vector
+of multiple file paths. Other web URLs are refused: download the file
+and read the local copy.}
 
 \item{...}{Additional arguments passed to the format-specific reader.}
 
@@ -39,27 +41,31 @@ source.
 }
 \details{
 When \code{source} is a character vector of multiple paths, each file is read
-and row-bound into a single result with a \code{source_file} column. When
+and row-bound into a single result with a \code{source_file} column
+giving each file's path below the deepest folder they share. When
 \code{source} is a directory path, it is equivalent to calling
-\code{tl_read_dir()}. When \code{source} is a \code{.zip} file, it is
-equivalent to calling \code{tl_read_zip()}.
+\code{tl_read_dir()}. When \code{source} is a local \code{.zip} file, it
+is equivalent to calling \code{tl_read_zip()}.
 }
 \examples{
-\donttest{
-# Read a single CSV file
-# data <- tl_read("path/to/data.csv")
+# The format is detected from the extension
+csv <- tempfile(fileext = ".csv")
+write.csv(mtcars, csv, row.names = FALSE)
+tl_read(csv)
 
-# Read multiple files and row-bind
-# data <- tl_read(c("jan.csv", "feb.csv", "mar.csv"))
+# Several files are row-bound, with a source_file column naming each
+jan <- tempfile(fileext = ".csv")
+feb <- tempfile(fileext = ".csv")
+write.csv(mtcars[1:16, ], jan, row.names = FALSE)
+write.csv(mtcars[17:32, ], feb, row.names = FALSE)
+both <- tl_read(c(jan, feb), .quiet = TRUE)
+table(both$source_file)
 
-# Read all CSVs from a directory
-# data <- tl_read("data/")
+# A .txt file is read as CSV unless told otherwise
+txt <- tempfile(fileext = ".txt")
+write.table(mtcars, txt, sep = "\t", row.names = FALSE)
+tl_read(txt, format = "tsv", .quiet = TRUE)
 
-# Read from a zip archive
-# data <- tl_read("data.zip")
-
-# Explicit format override
-# data <- tl_read("path/to/data.txt", format = "tsv")
-}
+unlink(c(csv, jan, feb, txt))
 
 }

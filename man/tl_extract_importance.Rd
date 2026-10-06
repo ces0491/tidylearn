@@ -10,7 +10,8 @@ tl_extract_importance(model)
 \item{model}{A tidylearn model object}
 }
 \value{
-A data frame with feature importance values
+A data frame with feature importance values, rescaled so the
+largest is 100. Empty for a tree with no splits.
 }
 \description{
 Extract importance from a tree-based model

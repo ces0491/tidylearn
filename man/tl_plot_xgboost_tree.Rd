@@ -9,9 +9,11 @@ tl_plot_xgboost_tree(model, tree_index = 0, ...)
 \arguments{
 \item{model}{A tidylearn XGBoost model object}
 
-\item{tree_index}{Index of the tree to plot (default: 0, first tree)}
+\item{tree_index}{Index of the tree to plot, counting the first tree as
+0 (default: 0). A multiclass model grows one tree per class in each
+round.}
 
-\item{...}{Additional arguments}
+\item{...}{Additional arguments passed to \code{xgboost::xgb.plot.tree()}}
 }
 \value{
 The return value of \code{\link[xgboost]{xgb.plot.tree}}, a
@@ -24,7 +26,8 @@ Plot XGBoost tree visualization
 \donttest{
 if (requireNamespace("xgboost", quietly = TRUE) &&
     requireNamespace("DiagrammeR", quietly = TRUE)) {
-  model <- tl_model(iris, Species ~ ., method = "xgboost", nrounds = 10)
+  model <- tl_model(iris, Species ~ ., method = "xgboost", nrounds = 10,
+    nthread = 2)
 
   # tree_index is zero-based, so this is the first tree
   tl_plot_xgboost_tree(model, tree_index = 0)

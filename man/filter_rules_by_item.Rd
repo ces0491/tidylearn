@@ -7,9 +7,12 @@
 filter_rules_by_item(rules_obj, item, where = "both")
 }
 \arguments{
-\item{rules_obj}{A tidy_apriori object or tibble of rules}
+\item{rules_obj}{A tidy_apriori object, an arules rules object, or a
+tibble of rules from \code{\link{tidy_rules}}, which must keep its
+\code{lhs_items} and \code{rhs_items} columns}
 
-\item{item}{Character; item to filter by}
+\item{item}{Character; one item name, matched against whole items, so
+"coffee" does not match "instant coffee"}
 
 \item{where}{Character; "lhs", "rhs", or "both" (default: "both")}
 }

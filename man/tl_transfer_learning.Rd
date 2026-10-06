@@ -15,16 +15,20 @@ tl_transfer_learning(
 \arguments{
 \item{data}{Training data}
 
-\item{formula}{Model formula}
+\item{formula}{Model formula, or a string that parses as one. The PCA is
+fitted on the numeric predictors it names.}
 
-\item{pretrain_method}{Pre-training method: "pca", "autoencoder"}
+\item{pretrain_method}{Pre-training method. Only \code{"pca"} is
+available: \code{predict()} has to project new rows, and PCA is the
+reduction that can.}
 
 \item{supervised_method}{Supervised learning method (default:
 \code{"tree"}, which handles both regression and classification with
 any number of classes). \code{"logistic"} is binary-only and errors
 on a response with more than two levels.}
 
-\item{...}{Additional arguments}
+\item{...}{Additional arguments passed to
+\code{\link{tl_reduce_dimensions}}, such as \code{n_components}}
 }
 \value{
 A list with class \code{"tidylearn_transfer"} containing:
@@ -36,8 +40,9 @@ A list with class \code{"tidylearn_transfer"} containing:
 }
 }
 \description{
-Use unsupervised pre-training (e.g., autoencoder
-features) before supervised learning
+Use unsupervised pre-training before supervised learning: the
+predictors the formula names are projected onto their principal
+components, and the supervised model is fitted on the component scores.
 }
 \examples{
 \donttest{

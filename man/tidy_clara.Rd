@@ -4,10 +4,11 @@
 \alias{tidy_clara}
 \title{Tidy CLARA (Clustering Large Applications)}
 \usage{
-tidy_clara(data, k, metric = "euclidean", samples = 50, sampsize = NULL)
+tidy_clara(data, k, metric = "euclidean", samples = 50, sampsize = NULL, ...)
 }
 \arguments{
-\item{data}{A data frame or tibble}
+\item{data}{A data frame or tibble. CLARA samples observations, so it
+takes no distance matrix; use \code{\link{tidy_pam}} for a dist object.}
 
 \item{k}{Number of clusters}
 
@@ -16,6 +17,9 @@ tidy_clara(data, k, metric = "euclidean", samples = 50, sampsize = NULL)
 \item{samples}{Number of samples to draw (default: 50)}
 
 \item{sampsize}{Sample size (default: min(n, 40 + 2*k))}
+
+\item{...}{Further arguments passed to \code{\link[cluster]{clara}}, such
+as \code{correct.d}, \code{pamLike} or \code{rngR}.}
 }
 \value{
 A list of class \code{"tidy_clara"} containing:

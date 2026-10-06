@@ -42,7 +42,10 @@ hyperparameters (default: FALSE)}
 \item{tune_folds}{Number of folds for cross-validation
 during tuning (default: 5)}
 
-\item{...}{Additional arguments to pass to svm()}
+\item{...}{Additional arguments to pass to svm(). \code{type} and
+\code{probability} replace the defaults chosen from the task. Case
+\code{weights} are refused: e1071 has none. So is an offset, which
+e1071 leaves out of the fit.}
 }
 \value{
 A fitted SVM model

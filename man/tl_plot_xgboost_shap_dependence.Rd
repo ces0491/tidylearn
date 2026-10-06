@@ -26,7 +26,8 @@ tl_plot_xgboost_shap_dependence(
 (default: 100, NULL for all)}
 }
 \value{
-A \code{\link[ggplot2]{ggplot}} object.
+A \code{\link[ggplot2]{ggplot}} object. A multiclass model is
+drawn one panel per class, from that class's SHAP values.
 }
 \description{
 Plot SHAP dependence for a specific feature
@@ -34,8 +35,10 @@ Plot SHAP dependence for a specific feature
 \examples{
 \donttest{
 if (requireNamespace("xgboost", quietly = TRUE)) {
-  model <- tl_model(iris, Species ~ ., method = "xgboost", nrounds = 10)
+  model <- tl_model(iris, Species ~ ., method = "xgboost", nrounds = 10,
+    nthread = 2)
 
+  # One panel per class
   tl_plot_xgboost_shap_dependence(model, feature = "Petal.Length")
 
   # Colour the points by a second feature to read the interaction

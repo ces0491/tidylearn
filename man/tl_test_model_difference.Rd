@@ -16,7 +16,12 @@ tl_test_model_difference(
 
 \item{baseline_model}{Name of the model to use as baseline for comparison}
 
-\item{test}{Type of statistical test: "t.test" or "wilcox"}
+\item{test}{Type of statistical test: \code{"t.test"}, a paired t-test,
+or \code{"wilcox"}, a paired Wilcoxon signed-rank test
+(\code{"wilcox.test"} is read as \code{"wilcox"}). With no tied or zero
+differences the signed-rank test is exact, and the smallest two-sided
+p-value it can give for \code{n} folds is \code{2 / 2^n}: 0.0625 for 5
+folds, so it needs at least 6 to reach \code{p < 0.05}.}
 
 \item{metric}{Name of the metric to compare}
 }
@@ -24,7 +29,10 @@ tl_test_model_difference(
 A data frame with columns \code{metric}, \code{model},
 \code{baseline}, \code{mean_diff}, \code{p_value}, and
 \code{p_adj} (Holm-adjusted p-value) containing pairwise
-statistical comparisons against the baseline model.
+statistical comparisons against the baseline model. Each comparison
+pairs the folds both models have a value for, and \code{mean_diff} is
+the mean of those paired differences. With fewer than two such folds
+the p-values are \code{NA}, with a warning.
 }
 \description{
 Perform statistical comparison of models using cross-validation

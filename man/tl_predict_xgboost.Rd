@@ -24,8 +24,9 @@ tl_predict_xgboost(
 \item{iterationrange}{Boosting iterations to predict with, as
 \code{c(start, end)} -- base-1 and inclusive of both ends, so
 \code{c(1, 20)} predicts from the first twenty iterations and
-\code{end} may not exceed the number fitted. NULL (default) uses
-every iteration.}
+\code{end} may not exceed the number fitted. It is translated for
+xgboost before 3.0, which reads the end as exclusive. NULL (default)
+uses every iteration.}
 
 \item{ntreelimit}{Deprecated. Use \code{iterationrange} instead.
 \code{ntreelimit = n} is translated to \code{c(1, n)}.}

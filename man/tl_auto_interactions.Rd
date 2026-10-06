@@ -18,7 +18,8 @@ tl_auto_interactions(
 
 \item{formula}{A formula specifying the base model without interactions}
 
-\item{top_n}{Number of top interactions to return}
+\item{top_n}{Number of top interactions to return, a whole number. With
+\code{0} none is added.}
 
 \item{min_r2_change}{Minimum change in R-squared to consider}
 
@@ -33,7 +34,9 @@ A tidylearn model object (class \code{"tidylearn_model"}) fitted
 with the top significant interaction terms added to the formula.
 The interaction test results and selected interactions are stored as
 attributes \code{"interaction_tests"} and
-\code{"selected_interactions"}.
+\code{"selected_interactions"}, data frames in the layout
+\code{\link{tl_test_interactions}} returns. Both are present when no
+interaction is added, with no rows where there is nothing to report.
 }
 \description{
 Find important interactions automatically

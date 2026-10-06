@@ -23,8 +23,9 @@ Reads a tab-separated file into a
 available for faster parsing, with a base R fallback.
 }
 \examples{
-\donttest{
-# data <- tl_read_tsv("path/to/data.tsv")
-}
+path <- tempfile(fileext = ".tsv")
+write.table(mtcars, path, sep = "\t", row.names = FALSE)
+tl_read_tsv(path)
+unlink(path)
 
 }

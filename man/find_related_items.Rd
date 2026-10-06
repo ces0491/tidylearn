@@ -7,9 +7,12 @@
 find_related_items(rules_obj, item, min_lift = 1.5, top_n = 10)
 }
 \arguments{
-\item{rules_obj}{A tidy_apriori object}
+\item{rules_obj}{A tidy_apriori object, an arules rules object, or a
+tibble of rules from \code{\link{tidy_rules}}, which must keep its
+\code{lhs_items} and \code{rhs_items} columns}
 
-\item{item}{Character; item to find associations for}
+\item{item}{Character; one item name to find associations for, matched
+against whole items}
 
 \item{min_lift}{Minimum lift threshold (default: 1.5)}
 

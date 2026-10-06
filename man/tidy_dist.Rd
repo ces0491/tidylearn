@@ -14,7 +14,8 @@ tidy_dist(data, method = "euclidean", cols = NULL, ...)
 "manhattan", "maximum", "gower"}
 
 \item{cols}{Columns to include (tidy select).
-If NULL, uses all numeric columns.}
+If NULL, uses all numeric columns, or every column for
+\code{method = "gower"}.}
 
 \item{...}{Additional arguments passed to distance functions}
 }

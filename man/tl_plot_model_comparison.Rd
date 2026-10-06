@@ -9,8 +9,9 @@ tl_plot_model_comparison(..., new_data = NULL, metrics = NULL, names = NULL)
 \arguments{
 \item{...}{tidylearn model objects to compare}
 
-\item{new_data}{Optional data frame for evaluation
-(if NULL, uses training data)}
+\item{new_data}{Optional data frame for evaluation. If NULL, the models
+are scored on their training data, which they must share: models
+fitted on different data are an error asking for \code{new_data}.}
 
 \item{metrics}{Character vector of metrics to compute}
 

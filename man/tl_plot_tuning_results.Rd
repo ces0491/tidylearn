@@ -34,6 +34,15 @@ A \code{\link[ggplot2]{ggplot}} object.
 \description{
 Plot hyperparameter tuning results
 }
+\details{
+A parameter whose candidates are not single values, such as
+\code{hidden_layers = list(c(10), c(20, 10))} or a \code{parms} list,
+is drawn as a categorical one, each value labelled as the verbose
+messages print it. The importance of a numeric parameter is the
+absolute correlation of its values with the score; that of a
+categorical one is eta squared from a one-way ANOVA of the score,
+and 0 when the sets that were scored all share one value.
+}
 \examples{
 \donttest{
 model <- tl_tune_grid(iris, Species ~ ., method = "tree",

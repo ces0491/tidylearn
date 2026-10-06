@@ -25,13 +25,13 @@ classification problem}
 \item{alpha}{Mixing parameter (default: 0.5 for
 Elastic Net)}
 
-\item{lambda}{Regularization parameter (if NULL, uses
-cross-validation to select)}
+\item{lambda}{Regularization parameter: a single penalty, or NULL or a
+sequence of penalties for cross-validation to choose from}
 
 \item{cv_folds}{Number of folds for cross-validation
 (default: 5)}
 
-\item{...}{Additional arguments to pass to glmnet()}
+\item{...}{Additional arguments to pass to glmnet() or cv.glmnet()}
 }
 \value{
 A fitted Elastic Net regression model

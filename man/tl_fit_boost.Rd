@@ -37,12 +37,24 @@ in terminal nodes (default: 10)}
 \item{cv.folds}{Number of cross-validation folds
 (default: 0, no CV)}
 
-\item{...}{Additional arguments to pass to gbm()}
+\item{...}{Additional arguments to pass to gbm(), including case
+\code{weights}. \code{verbose}, and for regression
+\code{distribution}, replace the defaults used here. An offset is
+refused: predict.gbm() does not add it back.}
 }
 \value{
 A fitted gradient boosting model
 }
 \description{
 Fit a gradient boosting model
+}
+\details{
+The distribution follows the response: \code{"gaussian"} for
+regression, \code{"bernoulli"} for two classes and
+\code{"multinomial"} for more. gbm describes its multinomial
+distribution as currently broken, kept only for backwards
+compatibility, and warns to that effect on every multiclass fit. For
+three or more classes, \code{method = "forest"} or
+\code{method = "xgboost"} are the better supported choices.
 }
 \keyword{internal}

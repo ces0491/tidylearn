@@ -4,7 +4,7 @@
 \alias{tidy_pam}
 \title{Tidy PAM (Partitioning Around Medoids)}
 \usage{
-tidy_pam(data, k, metric = "euclidean", cols = NULL)
+tidy_pam(data, k, metric = "euclidean", cols = NULL, ...)
 }
 \arguments{
 \item{data}{A data frame, tibble, or dist object}
@@ -15,13 +15,20 @@ tidy_pam(data, k, metric = "euclidean", cols = NULL)
 Use "gower" for mixed data types.}
 
 \item{cols}{Columns to include (tidy select). If NULL, uses all columns.}
+
+\item{...}{Further arguments passed to \code{\link[cluster]{pam}}, such
+as \code{nstart}, \code{variant} or starting \code{medoids}.}
 }
 \value{
 A list of class "tidy_pam" containing:
 \itemize{
 \item clusters: tibble with observation IDs and cluster assignments
-\item medoids: tibble of medoid indices and values
-\item silhouette: average silhouette width
+\item medoids: tibble with one row per cluster: the medoid's row
+position in the data (\code{medoid_index}, an integer) and, unless
+\code{data} was a dist object, its values
+\item silhouette_avg: average silhouette width
+\item silhouette_data: the silhouette information \code{pam()}
+returns (its \code{silinfo})
 \item model: original pam object
 }
 }

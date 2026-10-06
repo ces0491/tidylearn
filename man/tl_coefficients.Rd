@@ -19,8 +19,9 @@ tl_coefficients(
 \item{conf_int}{Whether to add \code{conf_low} and \code{conf_high}
 columns (default \code{FALSE}). Not available for regularised methods.}
 
-\item{level}{Confidence level for the interval (default 0.95). Ignored
-unless \code{conf_int = TRUE}.}
+\item{level}{Confidence level for the interval (default 0.95), a number
+strictly between 0 and 1. Used only when \code{conf_int = TRUE}, but
+checked either way, so a percentage such as \code{95} is an error.}
 
 \item{exponentiate}{Whether to report \code{estimate} and the interval on
 the odds scale rather than the log-odds scale (default \code{FALSE}).

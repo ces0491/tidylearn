@@ -12,6 +12,12 @@ tl_get_best_model(pipeline)
 \value{
 The best \code{tidylearn_model} object from the pipeline,
 selected by the metric specified in \code{evaluation$best_metric}.
+The model was fitted on the preprocessed training data, so under the
+default preprocessing it expects predictors imputed and standardised
+the same way. Predict through \code{\link{tl_predict_pipeline}}, which
+replays that preprocessing on raw rows; \code{predict()} on the model
+itself reads raw values as if they were already standardised, and
+returns wrong predictions without a warning.
 }
 \description{
 Get the best model from a pipeline
@@ -24,5 +30,9 @@ pipe <- tl_pipeline(iris, Species ~ .,
     cv_folds = 2, best_metric = "accuracy"))
 pipe <- tl_run_pipeline(pipe, verbose = FALSE)
 best <- tl_get_best_model(pipe)
+best$spec$method
+
+# Predict through the pipeline, which preprocesses the new rows first
+tl_predict_pipeline(pipe, iris[c(1, 51, 101), ])
 }
 }

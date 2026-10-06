@@ -19,9 +19,11 @@ plot_clusters(
 
 \item{cluster_col}{Name of cluster column (default: "cluster")}
 
-\item{x_col}{X-axis variable (if NULL, uses first numeric column)}
+\item{x_col}{X-axis variable (if NULL, uses the first numeric column
+other than \code{cluster_col})}
 
-\item{y_col}{Y-axis variable (if NULL, uses second numeric column)}
+\item{y_col}{Y-axis variable (if NULL, uses the second numeric column
+other than \code{cluster_col})}
 
 \item{centers}{Optional data frame of cluster centers}
 

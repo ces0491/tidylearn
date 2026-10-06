@@ -11,21 +11,26 @@ tl_explore(data, response = NULL, max_components = 5, k_range = 2:6)
 
 \item{response}{Optional response variable for colored visualizations}
 
-\item{max_components}{Maximum PCA components to compute (default: 5)}
+\item{max_components}{Maximum number of PCA components to keep (default:
+5), or fewer if the data has fewer numeric columns}
 
-\item{k_range}{Range of k values for clustering (default: 2:6)}
+\item{k_range}{Range of k values for clustering (default: 2:6). Each is
+a whole number from 2 to one less than the number of rows, the range a
+silhouette is defined over.}
 }
 \value{
 A list with class \code{"tidylearn_eda"} containing:
 \describe{
 \item{data}{The original data frame.}
 \item{response}{The response variable name, or \code{NULL}.}
-\item{pca}{The fitted PCA model.}
+\item{pca}{The fitted PCA model, keeping the first
+\code{max_components} components, as
+\code{prcomp(rank. = max_components)} would.}
 \item{optimal_k}{List with optimal cluster count results.}
 \item{kmeans}{The fitted k-means model.}
 \item{hclust}{The fitted hierarchical clustering model.}
 \item{summary}{List with \code{n_obs}, \code{n_vars},
-\code{n_components}, and \code{best_k}.}
+\code{n_components} (the number kept), and \code{best_k}.}
 }
 }
 \description{

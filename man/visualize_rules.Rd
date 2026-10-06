@@ -7,20 +7,23 @@
 visualize_rules(rules_obj, method = "scatter", top_n = 50, ...)
 }
 \arguments{
-\item{rules_obj}{A tidy_apriori object, rules object, or rules tibble}
+\item{rules_obj}{A tidy_apriori object or an arules rules object. A
+table of rules is refused: the plots need the rules object.}
 
-\item{method}{Visualization method: "scatter"
-(default), "graph", "grouped", "paracoord"}
+\item{method}{Visualization method: "scatter" (default), drawn by
+tidylearn, or a method of \pkg{arulesViz}'s \code{plot()}, such as
+"graph", "grouped", "matrix" or "paracoord"}
 
-\item{top_n}{Number of top rules to visualize (default: 50)}
+\item{top_n}{Number of rules to visualize, those with the highest lift
+(default: 50)}
 
 \item{...}{Additional arguments passed to plot() for rules visualization}
 }
 \value{
-A \code{\link[ggplot2]{ggplot}} object when
-\code{method = "scatter"}.
-For other methods, the plot is produced as a side effect via
-\pkg{arulesViz}.
+For \code{method = "scatter"}, a \code{\link[ggplot2]{ggplot}}
+object. Other methods return what \pkg{arulesViz}'s \code{plot()}
+returns: a ggplot object for "graph", "grouped" and "matrix", and for
+"paracoord", which draws with grid, a grid \code{vpPath}.
 }
 \description{
 Create visualizations of association rules

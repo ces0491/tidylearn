@@ -17,7 +17,11 @@ tl_read_mysql(
 \arguments{
 \item{dsn}{A MySQL connection string (e.g.,
 \code{"mysql://user:pass@host:port/dbname"}), or the database host if
-using named parameters.}
+using named parameters. Percent-encode special characters in the user
+name and password (\code{@} as \code{\%40}). Query parameters are
+refused, because \pkg{RMariaDB} ignores arguments it does not know;
+pass its \code{dbConnect()} arguments, such as \code{ssl.ca},
+through \code{...}.}
 
 \item{query}{A SQL query string.}
 
@@ -25,9 +29,10 @@ using named parameters.}
 
 \item{user}{Username (if not in \code{dsn}).}
 
-\item{password}{Password (if not in \code{dsn}).}
+\item{password}{Password (if not in \code{dsn}), which keeps it out of
+the connection string.}
 
-\item{port}{Port number. Default is 3306.}
+\item{port}{Port number (if not in \code{dsn}). Default is 3306.}
 
 \item{...}{Additional arguments passed to \code{DBI::dbConnect()}.}
 }
@@ -41,14 +46,15 @@ string or individual connection parameters. Requires \pkg{DBI} and
 \pkg{RMariaDB}.
 }
 \examples{
-\donttest{
-# data <- tl_read_mysql(
-#   dsn = "localhost",
-#   query = "SELECT * FROM my_table",
-#   dbname = "mydb",
-#   user = "myuser",
-#   password = "mypass"
-# )
+\dontrun{
+# Needs a running MySQL or MariaDB server
+tl_read_mysql(
+  dsn = "localhost",
+  query = "SELECT * FROM my_table",
+  dbname = "mydb",
+  user = "myuser",
+  password = Sys.getenv("MYSQL_PWD")
+)
 }
 
 }

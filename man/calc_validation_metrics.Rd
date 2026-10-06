@@ -7,7 +7,10 @@
 calc_validation_metrics(clusters, data = NULL, dist_mat = NULL)
 }
 \arguments{
-\item{clusters}{Vector of cluster assignments}
+\item{clusters}{Vector of cluster assignments: numeric, factor or
+character. A label of 0 marks noise, as \code{\link{tidy_dbscan}}
+reports it: noise points are left out of every measure and counted in
+\code{n_noise}.}
 
 \item{data}{Original data frame (for WSS calculation)}
 
@@ -15,9 +18,10 @@ calc_validation_metrics(clusters, data = NULL, dist_mat = NULL)
 }
 \value{
 A single-row tibble with columns \code{k}, \code{min_size},
-\code{max_size}, \code{avg_size}, and optionally \code{avg_silhouette},
-\code{min_silhouette} (if \code{dist_mat} provided), and \code{total_wss}
-(if \code{data} provided).
+\code{max_size}, \code{avg_size}, \code{n_noise}, and optionally
+\code{avg_silhouette}, \code{min_silhouette} (if \code{dist_mat}
+provided; \code{NA} for a single cluster), and \code{total_wss} (if
+\code{data} provided).
 }
 \description{
 Comprehensive validation metrics for a clustering result

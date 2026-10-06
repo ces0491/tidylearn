@@ -34,6 +34,7 @@ A list of class "tidy_kmeans" containing:
 \item clusters: tibble with observation IDs and cluster assignments
 \item centers: tibble of cluster centers
 \item metrics: tibble with clustering quality metrics
+\item sizes: integer vector of cluster sizes
 \item model: original kmeans object
 }
 }

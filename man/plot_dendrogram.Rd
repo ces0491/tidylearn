@@ -11,7 +11,9 @@ plot_dendrogram(
 )
 }
 \arguments{
-\item{hclust_obj}{Hierarchical clustering object (hclust or tidy_hclust)}
+\item{hclust_obj}{Hierarchical clustering object: an \code{hclust}, a
+\code{tidy_hclust}, or a tidylearn model fitted with
+\code{method = "hclust"}}
 
 \item{k}{Number of clusters to highlight}
 

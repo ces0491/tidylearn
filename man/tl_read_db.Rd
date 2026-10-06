@@ -24,10 +24,11 @@ by this function — the caller is responsible for managing the connection
 lifecycle.
 }
 \examples{
-\donttest{
-# conn <- DBI::dbConnect(RSQLite::SQLite(), "my_database.sqlite")
-# data <- tl_read_db(conn, "SELECT * FROM my_table")
-# DBI::dbDisconnect(conn)
-}
-
+\dontshow{if (requireNamespace("RSQLite", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+# RSQLite imports DBI, so both are available here
+conn <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+DBI::dbWriteTable(conn, "cars", mtcars)
+tl_read_db(conn, "SELECT mpg, cyl, hp FROM cars WHERE cyl = 6")
+DBI::dbDisconnect(conn)
+\dontshow{\}) # examplesIf}
 }

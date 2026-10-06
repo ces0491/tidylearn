@@ -34,10 +34,21 @@ tl_step_selection(
 A \code{tidylearn_model} object of class
 \code{tidylearn_linear} wrapping the selected \code{\link[stats]{lm}}
 model. Access the underlying model via \code{$fit} and the selected
-formula via \code{$spec$formula}.
+formula via \code{$spec$formula}. \code{$data} is the data passed in.
 }
 \description{
 Perform stepwise selection on a linear model
+}
+\details{
+Every candidate model is fitted on the same rows: those with no
+missing value in any variable of \code{formula}. When that leaves out
+rows a candidate could otherwise use, a message gives the count, and
+the fit records the rows in its \code{na.action}, as \code{lm()}
+records the rows it drops itself.
+
+Forward and both-direction selection start from a model holding the
+intercept, or none if \code{formula} removes it with \code{- 1}, and
+any \code{offset()} terms in \code{formula}. Neither is ever dropped.
 }
 \examples{
 \donttest{

@@ -17,7 +17,9 @@ tl_read_postgres(
 \arguments{
 \item{dsn}{A PostgreSQL connection string (e.g.,
 \code{"postgres://user:pass@host:port/dbname"}), or the database host if
-using named parameters.}
+using named parameters. Percent-encode special characters in the user
+name and password (\code{@} as \code{\%40}). Query parameters such as
+\code{?sslmode=require} are passed to libpq as connection keywords.}
 
 \item{query}{A SQL query string.}
 
@@ -25,7 +27,8 @@ using named parameters.}
 
 \item{user}{Username (if not in \code{dsn}).}
 
-\item{password}{Password (if not in \code{dsn}).}
+\item{password}{Password (if not in \code{dsn}), which keeps it out of
+the connection string.}
 
 \item{port}{Port number. Default is 5432.}
 
@@ -40,14 +43,22 @@ result as a \code{tidylearn_data} object. Accepts either a connection string
 or individual connection parameters. Requires \pkg{DBI} and \pkg{RPostgres}.
 }
 \examples{
-\donttest{
-# data <- tl_read_postgres(
-#   dsn = "localhost",
-#   query = "SELECT * FROM my_table",
-#   dbname = "mydb",
-#   user = "myuser",
-#   password = "mypass"
-# )
+\dontrun{
+# Needs a running PostgreSQL server
+tl_read_postgres(
+  dsn = "localhost",
+  query = "SELECT * FROM my_table",
+  dbname = "mydb",
+  user = "myuser",
+  password = Sys.getenv("PGPASSWORD")
+)
+
+# The same connection as a URL, with the password still kept out of it
+tl_read_postgres(
+  "postgres://myuser@localhost:5432/mydb?sslmode=require",
+  query = "SELECT * FROM my_table",
+  password = Sys.getenv("PGPASSWORD")
+)
 }
 
 }

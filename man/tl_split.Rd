@@ -11,7 +11,11 @@ tl_split(data, prop = 0.8, stratify = NULL, seed = NULL)
 
 \item{prop}{Proportion for training set (default: 0.8)}
 
-\item{stratify}{Column name for stratified splitting}
+\item{stratify}{Column name for stratified splitting. Each stratum is
+split at \code{prop}. A numeric column with more than five distinct
+values is stratified by its quartiles, rows missing the value form a
+stratum of their own, and strata of a single row are pooled and split
+together.}
 
 \item{seed}{Random seed for reproducibility}
 }
@@ -21,6 +25,7 @@ A list with two elements:
 \item{\code{$train}}{A data frame containing the training subset.}
 \item{\code{$test}}{A data frame containing the test subset.}
 }
+A split that leaves the test set empty, as a single row does, warns.
 }
 \description{
 Split data into train and test sets

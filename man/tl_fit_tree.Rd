@@ -28,7 +28,9 @@ classification problem}
 
 \item{maxdepth}{Maximum depth of the tree}
 
-\item{...}{Additional arguments to pass to rpart()}
+\item{...}{Additional arguments to pass to rpart() or rpart.control().
+Any other name is refused, as is an offset, which rpart's predict()
+does not apply.}
 }
 \value{
 A fitted decision tree model

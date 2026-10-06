@@ -9,7 +9,10 @@ optimal_hclust_k(hclust_obj, method = "silhouette", max_k = 10)
 \arguments{
 \item{hclust_obj}{A tidy_hclust object}
 
-\item{method}{Character; "silhouette" (default) or "gap"}
+\item{method}{Character; "silhouette" (default) or "gap". The gap
+statistic resamples the observations' numeric columns, so it refuses a
+tree built from a dist object, and one built with
+\code{distance = "gower"} on non-numeric columns.}
 
 \item{max_k}{Maximum number of clusters to test (default: 10)}
 }

@@ -7,7 +7,9 @@
 recommend_products(rules_obj, basket, top_n = 5, min_confidence = 0.5)
 }
 \arguments{
-\item{rules_obj}{A tidy_apriori object}
+\item{rules_obj}{A tidy_apriori object, an arules rules object, or a
+tibble of rules from \code{\link{tidy_rules}}, which must keep its
+\code{lhs_items} and \code{rhs_items} columns}
 
 \item{basket}{Character vector of items in current basket}
 
@@ -18,7 +20,9 @@ recommend_products(rules_obj, basket, top_n = 5, min_confidence = 0.5)
 \value{
 A tibble with columns \code{rhs} (recommended item),
 \code{confidence}, \code{lift}, and \code{support}, sorted by lift in
-descending order.
+descending order. A rule is used when the basket holds its whole
+left-hand side and none of its right-hand side, and each product is
+listed once, from its highest-lift rule.
 }
 \description{
 Get product recommendations based on basket contents

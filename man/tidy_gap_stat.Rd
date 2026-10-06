@@ -21,9 +21,13 @@ tidy_gap_stat(data, FUN_cluster = NULL, max_k = 10, B = 50, nstart = 25)
 A list of class \code{"tidy_gap"} containing:
 \itemize{
 \item gap_data: tibble with gap statistics for each k
-\item k_firstSEmax: optimal k via firstSEmax method (most conservative)
-\item k_globalmax: optimal k via globalmax method
-\item k_firstmax: optimal k via firstmax method
+\item k_firstSEmax: optimal k via \code{\link[cluster]{maxSE}}'s
+firstSEmax method, the smallest k within one standard error of the
+first local maximum (most conservative)
+\item k_globalmax: optimal k via the globalmax method, the k with the
+largest gap (most liberal)
+\item k_firstmax: optimal k via the firstmax method, the first local
+maximum of the gap
 \item recommended_k: recommended k (uses firstSEmax)
 \item model: the \code{\link[cluster]{clusGap}} result
 }

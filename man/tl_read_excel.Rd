@@ -24,9 +24,10 @@ Reads an Excel file (\code{.xls}, \code{.xlsx}, or \code{.xlsm}) into a
 \code{tidylearn_data} object. Requires the \pkg{readxl} package.
 }
 \examples{
-\donttest{
-# data <- tl_read_excel("path/to/data.xlsx")
-# data <- tl_read_excel("path/to/data.xlsx", sheet = "Sheet2")
-}
-
+\dontshow{if (requireNamespace("readxl", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+# readxl ships a workbook with one data set per sheet
+path <- readxl::readxl_example("datasets.xlsx")
+tl_read_excel(path)
+tl_read_excel(path, sheet = "mtcars")
+\dontshow{\}) # examplesIf}
 }

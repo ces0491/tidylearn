@@ -21,7 +21,8 @@ tl_test_interactions(
 
 \item{formula}{A formula specifying the base model without interactions,
 or a string that parses as one. \code{.} and \code{- var} are expanded
-against \code{data}.}
+against \code{data}. The models are fitted with \code{lm()}, so the
+response must be numeric or logical.}
 
 \item{var1}{First variable to test for interactions}
 

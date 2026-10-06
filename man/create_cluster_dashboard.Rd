@@ -18,17 +18,22 @@ create_cluster_dashboard(
 \item{validation_metrics}{Optional tibble of validation metrics}
 }
 \value{
-Invisibly returns a list of \code{\link[ggplot2]{ggplot}} objects.
-The combined plot grid is drawn as a side effect via
-\code{\link[gridExtra]{grid.arrange}}.
+Invisibly returns a named list of the
+\code{\link[ggplot2]{ggplot}} objects drawn: \code{clusters}, the
+scatter plot, when the data has two numeric columns besides
+\code{cluster_col}; \code{sizes}; and \code{metrics}, when
+\code{validation_metrics} is given. The combined plot grid is drawn as
+a side effect via \code{\link[gridExtra]{grid.arrange}}.
 }
 \description{
 Generate a multi-panel summary of clustering results
 }
 \examples{
+\dontshow{if (requireNamespace("gridExtra", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \donttest{
 df <- iris[, 1:4]
 df$cluster <- kmeans(df, 3)$cluster
 create_cluster_dashboard(df)
 }
+\dontshow{\}) # examplesIf}
 }
