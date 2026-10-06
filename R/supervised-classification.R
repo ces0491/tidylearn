@@ -21,14 +21,37 @@ tl_fit_logistic <- function(data, formula, ...) {
   # count below has to be of classes that are present: a subset of a
   # larger frame keeps every original level, and rejecting a two-class
   # response for declaring a third would refuse data glm() fits happily.
-  response_var <- all.vars(formula)[1]
-  data[[response_var]] <- tl_normalise_response(data[[response_var]])
+  #
+  # The response is the one the formula computes. Read off the column named
+  # first, I(mpg > 20) ~ wt was checked as raw mpg and refused for having
+  # 25 levels. Only a bare column name is written back into `data`:
+  # overwriting mpg with a factor would change what I(mpg > 20) computes.
+  lhs <- formula[[2L]]
+  response_label <- if (is.name(lhs)) as.character(lhs) else deparse1(lhs)
+  computed <- tl_formula_response(formula, data)
+  response <- tl_normalise_response(computed)
+  if (is.name(lhs)) {
+    data[[response_label]] <- response
+  }
 
   # Reject a response glm(binomial) cannot model, here rather than at
   # predict() or tl_evaluate(). glm() takes a three-class factor without
   # complaint and fits the first class against the other two, so nothing
   # upstream of prediction says the model is meaningless.
-  tl_check_binary_response(data[[response_var]], response_var)
+  tl_check_binary_response(response, response_label)
+
+  # glm() compares every row with the first declared level of a factor
+  # response. A computed one is fitted as computed, so if no row has that
+  # level, every row would count as the other class.
+  if (is.factor(computed) &&
+        !identical(levels(computed)[1], levels(response)[1])) {
+    stop(
+      "The response ", response_label, " declares '", levels(computed)[1],
+      "' first, a class no row has,\nand glm() would compare every row ",
+      "with it. Wrap the response in droplevels().",
+      call. = FALSE
+    )
+  }
 
   # Fit the logistic regression model
   # By value, so weights = <a vector> reaches glm() as a vector
@@ -95,15 +118,9 @@ tl_check_binary_response <- function(y, response_var) {
 #' @return Predictions
 #' @keywords internal
 tl_predict_logistic <- function(model, new_data, type = "prob", ...) {
-  # Extract necessary information
-  response_var <- model$spec$response_var
-
-  # Get original response variable from training data
-  original_response <- model$data[[response_var]]
-  if (!is.factor(original_response)) {
-    original_response <- factor(original_response)
-  }
-  class_levels <- levels(original_response)
+  # The model's classes. Read off the training column, I(mpg > 20) ~ wt
+  # had one class per distinct mpg.
+  class_levels <- tl_model_classes(model)
 
   # Make predictions based on the type
   if (type == "response") {
@@ -187,10 +204,13 @@ tl_chart_classes <- function(model, new_data, chart) {
          call. = FALSE)
   }
 
-  response_var <- model$spec$response_var
-  if (!response_var %in% names(new_data)) {
+  # Every column the response is computed from, not only the first
+  lhs <- model$spec$formula[[2L]]
+  needed <- setdiff(all.vars(lhs), names(new_data))
+  if (length(needed) > 0) {
     stop("The ", chart, " compares predictions with the observed classes, ",
-         "so\nnew_data needs the response column '", response_var, "'.",
+         "so\nnew_data needs the column(s) the response ", deparse1(lhs),
+         " is made of: ", paste0("'", needed, "'", collapse = ", "), ".",
          call. = FALSE)
   }
 
@@ -215,7 +235,9 @@ tl_chart_classes <- function(model, new_data, chart) {
 #' @noRd
 tl_binary_chart_scores <- function(model, new_data, model_levels, chart,
                                    both_classes = TRUE) {
-  observed <- new_data[[model$spec$response_var]]
+  # As the formula computes it. The column alone is the raw mpg when the
+  # response is I(mpg > 20).
+  observed <- tl_observed_response(model, new_data)
   aligned <- tl_align_classes(observed, model_levels)
   pos_class <- model_levels[2]
   pos_probs <- predict(model, new_data, type = "prob")[[pos_class]]
@@ -321,7 +343,7 @@ tl_plot_confusion <- function(model, new_data = NULL, ...) {
   # The rows and columns are the model's classes, whatever levels the
   # scored data declares or in whatever order
   model_levels <- tl_chart_classes(model, new_data, "confusion matrix")
-  observed <- new_data[[model$spec$response_var]]
+  observed <- tl_observed_response(model, new_data)
   aligned <- tl_align_classes(observed, model_levels)
 
   # Get predicted classes

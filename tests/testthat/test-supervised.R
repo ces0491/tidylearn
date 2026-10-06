@@ -49,6 +49,55 @@ test_that("logistic regression refuses a response it cannot model", {
   )
 })
 
+test_that("logistic fits and scores a response the formula computes", {
+  # The response was read off the column named first, so I(mpg > 20) ~ wt
+  # was refused as "binary only, but 'mpg' has 25 levels"
+  model <- withCallingHandlers(
+    tl_model(mtcars, I(mpg > 20) ~ wt, method = "logistic"),
+    tidylearn_response_conversion = function(w) invokeRestart("muffleWarning")
+  )
+  reference <- stats::glm(I(mpg > 20) ~ wt, data = mtcars,
+                          family = stats::binomial())
+  prob <- unname(stats::predict(reference, mtcars, type = "response"))
+
+  probs <- predict(model, mtcars, type = "prob")
+  expect_named(probs, c("FALSE", "TRUE"))
+  expect_equal(unname(probs[["TRUE"]]), prob)
+  expect_equal(unname(probs[["FALSE"]]), 1 - prob)
+  classes <- predict(model, mtcars, type = "class")$.pred
+  expect_identical(levels(classes), c("FALSE", "TRUE"))
+  expect_identical(as.character(classes), ifelse(prob > 0.5, "TRUE", "FALSE"))
+  expect_equal(tl_coefficients(model)$estimate,
+               unname(stats::coef(reference)))
+
+  # The plots score the computed response too. By hand: the AUC is the
+  # chance a car over 20 mpg outscores one that is not.
+  pos <- prob[mtcars$mpg > 20]
+  neg <- prob[mtcars$mpg <= 20]
+  auc <- mean(outer(pos, neg, ">") + 0.5 * outer(pos, neg, "=="))
+  expect_identical(plot(model, type = "roc")$labels$subtitle,
+                   paste0("AUC = ", round(auc, 3)))
+  confusion <- plot(model, type = "confusion")$data
+  expect_equal(sum(confusion$Freq), nrow(mtcars))
+
+  # A computed response with three classes is refused under its own name
+  expect_error(tl_model(mtcars, cut(mpg, 3) ~ wt, method = "logistic"),
+               "binary only, but 'cut\\(mpg, 3\\)' has 3 levels")
+
+  # A computed factor whose first level no row has would make glm() count
+  # every row as the other class; without that level it fits as glm() does
+  bands <- c(0, 5, 20, 50)
+  expect_error(tl_model(mtcars, cut(mpg, bands) ~ wt, method = "logistic"),
+               "declares '\\(0,5\\]' first, a class no row has")
+  dropped <- tl_model(mtcars, droplevels(cut(mpg, bands)) ~ wt,
+                      method = "logistic")
+  expect_equal(
+    unname(stats::coef(dropped$fit)),
+    unname(stats::coef(stats::glm(I(mpg > 20) ~ wt, data = mtcars,
+                                  family = stats::binomial())))
+  )
+})
+
 test_that("tree models work for classification", {
   skip_if_not_installed("rpart")
 
@@ -614,6 +663,18 @@ test_that("arguments tidylearn sets for glmnet are refused by name", {
   expect_equal(sort(unique(attr(four$fit, "cv_results")$foldid)), 1:4)
 })
 
+test_that("a glmnet model without stored classes takes the spec's", {
+  # A model fitted before the classes were stored on the fit fell back to
+  # the raw column, so cut(mpg, ...) ~ . had 25 "classes" and failed
+  d <- transform(mtcars, band = cut(mpg, c(0, 20, 50)))
+  model <- tl_model(d, cut(mpg, c(0, 20, 50)) ~ wt + hp + qsec,
+                    method = "ridge", lambda = 0.1)
+  expected <- predict(model, d, type = "prob")
+  attr(model$fit, "response_levels") <- NULL
+  expect_named(predict(model, d, type = "prob"), levels(d$band))
+  expect_equal(predict(model, d, type = "prob"), expected)
+})
+
 test_that("a class the fitted rows lack is dropped from a glmnet response", {
   # Missing predictor values removed every setosa row, which left setosa as
   # an empty level, and glmnet stopped on a class with no observations
@@ -823,6 +884,12 @@ test_that("interval plots take the formula's predictors and response scale", {
   # Data to predict on need not carry the response: the bands are drawn
   # without the points
   p <- tl_plot_intervals(logged, new_data = mtcars[, c("wt", "hp")])
+  expect_false(any(vapply(p$layers, function(l) inherits(l$geom, "GeomPoint"),
+                          logical(1))))
+  # Nor all the columns a computed response is made of: mpg alone cannot
+  # give mpg / wt
+  ratio <- tl_model(mtcars, I(mpg / wt) ~ hp, method = "linear")
+  p <- tl_plot_intervals(ratio, new_data = mtcars[, c("mpg", "hp")])
   expect_false(any(vapply(p$layers, function(l) inherits(l$geom, "GeomPoint"),
                           logical(1))))
 

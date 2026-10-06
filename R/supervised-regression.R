@@ -510,7 +510,10 @@ tl_plot_intervals <- function(model,
   # The observed points on the scale the bands are on: the raw column drew
   # mpg against bands for log(mpg). Data to predict on may not carry the
   # response, and then the bands are drawn alone.
-  observed <- if (model$spec$response_var %in% names(sorted_data)) {
+  # Every column the response is computed from, not only the first: mpg
+  # alone cannot give I(mpg / wt).
+  response_vars <- all.vars(model$spec$formula[[2L]])
+  observed <- if (all(response_vars %in% names(sorted_data))) {
     tl_observed_response(model, sorted_data)
   }
   if (!is.null(observed)) {

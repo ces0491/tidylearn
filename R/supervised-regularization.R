@@ -778,7 +778,6 @@ tl_predict_glmnet <- function(model, new_data,
   is_classification <- model$spec$is_classification
 
   formula <- model$spec$formula
-  response_var <- model$spec$response_var
 
   # Rebuild the design matrix exactly as the fit did. Deriving it from a
   # "~ predictors - 1" formula instead would one-hot encode the first
@@ -822,10 +821,10 @@ tl_predict_glmnet <- function(model, new_data,
     )))
   }
 
-  class_levels <- attr(fit, "response_levels")
-  if (is.null(class_levels)) {
-    class_levels <- levels(factor(model$data[[response_var]]))
-  }
+  # The classes fitted, or for a fit that predates storing them, the
+  # model's. The training column is the raw one for a computed response,
+  # so cut(mpg, ...) ~ . had one class per distinct mpg.
+  class_levels <- attr(fit, "response_levels") %||% tl_model_classes(model)
 
   if (type == "prob") {
     probs <- stats::predict(
