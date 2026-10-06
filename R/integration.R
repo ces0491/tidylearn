@@ -541,8 +541,9 @@ tl_semisupervised <- function(data, formula, labeled_indices,
 #'   \code{"downweight"} gives anomalies a case weight of 0.1, and needs a
 #'   \code{supervised_method} that takes case weights: \code{"linear"},
 #'   \code{"polynomial"}, \code{"logistic"}, \code{"tree"}, \code{"ridge"},
-#'   \code{"lasso"}, \code{"elastic_net"} or \code{"forest"}. A forest reads
-#'   them as sampling weights.
+#'   \code{"lasso"}, \code{"elastic_net"}, \code{"forest"}, \code{"boost"},
+#'   \code{"nn"} or \code{"xgboost"}. A forest reads them as sampling
+#'   weights. \code{"svm"} and \code{"deep"} take none and are refused.
 #' @param supervised_method Supervised learning method (default:
 #'   \code{"tree"}, which handles both regression and classification with
 #'   any number of classes). \code{"logistic"} is binary-only and errors
@@ -629,13 +630,13 @@ tl_anomaly_aware <- function(data, formula, response,
     formula_updated <- stats::update(expanded, . ~ . + is_anomaly)
     model <- tl_model(data_flagged, formula_updated, method = supervised_method)
   } else if (action == "downweight") {
-    # Only these backends apply case weights. Of the rest, boost and nn
-    # error on them, xgboost warns that it does not recognise them, and
-    # svm ignores them without a word. randomForest reads them as
-    # sampling weights, so an anomaly is drawn into fewer bootstrap
-    # samples rather than weighted in a loss.
+    # Only these backends apply case weights: e1071::svm() has none, and
+    # the deep backend takes none. randomForest reads them as sampling
+    # weights, so an anomaly is drawn into fewer bootstrap samples rather
+    # than weighted in a loss.
     weighted_methods <- c("linear", "polynomial", "logistic", "tree",
-                          "ridge", "lasso", "elastic_net", "forest")
+                          "ridge", "lasso", "elastic_net", "forest",
+                          "boost", "nn", "xgboost")
     if (!supervised_method %in% weighted_methods) {
       stop(
         "action = \"downweight\" needs a method that takes case weights: ",

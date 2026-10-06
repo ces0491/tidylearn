@@ -415,14 +415,63 @@ test_that("downweight accepts every method that applies case weights", {
                               eps = 15, minPts = 3)
     expect_s3_class(model, "tidylearn_anomaly_aware")
   }
-  for (method in c("svm", "boost")) {
+  for (method in c("svm", "deep")) {
     expect_error(
       tl_anomaly_aware(d, mpg ~ wt + hp, response = "mpg",
                        action = "downweight", supervised_method = method,
                        eps = 15, minPts = 3),
-      "case weights"
+      "action = \"downweight\" needs a method that takes case weights",
+      info = method
     )
   }
+})
+
+test_that("downweight reaches boost, nn and xgboost fits", {
+  skip_if_not_installed("dbscan")
+
+  # gbm, nnet and xgboost take case weights, and downweight refused all
+  # three. Each fit has to match its package called with the same weights.
+  d <- iris[, c("Sepal.Length", "Sepal.Width", "Petal.Length")]
+  f <- Sepal.Length ~ Sepal.Width + Petal.Length
+  downweighted <- function(method) {
+    set.seed(11)
+    tl_anomaly_aware(d, f, response = "Sepal.Length", action = "downweight",
+                     supervised_method = method, eps = 0.3, minPts = 5)
+  }
+
+  boost <- downweighted("boost")
+  expect_gt(boost$anomaly_info$n_anomalies, 0)
+  w <- ifelse(boost$anomaly_info$is_anomaly, 0.1, 1)
+  set.seed(11)
+  direct_gbm <- gbm::gbm(f, data = d, distribution = "gaussian",
+                         n.trees = 100, interaction.depth = 3,
+                         shrinkage = 0.1, n.minobsinnode = 10, cv.folds = 0,
+                         verbose = FALSE, weights = w)
+  expect_equal(boost$fit$fit, direct_gbm$fit)
+
+  nn <- downweighted("nn")
+  set.seed(11)
+  direct_nnet <- nnet::nnet(f, data = d, size = 5, decay = 0, maxit = 100,
+                            trace = FALSE, linout = TRUE, weights = w)
+  expect_equal(nn$fit$wts, direct_nnet$wts)
+
+  skip_if_not_installed("xgboost")
+  xgb <- downweighted("xgboost")
+  x <- as.matrix(d[, c("Sepal.Width", "Petal.Length")])
+  direct_xgb <- xgboost::xgb.train(
+    params = list(objective = "reg:squarederror", eval_metric = "rmse",
+                  max_depth = 6, eta = 0.3, subsample = 1,
+                  colsample_bytree = 1, min_child_weight = 1, gamma = 0,
+                  alpha = 0, lambda = 1),
+    data = xgboost::xgb.DMatrix(x, label = d$Sepal.Length, weight = w),
+    nrounds = 100, verbose = 0
+  )
+  expect_equal(unname(predict(xgb, d)$.pred), predict(direct_xgb, x),
+               tolerance = 1e-6)
+  # and the weights moved the fit away from the unweighted one
+  unweighted <- tl_model(d, f, method = "xgboost")
+  expect_false(isTRUE(all.equal(predict(xgb, d)$.pred,
+                                predict(unweighted, d)$.pred)))
 })
 
 test_that("downweighting a logistic fit raises no binomial weight warning", {
