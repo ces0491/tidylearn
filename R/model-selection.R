@@ -418,15 +418,21 @@ tl_compare_cv <- function(data, models, folds = 5, metrics = NULL, ...) {
       # method's defaults, so two trees differing only in cp tied. The
       # notes tl_model() gives about the response were given when the
       # model was built, and every fold refit repeated them, as tl_cv()
-      # does not.
-      fold_model <- suppressMessages(do.call(
-        tl_model,
-        c(
-          list(train_data, formula = model$spec$formula,
-               method = model$spec$method),
-          fit_args[[i]]
-        )
-      ))
+      # does not. So was the warning that a 0/1 response is converted for
+      # logistic regression.
+      fold_model <- withCallingHandlers(
+        suppressMessages(do.call(
+          tl_model,
+          c(
+            list(train_data, formula = model$spec$formula,
+                 method = model$spec$method),
+            fit_args[[i]]
+          )
+        )),
+        tidylearn_response_conversion = function(w) {
+          invokeRestart("muffleWarning")
+        }
+      )
 
       # Evaluate model on test data. tl_evaluate() refuses a fold on which
       # no row can be scored -- every predictor missing, say -- and one

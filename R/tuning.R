@@ -171,6 +171,10 @@ tl_tune_grid <- function(data, formula, method,
   # Initialize results storage
   tuning_results <- list()
 
+  # Shared by every fit of this search, the final one included, so the
+  # response-conversion warning is given once
+  conversion <- tl_warn_once()
+
   # Loop through parameter combinations
   for (i in seq_len(n_sets)) {
     params <- param_combinations[[i]]
@@ -183,7 +187,7 @@ tl_tune_grid <- function(data, formula, method,
     }
 
     tuning_results[[i]] <- tl_tune_score_set(
-      params, cv_splits, formula, method, metric, dots
+      params, cv_splits, formula, method, metric, dots, conversion
     )
 
     if (verbose) {
@@ -234,7 +238,10 @@ tl_tune_grid <- function(data, formula, method,
     dots
   )
 
-  final_model <- do.call(tl_model, final_model_args)
+  final_model <- withCallingHandlers(
+    do.call(tl_model, final_model_args),
+    tidylearn_response_conversion = conversion
+  )
 
   # Add tuning results to model
   attr(final_model, "tuning_results") <- list(
@@ -466,12 +473,15 @@ tl_check_per_row_args <- function(arg_names, caller) {
 #' @param formula,method Passed to \code{tl_model()}
 #' @param metric The metric scored
 #' @param dots Further arguments for \code{tl_model()}
+#' @param conversion Handler for \code{tl_model()}'s response-conversion
+#'   warning, shared by every fit of one search; see
+#'   \code{tl_warn_once()}
 #' @return A list: \code{mean_metric} over the scored folds,
 #'   \code{n_folds_ok}, \code{n_fit_failed} and \code{fold_metrics}
 #' @keywords internal
 #' @noRd
 tl_tune_score_set <- function(params, cv_splits, formula, method, metric,
-                              dots) {
+                              dots, conversion = tl_warn_once()) {
   n_folds <- length(cv_splits$splits)
   fold_metrics <- rep(NA_real_, n_folds)
   fit_failed <- logical(n_folds)
@@ -488,9 +498,14 @@ tl_tune_score_set <- function(params, cv_splits, formula, method, metric,
     # tl_model() notes things about the response -- that a numeric column
     # with few distinct values is being treated as regression, say -- and
     # every fold refit repeated it. The final fit on all the rows gives it
-    # once, as tl_cv() leaves it to the caller's own fit.
+    # once, as tl_cv() leaves it to the caller's own fit. The warning that
+    # a 0/1 response is converted for logistic regression repeated the same
+    # way, and is let through once per search.
     fold_model <- tryCatch(
-      suppressMessages(do.call(tl_model, model_args)),
+      withCallingHandlers(
+        suppressMessages(do.call(tl_model, model_args)),
+        tidylearn_response_conversion = conversion
+      ),
       error = function(e) {
         warning(
           "Error fitting model with parameters: ",
@@ -551,6 +566,27 @@ tl_tune_score_set <- function(params, cv_splits, formula, method, metric,
     n_fit_failed = sum(fit_failed),
     fold_metrics = fold_metrics
   )
+}
+
+#' A warning handler that lets the first warning through
+#'
+#' A search refits the model once per fold and set, and a warning about the
+#' data rather than the fit -- the response converted to a factor for
+#' logistic regression -- said the same thing every time: seven times for
+#' a 2-set, 3-fold search. One handler is shared by every fit of a run, so
+#' the warning is given once.
+#'
+#' @return A function for \code{withCallingHandlers()}
+#' @keywords internal
+#' @noRd
+tl_warn_once <- function() {
+  warned <- FALSE
+  function(w) {
+    if (warned) {
+      invokeRestart("muffleWarning")
+    }
+    warned <<- TRUE
+  }
 }
 
 #' Why a resampling fold could not be scored
@@ -1157,6 +1193,10 @@ tl_tune_random <- function(data, formula, method,
   # Initialize results storage
   tuning_results <- list()
 
+  # Shared by every fit of this search, the final one included, so the
+  # response-conversion warning is given once
+  conversion <- tl_warn_once()
+
   # Generate random parameter combinations
   param_combinations <- lapply(seq_len(n_iter), function(i) {
     params <- lapply(names(param_space), function(param_name) {
@@ -1183,7 +1223,7 @@ tl_tune_random <- function(data, formula, method,
     }
 
     tuning_results[[i]] <- tl_tune_score_set(
-      params, cv_splits, formula, method, metric, dots
+      params, cv_splits, formula, method, metric, dots, conversion
     )
 
     if (verbose) {
@@ -1234,7 +1274,10 @@ tl_tune_random <- function(data, formula, method,
     dots
   )
 
-  final_model <- do.call(tl_model, final_model_args)
+  final_model <- withCallingHandlers(
+    do.call(tl_model, final_model_args),
+    tidylearn_response_conversion = conversion
+  )
 
   # Add tuning results to model
   attr(final_model, "tuning_results") <- list(

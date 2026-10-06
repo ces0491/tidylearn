@@ -983,6 +983,46 @@ test_that("the response note is given once per search, not once per fold", {
   expect_identical(sum(grepl(note, seen, fixed = TRUE)), 0L)
 })
 
+test_that("the logistic conversion warning is given once per search", {
+  # A numeric 0/1 response is converted to a factor for logistic regression,
+  # with a warning on every fit, so a 2-set, 3-fold search warned 7 times
+  conversions <- function(expr) {
+    n <- 0L
+    withCallingHandlers(expr, warning = function(w) {
+      if (inherits(w, "tidylearn_response_conversion")) n <<- n + 1L
+      invokeRestart("muffleWarning")
+    })
+    n
+  }
+
+  set.seed(1)
+  expect_identical(conversions(tl_tune_grid(
+    mtcars, am ~ wt + hp, method = "logistic",
+    param_grid = list(maxit = c(25, 50)), folds = 3, verbose = FALSE
+  )), 1L)
+  expect_identical(conversions(tl_tune_random(
+    mtcars, am ~ wt + hp, method = "logistic",
+    param_space = list(maxit = c(25, 50)), n_iter = 2, folds = 3,
+    verbose = FALSE, seed = 1
+  )), 1L)
+
+  # Building each model already warned, so the refits say nothing
+  m1 <- suppressWarnings(tl_model(mtcars, am ~ wt, method = "logistic"))
+  m2 <- suppressWarnings(tl_model(mtcars, am ~ wt + hp, method = "logistic"))
+  set.seed(1)
+  expect_identical(conversions(tl_compare_cv(
+    mtcars, list(a = m1, b = m2), folds = 3, metrics = "accuracy"
+  )), 0L)
+
+  # Other warnings from the fits still come through
+  set.seed(1)
+  run <- collect_warnings(tl_tune_grid(
+    mtcars, am ~ wt + hp, method = "logistic",
+    param_grid = list(maxit = 1), folds = 3, verbose = FALSE
+  ))
+  expect_true(any(grepl("did not converge", run$warnings)))
+})
+
 test_that("a parameter set that failed a fold cannot win", {
   results <- data.frame(
     mean_metric = c(3.0, 2.0, 2.5),
