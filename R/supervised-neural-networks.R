@@ -20,13 +20,14 @@ NULL
 #' @param trace Logical; whether to print progress (default: FALSE)
 #' @param ... Additional arguments to pass to nnet(), including case
 #'   \code{weights}. For regression, \code{linout} replaces the default
-#'   \code{TRUE}.
+#'   \code{TRUE}. An offset is refused: nnet leaves it out of the fit.
 #' @return A fitted neural network model
 #' @keywords internal
 tl_fit_nn <- function(data, formula, is_classification = FALSE,
                       size = 5, decay = 0, maxit = 100, trace = FALSE, ...) {
   # Check if nnet is installed
   tl_check_packages("nnet")
+  tl_refuse_offset(formula, data, list(...), "nn", "nnet()")
 
   # Get response variable
   response_var <- all.vars(formula)[1]
@@ -149,7 +150,7 @@ tl_class_from_probs <- function(probs) {
 tl_tuner_task <- function(data, formula, is_classification) {
   lhs <- formula[[2L]]
   response_label <- if (is.name(lhs)) as.character(lhs) else deparse1(lhs)
-  y <- tl_formula_lhs(formula, data)
+  y <- tl_formula_response(formula, data)
   categorical <- is.factor(y) || is.character(y)
 
   if (is.null(is_classification)) {
@@ -183,22 +184,6 @@ tl_tuner_task <- function(data, formula, is_classification) {
   list(data = data, is_classification = is_classification)
 }
 
-#' The response a formula computes, one value per row of data
-#'
-#' A computed left-hand side such as \code{log(mpg)} or \code{factor(am)}
-#' is not the raw column: fitting or scoring against the column fits a
-#' different response from the one the formula names.
-#'
-#' @param formula A two-sided formula
-#' @param data Data holding the columns it uses
-#' @return The response, with missing values kept in place
-#' @keywords internal
-#' @noRd
-tl_formula_lhs <- function(formula, data) {
-  frame <- stats::model.frame(formula, data = data, na.action = stats::na.pass)
-  unname(stats::model.response(frame))
-}
-
 #' Predict using a neural network model
 #'
 #' @param model A tidylearn neural network model object
@@ -212,7 +197,6 @@ tl_predict_nn <- function(model, new_data, type = "response", ...) {
   # Get the neural network model
   fit <- model$fit
   is_classification <- model$spec$is_classification
-  response_var <- model$spec$response_var
 
   if (!is_classification) {
     # Regression predictions
@@ -227,8 +211,13 @@ tl_predict_nn <- function(model, new_data, type = "response", ...) {
     )
   }
 
+  # The classes of the response the formula computes. The raw column of
+  # factor(mpg > 20) ~ . held 25 values, and a one-output network could
+  # not be read as 25 classes.
   class_levels <- model$spec$response_levels %||%
-    levels(tl_normalise_response(model$data[[response_var]]))
+    levels(tl_normalise_response(
+      tl_formula_response(model$spec$formula, model$data)
+    ))
 
   # predict.nnet() keeps a row with a missing predictor as a row of NA, so
   # the probabilities, and the classes read from them, stay aligned with
@@ -295,7 +284,10 @@ tl_plot_nn_architecture <- function(model, ...) {
 #' @param folds Number of cross-validation folds (default: 5)
 #' @param ... Additional arguments to pass to nnet(). \code{maxit}
 #'   (default 100) and \code{trace} (default \code{FALSE}) replace the
-#'   values used otherwise.
+#'   values used otherwise. Arguments with one value per row --
+#'   \code{weights}, \code{subset}, \code{offset}, \code{foldid},
+#'   \code{strata} -- are refused, since each fold fits a subset of the
+#'   rows.
 #' @return A list with elements \code{model} (the best fitted \code{nnet}
 #'   model), \code{best_size} (optimal hidden-layer size), \code{best_decay}
 #'   (optimal weight decay), and \code{tuning_results} (a data frame of all
@@ -323,10 +315,13 @@ tl_tune_nn <- function(data, formula, is_classification = NULL,
   tl_check_packages("nnet")
 
   formula <- tl_as_formula(formula)
-  response_var <- all.vars(formula)[1]
   task <- tl_tuner_task(data, formula, is_classification)
   data <- task$data
   is_classification <- task$is_classification
+
+  # A per-row argument went whole into every fold, a subset of the rows,
+  # and nnet failed on "variable lengths differ"
+  tl_check_per_row_args(names2(list(...)), "tl_tune_nn()")
 
   # maxit and trace are defaults, not fixed values: set alongside ..., the
   # caller's own failed with "formal argument matched by multiple actual
@@ -376,7 +371,7 @@ tl_tune_nn <- function(data, formula, is_classification = NULL,
         data = train_data,
         spec = list(
           is_classification = is_classification,
-          response_var = response_var,
+          formula = formula,
           response_levels = nn$lev
         )
       )
@@ -384,7 +379,7 @@ tl_tune_nn <- function(data, formula, is_classification = NULL,
       # The response the formula computes: scored against the raw column,
       # log(y) ~ x was judged by how far its log-scale predictions fell
       # from y itself
-      actuals <- tl_formula_lhs(formula, test_data)
+      actuals <- tl_formula_response(formula, test_data)
 
       if (is_classification) {
         # Classification error, over the rows the fold's model can score

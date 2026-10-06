@@ -29,6 +29,50 @@ tl_override_args <- function(defaults, overrides) {
   c(defaults, overrides[!named])
 }
 
+#' Refuse an offset a method cannot apply at predict()
+#'
+#' Only lm() and glm() add an offset back when they predict. rpart and gbm
+#' fit an \code{offset()} term as a shift of the response that their
+#' predict() never adds back, and randomForest, e1071, nnet, keras and
+#' xgboost leave it out of the fit. Held at the same predictors, each
+#' method's prediction moved by 0 when the offset moved by 100. Passed as
+#' an argument, an offset was ignored by randomForest, e1071 and xgboost
+#' without a word.
+#'
+#' @param formula The model formula
+#' @param data The training data, to expand a dot against
+#' @param dots The fitting arguments
+#' @param method The tidylearn method, for the message
+#' @param fitter What fits it, for the message, e.g. "rpart()"
+#' @return \code{TRUE}, invisibly, when there is no offset
+#' @keywords internal
+#' @noRd
+tl_refuse_offset <- function(formula, data, dots, method, fitter) {
+  model_terms <- tryCatch(
+    stats::terms(formula, data = data),
+    error = function(e) NULL
+  )
+  offsets <- attr(model_terms, "offset")
+  given <- c(
+    if (!is.null(offsets)) {
+      vapply(as.list(attr(model_terms, "variables"))[-1][offsets],
+             deparse1, character(1))
+    },
+    if ("offset" %in% names2(dots)) "the offset argument"
+  )
+  if (length(given) == 0L) {
+    return(invisible(TRUE))
+  }
+
+  stop(
+    "Method \"", method, "\" cannot use ", paste(given, collapse = " or "),
+    ": ", fitter, " cannot apply an offset to new data at predict(). For a ",
+    "model with an offset, fit method = \"linear\" or \"logistic\" with ",
+    "offset(<column>) in the formula.",
+    call. = FALSE
+  )
+}
+
 #' Fit a decision tree model
 #'
 #' @param data A data frame containing the training data
@@ -38,7 +82,9 @@ tl_override_args <- function(defaults, overrides) {
 #' @param cp Complexity parameter (default: 0.01)
 #' @param minsplit Minimum number of observations in a node for a split
 #' @param maxdepth Maximum depth of the tree
-#' @param ... Additional arguments to pass to rpart()
+#' @param ... Additional arguments to pass to rpart() or rpart.control().
+#'   Any other name is refused, as is an offset, which rpart's predict()
+#'   does not apply.
 #' @return A fitted decision tree model
 #' @keywords internal
 tl_fit_tree <- function(data, formula, is_classification = FALSE,
@@ -54,6 +100,7 @@ tl_fit_tree <- function(data, formula, is_classification = FALSE,
   # parms were accepted and silently had no effect. Send rpart()'s own
   # arguments to rpart().
   dots <- list(...)
+  tl_refuse_offset(formula, data, dots, "tree", "rpart()")
   dot_names <- names2(dots)
   rpart_own <- dot_names %in%
     c("weights", "subset", "na.action", "model", "x", "y", "parms", "cost")
@@ -179,13 +226,15 @@ tl_predict_tree <- function(model, new_data, type = "response", ...) {
 #'   \code{max(floor(p / 3), 1)} for regression over the \code{p}
 #'   columns of the design matrix.
 #' @param importance Whether to compute variable importance (default: TRUE)
-#' @param ... Additional arguments to pass to randomForest()
+#' @param ... Additional arguments to pass to randomForest(). An offset is
+#'   refused: randomForest leaves it out of the fit.
 #' @return A fitted random forest model
 #' @keywords internal
 tl_fit_forest <- function(data, formula, is_classification = FALSE,
                           ntree = 500, mtry = NULL, importance = TRUE, ...) {
   # Check if randomForest is installed
   tl_check_packages("randomForest")
+  tl_refuse_offset(formula, data, list(...), "forest", "randomForest()")
 
   # randomForest's classification path hangs rather than erroring when no
   # predictor can produce a split, and the loop is uninterruptible
@@ -404,7 +453,7 @@ tl_predict_forest <- function(model, new_data, type = "response", ...) {
 tl_boost_class_levels <- function(model) {
   model$spec$response_levels %||%
     levels(tl_normalise_response(
-      tl_formula_lhs(model$spec$formula, model$data)
+      tl_formula_response(model$spec$formula, model$data)
     ))
 }
 
@@ -463,7 +512,8 @@ tl_gbm_multinomial_matrix <- function(probs, model) {
 #'   (default: 0, no CV)
 #' @param ... Additional arguments to pass to gbm(), including case
 #'   \code{weights}. \code{verbose}, and for regression
-#'   \code{distribution}, replace the defaults used here.
+#'   \code{distribution}, replace the defaults used here. An offset is
+#'   refused: predict.gbm() does not add it back.
 #' @return A fitted gradient boosting model
 #' @details The distribution follows the response: \code{"gaussian"} for
 #'   regression, \code{"bernoulli"} for two classes and
@@ -484,12 +534,13 @@ tl_fit_boost <- function(
   # Check if gbm is installed
   tl_check_packages("gbm")
   dots <- list(...)
+  tl_refuse_offset(formula, data, dots, "boost", "gbm()")
 
   # Determine distribution based on problem type
   if (is_classification) {
     # The response the formula computes, which for factor(am) ~ . is not
     # the column am
-    y <- tl_normalise_response(tl_formula_lhs(formula, data))
+    y <- tl_normalise_response(tl_formula_response(formula, data))
     class_levels <- levels(y)
 
     # Check if binary or multiclass
@@ -824,8 +875,12 @@ tl_plot_partial_dependence <- function(model, var, n.pts = 20, ...) {
   # one drawn.
   is_classification <- model$spec$is_classification
   if (is_classification) {
+    # The classes of the response the formula computes: the raw column of
+    # factor(mpg > 20) ~ . held 25 values, read as 25 classes
     class_levels <- model$spec$response_levels %||%
-      levels(tl_normalise_response(data[[model$spec$response_var]]))
+      levels(tl_normalise_response(
+        tl_formula_response(model$spec$formula, data)
+      ))
     shown <- if (length(class_levels) == 2L) class_levels[2] else class_levels
   }
 

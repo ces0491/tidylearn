@@ -27,7 +27,8 @@ NULL
 #'   keras's own adam default in place.
 #' @param verbose Verbosity mode (0 = silent, 1 = progress bar,
 #'   2 = one line per epoch) (default: 0)
-#' @param ... Additional arguments to pass to keras's fit()
+#' @param ... Additional arguments to pass to keras's fit(). Case
+#'   \code{weights} and an offset are refused: neither is passed on.
 #' @param compute Compute tier. Either \code{"cpu"} (default) or
 #'   \code{"gpu"}. GPU usage is handled automatically by the underlying
 #'   tensorflow runtime when CUDA is configured; this argument is
@@ -47,9 +48,24 @@ tl_fit_deep <- function(data, formula,
                         learning_rate = NULL,
                         verbose = 0, ...,
                         compute = "cpu") {
+  # These refusals need no backend, so they come before the check for one
+  dots <- list(...)
+  tl_refuse_offset(formula, data, dots, "deep", "the keras network")
+
+  # keras's fit() swallows an argument it has no use for, so weights were
+  # accepted and ignored. It takes case weights only as sample_weight,
+  # which this wrapper does not pass on.
+  if ("weights" %in% names2(dots)) {
+    stop(
+      "Method \"deep\" cannot use case weights: they are not passed on to ",
+      "keras, so they would be ignored. For case weights, use a method ",
+      "that applies them, such as \"tree\", \"boost\", \"nn\" or \"xgboost\".",
+      call. = FALSE
+    )
+  }
+
   # Check if keras is installed
   tl_check_packages(c("keras", "tensorflow"))
-  dots <- list(...)
 
   # One model frame supplies both x and y, so a row dropped for a missing
   # value leaves both. model.matrix() applied na.omit by itself while the
@@ -434,7 +450,9 @@ tl_plot_deep_architecture <- function(model, ...) {
 #'   is scored on the same rows.
 #' @param ... Additional arguments passed to keras's fit() for every
 #'   configuration; \code{verbose} (default 0) replaces the value used
-#'   otherwise.
+#'   otherwise. Arguments with one value per row -- \code{weights},
+#'   \code{subset}, \code{offset}, \code{foldid}, \code{strata} -- are
+#'   refused, since each configuration is fitted on part of the rows.
 #' @return A list with elements \code{model} (the best configuration refitted
 #'   as a \code{tidylearn_model}, so \code{predict()} and the deep plots take
 #'   it; the keras model is at \code{$model$fit$model}),
@@ -465,6 +483,10 @@ tl_tune_deep <- function(data, formula,
                          batch_sizes = c(16, 32, 64),
                          epochs = 30,
                          validation_split = 0.2, ...) {
+  # A per-row argument went whole into every configuration's fit, which
+  # holds out some of the rows. Refused before a backend is needed.
+  tl_check_per_row_args(names2(list(...)), "tl_tune_deep()")
+
   # Check if keras is installed
   tl_check_packages(c("keras", "tensorflow"))
 

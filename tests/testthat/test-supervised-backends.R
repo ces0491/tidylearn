@@ -45,6 +45,39 @@ geoms_of <- function(p) {
   vapply(p$layers, function(l) class(l$geom)[1], character(1))
 }
 
+# ---- every backend -----------------------------------------------------
+
+test_that("the backends refuse an offset they cannot apply at predict()", {
+  # Held at the same predictors, a prediction moved by 0 when the offset
+  # moved by 100, for every method here: rpart and gbm fit an offset()
+  # term as a shift of the response that their predict() never adds back,
+  # and the rest left it out of the fit. Passed as an argument, it was
+  # ignored by randomForest, e1071 and xgboost without a word.
+  d <- make_regression_data()
+  d$off <- rep(c(0, 100), length.out = nrow(d))
+  methods <- c("tree", "forest", "boost", "svm", "nn", "deep")
+  if (requireNamespace("xgboost", quietly = TRUE)) {
+    methods <- c(methods, "xgboost")
+  }
+
+  for (method in methods) {
+    expect_error(
+      tl_model(d, y ~ x1 + offset(off), method = method),
+      paste0("Method \"", method, "\" cannot use offset\\(off\\)"),
+      info = method
+    )
+    expect_error(
+      tl_model(d, y ~ x1, method = method, offset = d$off),
+      paste0("Method \"", method, "\" cannot use the offset argument"),
+      info = method
+    )
+  }
+
+  # The offset column as an ordinary predictor still fits
+  expect_s3_class(tl_model(d, y ~ x1 + off, method = "tree"),
+                  "tidylearn_tree")
+})
+
 # ---- tree ------------------------------------------------------------
 
 test_that("a tree refuses an argument rpart() and rpart.control() lack", {
@@ -53,14 +86,15 @@ test_that("a tree refuses an argument rpart() and rpart.control() lack", {
   # Everything that was not one of rpart()'s own arguments went to
   # rpart.control(), which discards names it does not recognise. A
   # misspelt maxdeth = 1 fitted the default tree, and an offset fitted with
-  # no offset, where rpart() itself stops on both.
+  # no offset, where rpart() itself stops on both. An offset is refused
+  # with the other backends' in "the backends refuse an offset ...".
   expect_error(
     tl_model(mtcars, mpg ~ wt + hp + qsec, method = "tree", maxdeth = 1),
     "Method \"tree\" has no argument 'maxdeth'"
   )
   expect_error(
     tl_model(mtcars, mpg ~ wt + hp, method = "tree", offset = mtcars$hp),
-    "Method \"tree\" has no argument 'offset'"
+    "Method \"tree\" cannot use the offset argument"
   )
 
   # rpart.control()'s own arguments still reach it, spelt correctly
@@ -254,6 +288,16 @@ test_that("partial dependence draws every class of a multiclass model", {
   )
   expect_identical(as.character(unique(pb$data$class)), "virginica")
   expect_match(pb$labels$y, "virginica")
+
+  # A model that records no classes reads them off the response the
+  # formula computes, not the raw column: factor(mpg > 20) has two classes,
+  # where mpg has 25 values
+  cars <- rbind(mtcars, mtcars)
+  above <- tl_model(cars, factor(mpg > 20) ~ wt + hp, method = "tree")
+  above$spec$response_levels <- NULL
+  pa <- tl_plot_partial_dependence(above, var = "wt", n.pts = 3)
+  expect_identical(levels(pa$data$class), c("FALSE", "TRUE"))
+  expect_false(anyNA(pa$data$y))
 })
 
 # ---- boost -------------------------------------------------------------
@@ -317,6 +361,28 @@ test_that("boost classifies a response the formula computes", {
   # A dot still leaves the response's own column out of the predictors
   dotted <- tl_model(cars, factor(am) ~ ., method = "boost", n.trees = 5)
   expect_false(any(c("am", ".tl_response") %in% dotted$fit$var.names))
+
+  # factor(am) has the classes of the column itself; factor(mpg > 20)
+  # does not, and has to be read from the formula as well
+  coded <- transform(cars, hi = as.integer(mpg > 20))
+  set.seed(1)
+  above <- tl_model(cars, factor(mpg > 20) ~ wt + hp, method = "boost",
+                    n.trees = 30)
+  set.seed(1)
+  direct_hi <- gbm::gbm(
+    hi ~ wt + hp, data = coded, distribution = "bernoulli",
+    n.trees = 30, interaction.depth = 3, shrinkage = 0.1,
+    n.minobsinnode = 10, cv.folds = 0, verbose = FALSE
+  )
+  expect_named(predict(above, cars, type = "prob"), c("FALSE", "TRUE"))
+  expect_equal(predict(above, cars, type = "prob")[["TRUE"]],
+               gbm::predict.gbm(direct_hi, newdata = cars, n.trees = 30,
+                                type = "response"))
+
+  # And a model that records no classes reads them off the same response
+  above$spec$response_levels <- NULL
+  expect_identical(levels(predict(above, cars[1:3, ])$.pred),
+                   c("FALSE", "TRUE"))
 })
 
 test_that("boost takes the caller's verbose and regression distribution", {
@@ -481,6 +547,20 @@ test_that("tl_plot_svm_boundary draws the 0.5 contour for two classes", {
   expect_equal(grid$pred_prob, unname(direct[, "virginica"]))
 })
 
+test_that("tl_plot_svm_boundary colours the points by the computed response", {
+  skip_if_not_installed("e1071")
+
+  # The points were coloured by the raw column the formula's response is
+  # computed from: 25 shades of mpg for a model of factor(mpg > 20)
+  cars <- rbind(mtcars, mtcars)
+  model <- tl_model(cars, factor(mpg > 20) ~ wt + hp, method = "svm")
+  p <- tl_plot_svm_boundary(model, grid_size = 10)
+  points <- which(geoms_of(p) == "GeomPoint")
+  built <- ggplot2::layer_data(p, points)
+  expect_length(unique(built$colour), 2L)
+  expect_equal(nrow(built), nrow(cars))
+})
+
 # ---- neural networks ---------------------------------------------------
 
 test_that("a multiclass network predicts NA for a row missing a predictor", {
@@ -508,6 +588,17 @@ test_that("a multiclass network predicts NA for a row missing a predictor", {
 
   probs <- predict(model, nd, type = "prob")
   expect_true(all(is.na(unlist(probs[2, ]))))
+
+  # A model that records no classes reads them off the response the
+  # formula computes: the raw mpg column gave 25 "classes" for a
+  # one-output network, and predict() failed
+  cars <- rbind(mtcars, mtcars)
+  set.seed(1)
+  above <- tl_model(cars, factor(mpg > 20) ~ wt + hp, method = "nn",
+                    size = 2, trace = FALSE)
+  recorded <- predict(above, cars, type = "prob")
+  above$spec$response_levels <- NULL
+  expect_equal(predict(above, cars, type = "prob"), recorded)
 })
 
 test_that("a neural network applies case weights as nnet does", {
@@ -646,6 +737,23 @@ test_that("tl_tune_nn takes the caller's maxit", {
   tuned <- tl_tune_nn(iris, Species ~ ., is_classification = TRUE,
                       sizes = 2, decays = 0, folds = 2, maxit = 300)
   expect_equal(tuned$model$call$maxit, 300)
+})
+
+test_that("tl_tune_nn and tl_tune_deep refuse per-row arguments", {
+  skip_if_not_installed("nnet")
+
+  # A weight vector went whole into every fold, a subset of the rows:
+  # nnet failed on the lengths, and keras on an argument it does not take
+  w <- rep(c(1, 2), length.out = nrow(iris))
+  expect_error(
+    tl_tune_nn(iris, Species ~ ., sizes = 2, decays = 0, folds = 2,
+               weights = w),
+    "tl_tune_nn\\(\\) cannot re-split 'weights' across folds"
+  )
+  expect_error(
+    tl_tune_deep(iris, Species ~ ., subset = w > 1),
+    "tl_tune_deep\\(\\) cannot re-split 'subset' across folds"
+  )
 })
 
 # ---- xgboost -----------------------------------------------------------
@@ -791,6 +899,77 @@ test_that("xgboost fits the response the formula computes", {
   expect_lt(attr(tuned, "tuning_results")$best_score, 1)
 })
 
+test_that("predict()'s iterationrange follows the installed xgboost", {
+  skip_if_not_installed("xgboost")
+
+  # iterationrange is documented as inclusive of both ends, as xgboost 3.x
+  # reads it, but went to predict() as given, and xgboost before 3.0 reads
+  # the end as exclusive: c(1, 5) predicted from four rounds there
+  model <- tl_model(mtcars, mpg ~ wt + hp, method = "xgboost", nrounds = 20)
+  five <- tl_model(mtcars, mpg ~ wt + hp, method = "xgboost", nrounds = 5)
+  six <- tl_model(mtcars, mpg ~ wt + hp, method = "xgboost", nrounds = 6)
+  expect_equal(predict(model, mtcars, iterationrange = c(1, 5))$.pred,
+               predict(five, mtcars)$.pred)
+
+  # Told it runs an xgboost before 3.0, it hands this one that version's
+  # c(1, 6) -- which 3.x reads as six rounds
+  if (xgb_v3()) {
+    local_mocked_bindings(tl_xgb_v3 = function() FALSE)
+    expect_equal(predict(model, mtcars, iterationrange = c(1, 5))$.pred,
+                 predict(six, mtcars)$.pred)
+  }
+
+  expect_error(
+    predict(model, mtcars, iterationrange = c(1, 25)),
+    "'iterationrange' runs to round 25, but the model has 20 rounds"
+  )
+  expect_error(
+    predict(model, mtcars, iterationrange = c(5, 1)),
+    "'iterationrange' must be c\\(start, end\\)"
+  )
+})
+
+test_that("the extra-columns warning in xgboost predict has no call", {
+  skip_if_not_installed("xgboost")
+
+  # Every other message in the file is raised with call. = FALSE
+  model <- tl_model(mtcars[, 1:4], mpg ~ ., method = "xgboost", nrounds = 5)
+  w <- expect_warning(
+    tl_predict_xgboost(model, mtcars),
+    "New data contains columns not in the training data"
+  )
+  expect_null(conditionCall(w))
+})
+
+test_that("a gblinear booster gets no tree parameters", {
+  skip_if_not_installed("xgboost")
+
+  # max_depth, subsample and the other tree parameters were always set,
+  # so a linear booster printed "Parameters: { ... } are not used" on
+  # every fit
+  # gblinear's default updater runs its coordinate updates in parallel,
+  # and on several threads the result depends on their timing, so both
+  # fits use one thread and the same seed
+  notes <- utils::capture.output(
+    model <- tl_model(mtcars, mpg ~ wt + hp, method = "xgboost",
+                      nrounds = 10, booster = "gblinear", seed = 1,
+                      nthread = 1),
+    type = "message"
+  )
+  expect_false(any(grepl("are not used", notes)))
+
+  x <- stats::model.matrix(mpg ~ wt + hp, mtcars)[, -1]
+  direct <- xgboost::xgb.train(
+    params = list(objective = "reg:squarederror", eval_metric = "rmse",
+                  eta = 0.3, alpha = 0, lambda = 1, booster = "gblinear",
+                  seed = 1, nthread = 1),
+    data = xgboost::xgb.DMatrix(x, label = mtcars$mpg),
+    nrounds = 10, verbose = 0
+  )
+  expect_equal(predict(model, mtcars)$.pred,
+               stats::predict(direct, xgboost::xgb.DMatrix(x)))
+})
+
 test_that("xgboost probabilities come back as a tibble", {
   skip_if_not_installed("xgboost")
 
@@ -923,6 +1102,26 @@ test_that("tl_tune_xgboost's default grid is tl_default_param_grid()'s", {
                               verbose = FALSE, nthread = 1)
   expect_identical(attr(followed, "tuning_results")$param_grid,
                    list(max_depth = c(2, 3)))
+})
+
+test_that("tl_tune_xgboost takes weights and refuses other per-row arguments", {
+  skip_if_not_installed("xgboost")
+
+  # A subset or foldid went into params, where xgboost ignored it with a
+  # note, and the tuning ran on every row
+  expect_error(
+    tl_tune_xgboost(mtcars, mpg ~ wt + hp, cv_folds = 2, nrounds = 2,
+                    param_grid = list(max_depth = 2), verbose = FALSE,
+                    subset = mtcars$cyl != 8),
+    "tl_tune_xgboost\\(\\) cannot re-split 'subset' across folds"
+  )
+
+  # Weights live on the DMatrix, whose folds xgb.cv() slices with them
+  w <- rep(c(1, 2), length.out = nrow(mtcars))
+  weighted <- tl_tune_xgboost(mtcars, mpg ~ wt + hp, cv_folds = 2,
+                              nrounds = 2, param_grid = list(max_depth = 2),
+                              verbose = FALSE, weights = w)
+  expect_identical(weighted$spec$per_row_args, "weights")
 })
 
 test_that("tl_tune_xgboost sends xgb.cv() arguments to xgb.cv() alone", {
@@ -1077,6 +1276,16 @@ test_that("the SHAP dependence plot pairs each SHAP value with its own row", {
 })
 
 # ---- deep learning -------------------------------------------------------
+
+test_that("deep refuses case weights, which it does not pass to keras", {
+  # They reached keras's fit() as an argument it does not take, and the
+  # fit failed with Python's TypeError. Refused before keras is needed.
+  w <- rep(c(1, 2), length.out = nrow(mtcars))
+  expect_error(
+    tl_model(mtcars, mpg ~ wt + hp, method = "deep", weights = w),
+    "Method \"deep\" cannot use case weights"
+  )
+})
 
 test_that("deep predict scores unlabelled data, keeps NA rows, pins levels", {
   skip_on_cran()

@@ -88,7 +88,9 @@ tl_xgb_training_rows <- function(formula, data, weights = NULL) {
 #'   booster parameters such as \code{max_leaves} or \code{tree_method},
 #'   which go into \code{params}. A booster parameter given here, including
 #'   \code{objective} and \code{eval_metric}, replaces the value set from
-#'   the arguments above.
+#'   the arguments above. With \code{booster = "gblinear"}, the tree
+#'   parameters above are left out unless named. An offset is refused:
+#'   predictions would not apply it.
 #' @param compute Compute tier. Either \code{"cpu"} (default) or
 #'   \code{"gpu"}; when \code{"gpu"}, the function passes
 #'   \code{device = "cuda"} to \code{xgb.train()}. Requires an
@@ -105,13 +107,14 @@ tl_fit_xgboost <- function(data, formula, is_classification = FALSE,
                            compute = "cpu") {
   # Check if xgboost is installed
   tl_check_packages("xgboost")
+  dots <- list(...)
+  tl_refuse_offset(formula, data, dots, "xgboost", "xgb.train()")
 
   # Parse formula
   response_var <- all.vars(formula)[1]
 
   # Case weights belong to the DMatrix. Forwarded to xgb.train() they were
   # an argument it does not have: xgboost 3.x warned and fitted without.
-  dots <- list(...)
   weights <- dots$weights
   dots$weights <- NULL
 
@@ -194,6 +197,16 @@ tl_fit_xgboost <- function(data, formula, is_classification = FALSE,
   booster_params <- dots[!to_train & names2(dots) != "params"]
   params <- tl_override_args(params, c(dots$params, booster_params))
 
+  # A linear booster grows no trees, and xgboost printed "Parameters: {
+  # ... } are not used" on every fit for the tree parameters set above by
+  # default. Those are left out for it; one the caller named is kept.
+  if (identical(params$booster, "gblinear")) {
+    named <- c(names(match.call())[-1], names(dots$params))
+    tree_params <- c("max_depth", "subsample", "colsample_bytree",
+                     "min_child_weight", "gamma")
+    params[setdiff(tree_params, named)] <- NULL
+  }
+
   # Early stopping needs data to stop on, and a fit on every row has none:
   # xgboost stopped with "For early stopping, 'evals' must have at least
   # one element". Stopping on the training rows would only stop once the
@@ -271,8 +284,9 @@ tl_xgb_prob_matrix <- function(raw, n_obs, class_levels) {
 #' @param iterationrange Boosting iterations to predict with, as
 #'   \code{c(start, end)} -- base-1 and inclusive of both ends, so
 #'   \code{c(1, 20)} predicts from the first twenty iterations and
-#'   \code{end} may not exceed the number fitted. NULL (default) uses
-#'   every iteration.
+#'   \code{end} may not exceed the number fitted. It is translated for
+#'   xgboost before 3.0, which reads the end as exclusive. NULL (default)
+#'   uses every iteration.
 #' @param ntreelimit Deprecated. Use \code{iterationrange} instead.
 #'   \code{ntreelimit = n} is translated to \code{c(1, n)}.
 #' @param ... Additional arguments
@@ -299,6 +313,13 @@ tl_predict_xgboost <- function(model, new_data,
   # Extract XGBoost model
   xgb_model <- model$fit
 
+  # iterationrange is documented as inclusive of both ends, as xgboost 3.x
+  # reads it. Passed on as given, xgboost before 3.0 read its end as
+  # exclusive, and c(1, 5) predicted from four rounds.
+  if (!is.null(iterationrange)) {
+    iterationrange <- tl_xgb_iteration_range(iterationrange, xgb_model)
+  }
+
   # Extract metadata
   feature_names <- attr(xgb_model, "feature_names")
   is_classification <- model$spec$is_classification
@@ -314,7 +335,7 @@ tl_predict_xgboost <- function(model, new_data,
   if (!all(colnames(x_new) %in% feature_names)) {
     extra_cols <- setdiff(colnames(x_new), feature_names)
     warning("New data contains columns not in the training data: ",
-            paste(extra_cols, collapse = ", "))
+            paste(extra_cols, collapse = ", "), call. = FALSE)
   }
   missing_cols <- setdiff(feature_names, colnames(x_new))
   if (length(missing_cols) > 0) {
@@ -605,10 +626,12 @@ tl_xgb_best_iteration <- function(cv_result) {
 #' @param verbose Logical indicating whether to print progress (default: TRUE)
 #' @param ... Arguments \code{xgboost::xgb.cv()} takes, such as
 #'   \code{showsd} or \code{stratified}, which go to it alone; case
-#'   \code{weights}, one per row of \code{data}; and booster parameters held
-#'   fixed across the grid, such as \code{nthread} or \code{tree_method},
-#'   which join each parameter set and the final fit. A value in
-#'   \code{param_grid} replaces one given here.
+#'   \code{weights}, one per row of \code{data}, which the folds split with
+#'   the rows; and booster parameters held fixed across the grid, such as
+#'   \code{nthread} or \code{tree_method}, which join each parameter set and
+#'   the final fit. A value in \code{param_grid} replaces one given here.
+#'   The other per-row arguments -- \code{subset}, \code{offset},
+#'   \code{foldid}, \code{strata} -- are refused.
 #' @return A \code{tidylearn_model} object (the refit on full data using the
 #'   best hyperparameters, built by \code{\link{tl_model}} so that it records
 #'   them in \code{$spec$args}) with an attribute \code{"tuning_results"}
@@ -670,6 +693,12 @@ tl_tune_xgboost <- function(data, formula, is_classification = NULL,
   dots <- list(...)
   weights <- dots$weights
   dots$weights <- NULL
+
+  # Weights sit on the DMatrix, whose folds xgb.cv() slices along with
+  # them. The other per-row arguments would land in params, where xgboost
+  # ignores them with a note, and tune on every row.
+  tl_check_per_row_args(names2(dots), "tl_tune_xgboost()")
+
   cv_formals <- setdiff(
     names(formals(xgboost::xgb.cv)), c("...", "params", "objective")
   )
@@ -939,9 +968,6 @@ tl_xgb_contributions <- function(model, data, trees_idx = NULL) {
 
 #' Translate a run of boosting rounds into predict()'s iterationrange
 #'
-#' xgboost 3.0 reads \code{iterationrange} as inclusive of both ends;
-#' earlier versions read its end as exclusive.
-#'
 #' @param trees_idx One-based rounds, consecutive and increasing
 #' @param xgb_model The booster, for its number of rounds
 #' @return A length-2 integer vector in the installed version's convention
@@ -958,22 +984,62 @@ tl_xgb_round_range <- function(trees_idx, xgb_model) {
       call. = FALSE
     )
   }
+  tl_xgb_version_range(min(trees_idx), max(trees_idx), xgb_model,
+                       "trees_idx")
+}
 
-  rounds <- if (tl_xgb_v3()) {
-    xgboost::xgb.get.num.boosted.rounds(xgb_model)
+#' Translate predict()'s documented iterationrange for the installed xgboost
+#'
+#' @param iterationrange \code{c(start, end)}, one-based and inclusive
+#' @param xgb_model The booster, for its number of rounds
+#' @return A length-2 integer vector in the installed version's convention
+#' @keywords internal
+#' @noRd
+tl_xgb_iteration_range <- function(iterationrange, xgb_model) {
+  if (!is.numeric(iterationrange) || length(iterationrange) != 2L ||
+        anyNA(iterationrange) ||
+        any(iterationrange != round(iterationrange)) ||
+        iterationrange[1] < 1 || iterationrange[2] < iterationrange[1]) {
+    stop(
+      "'iterationrange' must be c(start, end): whole rounds counted from 1, ",
+      "with start no later than end; got ",
+      paste(format(iterationrange), collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+  tl_xgb_version_range(iterationrange[1], iterationrange[2], xgb_model,
+                       "iterationrange")
+}
+
+#' Rounds first to last, in the installed xgboost's iterationrange
+#'
+#' xgboost 3.0 reads \code{iterationrange} as inclusive of both ends;
+#' earlier versions read its end as exclusive.
+#'
+#' @param first,last One-based rounds, inclusive
+#' @param xgb_model The booster, for its number of rounds
+#' @param arg The argument the rounds came from, for the message
+#' @return A length-2 integer vector
+#' @keywords internal
+#' @noRd
+tl_xgb_version_range <- function(first, last, xgb_model, arg) {
+  # The count is read by whichever means the installed version has, apart
+  # from the range convention
+  rounds <- if ("xgb.get.num.boosted.rounds" %in%
+                  getNamespaceExports("xgboost")) {
+    getExportedValue("xgboost", "xgb.get.num.boosted.rounds")(xgb_model)
   } else {
     xgb_model$niter
   }
-  last <- max(trees_idx)
   if (last > rounds) {
     stop(
-      "'trees_idx' runs to round ", last, ", but the model has ", rounds,
+      "'", arg, "' runs to round ", last, ", but the model has ", rounds,
       " rounds.",
       call. = FALSE
     )
   }
 
-  first <- as.integer(min(trees_idx))
+  first <- as.integer(first)
   last <- as.integer(last)
   if (tl_xgb_v3()) c(first, last) else c(first, last + 1L)
 }

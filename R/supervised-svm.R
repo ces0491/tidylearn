@@ -27,7 +27,8 @@ NULL
 #'   during tuning (default: 5)
 #' @param ... Additional arguments to pass to svm(). \code{type} and
 #'   \code{probability} replace the defaults chosen from the task. Case
-#'   \code{weights} are refused: e1071 has none.
+#'   \code{weights} are refused: e1071 has none. So is an offset, which
+#'   e1071 leaves out of the fit.
 #' @return A fitted SVM model
 #' @keywords internal
 tl_fit_svm <- function(data, formula,
@@ -39,6 +40,7 @@ tl_fit_svm <- function(data, formula,
   # Check if e1071 is installed
   tl_check_packages("e1071")
   dots <- list(...)
+  tl_refuse_offset(formula, data, dots, "svm", "e1071::svm()")
 
   # svm.default() swallows an argument it does not recognise, so weights
   # were accepted and ignored: a weighted fit was identical to the
@@ -278,7 +280,8 @@ tl_plot_svm_boundary <- function(model,
   # Get original data
   data <- model$data
   formula <- model$spec$formula
-  response_var <- all.vars(formula)[1]
+  # The legend names the response as the formula writes it
+  response_label <- deparse1(formula[[2L]])
 
   # The predictors the model was fitted on. The axes used to default to
   # the first two numeric columns of the data, so Species ~ Petal.Length +
@@ -407,14 +410,20 @@ tl_plot_svm_boundary <- function(model,
     )
   }
 
-  # Add original data points
+  # Add original data points, coloured by the response the formula
+  # computes. Coloured by the raw column, factor(mpg > 20) ~ . drew 25
+  # shades of mpg rather than its two classes.
+  point_data <- data
+  point_data$.observed <- tl_normalise_response(
+    tl_formula_response(formula, data)
+  )
   p <- p +
     ggplot2::geom_point(
-      data = data,
+      data = point_data,
       ggplot2::aes(
         x = .data[[x_var]],
         y = .data[[y_var]],
-        color = .data[[response_var]]
+        color = .data[[".observed"]]
       ),
       size = 3,
       alpha = 0.7
@@ -423,7 +432,7 @@ tl_plot_svm_boundary <- function(model,
       title = "SVM Decision Boundary",
       x = x_var,
       y = y_var,
-      color = response_var,
+      color = response_label,
       fill = "Predicted Class"
     ) +
     ggplot2::theme_minimal()
