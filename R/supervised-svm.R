@@ -25,7 +25,9 @@ NULL
 #'   hyperparameters (default: FALSE)
 #' @param tune_folds Number of folds for cross-validation
 #'   during tuning (default: 5)
-#' @param ... Additional arguments to pass to svm()
+#' @param ... Additional arguments to pass to svm(). \code{type} and
+#'   \code{probability} replace the defaults chosen from the task. Case
+#'   \code{weights} are refused: e1071 has none.
 #' @return A fitted SVM model
 #' @keywords internal
 tl_fit_svm <- function(data, formula,
@@ -36,7 +38,20 @@ tl_fit_svm <- function(data, formula,
                        tune_folds = 5, ...) {
   # Check if e1071 is installed
   tl_check_packages("e1071")
+  dots <- list(...)
 
+  # svm.default() swallows an argument it does not recognise, so weights
+  # were accepted and ignored: a weighted fit was identical to the
+  # unweighted one, while the model recorded that weights had been used.
+  if ("weights" %in% names2(dots)) {
+    stop(
+      "Method \"svm\" cannot use case weights: e1071::svm() has no case ",
+      "weights, so they would be ignored. For per-class weights in ",
+      "classification, pass class.weights; for case weights, use a method ",
+      "that applies them, such as \"tree\", \"boost\", \"nn\" or \"xgboost\".",
+      call. = FALSE
+    )
+  }
 
   # No default gamma. e1071's own is 1 / ncol(design matrix), which
   # accounts for the dummy columns a factor predictor expands into.
@@ -45,23 +60,13 @@ tl_fit_svm <- function(data, formula,
   # mtcars got a kernel width of 1/10 instead of 1/2, with nothing said.
   # Below, gamma is passed on only when the caller or the tuner set one.
 
-  # Determine SVM type based on problem type
-  if (is_classification) {
-    # Get response variable
-    response_var <- all.vars(formula)[1]
-    y <- data[[response_var]]
-
-    # Check if binary or multiclass
-    if (is.factor(y) && length(levels(y)) == 2) {
-      # Binary classification
-      svm_type <- "C-classification"
-    } else {
-      # Multiclass classification
-      svm_type <- "C-classification"
-    }
+  # The SVM type follows the task unless the caller names one
+  svm_type <- if (!is.null(dots$type)) {
+    dots$type
+  } else if (is_classification) {
+    "C-classification"
   } else {
-    # Regression
-    svm_type <- "eps-regression"
+    "eps-regression"
   }
 
   if (tune) {
@@ -104,7 +109,9 @@ tl_fit_svm <- function(data, formula,
     tuning_results <- NULL
   }
 
-  # Fit the SVM model
+  # Fit the SVM model. probability and type are defaults, not fixed
+  # values: alongside the caller's own, they failed with "formal argument
+  # matched by multiple actual arguments".
   args <- list(
     formula = formula,
     data = data,
@@ -112,14 +119,15 @@ tl_fit_svm <- function(data, formula,
     kernel = kernel,
     cost = cost,
     degree = degree,
-    probability = is_classification,
-    ...
+    probability = is_classification
   )
   if (!is.null(gamma)) {
     args$gamma <- gamma
   }
 
-  svm_model <- tl_restore_call_data(do.call(e1071::svm, args))
+  svm_model <- tl_restore_call_data(
+    do.call(e1071::svm, tl_override_args(args, dots))
+  )
 
   # Store tuning results if available
   if (!is.null(tuning_results)) {
@@ -144,11 +152,27 @@ tl_predict_svm <- function(model, new_data,
   fit <- model$fit
   is_classification <- model$spec$is_classification
 
-  # predict.svm defaults to na.omit and silently returns a shorter vector,
-  # so drop incomplete rows here and put NA back afterwards -- otherwise
-  # row i of the output stops describing row i of new_data.
-  keep <- tl_complete_predictor_rows(model$spec$formula, new_data)
-  predict_data <- new_data[keep, , drop = FALSE]
+  # The columns the fitted model reads. predict.svm() applies its
+  # na.action, na.omit, to the whole of newdata before it selects them, so
+  # a missing value in the response or in a column the formula never used
+  # dropped the row as well, and the shorter result stopped lining up with
+  # new_data: airquality's Ozone ~ Temp + Wind returned 111 predictions
+  # for 153 rows. Handed these columns alone, it has nothing else to drop.
+  predictors <- all.vars(stats::delete.response(fit$terms))
+  missing_cols <- setdiff(predictors, names(new_data))
+  if (length(missing_cols) > 0) {
+    stop(
+      "New data is missing predictors used at fit time: ",
+      paste(missing_cols, collapse = ", "),
+      call. = FALSE
+    )
+  }
+  predictor_data <- new_data[, predictors, drop = FALSE]
+
+  # Incomplete rows are dropped here and put back as NA afterwards, so
+  # row i of the output still describes row i of new_data
+  keep <- tl_complete_predictor_rows(model$spec$formula, predictor_data)
+  predict_data <- predictor_data[keep, , drop = FALSE]
 
   if (is_classification) {
     if (type == "prob") {
@@ -162,14 +186,20 @@ tl_predict_svm <- function(model, new_data,
         )
       }
 
-      # Get class probabilities
-      probs <- attr(
-        predict(
-          fit, newdata = predict_data,
-          probability = TRUE, ...
-        ),
-        "probabilities"
-      )
+      # Get class probabilities. predict.svm() fails on zero rows, which
+      # is what is left when every row misses a predictor.
+      probs <- if (any(keep)) {
+        attr(
+          predict(
+            fit, newdata = predict_data,
+            probability = TRUE, ...
+          ),
+          "probabilities"
+        )
+      } else {
+        matrix(numeric(0), nrow = 0, ncol = length(fit$levels),
+               dimnames = list(NULL, fit$levels))
+      }
 
       # e1071 orders the probability columns by its own internal class
       # ordering; align them with the response factor levels so every
@@ -203,12 +233,16 @@ tl_predict_svm <- function(model, new_data,
 #' Plot SVM decision boundary
 #'
 #' @param model A tidylearn SVM model object
-#' @param x_var Name of the x-axis variable
-#' @param y_var Name of the y-axis variable
+#' @param x_var Name of the x-axis variable. Defaults to the first numeric
+#'   predictor in the model's formula.
+#' @param y_var Name of the y-axis variable. Defaults to the next numeric
+#'   predictor in the model's formula.
 #' @param grid_size Number of points in each dimension
 #'   for the grid (default: 100)
 #' @param ... Additional arguments
-#' @return A \code{\link[ggplot2]{ggplot}} object.
+#' @return A \code{\link[ggplot2]{ggplot}} object. The other predictors are
+#'   held at their mean, or their most frequent level. A two-class model
+#'   fitted with probabilities also gets the 0.5 probability contour.
 #' @importFrom ggplot2 ggplot aes geom_point geom_contour
 #'   scale_fill_gradient2 labs theme_minimal
 #' @examples
@@ -246,23 +280,32 @@ tl_plot_svm_boundary <- function(model,
   formula <- model$spec$formula
   response_var <- all.vars(formula)[1]
 
-  # If x_var and y_var are not specified, use first two predictors
+  # The predictors the model was fitted on. The axes used to default to
+  # the first two numeric columns of the data, so Species ~ Petal.Length +
+  # Petal.Width was drawn over the sepal columns the model never saw, with
+  # one predicted class across the whole grid.
+  predictor_vars <- intersect(get_formula_vars(formula, data), names(data))
+
+  # Fill in whichever axis was not named, from the numeric predictors
   if (is.null(x_var) || is.null(y_var)) {
-    # Use data columns instead of all.vars() -- all.vars(y ~ .) returns only "y"
-    predictor_vars <- setdiff(names(data), response_var)
-    # Keep only numeric predictors for the boundary grid
-    predictor_vars <- predictor_vars[
+    numeric_vars <- predictor_vars[
       vapply(data[predictor_vars], is.numeric, logical(1))
     ]
-    if (length(predictor_vars) < 2) {
+    candidates <- setdiff(numeric_vars, c(x_var, y_var))
+    if (is.null(x_var)) {
+      x_var <- candidates[1]
+      candidates <- candidates[-1]
+    }
+    if (is.null(y_var)) {
+      y_var <- candidates[1]
+    }
+    if (is.na(x_var) || is.na(y_var)) {
       stop(
         "At least two numeric predictor variables are ",
         "required for decision boundary plot",
         call. = FALSE
       )
     }
-    x_var <- predictor_vars[1]
-    y_var <- predictor_vars[2]
   }
 
   # Check if variables exist
@@ -288,10 +331,8 @@ tl_plot_svm_boundary <- function(model,
   grid_data <- expand.grid(x = x_grid, y = y_grid)
   names(grid_data) <- c(x_var, y_var)
 
-  # Add other predictors with mean values
-  other_vars <- setdiff(
-    names(data), c(response_var, x_var, y_var)
-  )
+  # Hold the other predictors at their mean, or their most frequent level
+  other_vars <- setdiff(predictor_vars, c(x_var, y_var))
   for (var in other_vars) {
     if (is.factor(data[[var]]) ||
           is.character(data[[var]])) {
@@ -299,7 +340,11 @@ tl_plot_svm_boundary <- function(model,
       most_freq <- names(
         sort(table(data[[var]]), decreasing = TRUE)[1]
       )
-      grid_data[[var]] <- most_freq
+      grid_data[[var]] <- if (is.factor(data[[var]])) {
+        factor(most_freq, levels = levels(data[[var]]))
+      } else {
+        most_freq
+      }
     } else {
       # For continuous variables, use mean
       grid_data[[var]] <- mean(
@@ -312,15 +357,25 @@ tl_plot_svm_boundary <- function(model,
   preds <- predict(model$fit, newdata = grid_data)
   grid_data$pred_class <- as.character(preds)
 
-  # For binary classification, also get numeric probability for contour line
+  # For binary classification, also get numeric probability for contour
+  # line. e1071 stores the type as a code -- 0 is C-classification, 1
+  # nu-classification -- and the probability flag as $compprob. Comparing
+  # $type with the string and reading $probability, which is an argument
+  # name rather than a slot, made this FALSE for every model, so the
+  # contour was never drawn.
   has_numeric_pred <- FALSE
-  if (model$fit$type == "C-classification" && model$fit$probability) {
+  if (model$fit$type %in% c(0, 1) && isTRUE(model$fit$compprob)) {
     probs <- attr(
       predict(model$fit, newdata = grid_data, probability = TRUE),
       "probabilities"
     )
     if (!is.null(probs) && ncol(probs) == 2) {
-      grid_data$pred_prob <- probs[, 2]
+      # The positive class, the second level, whatever order e1071 keeps
+      positive <- model$spec$response_levels[2]
+      if (is.null(positive) || !positive %in% colnames(probs)) {
+        positive <- colnames(probs)[2]
+      }
+      grid_data$pred_prob <- unname(probs[, positive])
       has_numeric_pred <- TRUE
     }
   }

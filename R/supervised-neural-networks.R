@@ -18,7 +18,9 @@ NULL
 #' @param decay Weight decay parameter (default: 0)
 #' @param maxit Maximum number of iterations (default: 100)
 #' @param trace Logical; whether to print progress (default: FALSE)
-#' @param ... Additional arguments to pass to nnet()
+#' @param ... Additional arguments to pass to nnet(), including case
+#'   \code{weights}. For regression, \code{linout} replaces the default
+#'   \code{TRUE}.
 #' @return A fitted neural network model
 #' @keywords internal
 tl_fit_nn <- function(data, formula, is_classification = FALSE,
@@ -29,56 +31,172 @@ tl_fit_nn <- function(data, formula, is_classification = FALSE,
   # Get response variable
   response_var <- all.vars(formula)[1]
 
-  if (is_classification) {
-    # For classification, ensure response is a factor
-    if (!is.factor(data[[response_var]])) {
-      data[[response_var]] <- factor(data[[response_var]])
-    }
-
-    # Fit classification neural network.
-    #
-    # The error criterion is deliberately left to nnet. nnet.formula()
-    # already chooses it from the response: cross-entropy for a two-level
-    # factor, softmax for three or more. Naming entropy = TRUE here reached
-    # nnet.default() through `...` alongside the one nnet.formula() supplies
-    # itself, and a two-class fit died with "formal argument 'entropy'
-    # matched by multiple actual arguments". Multiclass survived only
-    # because nnet.default() sets entropy <- FALSE whenever softmax is on,
-    # so the argument it collided with was never there.
-    nn_model <- nnet::nnet(
-      formula = formula,
-      data = data,
-      size = size,
-      decay = decay,
-      maxit = maxit,
-      trace = trace,
-      ...
-    )
-  } else {
-    # Fit regression neural network
-    nn_model <- nnet::nnet(
-      formula = formula,
-      data = data,
-      size = size,
-      decay = decay,
-      maxit = maxit,
-      trace = trace,
-      linout = TRUE,  # Linear output for regression
-      ...
-    )
+  # For classification, ensure response is a factor. Only a bare column is
+  # converted: a computed response such as cut(mpg, 3) reads its column,
+  # and handed a factor, it failed.
+  if (is_classification && is.name(formula[[2L]]) &&
+        !is.factor(data[[response_var]])) {
+    data[[response_var]] <- factor(data[[response_var]])
   }
 
-  # nnet() records its call verbatim, so the stored call reads
-  # `nnet(formula = formula, ...)` -- the symbol, not the formula. Anything
-  # that later evaluates `mod_in$call$formula` outside this function gets
-  # stats::formula, the function. NeuralNetTools::plotnet() does exactly
-  # that for any net with a single output unit, which is every regression
-  # fit and every two-class fit, and fails with "cannot coerce type
-  # 'closure' to vector of type 'character'". Substituting the formula into
-  # the recorded call makes it mean what it says.
+  args <- list(
+    formula = formula,
+    data = data,
+    size = size,
+    decay = decay,
+    maxit = maxit,
+    trace = trace
+  )
+
+  # The error criterion of a classification fit is deliberately left to
+  # nnet. nnet.formula() already chooses it from the response:
+  # cross-entropy for a two-level factor, softmax for three or more. Naming
+  # entropy = TRUE here reached nnet.default() through `...` alongside the
+  # one nnet.formula() supplies itself, and a two-class fit died with
+  # "formal argument 'entropy' matched by multiple actual arguments".
+  # Multiclass survived only because nnet.default() sets entropy <- FALSE
+  # whenever softmax is on, so the argument it collided with was never
+  # there.
+  if (!is_classification) {
+    args$linout <- TRUE  # Linear output for regression
+  }
+
+  # nnet() evaluates weights and subset inside its own model frame, which a
+  # value forwarded through ... cannot reach: weights failed with "..1 used
+  # in an incorrect context". So the call is built from values, and the
+  # caller's arguments replace the defaults above -- linout included --
+  # rather than colliding with them.
+  nn_model <- tl_fit_by_value(
+    nnet::nnet, "nnet", tl_override_args(args, list(...))
+  )
+
+  # NeuralNetTools::plotnet() evaluates `mod_in$call$formula` for any net
+  # with a single output unit -- every regression and two-class fit. A
+  # call that recorded the symbol `formula` resolved it to stats::formula,
+  # the function, and plotting failed with "cannot coerce type 'closure'
+  # to vector of type 'character'". The stored call has to hold the
+  # formula itself.
   nn_model$call$formula <- formula
 
   nn_model
+}
+
+#' Class probabilities as an n x k matrix
+#'
+#' A two-class network has one output unit, the probability of the second
+#' level -- the positive class -- and the first level's is its complement.
+#'
+#' @param raw The network's output: a vector, or a matrix with one column
+#'   per output unit
+#' @param class_levels The classes, in level order
+#' @return A numeric matrix with one named column per class
+#' @keywords internal
+#' @noRd
+tl_class_prob_matrix <- function(raw, class_levels) {
+  raw <- as.matrix(raw)
+  if (ncol(raw) == 1L && length(class_levels) == 2L) {
+    raw <- cbind(1 - raw[, 1], raw[, 1])
+  }
+  if (ncol(raw) != length(class_levels)) {
+    stop(
+      "The network returned ", ncol(raw), " output columns for ",
+      length(class_levels), " classes.",
+      call. = FALSE
+    )
+  }
+  dimnames(raw) <- list(NULL, class_levels)
+  raw
+}
+
+#' The most probable class in each row of a probability matrix
+#'
+#' A row whose probabilities are missing -- what predict.nnet() and the
+#' deep path leave where a predictor is missing -- gets an NA class.
+#' \code{apply(probs, 1, which.max)} returned \code{integer(0)} for such a
+#' row, and indexing the levels with the list that made failed with
+#' "invalid subscript type 'list'". \code{max.col()} returns NA instead.
+#'
+#' @param probs Matrix from \code{tl_class_prob_matrix()}
+#' @return A factor with the matrix's column names as levels
+#' @keywords internal
+#' @noRd
+tl_class_from_probs <- function(probs) {
+  class_levels <- colnames(probs)
+  idx <- max.col(probs, ties.method = "first")
+  factor(class_levels[idx], levels = class_levels)
+}
+
+#' Settle a tuner's task from its response, as tl_model() does
+#'
+#' The tuners took \code{is_classification} on trust and defaulted it to
+#' FALSE, so a factor response was tuned as a regression on its integer
+#' codes: silently for xgboost, and failing with "NA/NaN argument" for
+#' nnet. The response was not cleaned either, so a subset that still
+#' declared a class it no longer held was tuned with that class as well.
+#'
+#' The response is the one the formula computes, so \code{factor(am) ~ .}
+#' is a classification although \code{am} is numeric.
+#'
+#' @param data Training data
+#' @param formula The model formula
+#' @param is_classification The caller's flag: \code{NULL} to read the task
+#'   from the response, or \code{TRUE} or \code{FALSE}
+#' @return A list: \code{data}, whose classification response, when it is
+#'   a column of its own, is a factor of the classes it holds; and
+#'   \code{is_classification}
+#' @keywords internal
+#' @noRd
+tl_tuner_task <- function(data, formula, is_classification) {
+  lhs <- formula[[2L]]
+  response_label <- if (is.name(lhs)) as.character(lhs) else deparse1(lhs)
+  y <- tl_formula_lhs(formula, data)
+  categorical <- is.factor(y) || is.character(y)
+
+  if (is.null(is_classification)) {
+    is_classification <- categorical
+  } else if (!is.logical(is_classification) ||
+               length(is_classification) != 1L ||
+               is.na(is_classification)) {
+    stop(
+      "'is_classification' must be TRUE, FALSE or NULL; got ",
+      tl_describe_value(is_classification), ".",
+      call. = FALSE
+    )
+  }
+
+  if (!is_classification && categorical) {
+    stop(
+      "is_classification = FALSE, but '", response_label, "' is a ",
+      if (is.factor(y)) "factor" else "character vector",
+      ". A regression would fit its classes' integer codes. Leave ",
+      "is_classification out to classify it, or pass a numeric response.",
+      call. = FALSE
+    )
+  }
+
+  # A computed response is left to the formula: writing factor(am) back
+  # over am would change what the formula computes
+  if (is_classification && is.name(lhs)) {
+    data[[response_label]] <- tl_normalise_response(y)
+  }
+
+  list(data = data, is_classification = is_classification)
+}
+
+#' The response a formula computes, one value per row of data
+#'
+#' A computed left-hand side such as \code{log(mpg)} or \code{factor(am)}
+#' is not the raw column: fitting or scoring against the column fits a
+#' different response from the one the formula names.
+#'
+#' @param formula A two-sided formula
+#' @param data Data holding the columns it uses
+#' @return The response, with missing values kept in place
+#' @keywords internal
+#' @noRd
+tl_formula_lhs <- function(formula, data) {
+  frame <- stats::model.frame(formula, data = data, na.action = stats::na.pass)
+  unname(stats::model.response(frame))
 }
 
 #' Predict using a neural network model
@@ -96,76 +214,33 @@ tl_predict_nn <- function(model, new_data, type = "response", ...) {
   is_classification <- model$spec$is_classification
   response_var <- model$spec$response_var
 
-  if (is_classification) {
-    # Get original response levels
-    levels <- levels(factor(model$data[[response_var]]))
-
-    if (type == "prob") {
-      # Get class probabilities
-      probs <- as.data.frame(
-        predict(fit, newdata = new_data, type = "raw", ...)
-      )
-
-      # For binary classification
-      if (length(levels) == 2) {
-        # nnet returns probability for the second class only
-        if (ncol(probs) == 1) {
-          # Create data frame with probabilities for both classes
-          prob_df <- tibble::tibble(
-            !!levels[1] := 1 - probs[[1]],
-            !!levels[2] := probs[[1]]
-          )
-        } else {
-          # Already has both classes
-          names(probs) <- levels
-          prob_df <- tibble::as_tibble(probs)
-        }
-      } else {
-        # Multiclass - ensure column names match class levels
-        names(probs) <- levels
-        prob_df <- tibble::as_tibble(probs)
-      }
-
-      prob_df
-    } else if (type == "class") {
-      # Get probabilities first
-      probs <- as.data.frame(
-        predict(fit, newdata = new_data, type = "raw", ...)
-      )
-
-      # For binary classification
-      if (length(levels) == 2) {
-        if (ncol(probs) == 1) {
-          # Classify based on probability > 0.5
-          pred_classes <- ifelse(probs[[1]] > 0.5, levels[2], levels[1])
-        } else {
-          # Find class with highest probability
-          pred_classes <- levels[apply(probs, 1, which.max)]
-        }
-      } else {
-        # Multiclass - find class with highest probability
-        pred_classes <- levels[apply(probs, 1, which.max)]
-      }
-
-      # Convert to factor with original levels
-      pred_classes <- factor(pred_classes, levels = levels)
-
-      pred_classes
-    } else if (type == "response") {
-      # Same as "class" for classification
-      tl_predict_nn(model, new_data, type = "class", ...)
-    } else {
-      stop(
-        "Invalid prediction type for neural networks. ",
-        "Use 'prob', 'class', or 'response'.",
-        call. = FALSE
-      )
-    }
-  } else {
+  if (!is_classification) {
     # Regression predictions
-    preds <- as.vector(predict(fit, newdata = new_data, type = "raw", ...))
-    preds
+    return(as.vector(predict(fit, newdata = new_data, type = "raw", ...)))
   }
+
+  if (!type %in% c("prob", "class", "response")) {
+    stop(
+      "Invalid prediction type for neural networks. ",
+      "Use 'prob', 'class', or 'response'.",
+      call. = FALSE
+    )
+  }
+
+  class_levels <- model$spec$response_levels %||%
+    levels(tl_normalise_response(model$data[[response_var]]))
+
+  # predict.nnet() keeps a row with a missing predictor as a row of NA, so
+  # the probabilities, and the classes read from them, stay aligned with
+  # new_data. "response" is the class, as for the other classifiers.
+  probs <- tl_class_prob_matrix(
+    predict(fit, newdata = new_data, type = "raw", ...),
+    class_levels
+  )
+  if (type == "prob") {
+    return(tibble::as_tibble(as.data.frame(probs)))
+  }
+  tl_class_from_probs(probs)
 }
 
 #' Plot neural network architecture
@@ -211,15 +286,22 @@ tl_plot_nn_architecture <- function(model, ...) {
 #' @param data A data frame containing the training data
 #' @param formula A formula specifying the model
 #' @param is_classification Logical indicating if this is a
-#'   classification problem
+#'   classification problem. \code{NULL} (default) reads it from the
+#'   response, as \code{\link{tl_model}} does: a factor or character
+#'   response is classification. \code{FALSE} with such a response is an
+#'   error.
 #' @param sizes Vector of hidden layer sizes to try
 #' @param decays Vector of weight decay parameters to try
 #' @param folds Number of cross-validation folds (default: 5)
-#' @param ... Additional arguments to pass to nnet()
+#' @param ... Additional arguments to pass to nnet(). \code{maxit}
+#'   (default 100) and \code{trace} (default \code{FALSE}) replace the
+#'   values used otherwise.
 #' @return A list with elements \code{model} (the best fitted \code{nnet}
 #'   model), \code{best_size} (optimal hidden-layer size), \code{best_decay}
 #'   (optimal weight decay), and \code{tuning_results} (a data frame of all
-#'   parameter combinations and their cross-validated errors).
+#'   parameter combinations and their cross-validated errors: the
+#'   misclassification rate for classification, the mean squared error for
+#'   regression).
 #' @export
 #' @examples
 #' \donttest{
@@ -234,11 +316,22 @@ tl_plot_nn_architecture <- function(model, ...) {
 #' # The grid this searched, drawn as a heatmap
 #' tl_plot_nn_tuning(tuned)
 #' }
-tl_tune_nn <- function(data, formula, is_classification = FALSE,
+tl_tune_nn <- function(data, formula, is_classification = NULL,
                        sizes = c(1, 2, 5, 10), decays = c(0, 0.001, 0.01, 0.1),
                        folds = 5, ...) {
   # Check if nnet is installed
   tl_check_packages("nnet")
+
+  formula <- tl_as_formula(formula)
+  response_var <- all.vars(formula)[1]
+  task <- tl_tuner_task(data, formula, is_classification)
+  data <- task$data
+  is_classification <- task$is_classification
+
+  # maxit and trace are defaults, not fixed values: set alongside ..., the
+  # caller's own failed with "formal argument matched by multiple actual
+  # arguments"
+  fit_args <- tl_override_args(list(maxit = 100, trace = FALSE), list(...))
 
   # Create cross-validation splits
   cv_splits <- rsample::vfold_cv(data, v = folds)
@@ -250,70 +343,57 @@ tl_tune_nn <- function(data, formula, is_classification = FALSE,
     error = NA
   )
 
-  # Get response variable
-  response_var <- all.vars(formula)[1]
-
   # Loop through parameter combinations
   for (i in seq_len(nrow(tune_results))) {
-    size <- tune_results$size[i]
-    decay <- tune_results$decay[i]
-
     # Cross-validation for this parameter combination
     cv_errors <- numeric(folds)
 
-    for (j in 1:folds) {
+    for (j in seq_len(folds)) {
       # Get training and testing data for this fold
       train_data <- rsample::analysis(cv_splits$splits[[j]])
       test_data <- rsample::assessment(cv_splits$splits[[j]])
 
       # Train neural network
-      nn <- tl_fit_nn(
+      nn <- do.call(tl_fit_nn, c(
+        list(
+          data = train_data,
+          formula = formula,
+          is_classification = is_classification,
+          size = tune_results$size[i],
+          decay = tune_results$decay[i]
+        ),
+        fit_args
+      ))
+
+      # Score the fold through the path predict() uses. Reading
+      # predict.nnet()'s raw output here instead, a two-class network's
+      # n x 1 matrix failed the is.vector() test, and which.max() over its
+      # one column chose the first class for every row: each candidate
+      # scored the share of the second class, and the first in the grid
+      # always won.
+      fold_model <- list(
+        fit = nn,
         data = train_data,
-        formula = formula,
-        is_classification = is_classification,
-        size = size,
-        decay = decay,
-        maxit = 100,
-        trace = FALSE,
-        ...
+        spec = list(
+          is_classification = is_classification,
+          response_var = response_var,
+          response_levels = nn$lev
+        )
       )
+      preds <- tl_predict_nn(fold_model, test_data, type = "class")
+      # The response the formula computes: scored against the raw column,
+      # log(y) ~ x was judged by how far its log-scale predictions fell
+      # from y itself
+      actuals <- tl_formula_lhs(formula, test_data)
 
-      # Make predictions
-      preds <- predict(nn, newdata = test_data, type = "raw")
-
-      # Calculate error
       if (is_classification) {
-        # For classification, use accuracy
-        if (is.factor(test_data[[response_var]])) {
-          actuals <- test_data[[response_var]]
-        } else {
-          actuals <- factor(test_data[[response_var]])
-        }
-
-        # Convert predictions to class labels
-        levels <- levels(actuals)
-
-        if (length(levels) == 2) {
-          if (is.vector(preds)) {
-            # Binary classification with single output
-            pred_classes <- ifelse(preds > 0.5, levels[2], levels[1])
-          } else {
-            # Binary classification with multiple outputs
-            pred_classes <- levels[apply(preds, 1, which.max)]
-          }
-        } else {
-          # Multiclass classification
-          pred_classes <- levels[apply(preds, 1, which.max)]
-        }
-
-        pred_classes <- factor(pred_classes, levels = levels)
-
-        # Calculate classification error (1 - accuracy)
-        cv_errors[j] <- 1 - mean(pred_classes == actuals)
+        # Classification error, over the rows the fold's model can score
+        aligned <- tl_align_classes(actuals, nn$lev)
+        scored <- aligned$keep & !is.na(preds)
+        cv_errors[j] <- mean(preds[scored] != aligned$actuals[scored])
       } else {
         # For regression, use MSE
-        actuals <- test_data[[response_var]]
-        cv_errors[j] <- mean((preds - actuals)^2)
+        cv_errors[j] <- mean((preds - actuals)^2, na.rm = TRUE)
       }
     }
 
@@ -327,15 +407,16 @@ tl_tune_nn <- function(data, formula, is_classification = FALSE,
   best_decay <- tune_results$decay[best_idx]
 
   # Train final model with best parameters
-  best_model <- tl_fit_nn(
-    data = data,
-    formula = formula,
-    is_classification = is_classification,
-    size = best_size,
-    decay = best_decay,
-    maxit = 100,
-    ...
-  )
+  best_model <- do.call(tl_fit_nn, c(
+    list(
+      data = data,
+      formula = formula,
+      is_classification = is_classification,
+      size = best_size,
+      decay = best_decay
+    ),
+    fit_args
+  ))
 
   # Return results
   list(

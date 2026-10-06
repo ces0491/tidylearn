@@ -19,13 +19,15 @@ NULL
 #' @param dropout Dropout rate for regularization (default: 0.2)
 #' @param epochs Number of training epochs (default: 30)
 #' @param batch_size Batch size for training (default: 32)
-#' @param validation_split Proportion of data for validation
+#' @param validation_split Proportion of the rows held out to validate on,
+#'   drawn at random (default: 0.2). Their row numbers are kept as
+#'   \code{$validation_rows}. Pass \code{validation_data} through \code{...}
+#'   to validate on data of your own instead.
 #' @param learning_rate Optimizer learning rate. NULL (default) leaves
 #'   keras's own adam default in place.
-#'   (default: 0.2)
 #' @param verbose Verbosity mode (0 = silent, 1 = progress bar,
 #'   2 = one line per epoch) (default: 0)
-#' @param ... Additional arguments
+#' @param ... Additional arguments to pass to keras's fit()
 #' @param compute Compute tier. Either \code{"cpu"} (default) or
 #'   \code{"gpu"}. GPU usage is handled automatically by the underlying
 #'   tensorflow runtime when CUDA is configured; this argument is
@@ -47,20 +49,32 @@ tl_fit_deep <- function(data, formula,
                         compute = "cpu") {
   # Check if keras is installed
   tl_check_packages(c("keras", "tensorflow"))
+  dots <- list(...)
 
-  # Parse the formula
-  response_var <- all.vars(formula)[1]
+  # One model frame supplies both x and y, so a row dropped for a missing
+  # value leaves both. model.matrix() applied na.omit by itself while the
+  # response was read straight from data, so one missing predictor left y
+  # a row longer than x, and keras trained on pairs shifted by one.
+  frame <- stats::model.frame(formula, data = data, na.action = stats::na.omit)
+  y <- unname(stats::model.response(frame))
+  x_mat <- stats::model.matrix(attr(frame, "terms"), frame)
+  x_mat <- x_mat[, colnames(x_mat) != "(Intercept)", drop = FALSE]
 
-  # Prepare data
-  # Extract response (y)
-  y <- data[[response_var]]
+  # The rows of data the fit used, for reporting which were held out
+  fitted_rows <- seq_len(nrow(data))
+  omitted <- attr(frame, "na.action")
+  if (!is.null(omitted)) {
+    fitted_rows <- fitted_rows[-as.integer(omitted)]
+  }
 
-  # Create model matrix for predictors, excluding the intercept
-  x_mat <- stats::model.matrix(formula, data = data)[, -1, drop = FALSE]
-
-  # Normalize features
+  # Normalize features. A constant column has sd 0, and scaling by it
+  # turned the column into NaN, which keras carried into every
+  # prediction. Scaled by 1 instead, it is 0 after centring and adds
+  # nothing. A factor level no training row uses gives the same all-zero
+  # column.
   x_means <- colMeans(x_mat)
-  x_sds <- apply(x_mat, 2, sd)
+  x_sds <- apply(x_mat, 2, stats::sd)
+  x_sds[!is.finite(x_sds) | x_sds == 0] <- 1
   x_scaled <- scale(x_mat, center = x_means, scale = x_sds)
 
   # Prepare y based on problem type
@@ -77,10 +91,12 @@ tl_fit_deep <- function(data, formula,
       loss <- "binary_crossentropy"
       metrics <- c("accuracy")
     } else {
-      # Multiclass classification
-      # One-hot encode the response
-      y_onehot <- keras::to_categorical(as.integer(y) - 1)
-      y_numeric <- y_onehot
+      # Multiclass classification. One-hot encode the response, with a
+      # column for every class even if no complete row holds one.
+      y_numeric <- keras::to_categorical(
+        as.integer(y) - 1,
+        num_classes = length(levels(y))
+      )
       output_units <- length(levels(y))
       output_activation <- "softmax"
       loss <- "categorical_crossentropy"
@@ -102,7 +118,7 @@ tl_fit_deep <- function(data, formula,
   model |> keras::layer_dense(
     units = hidden_layers[1],
     activation = activation,
-    input_shape = ncol(x_mat)
+    input_shape = ncol(x_scaled)
   )
 
   # Add dropout for regularization
@@ -146,15 +162,40 @@ tl_fit_deep <- function(data, formula,
     metrics = metrics
   )
 
-  # Fit the model
-  history <- model |> keras::fit(
-    x = x_scaled,
-    y = y_numeric,
+  # keras's validation_split holds out the last rows as given, before any
+  # shuffling. iris is sorted by species, so the default 0.2 held out
+  # every virginica row: the model never trained on that class and was
+  # validated on nothing else. Hold out a random set of rows instead,
+  # unless the caller supplies validation data of their own.
+  n <- nrow(x_scaled)
+  held_out <- if (validation_split > 0 && is.null(dots$validation_data)) {
+    sort(sample.int(n, floor(n * validation_split)))
+  } else {
+    integer(0)
+  }
+  train_rows <- setdiff(seq_len(n), held_out)
+  rows_of <- function(v, idx) {
+    if (is.matrix(v)) v[idx, , drop = FALSE] else v[idx]
+  }
+
+  fit_args <- list(
+    x = x_scaled[train_rows, , drop = FALSE],
+    y = rows_of(y_numeric, train_rows),
     epochs = epochs,
     batch_size = batch_size,
-    validation_split = validation_split,
-    verbose = verbose,
-    ...
+    verbose = verbose
+  )
+  if (length(held_out) > 0) {
+    fit_args$validation_data <- list(
+      x_scaled[held_out, , drop = FALSE],
+      rows_of(y_numeric, held_out)
+    )
+  }
+
+  # Fit the model
+  history <- do.call(
+    keras::fit,
+    c(list(object = model), tl_override_args(fit_args, dots))
   )
 
   # Store data for future predictions
@@ -165,7 +206,8 @@ tl_fit_deep <- function(data, formula,
     x_sds = x_sds,
     formula = formula,
     is_classification = is_classification,
-    levels = if (is_classification) levels(factor(y)) else NULL
+    levels = if (is_classification) levels(y) else NULL,
+    validation_rows = fitted_rows[held_out]
   )
 
   model_data
@@ -185,81 +227,62 @@ tl_predict_deep <- function(model, new_data,
   # Extract the deep learning model and associated data
   fit <- model$fit
   is_classification <- model$spec$is_classification
-  formula <- model$spec$formula
 
-  # Create model matrix for new data
-  x_new <- stats::model.matrix(
-    formula, data = new_data
-  )[, -1, drop = FALSE]
-
-  # Scale using the training data parameters
-  x_new_scaled <- scale(
-    x_new, center = fit$x_means, scale = fit$x_sds
-  )
-
-  # Make predictions
-  raw_preds <- predict(fit$model, x_new_scaled)
-
-  if (is_classification) {
-    if (length(fit$levels) == 2) {
-      # Binary classification
-      if (type == "prob") {
-        # Get probabilities
-        prob_df <- tibble::tibble(
-          !!fit$levels[1] := 1 - raw_preds[, 1],
-          !!fit$levels[2] := raw_preds[, 1]
-        )
-
-        prob_df
-      } else if (type == "class" || type == "response") {
-        # Get classes
-        pred_classes <- ifelse(
-          raw_preds[, 1] > 0.5,
-          fit$levels[2], fit$levels[1]
-        )
-        pred_classes <- factor(
-          pred_classes, levels = fit$levels
-        )
-
-        pred_classes
-      } else {
-        stop(
-          "Invalid prediction type for deep learning ",
-          "classification. Use 'prob', 'class', ",
-          "or 'response'.",
-          call. = FALSE
-        )
-      }
-    } else {
-      # Multiclass classification
-      if (type == "prob") {
-        # Convert to data frame with class probabilities
-        prob_df <- as.data.frame(raw_preds)
-        names(prob_df) <- fit$levels
-
-        tibble::as_tibble(prob_df)
-      } else if (type == "class" || type == "response") {
-        # Get classes with highest probability
-        pred_idx <- apply(raw_preds, 1, which.max)
-        pred_classes <- fit$levels[pred_idx]
-        pred_classes <- factor(
-          pred_classes, levels = fit$levels
-        )
-
-        pred_classes
-      } else {
-        stop(
-          "Invalid prediction type for deep learning ",
-          "classification. Use 'prob', 'class', ",
-          "or 'response'.",
-          call. = FALSE
-        )
-      }
-    }
-  } else {
-    # Regression predictions
-    as.vector(raw_preds)
+  if (is_classification && !type %in% c("prob", "class", "response")) {
+    stop(
+      "Invalid prediction type for deep learning ",
+      "classification. Use 'prob', 'class', ",
+      "or 'response'.",
+      call. = FALSE
+    )
   }
+
+  # The predictors alone, pinned to the training factor levels, with
+  # incomplete rows kept in place. Built from the full formula, the design
+  # matrix demanded the response column, which unlabelled data does not
+  # have; dropped incomplete rows, so three rows in came back as two; and
+  # took its factor levels from the new data, which changed the columns.
+  x_new <- tl_predictor_matrix(
+    model$spec$formula, new_data, xlev = model$spec$xlev
+  )
+  columns <- names(fit$x_means)
+  missing_cols <- setdiff(columns, colnames(x_new))
+  if (length(missing_cols) > 0) {
+    stop(
+      "New data is missing predictors used at fit time: ",
+      paste(missing_cols, collapse = ", "),
+      call. = FALSE
+    )
+  }
+  x_new <- x_new[, columns, drop = FALSE]
+
+  # Predict the complete rows, scaled with the training means and sds, and
+  # leave NA in the others. keras prints a progress bar unless told not to.
+  keep <- stats::complete.cases(x_new)
+  n_outputs <- if (is_classification && length(fit$levels) > 2) {
+    length(fit$levels)
+  } else {
+    1L
+  }
+  raw_preds <- matrix(NA_real_, nrow = nrow(x_new), ncol = n_outputs)
+  if (any(keep)) {
+    x_new_scaled <- scale(
+      x_new[keep, , drop = FALSE],
+      center = fit$x_means, scale = fit$x_sds
+    )
+    raw_preds[keep, ] <- predict(fit$model, x_new_scaled, verbose = 0)
+  }
+
+  if (!is_classification) {
+    # Regression predictions
+    return(as.vector(raw_preds))
+  }
+
+  probs <- tl_class_prob_matrix(raw_preds, fit$levels)
+  if (type == "prob") {
+    return(tibble::as_tibble(as.data.frame(probs)))
+  }
+  tl_class_from_probs(probs)
 }
 
 #' Plot deep learning model training history
@@ -352,9 +375,14 @@ tl_plot_deep_history <- function(model,
 #' Plot deep learning model architecture
 #'
 #' @param model A tidylearn deep learning model object
-#' @param ... Additional arguments
-#' @return The return value of \code{keras::plot_model()}, an architecture
-#'   diagram of the Keras model.
+#' @param ... Additional arguments passed to the \code{plot()} method keras
+#'   provides for its models, such as \code{to_file} or \code{dpi}.
+#'   \code{show_shapes} and \code{show_layer_names} default to \code{TRUE}.
+#' @return \code{NULL}, invisibly. Called for its side effect: keras draws
+#'   the architecture diagram on the current graphics device, or writes it
+#'   to \code{to_file}. keras renders it through the Python packages
+#'   \code{pydot} and \code{graphviz}, and errors saying so when they are
+#'   not installed.
 #' @examples
 #' \dontrun{
 #' if (requireNamespace("keras", quietly = TRUE)) {
@@ -375,13 +403,14 @@ tl_plot_deep_architecture <- function(model, ...) {
   # Check if keras is installed
   tl_check_packages("keras")
 
-  # Plot model architecture
-  getFromNamespace("plot_model", "keras")(
-    model$fit$model,
-    show_shapes = TRUE,
-    show_layer_names = TRUE,
-    ...
+  # keras 2.x draws a model through the plot() method it registers for its
+  # model class. It has no plot_model() function, so the lookup that was
+  # here failed on every call with "object 'plot_model' not found".
+  args <- tl_override_args(
+    list(show_shapes = TRUE, show_layer_names = TRUE),
+    list(...)
   )
+  do.call(plot, c(list(model$fit$model), args))
 }
 
 #' Tune a deep learning model
@@ -389,7 +418,10 @@ tl_plot_deep_architecture <- function(model, ...) {
 #' @param data A data frame containing the training data
 #' @param formula A formula specifying the model
 #' @param is_classification Logical indicating if this is a
-#'   classification problem
+#'   classification problem. \code{NULL} (default) reads it from the
+#'   response, as \code{\link{tl_model}} does: a factor or character
+#'   response is classification. \code{FALSE} with such a response is an
+#'   error.
 #' @param hidden_layers_options List of vectors defining hidden
 #'   layer configurations to try
 #' @param learning_rates Learning rates to try
@@ -397,11 +429,16 @@ tl_plot_deep_architecture <- function(model, ...) {
 #' @param batch_sizes Batch sizes to try
 #'   (default: c(16, 32, 64))
 #' @param epochs Number of training epochs (default: 30)
-#' @param validation_split Proportion of data for validation
-#'   (default: 0.2)
-#' @param ... Additional arguments
-#' @return A list with elements \code{model} (the best fitted deep learning
-#'   model), \code{best_hidden_layers} (optimal layer configuration),
+#' @param validation_split Proportion of the rows held out to score each
+#'   configuration on, drawn at random (default: 0.2). Every configuration
+#'   is scored on the same rows.
+#' @param ... Additional arguments passed to keras's fit() for every
+#'   configuration; \code{verbose} (default 0) replaces the value used
+#'   otherwise.
+#' @return A list with elements \code{model} (the best configuration refitted
+#'   as a \code{tidylearn_model}, so \code{predict()} and the deep plots take
+#'   it; the keras model is at \code{$model$fit$model}),
+#'   \code{best_hidden_layers} (optimal layer configuration),
 #'   \code{best_learning_rate}, \code{best_batch_size}, and
 #'   \code{tuning_results} (a data frame of all hyperparameter combinations
 #'   and their validation losses).
@@ -409,15 +446,15 @@ tl_plot_deep_architecture <- function(model, ...) {
 #' \dontrun{
 #' if (requireNamespace("keras", quietly = TRUE)) {
 #'   result <- tl_tune_deep(iris, Species ~ .,
-#'     is_classification = TRUE,
 #'     hidden_layers_options = list(c(10), c(10, 5)),
 #'     learning_rates = c(0.01, 0.001), batch_sizes = c(32),
 #'     epochs = 5)
+#'   predict(result$model, iris[1:5, ])
 #' }
 #' }
 #' @export
 tl_tune_deep <- function(data, formula,
-                         is_classification = FALSE,
+                         is_classification = NULL,
                          hidden_layers_options = list(
                            c(32), c(64, 32),
                            c(128, 64, 32)
@@ -430,6 +467,21 @@ tl_tune_deep <- function(data, formula,
                          validation_split = 0.2, ...) {
   # Check if keras is installed
   tl_check_packages(c("keras", "tensorflow"))
+
+  formula <- tl_as_formula(formula)
+  task <- tl_tuner_task(data, formula, is_classification)
+  data <- task$data
+  is_classification <- task$is_classification
+  dots <- list(...)
+
+  # tl_fit_deep() holds out a random set of rows to validate on. Drawing
+  # it from one seed for every configuration scores them all on the same
+  # rows, so their validation losses compare like with like.
+  split_seed <- sample.int(.Machine$integer.max, 1L)
+  with_split <- function(expr) {
+    tl_local_seed(split_seed)
+    expr
+  }
 
   # Create grid of hyperparameters
   hyperparams <- expand.grid(
@@ -447,20 +499,23 @@ tl_tune_deep <- function(data, formula,
     learning_rate <- hyperparams$learning_rate[i]
     batch_size <- hyperparams$batch_size[i]
 
-    # Fit model with current hyperparameters
+    # Fit model with current hyperparameters. verbose = 0 is a default,
+    # not a fixed value: alongside the caller's own it failed with
+    # "formal argument matched by multiple actual arguments".
     model <- tryCatch({
-      tl_fit_deep(
-        data = data,
-        formula = formula,
-        is_classification = is_classification,
-        hidden_layers = hidden_layers,
-        epochs = epochs,
-        batch_size = batch_size,
-        validation_split = validation_split,
-        learning_rate = learning_rate,
-        verbose = 0,
-        ...
-      )
+      with_split(do.call(tl_fit_deep, c(
+        list(
+          data = data,
+          formula = formula,
+          is_classification = is_classification,
+          hidden_layers = hidden_layers,
+          epochs = epochs,
+          batch_size = batch_size,
+          validation_split = validation_split,
+          learning_rate = learning_rate
+        ),
+        tl_override_args(list(verbose = 0), dots)
+      )))
     }, error = function(e) {
       message(
         "Error fitting model with hyperparameters: ",
@@ -504,18 +559,23 @@ tl_tune_deep <- function(data, formula,
     hyperparams$learning_rate[best_idx]
   best_batch_size <- hyperparams$batch_size[best_idx]
 
-  # Train final model with best hyperparameters
-  best_model <- tl_fit_deep(
-    data = data,
-    formula = formula,
-    is_classification = is_classification,
-    hidden_layers = best_hidden_layers,
-    epochs = epochs,
-    batch_size = best_batch_size,
-    validation_split = validation_split,
-    learning_rate = best_learning_rate,
-    ...
-  )
+  # Refit the winner through tl_model(), on the same held-out rows. It was
+  # the bare list tl_fit_deep() builds, and predict() on it failed with
+  # "no applicable method for 'predict' applied to an object of class
+  # \"list\"".
+  best_model <- with_split(do.call(tl_model, c(
+    list(
+      data = data,
+      formula = formula,
+      method = "deep",
+      hidden_layers = best_hidden_layers,
+      epochs = epochs,
+      batch_size = best_batch_size,
+      validation_split = validation_split,
+      learning_rate = best_learning_rate
+    ),
+    dots
+  )))
 
   # Return results
   list(
