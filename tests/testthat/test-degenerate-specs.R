@@ -478,9 +478,13 @@ test_that("the backends store a call that does not carry the data", {
 
   for (fit in list(
     tl_model(big, mpg ~ wt + hp, method = "forest", ntree = 10)$fit,
-    tl_model(big, mpg ~ wt + hp, method = "svm")$fit
+    tl_model(big, mpg ~ wt + hp, method = "svm")$fit,
+    tl_model(big, mpg ~ wt + hp, method = "linear")$fit
   )) {
-    expect_identical(fit$call$data, quote(data))
+    expect_false(is.data.frame(fit$call$data))
     expect_lt(as.numeric(utils::object.size(fit$call)), 10000)
+    expect_lt(nchar(paste(deparse(fit$call), collapse = "")), 150)
+    # The call still reaches the training rows, wherever it is evaluated
+    expect_identical(eval(fit$call$data, baseenv()), big)
   }
 })

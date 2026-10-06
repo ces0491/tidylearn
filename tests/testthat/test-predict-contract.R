@@ -161,6 +161,174 @@ for (method in regression_methods) {
   })
 }
 
+# ---- zero rows in, zero rows out -------------------------------------
+
+# A filter that matches nothing is ordinary input. logistic failed with
+# "eta must be a nonempty numeric vector", multinomial glmnet with
+# "non-conformable arrays" and xgboost with an input pointer misalignment.
+# The empty result has to have the columns and types a non-empty one has,
+# or code binding the two together breaks.
+
+expect_same_shape <- function(none, one, info) {
+  expect_equal(nrow(none), 0L, info = info)
+  expect_identical(class(none), class(one), info = info)
+  expect_identical(names(none), names(one), info = info)
+  expect_identical(
+    lapply(none, class), lapply(one, class), info = info
+  )
+  expect_identical(
+    lapply(none, levels), lapply(one, levels), info = info
+  )
+}
+
+for (task in c("binary", "multiclass")) {
+  data <- if (task == "binary") binary_data else multiclass_data
+  methods <- if (task == "binary") {
+    classification_methods
+  } else {
+    multiclass_methods
+  }
+
+  for (method in methods) {
+    label <- paste0(task, " '", method, "'")
+
+    test_that(paste(label, "predicts zero rows for zero rows"), {
+      model <- fit_model(method, data, Species ~ .)
+
+      for (type in c("response", "class", "prob")) {
+        one <- suppressWarnings(
+          predict(model, new_data = data[1, ], type = type)
+        )
+        none <- predict(model, new_data = data[0, ], type = type)
+        expect_same_shape(none, one, info = paste(method, type))
+      }
+    })
+  }
+}
+
+for (method in regression_methods) {
+  label <- paste0("regression '", method, "'")
+
+  test_that(paste(label, "predicts zero rows for zero rows"), {
+    model <- fit_model(method, regression_data, mpg ~ wt + hp)
+
+    one <- suppressWarnings(predict(model, new_data = regression_data[1, ]))
+    none <- predict(model, new_data = regression_data[0, ])
+    expect_same_shape(none, one, info = method)
+  })
+}
+
+# ---- a formula that subtracts a column -------------------------------
+
+# terms() keeps a subtracted column among its variables, and predict.lm()
+# and the other model-frame methods evaluate every variable of the terms
+# they stored. A fit on y ~ . - id therefore needed id at predict(), and
+# failed with "object 'id' not found" on rows without it. The column is not
+# needed now, and is still accepted.
+with_id <- function(data) {
+  data$id <- seq_len(nrow(data))
+  data
+}
+
+for (method in classification_methods) {
+  label <- paste0("binary '", method, "'")
+
+  test_that(paste(label, "predicts a formula that subtracts a column"), {
+    d <- with_id(binary_data)
+    model <- fit_model(method, d, Species ~ . - id)
+    classes <- function(new) {
+      suppressWarnings(predict(model, new_data = new, type = "class"))$.pred
+    }
+
+    stored <- suppressWarnings(predict(model, type = "class"))
+    expect_equal(nrow(stored), nrow(d))
+    expect_identical(classes(d), stored$.pred)
+    expect_identical(
+      classes(d[1:5, setdiff(names(d), "id")]), stored$.pred[1:5]
+    )
+  })
+}
+
+for (method in regression_methods) {
+  label <- paste0("regression '", method, "'")
+
+  test_that(paste(label, "predicts a formula that subtracts a column"), {
+    d <- with_id(regression_data)
+    model <- fit_model(method, d, mpg ~ . - id)
+    scored <- function(new) {
+      unname(suppressWarnings(predict(model, new_data = new))$.pred)
+    }
+
+    stored <- unname(suppressWarnings(predict(model))$.pred)
+    expect_equal(length(stored), nrow(d))
+    expect_equal(scored(d), stored)
+    expect_equal(scored(d[1:5, setdiff(names(d), "id")]), stored[1:5])
+  })
+}
+
+# ---- categorical predictors ------------------------------------------
+
+# A category usually arrives as text -- tl_read() returns character
+# columns -- and a prediction for one row cannot depend on which other
+# rows were scored with it. randomForest coded a character column by the
+# values present in new_data, gbm refused one at fit, and xgboost could
+# not build a one-row design matrix from it.
+set.seed(7)
+categorical_data <- data.frame(
+  grp = rep(c("a", "b", "c"), 40),
+  x = stats::rnorm(120),
+  stringsAsFactors = FALSE
+)
+categorical_data$y <- ifelse(categorical_data$grp == "c", 10, 0) +
+  categorical_data$x + stats::rnorm(120, sd = 0.1)
+
+for (method in regression_methods) {
+  label <- paste0("'", method, "'")
+
+  test_that(paste(label, "scores a character predictor row by row"), {
+    model <- fit_model(method, categorical_data, y ~ grp + x)
+    rows <- which(categorical_data$grp == "c")[1:3]
+    scored <- function(new) {
+      unname(suppressWarnings(predict(model, new_data = new))$.pred)
+    }
+    within_frame <- scored(categorical_data)
+
+    expect_equal(
+      scored(categorical_data[rows, ]), within_frame[rows], tolerance = 1e-8
+    )
+    expect_equal(
+      scored(categorical_data[rows[1], ]), within_frame[rows[1]],
+      tolerance = 1e-8
+    )
+  })
+
+  test_that(paste(label, "predicts a factor that declares fewer levels"), {
+    d <- categorical_data
+    d$grp <- factor(d$grp)
+    model <- fit_model(method, d, y ~ grp + x)
+
+    declared <- data.frame(grp = factor("b", levels = levels(d$grp)), x = 0.5)
+    expect_equal(
+      suppressWarnings(
+        predict(model, new_data = data.frame(grp = factor("b"), x = 0.5))
+      )$.pred,
+      suppressWarnings(predict(model, new_data = declared))$.pred,
+      tolerance = 1e-8
+    )
+  })
+
+  test_that(paste(label, "refuses a level it was not trained on"), {
+    model <- fit_model(method, categorical_data, y ~ grp + x)
+
+    # The guard's own wording: a backend's "new level" message passes a
+    # looser pattern without the guard
+    expect_error(
+      predict(model, new_data = data.frame(grp = "z", x = 0)),
+      "levels the model was not trained on: 'grp' has \"z\""
+    )
+  })
+}
+
 # ---- missing values keep predictions aligned -------------------------
 
 # The failure this guards against is silent: an upstream predict method
