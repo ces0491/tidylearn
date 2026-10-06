@@ -601,3 +601,22 @@ test_that("tl_cv does not repeat tl_model's notes once per fold", {
   )
   expect_false(any(grepl("Treating as regression", emitted)))
 })
+
+test_that("tl_cv warns once that logistic converts a 0/1 response", {
+  # The conversion is about the data, not the fold, and the warning came
+  # once per fold: five times at folds = 5
+  emitted <- character()
+  set.seed(1)
+  withCallingHandlers(
+    tl_cv(mtcars, am ~ wt + hp, method = "logistic", folds = 5),
+    warning = function(w) {
+      emitted <<- c(emitted, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  conversions <- grepl(
+    "Converting response variable to factor for logistic regression",
+    emitted, fixed = TRUE
+  )
+  expect_equal(sum(conversions), 1L)
+})

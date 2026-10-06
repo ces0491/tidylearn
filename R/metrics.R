@@ -978,6 +978,8 @@ tl_cv <- function(data, formula, method, folds = 5, metrics = NULL,
 
   cv_results <- list()
   test_sizes <- integer(folds)
+  # Set once for the run: see the tl_model() call below
+  warned <- FALSE
 
   for (i in 1:folds) {
     # Create fold indices
@@ -1005,9 +1007,16 @@ tl_cv <- function(data, formula, method, folds = 5, metrics = NULL,
     # Train model. tl_model() notes things about the response -- that a
     # numeric column with few distinct values is being treated as
     # regression, say -- which is worth saying once and not once per
-    # fold. The caller asked for cross-validation, not for k fits.
-    model <- suppressMessages(
-      tl_model(train_data, fold_formula, method = method, ...)
+    # fold. The caller asked for cross-validation, not for k fits. The
+    # warning that logistic is converting a 0/1 response is about the data
+    # too, so it is let through on the first fold only.
+    model <- withCallingHandlers(
+      suppressMessages(
+        tl_model(train_data, fold_formula, method = method, ...)
+      ),
+      tidylearn_response_conversion = function(w) {
+        if (warned) invokeRestart("muffleWarning") else warned <<- TRUE
+      }
     )
 
     # Evaluate. tl_evaluate() refuses a fold with no row it can score --
