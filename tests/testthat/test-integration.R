@@ -638,6 +638,28 @@ test_that("a cluster holding one class predicts that class", {
   expect_equal(predict(models, iris, "prob"), probs)
 })
 
+test_that("stratified logistic fits warn about the conversion once", {
+  # Each cluster's logistic fit on a 0/1 numeric response warned that it
+  # converts the response to a factor, once per cluster
+  set.seed(214)
+  binary <- data.frame(x1 = c(stats::rnorm(40), stats::rnorm(40, 6)),
+                       x2 = stats::rnorm(80))
+  binary$y <- as.integer(binary$x2 + stats::rnorm(80) > 0)
+
+  seen <- 0
+  set.seed(215)
+  withCallingHandlers(
+    models <- tl_stratified_models(binary, y ~ x1 + x2, k = 2,
+                                   supervised_method = "logistic"),
+    tidylearn_response_conversion = function(w) {
+      seen <<- seen + 1
+      invokeRestart("muffleWarning")
+    }
+  )
+  expect_length(models$supervised_models, 2)
+  expect_equal(seen, 1)
+})
+
 test_that("tl_stratified_models cuts hclust at k and predicts training rows", {
   # hclust failed with "unused argument (k = 2)", and pam and clara fits
   # could not predict even the rows they were fitted on

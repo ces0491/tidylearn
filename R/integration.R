@@ -741,6 +741,17 @@ tl_stratified_models <- function(data, formula, cluster_method = "kmeans",
   # in a cluster of their own. Its rows are predicted as that class.
   cluster_models <- list()
   single_class <- character()
+
+  # Logistic on a 0/1 numeric response warns that it converts the response
+  # to a factor, once per cluster fitted. The first is let through.
+  conversion_warned <- FALSE
+  muffle_repeat <- function(w) {
+    if (conversion_warned) {
+      invokeRestart("muffleWarning")
+    }
+    conversion_warned <<- TRUE
+  }
+
   for (i in seq_len(k)) {
     cluster_data <- data[clusters == i, , drop = FALSE]
     if (nrow(cluster_data) == 0) {
@@ -756,8 +767,9 @@ tl_stratified_models <- function(data, formula, cluster_method = "kmeans",
         next
       }
     }
-    cluster_models[[name]] <- tl_model(
-      cluster_data, formula, method = supervised_method, ...
+    cluster_models[[name]] <- withCallingHandlers(
+      tl_model(cluster_data, formula, method = supervised_method, ...),
+      tidylearn_response_conversion = muffle_repeat
     )
   }
 

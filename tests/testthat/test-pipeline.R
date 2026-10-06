@@ -297,6 +297,43 @@ test_that("a fold with no row to score is left out of the average", {
   )
 })
 
+test_that("a run warns about the logistic response conversion once", {
+  # Logistic on a 0/1 numeric response warns that it converts the response
+  # to a factor, and the run refits once per fold, per model, and again on
+  # every row: two specs over three folds gave eight copies of the warning
+  set.seed(211)
+  binary <- data.frame(x = stats::rnorm(60))
+  binary$y <- as.integer(binary$x + stats::rnorm(60) > 0)
+  pipe <- tl_pipeline(
+    binary, y ~ x,
+    models = list(plain = list(method = "logistic"),
+                  capped = list(method = "logistic", maxit = 50)),
+    evaluation = list(metrics = "accuracy", best_metric = "accuracy",
+                      cv_folds = 3)
+  )
+
+  count_conversions <- function(expr) {
+    seen <- 0
+    withCallingHandlers(
+      expr,
+      tidylearn_response_conversion = function(w) {
+        seen <<- seen + 1
+        invokeRestart("muffleWarning")
+      }
+    )
+    seen
+  }
+  set.seed(212)
+  expect_equal(count_conversions(tl_run_pipeline(pipe, verbose = FALSE)), 1)
+
+  split_pipe <- pipe
+  split_pipe$evaluation$validation <- "split"
+  set.seed(213)
+  expect_equal(
+    count_conversions(tl_run_pipeline(split_pipe, verbose = FALSE)), 1
+  )
+})
+
 test_that("tl_pipeline refuses arguments and settings it would ignore", {
   # A misspelt argument was swallowed by `...`, leaving cv_folds at 5
   expect_error(

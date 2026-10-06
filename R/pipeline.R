@@ -733,6 +733,23 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
   # Train and evaluate models
   model_results <- list()
 
+  # Logistic on a 0/1 numeric response warns that it converts the response
+  # to a factor, and the loop below refits once per fold, per model, and
+  # again on every row: two specs over three folds gave eight copies. The
+  # first is let through and the rest muffled.
+  conversion_warned <- FALSE
+  fit_model <- function(args) {
+    withCallingHandlers(
+      do.call(tl_model, args),
+      tidylearn_response_conversion = function(w) {
+        if (conversion_warned) {
+          invokeRestart("muffleWarning")
+        }
+        conversion_warned <<- TRUE
+      }
+    )
+  }
+
   for (model_name in names(models)) {
     if (verbose) {
       message("Training model: ", model_name)
@@ -780,7 +797,7 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
           model_params
         )
 
-        fold_model <- do.call(tl_model, model_args)
+        fold_model <- fit_model(model_args)
 
         # Evaluate on test fold. tl_evaluate() refuses a fold with no row
         # it can score -- every response in it missing, say -- and one such
@@ -832,7 +849,7 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
         model_params
       )
 
-      final_model <- do.call(tl_model, final_model_args)
+      final_model <- fit_model(final_model_args)
 
       # Store results
       model_results[[model_name]] <- list(
@@ -863,7 +880,7 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
         model_params
       )
 
-      split_model <- do.call(tl_model, model_args)
+      split_model <- fit_model(model_args)
 
       # Evaluate on test data
       test_metrics <- tl_evaluate(
