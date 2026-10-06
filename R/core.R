@@ -81,10 +81,14 @@ NULL
 #'     a removed intercept are kept as they are.}
 #'   \item{\code{"ridge"}, \code{"lasso"}, \code{"elastic_net"}}{
 #'     \code{alpha}, glmnet's mixing parameter (by default 0, 1 and 0.5);
-#'     \code{lambda}, a penalty to fit at, or \code{NULL} (the default) to
-#'     have \code{glmnet::cv.glmnet()} choose one; and \code{cv_folds}
-#'     (default 5), the number of folds for that cross-validation.
-#'     \code{predict()} uses the \code{lambda.1se} penalty.}
+#'     \code{lambda}, a single penalty to fit at, a sequence of penalties for
+#'     \code{glmnet::cv.glmnet()} to choose from, or \code{NULL} (the
+#'     default) to let it choose its own; and \code{cv_folds} (default 5),
+#'     the number of folds for that cross-validation, which takes the place
+#'     of glmnet's \code{nfolds}. \code{predict()} uses the \code{lambda.1se}
+#'     penalty. tidylearn sets \code{x}, \code{y}, \code{family} and
+#'     \code{nfolds} itself and refuses them, along with any argument glmnet
+#'     does not take.}
 #'   \item{\code{"svm"}}{\code{tune} (default \code{FALSE}) and
 #'     \code{tune_folds} (default 5), to choose \code{cost} by
 #'     cross-validation before the fit, with \code{gamma} for a non-linear
