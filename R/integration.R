@@ -306,16 +306,30 @@ tl_check_cluster_args <- function(cluster_args, k_owner) {
 #'
 #' `...` goes to the supervised model alone, so \code{nstart = 5} reached
 #' the tree, which refused it with a message about rpart that never
-#' mentioned \code{cluster_args}. Only names no supervised backend takes are
-#' caught: randomForest's \code{sampsize} is a forest setting.
+#' mentioned \code{cluster_args}. The names caught are the arguments of the
+#' k-means, hclust, \code{cluster::pam()} and \code{cluster::clara()} fits
+#' that no supervised backend takes, and kmeans()'s own \code{iter.max}.
+#' Those a backend does take are left alone: randomForest's
+#' \code{sampsize}, gbm's \code{keep.data} and nnet's \code{trace}. So are
+#' the ones the clustering fits refuse or set themselves (\code{diss},
+#' \code{cluster.only}, \code{medoids.x}, \code{cols}).
 #'
 #' @param dots The \code{...} arguments, as a list
 #' @return \code{TRUE}, invisibly
 #' @keywords internal
 #' @noRd
 tl_check_cluster_dots <- function(dots) {
-  clustering_only <- c("nstart", "iter_max", "iter.max", "algorithm",
-                       "metric", "samples", "distance")
+  clustering_only <- c(
+    # k-means
+    "nstart", "iter_max", "iter.max", "algorithm",
+    # hclust
+    "hclust_method", "distance",
+    # pam
+    "metric", "medoids", "variant", "pamonce", "do.swap", "keep.diss",
+    "trace.lev", "stand",
+    # clara
+    "samples", "rngR", "pamLike", "correct.d"
+  )
   found <- intersect(names2(dots), clustering_only)
   if (length(found) == 0) {
     return(invisible(TRUE))
@@ -382,8 +396,13 @@ tl_assign_clusters <- function(predictor_data, method, k, cluster_args) {
 #' second level stays the positive class.
 #'
 #' @param data A data frame
-#' @param formula Model formula. The response must be a factor, character
-#'   or logical column.
+#' @param formula Model formula. The response must be categorical: a
+#'   factor, character or logical column, or an expression that computes a
+#'   factor or character vector from a column, such as \code{factor(am)} or
+#'   \code{factor(mpg > 20)}. For an expression, each row's propagated label
+#'   is written to that column as its value in a labelled row of the same
+#'   class. An expression that then computes other labels, such as
+#'   \code{cut(mpg, 2)}, whose breaks follow the column's range, is refused.
 #' @param labeled_indices Indices of labeled observations
 #' @param cluster_method Clustering method for label propagation:
 #'   \code{"kmeans"} (default), \code{"pam"}, \code{"clara"} or
@@ -431,18 +450,37 @@ tl_semisupervised <- function(data, formula, labeled_indices,
 
   # Extract response variable
   response_var <- all.vars(formula)[1]
+  response_label <- if (is.name(formula[[2L]])) {
+    response_var
+  } else {
+    deparse1(formula[[2L]])
+  }
 
   # Labels are propagated by majority vote within a cluster, which has no
   # meaning for a continuous response -- and factor() below would quietly
   # turn a regression into a classification with one class per value.
-  response <- data[[response_var]]
+  # The response is the one the formula computes, as tl_model() reads it:
+  # the raw column refused factor(am) ~ . as numeric.
+  response <- tl_formula_response(formula, data)
   if (!is.factor(response) && !is.character(response) &&
         !is.logical(response)) {
     stop(
       "tl_semisupervised() propagates class labels, so it needs a ",
-      "categorical response.\n'", response_var, "' is ",
+      "categorical response.\n'", response_label, "' is ",
       class(response)[1], ". Convert it with factor() if its values ",
       "are classes.",
+      call. = FALSE
+    )
+  }
+  # A logical column is written back below as a factor of its labels, but
+  # an expression is recomputed from the column, and tl_model() fits a
+  # logical result such as I(mpg > 20) as a regression on 0 and 1
+  if (is.logical(response) && !is.name(formula[[2L]])) {
+    stop(
+      "tl_semisupervised() propagates class labels, so it needs a ",
+      "categorical response.\n'", response_label, "' is logical, which ",
+      "tl_model() fits as a regression. Wrap it in factor() to treat its ",
+      "values as classes.",
       call. = FALSE
     )
   }
@@ -501,10 +539,56 @@ tl_semisupervised <- function(data, formula, labeled_indices,
       )
     )
 
+  unlabelled <- is.na(pseudo_labeled$final_label)
+
+  data_pseudo <- data
+  if (is.name(formula[[2L]])) {
+    # Keep the response's level order. as.factor() sorted the labels, which
+    # moved the positive class -- the second level -- whenever the declared
+    # order was not alphabetical.
+    data_pseudo[[response_var]] <- factor(
+      pseudo_labeled$final_label,
+      levels = levels(tl_normalise_response(response))
+    )
+  } else {
+    # The formula computes the response from this column, so each row is
+    # given the column's value in a labelled row of its class, and the
+    # formula computes the label from it as it did from the data. The label
+    # itself will not do for a recoding response: factor(am, levels = 0:1,
+    # labels = ...) of "manual" is NA.
+    labelled_rows <- labeled_indices[!is.na(response[labeled_indices])]
+    source_row <- labelled_rows[
+      match(pseudo_labeled$final_label, as.character(response[labelled_rows]))
+    ]
+    data_pseudo[[response_var]] <- data[[response_var]][source_row]
+  }
+  data_pseudo <- data_pseudo[!unlabelled, , drop = FALSE]
+
+  # A response computed from the column as a whole, such as cut(mpg, 2),
+  # whose breaks follow the column's range, gives other classes once the
+  # column holds only those values
+  if (!is.name(formula[[2L]])) {
+    recomputed <- tryCatch(
+      as.character(tl_formula_response(formula, data_pseudo)),
+      error = function(e) NULL,
+      warning = function(w) NULL
+    )
+    if (!identical(recomputed, pseudo_labeled$final_label[!unlabelled])) {
+      stop(
+        "tl_semisupervised() writes each propagated label to '",
+        response_var, "' as that column's value in a labelled row of the ",
+        "same class, but the formula's response, ", response_label,
+        ", does not give the labels back when computed from those values. ",
+        "Add the response to `data` as a column of its own and name that ",
+        "column in the formula.",
+        call. = FALSE
+      )
+    }
+  }
+
   # A cluster where no labelled observation carries a label has nothing to
   # propagate. Its rows used to become NA and vanish at fit time without a
   # word, so the model trained on a fraction of the data it appeared to use.
-  unlabelled <- is.na(pseudo_labeled$final_label)
   if (any(unlabelled)) {
     is_labelled <- pseudo_labeled$obs_id %in% labeled_indices
     orphaned <- unlabelled & !is_labelled
@@ -532,16 +616,6 @@ tl_semisupervised <- function(data, formula, labeled_indices,
       call. = FALSE
     )
   }
-
-  # Keep the response's level order. as.factor() sorted the labels, which
-  # moved the positive class -- the second level -- whenever the declared
-  # order was not alphabetical.
-  data_pseudo <- data
-  data_pseudo[[response_var]] <- factor(
-    pseudo_labeled$final_label,
-    levels = levels(tl_normalise_response(response))
-  )
-  data_pseudo <- data_pseudo[!unlabelled, , drop = FALSE]
 
   # Train supervised model on pseudo-labeled data
   model <- tl_model(data_pseudo, formula, method = supervised_method, ...)
@@ -760,9 +834,10 @@ tl_stratified_models <- function(data, formula, cluster_method = "kmeans",
   tl_check_cluster_args(cluster_args, "Pass k as the k argument.")
   tl_check_cluster_dots(list(...))
 
-  # Extract response variable
-  response_var <- all.vars(formula)[1]
-  response <- data[[response_var]]
+  # The response the formula computes, as tl_model() reads it. Read off the
+  # raw column, factor(am) looked numeric, so a cluster holding one class
+  # went to the classifier, which refused it.
+  response <- tl_formula_response(formula, data)
   is_categorical <- is.factor(response) || is.character(response)
 
   # Cluster on the formula's predictors
@@ -797,7 +872,7 @@ tl_stratified_models <- function(data, formula, cluster_method = "kmeans",
     name <- paste0("cluster_", i)
     if (is_categorical) {
       classes <- unique(
-        stats::na.omit(as.character(cluster_data[[response_var]]))
+        stats::na.omit(as.character(response[clusters == i]))
       )
       if (length(classes) == 1L) {
         single_class[[name]] <- classes
@@ -927,8 +1002,10 @@ predict.tidylearn_stratified <- function(object, new_data = NULL, ...) {
   # columns, from whichever rows came first -- the second level, which
   # tidylearn treats as the positive class, changed with row order. A class
   # a cluster never saw came back as NA rather than probability 0. Both are
-  # set from the classes in the full training data.
-  response <- object$data[[response_var]]
+  # set from the classes in the full training data, in the response the
+  # formula computes: the raw column of factor(am) is numeric, which
+  # skipped this.
+  response <- tl_formula_response(object$formula, object$data)
   if (is.factor(response) || is.character(response)) {
     class_levels <- levels(factor(response))
     if (".pred" %in% names(result) &&

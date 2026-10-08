@@ -223,6 +223,108 @@ test_that("tl_semisupervised refuses a response it cannot vote on", {
   expect_equal(model$semisupervised_info$n_unlabelled_dropped, 0L)
 })
 
+test_that("tl_semisupervised reads the response the formula computes", {
+  # factor(am) is categorical, but the check read the numeric column am and
+  # refused the call, which 0.5.0 had fitted
+  labelled <- c(1:6, 18:22)
+  set.seed(1)
+  model <- tl_semisupervised(mtcars, factor(am) ~ wt + hp + qsec,
+                             labeled_indices = labelled)
+  expect_s3_class(model, "tidylearn_semisupervised")
+  expect_true(model$spec$is_classification)
+  expect_identical(model$spec$response_levels, c("0", "1"))
+
+  # The labels are those a majority vote within each cluster gives
+  info <- model$semisupervised_info
+  clusters <- info$cluster_model$fit$clusters$cluster
+  classes <- as.character(mtcars$am)
+  vote <- vapply(
+    split(classes[labelled], clusters[labelled]),
+    function(x) names(which.max(table(x))), character(1)
+  )
+  expected <- unname(vote[as.character(clusters)])
+  expected[labelled] <- classes[labelled]
+  expect_false(anyNA(expected))
+  expect_identical(as.character(model$data$am), expected)
+
+  # and the tree is the one rpart() fits to them
+  pseudo <- mtcars
+  pseudo$am <- factor(expected, levels = c("0", "1"))
+  direct <- rpart::rpart(factor(am) ~ wt + hp + qsec, data = pseudo,
+                         method = "class")
+  expect_equal(model$fit$frame, direct$frame)
+
+  # A numeric response is still refused, computed or not
+  expect_error(
+    tl_semisupervised(mtcars, mpg ~ ., labeled_indices = 1:10),
+    paste0("propagates class labels, so it needs a categorical ",
+           "response.\n'mpg' is numeric")
+  )
+  expect_error(
+    tl_semisupervised(mtcars, log(mpg) ~ wt + hp, labeled_indices = 1:10),
+    "needs a categorical response.\n'log\\(mpg\\)' is numeric"
+  )
+
+  # tl_model() fits a computed logical as a regression, so the propagated
+  # classes would have been fitted as 0 and 1; wrapped in factor() they
+  # are classes
+  expect_error(
+    tl_semisupervised(mtcars, I(mpg > 20) ~ wt + hp,
+                      labeled_indices = labelled),
+    paste0("'I\\(mpg > 20\\)' is logical, which tl_model\\(\\) fits as a ",
+           "regression. Wrap it in factor\\(\\)")
+  )
+  set.seed(1)
+  high <- tl_semisupervised(mtcars, factor(mpg > 20) ~ wt + hp,
+                            labeled_indices = labelled)
+  expect_true(high$spec$is_classification)
+  expect_identical(high$spec$response_levels, c("FALSE", "TRUE"))
+  high_clusters <- high$semisupervised_info$cluster_model$fit$clusters$cluster
+  high_classes <- as.character(mtcars$mpg > 20)
+  high_vote <- vapply(
+    split(high_classes[labelled], high_clusters[labelled]),
+    function(x) names(which.max(table(x))), character(1)
+  )
+  high_expected <- unname(high_vote[as.character(high_clusters)])
+  high_expected[labelled] <- high_classes[labelled]
+  expect_identical(as.character(high$data$mpg > 20), high_expected)
+})
+
+test_that("a recoding response is computed from the propagated labels", {
+  # The labels go back into the column am, which the formula recodes. Each
+  # row gets am's value in a labelled row of its class, so the recoding
+  # gives the label back, and the level order is the formula's.
+  labelled <- c(1:6, 18:22)
+  coded <- factor(am, levels = c(1, 0), labels = c("manual", "auto")) ~
+    wt + hp + qsec
+  set.seed(1)
+  model <- tl_semisupervised(mtcars, coded, labeled_indices = labelled)
+  expect_identical(model$spec$response_levels, c("manual", "auto"))
+
+  set.seed(1)
+  plain <- tl_semisupervised(mtcars, factor(am) ~ wt + hp + qsec,
+                             labeled_indices = labelled)
+  expect_identical(as.character(model$data$am), as.character(plain$data$am))
+  expect_identical(
+    as.character(predict(model, mtcars)$.pred),
+    c("auto", "manual")[match(as.character(predict(plain, mtcars)$.pred),
+                              c("0", "1"))]
+  )
+})
+
+test_that("a response that cannot be computed from its labels is refused", {
+  # cut(mpg, 2) takes its breaks from mpg's range, which shrinks once the
+  # column holds one value per class, and the classes it gives change
+  set.seed(1)
+  expect_error(
+    tl_semisupervised(mtcars, cut(mpg, 2) ~ wt + hp,
+                      labeled_indices = c(1:6, 18:22)),
+    paste0("writes each propagated label to 'mpg' as that column's value ",
+           "in a labelled row of the same class, but the formula's ",
+           "response, cut\\(mpg, 2\\), does not give the labels back")
+  )
+})
+
 test_that("rows whose cluster holds no label are left out, and counted", {
   # Six labels from two classes -> k = 2, and on iris one of those two
   # clusters holds none of them. Its rows became NA and disappeared at
@@ -396,6 +498,57 @@ test_that("a clustering setting left in ... points to cluster_args", {
                                   supervised_method = "forest",
                                   sampsize = 10, ntree = 50)
   expect_s3_class(forests, "tidylearn_stratified")
+})
+
+test_that("every clustering setting left in ... points to cluster_args", {
+  # Only a fixed few were caught. hclust_method and pam's variant reached
+  # the tree, which refused them with a message about rpart
+  labelled <- c(1:5, 51:55, 101:105)
+  expect_error(
+    tl_semisupervised(iris, Species ~ ., labeled_indices = labelled,
+                      cluster_method = "hclust", hclust_method = "complete"),
+    paste0("'hclust_method' is a setting for the clustering step, but ",
+           "`...` goes to the supervised model. Pass it as cluster_args = ",
+           "list\\(hclust_method = \"complete\"\\)")
+  )
+  expect_error(
+    tl_stratified_models(mtcars, mpg ~ wt + hp, cluster_method = "pam",
+                         k = 2, variant = "faster"),
+    "Pass it as cluster_args = list\\(variant = \"faster\"\\)"
+  )
+
+  # The settings of kmeans(), hclust, pam() and clara() that no supervised
+  # backend takes
+  for (name in c("hclust_method", "medoids", "variant", "pamonce",
+                 "do.swap", "keep.diss", "trace.lev", "stand", "rngR",
+                 "pamLike", "correct.d")) {
+    expect_error(
+      do.call(tl_stratified_models,
+              c(list(mtcars, mpg ~ wt + hp, k = 2),
+                stats::setNames(list(TRUE), name))),
+      paste0("'", name, "' is a setting for the clustering step"),
+      fixed = TRUE, info = name
+    )
+  }
+  # gbm takes keep.data and nnet takes trace, so those reach the model
+  expect_true(tl_check_cluster_dots(
+    list(sampsize = 10, keep.data = FALSE, trace = FALSE)
+  ))
+
+  # and through cluster_args each reaches the clustering fit
+  set.seed(3)
+  semi <- tl_semisupervised(iris, Species ~ ., labeled_indices = labelled,
+                            cluster_method = "hclust",
+                            cluster_args = list(hclust_method = "complete"))
+  expect_equal(semi$semisupervised_info$cluster_model$fit$model$method,
+               "complete")
+
+  skip_if_not_installed("cluster")
+  strat <- tl_stratified_models(mtcars, mpg ~ wt + hp, cluster_method = "pam",
+                                k = 2, cluster_args = list(variant = "faster"))
+  direct <- cluster::pam(stats::dist(mtcars[, c("wt", "hp")]), k = 2,
+                         diss = TRUE, variant = "faster")
+  expect_equal(strat$clusters, unname(direct$clustering))
 })
 
 test_that("downweight reaches the fit, or is refused", {
@@ -662,6 +815,35 @@ test_that("a cluster holding one class predicts that class", {
 
   # type can also be given by position, as the other clusters' models take it
   expect_equal(predict(models, iris, "prob"), probs)
+})
+
+test_that("a computed factor response finds its single-class clusters", {
+  # The check for a one-class cluster read the numeric column am, not
+  # factor(am), so it was skipped, and the tree refused the cluster that
+  # holds only manual cars
+  set.seed(2)
+  models <- tl_stratified_models(mtcars, factor(am) ~ wt + hp + qsec, k = 4)
+
+  classes <- as.character(mtcars$am)
+  by_cluster <- lapply(split(classes, models$clusters), unique)
+  one_class <- by_cluster[lengths(by_cluster) == 1L]
+  expect_gt(length(one_class), 0)
+  expect_gt(length(models$supervised_models), 0)
+  expect_identical(
+    models$single_class_clusters[paste0("cluster_", names(one_class))],
+    stats::setNames(unlist(one_class), paste0("cluster_", names(one_class)))
+  )
+
+  # predict() sets the levels from factor(am), in the response's order
+  preds <- predict(models)
+  expect_identical(levels(preds$.pred), c("0", "1"))
+  single_rows <- models$clusters %in% as.integer(names(one_class))
+  expect_identical(as.character(preds$.pred[single_rows]),
+                   classes[single_rows])
+
+  probs <- predict(models, type = "prob")
+  expect_identical(names(probs)[1:2], c("0", "1"))
+  expect_equal(rowSums(probs[c("0", "1")]), rep(1, nrow(mtcars)))
 })
 
 test_that("stratified logistic fits warn about the conversion once", {

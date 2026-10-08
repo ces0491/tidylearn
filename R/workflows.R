@@ -40,7 +40,10 @@ tl_automl_task <- function(task, y, response_var) {
 
   # tl_model() takes the task from the response whatever `task` says, so a
   # task the response contradicts had every candidate scored on metrics it
-  # could not produce, and the leaderboard came back all NA
+  # could not produce, and the leaderboard came back all NA.
+  # tl_tuning_task() settles the task of one method, logistic's override
+  # included. AutoML's candidates share one task, which the response alone
+  # decides: logistic is a candidate only for a two-class categorical one.
   observed <- if (is.factor(y) || is.character(y)) {
     "classification"
   } else {

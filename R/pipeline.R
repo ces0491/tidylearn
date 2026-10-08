@@ -306,6 +306,10 @@ tl_pipeline <- function(data, formula,
   # The task comes from the response the formula computes, as tl_model()
   # takes it. Read off the raw column, factor(am) ~ wt + hp was set up as a
   # regression whose default metrics its classification models refused.
+  # tl_tuning_task() settles the task of one method; a pipeline's models
+  # share one task, and the default models are chosen before there are any
+  # methods to ask about, so the response alone decides here and logistic's
+  # override is applied to the set below.
   y <- tl_formula_response(formula, data)
   is_classification <- is.factor(y) || is.character(y)
 
@@ -738,8 +742,17 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
       message("Setting up ", cv_folds, "-fold cross-validation")
     }
 
-    # Create cross-validation splits
-    cv_splits <- rsample::vfold_cv(data, v = cv_folds)
+    # Create cross-validation splits. vfold_cv() refuses as many folds as
+    # rows, which the check above lets through; that is leave-one-out, and
+    # tl_resample_folds() runs it as such, as the tuners do.
+    cv_splits <- tl_resample_folds(data, cv_folds)
+
+    # One warning per run says what one-row folds do to each metric, as the
+    # tuners and tl_cv() say it; the per-fold warnings it explains are
+    # muffled below
+    loo_warned <- length(
+      tl_warn_loo_metrics(cv_folds, nrow(data), evaluation$metrics)
+    ) > 0
   } else if (evaluation$validation == "split") {
     train_prop <- evaluation$train_prop
 
@@ -847,7 +860,10 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
         # average is taken over the rest, as in tl_cv(). The split below
         # lets the error through: it has no other rows to score.
         fold_metrics <- tryCatch(
-          tl_evaluate(fold_model, test_fold, metrics = evaluation$metrics),
+          withCallingHandlers(
+            tl_evaluate(fold_model, test_fold, metrics = evaluation$metrics),
+            warning = tl_loo_fold_muffler(loo_warned)
+          ),
           tidylearn_no_scored_rows = function(e) {
             warning(
               "Fold ", i, " of model '", model_name, "' is left out of its ",

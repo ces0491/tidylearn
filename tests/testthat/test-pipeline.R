@@ -383,6 +383,64 @@ test_that("a fold with no row to score is left out of the average", {
   )
 })
 
+test_that("cv_folds equal to the row count runs leave-one-out", {
+  # rsample::vfold_cv() refuses v = nrow(data) and points to loo_cv(), so a
+  # fold count the pipeline accepted failed inside rsample
+  d <- mtcars[1:10, ]
+  set.seed(1)
+  expect_warning(
+    run <- tl_run_pipeline(
+      tl_pipeline(d, mpg ~ wt, models = list(lin = list(method = "linear")),
+                  evaluation = list(cv_folds = 10, metrics = "rmse",
+                                    best_metric = "rmse")),
+      verbose = FALSE
+    ),
+    "each fold holds one row (leave-one-out)", fixed = TRUE
+  )
+  folds <- run$results$model_results$lin$cv_results
+  expect_length(folds, 10)
+
+  # Each fold holds one row, so its rmse is that row's absolute
+  # leave-one-out error, which for lm() is |e_i / (1 - h_ii)|
+  fit <- lm(mpg ~ wt, data = d)
+  loo_error <- unname(abs(residuals(fit) / (1 - hatvalues(fit))))
+  fold_scores <- vapply(
+    folds, function(fold) fold$metrics$value[fold$metrics$metric == "rmse"],
+    numeric(1)
+  )
+  expect_equal(sort(fold_scores), sort(loo_error))
+  expect_equal(run$results$metric_values[["lin"]], mean(loo_error))
+})
+
+test_that("a leave-one-out classification run warns once about its metrics", {
+  # One-row folds leave precision, recall, f1 and auc undefined, and
+  # yardstick warned once per fold without saying why
+  binary <- droplevels(iris[iris$Species != "setosa", ])[c(1:15, 51:65), ]
+  pipe <- tl_pipeline(
+    binary, Species ~ Sepal.Length + Sepal.Width,
+    models = list(tree = list(method = "tree")),
+    evaluation = list(cv_folds = nrow(binary), best_metric = "accuracy")
+  )
+  messages <- character()
+  set.seed(2)
+  run <- withCallingHandlers(
+    tl_run_pipeline(pipe, verbose = FALSE),
+    warning = function(w) {
+      messages <<- c(messages, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  expect_length(messages, 1)
+  expect_match(messages, "With 30 folds for 30 rows, each fold holds one row",
+               fixed = TRUE)
+  expect_false(is.na(run$results$metric_values[["tree"]]))
+
+  # An ordinary k-fold run gives no such warning
+  pipe$evaluation$cv_folds <- 3
+  set.seed(2)
+  expect_no_warning(tl_run_pipeline(pipe, verbose = FALSE))
+})
+
 test_that("a run warns about the logistic response conversion once", {
   # Logistic on a 0/1 numeric response warns that it converts the response
   # to a factor, and the run refits once per fold, per model, and again on
