@@ -11,7 +11,10 @@ NULL
 
 #' Plot feature importance across multiple models
 #'
-#' Each model's importance is on its own 0-100 scale. A factor predictor
+#' Each model's importance is rescaled on its own: its largest value
+#' becomes 100, or, when no value is positive (a forest's permutation
+#' importance can be negative throughout), its largest magnitude becomes
+#' -100. A factor predictor
 #' appears once, under its own name, for every model: the largest of its
 #' design columns stands for it where a method ranks those columns
 #' separately (ridge, lasso, elastic net and xgboost). A predictor a model
@@ -161,7 +164,13 @@ tl_comparison_importance <- function(model, name) {
   importance <- unname(by_term[features])
   importance[is.na(importance)] <- 0
 
-  tibble::tibble(feature = features, model = name, importance = importance)
+  # Shown as the predictor is named, without the backquotes a term label
+  # puts around a non-syntactic name
+  tibble::tibble(
+    feature = gsub("`", "", features, fixed = TRUE),
+    model = name,
+    importance = importance
+  )
 }
 
 #' The formula term each importance name belongs to
@@ -177,10 +186,16 @@ tl_comparison_importance <- function(model, name) {
 tl_importance_terms <- function(model, features) {
   formula <- model$spec$formula
   labels <- attr(stats::terms(formula, data = model$data), "term.labels")
-  # randomForest rebuilds its frame with data.frame(), which turns a
-  # non-syntactic name into a syntactic one
+  # A term label backquotes a non-syntactic name, `car weight`, as glmnet
+  # and xgboost columns do; rpart names the variable without them, and
+  # randomForest rebuilds its frame with data.frame(), which makes the name
+  # syntactic. Unmapped, one predictor became two features, each with a
+  # false zero.
+  unquoted <- gsub("`", "", labels, fixed = TRUE)
   term_of <- c(
     stats::setNames(labels, labels),
+    stats::setNames(labels, unquoted),
+    stats::setNames(labels, make.names(unquoted)),
     stats::setNames(labels, make.names(labels))
   )
 
@@ -449,7 +464,9 @@ tl_design_column_terms <- function(model) {
 #' @param ... tidylearn model objects to compare
 #' @param new_data Optional data frame for evaluation. If NULL, the models
 #'   are scored on their training data, which they must share: models
-#'   fitted on different data are an error asking for \code{new_data}.
+#'   fitted on different data are an error asking for \code{new_data}. A
+#'   model fitted on engineered features, as \code{tl_auto_ml()} builds some
+#'   of its candidates, is scored on the training data of the others.
 #' @param metrics Character vector of metrics to compute
 #' @param names Optional character vector of model names
 #' @return A \code{\link[ggplot2]{ggplot}} object.
@@ -487,10 +504,9 @@ tl_plot_model_comparison <- function(
 
   is_classification <- is_classifications[1]
 
-  # Without new_data each model is scored on its own training rows, which
-  # the check confirms are the same rows for every model
+  # Without new_data the models are scored on the training rows they share
   if (is.null(new_data)) {
-    tl_check_shared_training_data(models, names)
+    new_data <- tl_shared_training_data(models, names)
     message(
       "Evaluating on training data. ",
       "For model validation, provide separate test data."
@@ -538,41 +554,79 @@ tl_plot_model_comparison <- function(
   p
 }
 
-#' Check that compared models share the training data they default to
+#' The training data compared models share, for when no new_data is given
 #'
 #' With no \code{new_data} the comparisons scored every model on the first
-#' model's training rows. A model fitted on other rows was scored partly
-#' on rows it never saw, without a word. A model fitted on engineered
-#' features -- \code{tl_auto_ml()}'s PCA and cluster candidates store
-#' their features -- either failed on another model's rows or was scored
-#' on them, depending on the order the models were listed in. The training
-#' rows stand in for \code{new_data} only when every model was fitted on
-#' the same data.
+#' model's training rows, so a model fitted on other rows was scored
+#' partly on rows it never saw, without a word. Those rows stand in for
+#' \code{new_data} only when the models were fitted on the same data.
+#'
+#' A model fitted on engineered features -- \code{tl_auto_ml()}'s PCA and
+#' cluster candidates -- stores those features, and \code{predict()}
+#' rebuilds them from raw rows, so every model is scored on raw rows taken
+#' from a model that stores them. A PCA candidate's stored frame cannot be
+#' that reference: handed to a model fitted on the raw columns it lacks
+#' them, and handed back to the candidate it is projected a second time.
+#' It is left out of the check. A cluster candidate stores the raw rows
+#' beside its cluster column, and those rows are checked and can be the
+#' reference.
 #'
 #' @param models List of tidylearn models.
 #' @param names Their names in the comparison.
-#' @return Invisibly TRUE; an error naming the models whose training data
-#'   differs from the first model's.
+#' @return The raw training rows of the first model that stores them, to
+#'   score every model on; an error when the models' rows differ, or when
+#'   no model stores its rows.
 #' @keywords internal
 #' @noRd
-tl_check_shared_training_data <- function(models, names) {
-  reference <- models[[1]]$data
-  differs <- !vapply(
-    models,
-    function(model) tl_same_training_data(model$data, reference),
+tl_shared_training_data <- function(models, names) {
+  rows <- lapply(models, tl_stored_raw_rows)
+  stored <- !vapply(rows, is.null, logical(1))
+  if (!any(stored)) {
+    stop(
+      "None of the models stores the rows it was fitted on: each was ",
+      "fitted on engineered features such as PCA scores. Pass the rows to ",
+      "compare them on as 'new_data'.",
+      call. = FALSE
+    )
+  }
+
+  first <- which(stored)[1]
+  reference <- rows[[first]]
+  differs <- stored & !vapply(
+    rows,
+    function(model_rows) {
+      is.null(model_rows) || tl_same_training_data(model_rows, reference)
+    },
     logical(1)
   )
   if (any(differs)) {
     stop(
       "The models were fitted on different data, so they share no ",
       "training rows to be compared on. Models whose training data ",
-      "differs from that of '", names[1], "': ",
+      "differs from that of '", names[first], "': ",
       paste0("'", names[differs], "'", collapse = ", "),
       ". Pass the rows to compare them on as 'new_data'.",
       call. = FALSE
     )
   }
-  invisible(TRUE)
+  reference
+}
+
+#' The raw rows a model stores
+#'
+#' @param model A tidylearn model.
+#' @return The stored data for a model fitted on its own columns; for a
+#'   cluster candidate, the stored data without the cluster column it
+#'   added; NULL for a model fitted on PCA scores, which keeps no raw rows.
+#' @keywords internal
+#' @noRd
+tl_stored_raw_rows <- function(model) {
+  transform <- model$feature_transform
+  if (is.null(transform)) {
+    model$data
+  } else if (identical(transform$kind, "cluster")) {
+    model$data[setdiff(names(model$data), transform$column)]
+  }
 }
 
 #' Whether two models were fitted on the same data
@@ -715,7 +769,7 @@ tl_plot_cv_results <- function(cv_results, metrics = NULL) {
 #'   (if NULL, uses training data)
 #' @param ... Additional arguments
 #' @return A \code{\link[shiny]{shinyApp}} object.
-#' @examplesIf all(sapply(c("shiny", "shinydashboard", "DT"), requireNamespace))
+#' @examplesIf rlang::is_installed(c("shiny", "shinydashboard", "DT"))
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
 #' app <- tl_dashboard(model)
@@ -935,22 +989,8 @@ tl_dashboard <- function(model, new_data = NULL, ...) {
     # inside rstandard() for every other method.
     output$diagnostics_plot <- shiny::renderPlot({
       if (!model$spec$is_classification) {
-        shiny::validate(
-          shiny::need(
-            inherits(model$fit, "lm"),
-            paste0(
-              "Diagnostic plots are available for linear and polynomial ",
-              "models only."
-            )
-          ),
-          shiny::need(
-            requireNamespace("gridExtra", quietly = TRUE),
-            paste0(
-              "The diagnostic plots need the gridExtra package. Install it ",
-              "with: install.packages(\"gridExtra\")"
-            )
-          )
-        )
+        problem <- tl_dashboard_diagnostics_issue(model)
+        shiny::validate(shiny::need(is.null(problem), problem))
         tl_dashboard_diagnostics_plot(model)
       }
     })
@@ -1077,6 +1117,24 @@ tl_dashboard_residuals_plot <- function(model, new_data) {
 #' @noRd
 tl_dashboard_diagnostics_plot <- function(model) {
   gridExtra::grid.arrange(grobs = tl_plot_diagnostics(model), ncol = 2)
+}
+
+#' Why the dashboard cannot show the regression diagnostics
+#'
+#' @param model A tidylearn regression model.
+#' @return NULL when the four plots can be drawn; otherwise the message the
+#'   panel shows in their place.
+#' @keywords internal
+#' @noRd
+tl_dashboard_diagnostics_issue <- function(model) {
+  if (!inherits(model$fit, "lm")) {
+    "Diagnostic plots are available for linear and polynomial models only."
+  } else if (!requireNamespace("gridExtra", quietly = TRUE)) {
+    paste0(
+      "The diagnostic plots need the gridExtra package. Install it with: ",
+      "install.packages(\"gridExtra\")"
+    )
+  }
 }
 
 #' Bin number for each of n ranked rows

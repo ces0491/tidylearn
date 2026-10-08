@@ -80,6 +80,10 @@ tl_model_info <- function(model, n = tl_fit_rows(model)) {
 #' @noRd
 tl_fit_rows <- function(model) {
   fit <- model$fit
+  # nobs() has methods for lm, glm and glmnet only. Without a count of its
+  # own, a fit fell back to every stored row: 153 for airquality, where
+  # xgboost trains on the 116 rows with an Ozone value and svm and nn on
+  # the 111 complete ones.
   n <- switch(
     model$spec$method,
     # rpart drops a row missing the response but keeps one missing a
@@ -88,6 +92,14 @@ tl_fit_rows <- function(model) {
     tree = fit$frame$n[1],
     forest = length(fit$predicted),
     boost = fit$nTrain,
+    # The rows the fit trained on: those with a response, as xgboost
+    # routes a missing predictor itself
+    xgboost = length(
+      tl_xgb_training_rows(model$spec$formula, model$data)$y
+    ),
+    # Fitted values, one per row fitted; e1071 keeps none with fitted = FALSE
+    svm = if (length(fit$fitted) > 0L) length(fit$fitted),
+    nn = if (!is.null(fit$fitted.values)) NROW(fit$fitted.values),
     tryCatch(stats::nobs(fit), error = function(e) NULL)
   )
   if (is.numeric(n) && length(n) == 1L && !is.na(n)) n else nrow(model$data)
@@ -773,7 +785,9 @@ tl_cluster_fit_columns <- function(model) {
 #' @param ... tidylearn model objects to compare
 #' @param new_data Optional test data for evaluation. If NULL, the models
 #'   are scored on their training data, which they must share: models
-#'   fitted on different data are an error asking for \code{new_data}.
+#'   fitted on different data are an error asking for \code{new_data}. A
+#'   model fitted on engineered features, as \code{tl_auto_ml()} builds some
+#'   of its candidates, is scored on the training data of the others.
 #' @param names Optional character vector of model names
 #' @param digits Number of decimal places (default: 4)
 #' @return A \code{\link[gt]{gt}} table object. Its source note counts the
@@ -805,10 +819,9 @@ tl_table_comparison <- function(..., new_data = NULL,
     paste0(m$spec$method, " (", task, ")")
   })
 
-  # Without new_data each model is scored on its own training rows, which
-  # the check confirms are the same rows for every model
+  # Without new_data the models are scored on the training rows they share
   if (is.null(new_data)) {
-    tl_check_shared_training_data(models, names)
+    new_data <- tl_shared_training_data(models, names)
   }
 
   results <- purrr::map2_dfr(models, names, function(model, name) {

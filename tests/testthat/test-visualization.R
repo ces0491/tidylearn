@@ -369,6 +369,26 @@ test_that("model comparison needs new_data for models fitted apart", {
   m2 <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
   expect_message(tl_plot_model_comparison(m1, m2, metrics = "rmse"),
                  "Evaluating on training data")
+
+  # So is a model fitted on PCA scores of that frame, through its own
+  # projection, whichever model is listed first
+  reduced <- tl_reduce_dimensions(mtcars[, c("mpg", "wt", "hp", "qsec")],
+                                  response = "mpg", method = "pca",
+                                  n_components = 2)
+  pca <- tl_model(reduced$data, mpg ~ PC1 + PC2, method = "linear")
+  pca$feature_transform <- list(
+    kind = "pca", reduction_model = reduced$reduction_model,
+    response = "mpg"
+  )
+  for (models in list(list(pca, m1), list(m1, pca))) {
+    p <- suppressMessages(do.call(
+      tl_plot_model_comparison,
+      c(models, list(metrics = "rmse", names = c("a", "b")))
+    ))
+    geoms <- vapply(p$layers, function(l) class(l$geom)[1], character(1))
+    bars <- ggplot2::layer_data(p, which(geoms == "GeomCol"))
+    expect_equal(sort(bars$y), sort(c(rmse(pca), rmse(m1))))
+  }
 })
 
 test_that("gain and lift do not depend on row order", {
@@ -526,6 +546,37 @@ test_that("importance comparison names a factor once for every model", {
   expect_equal(
     d$importance[d$model == "Forest" & d$feature == "Species"],
     100 * forest_raw[["Species"]] / max(forest_raw)
+  )
+})
+
+test_that("importance comparison names a non-syntactic predictor once", {
+  # rpart names `car weight` without its backquotes and glmnet keeps them,
+  # so the predictor became two features, each with a false zero bar
+  d <- mtcars
+  names(d)[names(d) == "wt"] <- "car weight"
+  tree <- tl_model(d, mpg ~ `car weight` + hp + qsec, method = "tree")
+  lasso <- tl_model(d, mpg ~ `car weight` + hp + qsec, method = "lasso")
+  p <- tl_plot_importance_comparison(lasso, tree, names = c("lasso", "tree"))
+  d_plot <- as.data.frame(p$data)
+  expect_setequal(unique(as.character(d_plot$feature)),
+                  c("car weight", "hp", "qsec"))
+
+  # Each model keeps its own value: rpart's directly, the lasso's from its
+  # own importance table
+  importance_of <- function(model) {
+    d_plot$importance[d_plot$model == model & d_plot$feature == "car weight"]
+  }
+  rpart_imp <- tree$fit$variable.importance
+  expect_equal(importance_of("tree"),
+               100 * rpart_imp[["car weight"]] / max(rpart_imp))
+  lasso_imp <- tl_get_importance_regularized(lasso)
+  expect_equal(importance_of("lasso"),
+               lasso_imp$importance[lasso_imp$feature == "`car weight`"])
+
+  # Two trees give one row per predictor each, with no extra zero row
+  expect_identical(
+    nrow(tl_plot_importance_comparison(tree, tree, names = c("a", "b"))$data),
+    6L
   )
 })
 
@@ -842,14 +893,11 @@ test_that("multiclass models still get the binary-only message", {
                "only implemented for binary classification")
 })
 
-# -- Dashboard panels, run through the server without a browser --
-# testServer() attaches shiny and the diagnostics plots report their loess
-# formula, so its calls run under suppressMessages()
+# -- Dashboard panels --
+# The panels' contents come from helpers tested directly. One run of the
+# server, in the last test of this group, checks that the panels use them.
 
 test_that("the dashboard's residual panel draws for every regression method", {
-  skip_if_not_installed("shiny")
-  skip_if_not_installed("shinydashboard")
-  skip_if_not_installed("DT")
   # The panel passed the evaluation data to tl_plot_residuals() as its
   # plot type, and failed with "the condition has length > 1"
   models <- list(
@@ -858,9 +906,9 @@ test_that("the dashboard's residual panel draws for every regression method", {
     tl_model(mtcars, mpg ~ wt + hp, method = "forest", ntree = 50)
   )
   for (model in models) {
-    suppressMessages(shiny::testServer(tl_dashboard(model), {
-      expect_no_error(output$residuals_plot)
-    }))
+    expect_no_error(
+      ggplot2::ggplot_build(tl_dashboard_residuals_plot(model, mtcars))
+    )
   }
 
   # Residuals of the evaluation data, as the predictions table shows them
@@ -875,18 +923,10 @@ test_that("the dashboard's residual panel draws for every regression method", {
 })
 
 test_that("the dashboard's predictions show the response the model fits", {
-  skip_if_not_installed("shiny")
-  skip_if_not_installed("shinydashboard")
-  skip_if_not_installed("DT")
   # The predictions table and the residual panel read the raw column, so a
   # log(mpg) ~ wt + hp model listed mpg beside log-scale predictions, with
   # residuals of mpg minus log(mpg)
   model <- tl_model(mtcars, log(mpg) ~ wt + hp, method = "linear")
-  suppressMessages(shiny::testServer(tl_dashboard(model), {
-    expect_no_error(output$predictions_table)
-    expect_no_error(output$residuals_plot)
-  }))
-
   table <- tl_dashboard_predictions(model, mtcars)
   expect_equal(table$actual, log(mtcars$mpg))
   expect_equal(table$predicted, unname(stats::fitted(model$fit)))
@@ -899,31 +939,48 @@ test_that("the dashboard's predictions show the response the model fits", {
 })
 
 test_that("the dashboard diagnostics panel shows four plots, or why not", {
-  skip_if_not_installed("shiny")
-  skip_if_not_installed("shinydashboard")
-  skip_if_not_installed("DT")
-  skip_if_not_installed("gridExtra")
   # renderPlot() printed the list of four plots and each print replaced the
   # one before, so the panel showed only the last. Outside lm the panel
   # failed inside rstandard().
   linear <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
-  arranged <- suppressMessages(tl_dashboard_diagnostics_plot(linear))
-  expect_s3_class(arranged, "gtable")
-  expect_length(arranged$grobs, 4)
-  suppressMessages(shiny::testServer(tl_dashboard(linear), {
-    expect_no_error(output$diagnostics_plot)
-  }))
-
+  expect_null(tl_dashboard_diagnostics_issue(linear))
   for (model in list(tl_model(mtcars, mpg ~ wt + hp, method = "lasso"),
                      tl_model(mtcars, mpg ~ wt + hp, method = "forest",
                               ntree = 50))) {
-    suppressMessages(shiny::testServer(tl_dashboard(model), {
-      expect_error(
-        output$diagnostics_plot,
-        "Diagnostic plots are available for linear and polynomial models only"
-      )
-    }))
+    expect_match(
+      tl_dashboard_diagnostics_issue(model),
+      "Diagnostic plots are available for linear and polynomial models only"
+    )
   }
+
+  skip_if_not_installed("gridExtra")
+  arranged <- suppressMessages(tl_dashboard_diagnostics_plot(linear))
+  expect_s3_class(arranged, "gtable")
+  expect_length(arranged$grobs, 4)
+})
+
+test_that("the dashboard server draws its regression panels", {
+  skip_on_cran()
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("shinydashboard")
+  skip_if_not_installed("DT")
+  skip_if_not_installed("gridExtra")
+  # testServer() attaches shiny. Later test files ran with it on the search
+  # path, so it is detached again unless it was attached already.
+  shiny_attached <- "package:shiny" %in% search()
+  withr::defer(
+    if (!shiny_attached && "package:shiny" %in% search()) {
+      detach("package:shiny")
+    }
+  )
+
+  model <- tl_model(mtcars, log(mpg) ~ wt + hp, method = "linear")
+  # The diagnostics plots report their loess formula as a message
+  suppressMessages(shiny::testServer(tl_dashboard(model), {
+    expect_no_error(output$residuals_plot)
+    expect_no_error(output$predictions_table)
+    expect_no_error(output$diagnostics_plot)
+  }))
 })
 
 # -- Cross-validation plot --

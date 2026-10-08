@@ -175,12 +175,12 @@ test_that("the comparison table needs new_data for models fitted apart", {
   expect_equal(data$late[data$metric == "Rmse"], rmse(late))
 })
 
-test_that("the comparison table needs new_data for engineered features", {
+test_that("the comparison table scores engineered features on the raw rows", {
   skip_if_not_installed("gt")
   # A model fitted on PCA scores, as tl_auto_ml() builds its candidates,
-  # stores the scores. Listed first, its data was handed to every model and
-  # the tree failed with "object 'Sepal.Length' not found"; listed second,
-  # it was scored on the tree's rows without a word.
+  # stores the scores, and predict() rebuilds them from raw rows. It was
+  # refused beside a tree fitted on those raw rows, which 0.5.0 compared.
+  # The raw rows the tree stored score both models, in either order.
   ib <- droplevels(iris[iris$Species != "setosa", ])
   reduced <- tl_reduce_dimensions(ib, response = "Species", method = "pca",
                                   n_components = 2)
@@ -190,17 +190,79 @@ test_that("the comparison table needs new_data for engineered features", {
     response = "Species"
   )
   tree <- tl_model(ib, Species ~ ., method = "tree")
-  expect_error(tl_table_comparison(pca, tree), "fitted on different data")
-  expect_error(tl_table_comparison(tree, pca), "fitted on different data")
-
-  # The raw rows score both, the PCA model through its own projection
-  data <- tl_table_comparison(tree, pca, names = c("tree", "pca"),
-                              new_data = ib)[["_data"]]
   accuracy <- function(m) {
     mean(predict(m, ib, type = "class")$.pred == ib$Species)
   }
+
+  data <- tl_table_comparison(tree, pca, names = c("tree", "pca"))[["_data"]]
   expect_equal(data$tree, accuracy(tree))
   expect_equal(data$pca, accuracy(pca))
+  data <- tl_table_comparison(pca, tree, names = c("pca", "tree"))[["_data"]]
+  expect_equal(data$tree, accuracy(tree))
+  expect_equal(data$pca, accuracy(pca))
+
+  # A cluster candidate stores the rows it was fitted on beside its cluster
+  # column, so it supplies the rows when no model was fitted on raw columns,
+  # as it did in 0.5.0
+  km <- tl_model(ib[, 1:4], method = "kmeans", k = 2)
+  with_clusters <- ib
+  with_clusters$cluster_kmeans <- factor(
+    predict(km, new_data = ib[, 1:4])$cluster
+  )
+  clustered <- tl_model(with_clusters, Species ~ ., method = "tree")
+  clustered$feature_transform <- list(
+    kind = "cluster", cluster_model = km, column = "cluster_kmeans",
+    levels = levels(with_clusters$cluster_kmeans), response = "Species"
+  )
+  data <- tl_table_comparison(clustered, pca,
+                              names = c("clustered", "pca"))[["_data"]]
+  expect_equal(data$clustered, accuracy(clustered))
+  expect_equal(data$pca, accuracy(pca))
+
+  # Those rows are checked like any model's
+  late_km <- tl_model(ib[26:75, 1:4], method = "kmeans", k = 2)
+  late <- with_clusters[26:75, ]
+  late_clustered <- tl_model(late, Species ~ ., method = "tree")
+  late_clustered$feature_transform <- list(
+    kind = "cluster", cluster_model = late_km, column = "cluster_kmeans",
+    levels = levels(late$cluster_kmeans), response = "Species"
+  )
+  expect_error(
+    tl_table_comparison(tree, late_clustered, names = c("tree", "late")),
+    "fitted on different data.*'late'"
+  )
+
+  # Models fitted on PCA scores alone store no rows to compare them on, so
+  # the rows have to be passed
+  pca_tree <- tl_model(reduced$data, Species ~ PC1 + PC2, method = "tree")
+  pca_tree$feature_transform <- pca$feature_transform
+  expect_error(
+    tl_table_comparison(pca, pca_tree),
+    "None of the models stores the rows it was fitted on.*'new_data'"
+  )
+  expect_s3_class(tl_table_comparison(pca, pca_tree, new_data = ib), "gt_tbl")
+})
+
+test_that("the importance note counts the rows xgboost, svm and nn fitted", {
+  # nobs() has no method for these fits, so the count fell back to every
+  # stored row: 153 for airquality, where xgboost trains on the 116 rows
+  # with an Ozone value and svm and nn on the 111 complete ones
+  vars <- c("Ozone", "Temp", "Wind", "Solar.R")
+  complete <- sum(stats::complete.cases(airquality[, vars]))
+  ozone <- Ozone ~ Temp + Wind + Solar.R
+
+  svm <- tl_model(airquality, ozone, method = "svm")
+  expect_identical(tl_fit_rows(svm), complete)
+  set.seed(1)
+  nn <- tl_model(airquality, ozone, method = "nn", size = 2, trace = FALSE,
+                 linout = TRUE)
+  expect_identical(tl_fit_rows(nn), complete)
+
+  skip_if_not_installed("xgboost")
+  xgb <- tl_model(airquality, ozone, method = "xgboost", nrounds = 5)
+  expect_identical(tl_fit_rows(xgb), sum(!is.na(airquality$Ozone)))
+  skip_if_not_installed("gt")
+  expect_match(tl_table_importance(xgb)[["_source_notes"]][[1]], "n = 116$")
 })
 
 test_that("models fitted on one frame still share it as the default", {
