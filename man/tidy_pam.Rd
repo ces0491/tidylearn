@@ -17,7 +17,9 @@ Use "gower" for mixed data types.}
 \item{cols}{Columns to include (tidy select). If NULL, uses all columns.}
 
 \item{...}{Further arguments passed to \code{\link[cluster]{pam}}, such
-as \code{nstart}, \code{variant} or starting \code{medoids}.}
+as \code{nstart}, \code{variant} or starting \code{medoids}.
+\code{cluster.only} and \code{diss} are refused: the first leaves no
+fit to build the result from, and tidy_pam() sets the second itself.}
 }
 \value{
 A list of class "tidy_pam" containing:

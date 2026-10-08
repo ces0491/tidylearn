@@ -9,7 +9,8 @@ tl_read_github(source, path = NULL, ref = "main", ..., trust_rds = FALSE)
 \arguments{
 \item{source}{A GitHub URL or \code{"owner/repo"} string. A URL is either
 a file page (\code{https://github.com/<owner>/<repo>/blob/<ref>/<path>},
-with or without \code{www.} and a query such as \code{?raw=true}) or a
+with \code{raw} in place of \code{blob} or with neither, and with or
+without \code{www.} and a query such as \code{?raw=true}) or a
 raw file (\code{https://raw.githubusercontent.com/...}), whose query is
 kept for the download. Zip archives are not read from GitHub: download
 the file and read it with \code{tl_read_zip()}.}

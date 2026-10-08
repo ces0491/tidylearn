@@ -18,7 +18,10 @@ per model}
 A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
-Each model's importance is on its own 0-100 scale. A factor predictor
+Each model's importance is rescaled on its own: its largest value
+becomes 100, or, when no value is positive (a forest's permutation
+importance can be negative throughout), its largest magnitude becomes
+-100. A factor predictor
 appears once, under its own name, for every model: the largest of its
 design columns stands for it where a method ranks those columns
 separately (ridge, lasso, elastic net and xgboost). A predictor a model

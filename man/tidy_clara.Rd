@@ -19,7 +19,9 @@ takes no distance matrix; use \code{\link{tidy_pam}} for a dist object.}
 \item{sampsize}{Sample size (default: min(n, 40 + 2*k))}
 
 \item{...}{Further arguments passed to \code{\link[cluster]{clara}}, such
-as \code{correct.d}, \code{pamLike} or \code{rngR}.}
+as \code{correct.d}, \code{pamLike} or \code{rngR}.
+\code{cluster.only} and \code{medoids.x} are refused, since the result
+needs the fit and its medoids.}
 }
 \value{
 A list of class \code{"tidy_clara"} containing:

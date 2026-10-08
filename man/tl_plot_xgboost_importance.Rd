@@ -11,9 +11,13 @@ tl_plot_xgboost_importance(model, top_n = 10, importance_type = "gain", ...)
 
 \item{top_n}{Number of top features to display (default: 10)}
 
-\item{importance_type}{Type of importance: "gain" (default), "cover" or
-"frequency", read from the matching column of
-\code{xgboost::xgb.importance()}}
+\item{importance_type}{Type of importance: "gain" (default), "cover",
+"frequency" or "weight", read from the matching column of
+\code{xgboost::xgb.importance()}. A linear booster
+(\code{booster = "gblinear"}) reports only "weight", its coefficients,
+which it uses when \code{importance_type} is left out; they are ranked
+by size, and for a multiclass model by their mean size over the
+classes. A coefficient's size depends on its predictor's scale.}
 
 \item{...}{Additional arguments passed to \code{xgboost::xgb.importance()}}
 }

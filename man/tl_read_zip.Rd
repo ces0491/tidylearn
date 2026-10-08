@@ -41,9 +41,9 @@ column. Use the \code{file} argument to select a specific file from
 the archive.
 }
 \details{
-An archive with a member that would be written outside the extraction
-directory -- an absolute path, or one climbing out with \code{..} -- is
-refused before anything is extracted.
+An archive with a member whose name could reach outside the extraction
+directory -- an absolute path, a drive letter on Windows, or any
+\code{..} component -- is refused before anything is extracted.
 }
 \examples{
 \dontshow{if (requireNamespace("readr", quietly = TRUE)) withAutoprint(\{ # examplesIf}

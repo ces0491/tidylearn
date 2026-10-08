@@ -28,7 +28,7 @@ tl_tune_grid(
 \code{\link{tl_model}} argument to tune, named after it}
 
 \item{folds}{Number of cross-validation folds, a whole number between 2
-and \code{nrow(data)}}
+and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn.}
 
 \item{metric}{Metric to optimize: one of the names
 \code{\link{tl_evaluate}} computes for the task. Defaults to

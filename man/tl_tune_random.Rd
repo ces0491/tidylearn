@@ -51,7 +51,7 @@ given, whether or not they are whole}
 combinations to try, a whole number of at least 1}
 
 \item{folds}{Number of cross-validation folds, a whole number between 2
-and \code{nrow(data)}}
+and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn.}
 
 \item{metric}{Metric to optimize, as for \code{\link{tl_tune_grid}}}
 

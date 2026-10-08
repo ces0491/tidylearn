@@ -77,7 +77,10 @@ the problem is binary. The fit is unaffected.
 
 Whether a supervised model is a classification or a regression is
 decided by the response the formula computes, so \code{factor(cyl) ~ wt}
-is a classification even though \code{cyl} is numeric.
+is a classification even though \code{cyl} is numeric. A factor or text
+response is a classification. A logical response is a regression for
+every method but \code{"logistic"} -- with \code{"linear"}, a linear
+probability model -- so write \code{factor(y) ~ ...} to classify it.
 
 A categorical predictor stored as text, as \code{tl_read()} returns it,
 is made a factor before the fit and stored as one in \code{$data}, so
@@ -98,10 +101,14 @@ result fitted with \code{lm()}. Factor terms, interactions,
 a removed intercept are kept as they are.}
 \item{\code{"ridge"}, \code{"lasso"}, \code{"elastic_net"}}{
 \code{alpha}, glmnet's mixing parameter (by default 0, 1 and 0.5);
-\code{lambda}, a penalty to fit at, or \code{NULL} (the default) to
-have \code{glmnet::cv.glmnet()} choose one; and \code{cv_folds}
-(default 5), the number of folds for that cross-validation.
-\code{predict()} uses the \code{lambda.1se} penalty.}
+\code{lambda}, a single penalty to fit at, a sequence of penalties for
+\code{glmnet::cv.glmnet()} to choose from, or \code{NULL} (the
+default) to let it choose its own; and \code{cv_folds} (default 5),
+the number of folds for that cross-validation, which takes the place
+of glmnet's \code{nfolds}. \code{predict()} uses the \code{lambda.1se}
+penalty. tidylearn sets \code{x}, \code{y}, \code{family} and
+\code{nfolds} itself and refuses them, along with any argument glmnet
+does not take.}
 \item{\code{"svm"}}{\code{tune} (default \code{FALSE}) and
 \code{tune_folds} (default 5), to choose \code{cost} by
 cross-validation before the fit, with \code{gamma} for a non-linear
@@ -118,7 +125,11 @@ the number of dimensions (default 2).}
 \item{\code{"kmeans"}, \code{"pam"}, \code{"clara"}}{\code{k}, the
 number of clusters (default 3); for \code{"pam"}, \code{metric}
 as well (default \code{"euclidean"}).}
-\item{\code{"hclust"}}{\code{distance} (default \code{"euclidean"}).}
+\item{\code{"hclust"}}{\code{hclust_method}, the linkage:
+\code{"average"} (the default), \code{"ward.D"}, \code{"ward.D2"},
+\code{"single"}, \code{"complete"}, \code{"mcquitty"},
+\code{"median"} or \code{"centroid"}; and \code{distance} (default
+\code{"euclidean"}).}
 \item{\code{"dbscan"}}{\code{eps} (default 0.5), \code{minPts}
 (default 5) and \code{distance} (default \code{"euclidean"}).}
 }

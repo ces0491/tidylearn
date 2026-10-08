@@ -22,10 +22,12 @@ tl_pipeline(
 \code{TRUE} or \code{FALSE}: \code{impute_missing} (default
 \code{TRUE}) replaces missing predictor values with the training
 median or mode; \code{standardize} (default \code{TRUE}) centres and
-scales numeric predictors, leaving alone any column the formula uses
+scales numeric predictors where that leaves the model the formula
+describes unchanged. It leaves alone any column the formula uses
 inside a function call such as \code{log()}, \code{poly()} or
-\code{offset()}, so those terms are computed on the column's own
-scale; \code{dummy_encode} (default \code{TRUE}) only records that
+\code{offset()}, every column when the formula has no intercept, and
+the columns of an interaction whose lower-order terms are not all in
+the formula; \code{dummy_encode} (default \code{TRUE}) only records that
 categorical predictors are encoded by each model's fitting function,
 and cannot be set to \code{FALSE}.}
 

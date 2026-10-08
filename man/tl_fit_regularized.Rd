@@ -38,7 +38,9 @@ cross-validation chooses one}
 
 \item{...}{Additional arguments to pass to glmnet() or cv.glmnet(). A
 name neither function takes is an error, as are \code{x}, \code{y},
-\code{family} and \code{nfolds}, which tidylearn sets itself.}
+\code{family} and \code{nfolds}, which tidylearn sets itself, and
+\code{relax = TRUE} and \code{gamma}: predictions and coefficients
+come from the unrelaxed fit.}
 
 \item{weights}{Optional case weights, one per row of \code{data}}
 

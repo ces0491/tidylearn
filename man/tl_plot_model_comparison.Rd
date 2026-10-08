@@ -11,7 +11,9 @@ tl_plot_model_comparison(..., new_data = NULL, metrics = NULL, names = NULL)
 
 \item{new_data}{Optional data frame for evaluation. If NULL, the models
 are scored on their training data, which they must share: models
-fitted on different data are an error asking for \code{new_data}.}
+fitted on different data are an error asking for \code{new_data}. A
+model fitted on engineered features, as \code{tl_auto_ml()} builds some
+of its candidates, is scored on the training data of the others.}
 
 \item{metrics}{Character vector of metrics to compute}
 

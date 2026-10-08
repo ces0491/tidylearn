@@ -34,7 +34,7 @@ quartiles; quartiles that tie are evaluated once, with a label naming
 each quartile they stand for, such as \code{"Q0/Q25"}. A factor,
 character or logical variable is categorical, and is evaluated at the
 values the data holds: a level no row uses, and a missing value, are
-left out.
+left out. A factor is returned as a factor with the model's levels.
 
 \code{fit}, \code{lower}, \code{upper} and \code{slope} are on the
 response scale whatever \code{intervals} is set to. For a

@@ -21,10 +21,14 @@ tl_auto_ml(
 \item{formula}{Model formula (for supervised learning)}
 
 \item{task}{Task type: "classification", "regression", or "auto"
-(default), which reads it off the response. An explicit task has to
-agree with the response, since \code{tl_model()} fits a factor or
-character response as a classification and a numeric one as a
-regression.}
+(default), which takes it from the response the formula computes, so
+\code{factor(am) ~ .} is a classification although \code{am} is
+numeric. A factor or character response is a classification and any
+other a regression. An explicit task has to agree: every candidate but
+logistic regression takes its task from the response, so a
+contradicting task would be scored on metrics the candidates cannot
+produce. A 0/1 numeric response is therefore a regression; convert it
+with \code{factor()} to treat its values as classes.}
 
 \item{use_reduction}{Whether to try dimensionality reduction (default: TRUE)}
 
