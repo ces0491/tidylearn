@@ -172,12 +172,33 @@ test_that("stratifying on a continuous column splits by its quartiles", {
   expect_equal(sum(is.na(split$test$y)), 2)
 })
 
-test_that("strata too small to split are pooled", {
-  # An ID column made every row a stratum of one, all sent to training
+test_that("one-row strata are pooled only when they are over a tenth", {
+  # An ID column made every row a stratum of one, all sent to training. The
+  # pooled stratum is every row, so the draw is the unstratified one.
   ids <- data.frame(id = sprintf("id%02d", 1:50), x = seq_len(50))
   split <- tl_split(ids, prop = 0.8, stratify = "id", seed = 1)
   expect_equal(nrow(split$train), 40)
   expect_equal(nrow(split$test), 10)
+  expect_identical(split, tl_split(ids, prop = 0.8, seed = 1))
+
+  # Two levels seen once in 22 rows stay in training, where a model can
+  # learn them. Pooled, d's row went to test, a level predict() refuses.
+  few <- data.frame(g = factor(c("a", "d", rep("b", 10), rep("c", 10))),
+                    x = 1:22)
+  split <- tl_split(few, stratify = "g", seed = 1)
+  expect_equal(as.vector(table(split$train$g)), c(1, 8, 8, 1))
+  expect_equal(as.vector(table(split$test$g)), c(0, 2, 2, 0))
+
+  # Three one-row strata in 30 rows are exactly a tenth and stay in
+  # training; in 29 rows they are more than a tenth and are pooled
+  singles <- c("a", "b", "c")
+  at_tenth <- data.frame(g = c(singles, rep("x", 27)), x = 1:30)
+  split <- tl_split(at_tenth, stratify = "g", seed = 1)
+  expect_true(all(singles %in% split$train$g))
+  over_tenth <- data.frame(g = c(singles, rep("x", 26)), x = 1:29)
+  split <- tl_split(over_tenth, stratify = "g", seed = 1)
+  expect_equal(sum(singles %in% split$train$g), 2)
+  expect_equal(sum(singles %in% split$test$g), 1)
 
   # A numeric column with few distinct values is still split by value.
   # Binning cyl by its quartiles would put 4 and 6 in one bin and draw 25.

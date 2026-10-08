@@ -434,8 +434,10 @@ scale_features <- function(data, numeric_cols, method = "standardize") {
 #' @param prop Proportion for training set (default: 0.8)
 #' @param stratify Column name for stratified splitting. Each stratum is
 #'   split at \code{prop}. A numeric column with more than five distinct
-#'   values is stratified by its quartiles, rows missing the value form a
-#'   stratum of their own, and strata of a single row are pooled and split
+#'   values is stratified by its quartiles, and rows missing the value form
+#'   a stratum of their own. A stratum of a single row goes to the training
+#'   set, unless such strata together hold more than a tenth of the rows, as
+#'   in an ID column; then they are pooled into one stratum and split
 #'   together.
 #' @param seed Random seed for reproducibility
 #' @return A list with two elements:
@@ -481,8 +483,9 @@ tl_split <- function(data, prop = 0.8, stratify = NULL, seed = NULL) {
 
   if (!is.null(stratify)) {
     # Stratified sampling. Each stratum keeps at least one training row
-    # and one test row where it has the rows to spare, so a small group
-    # cannot vanish from the training set entirely.
+    # and one test row where it has the rows to spare, and a stratum of
+    # one row goes to training, unless tl_split_strata() pooled the
+    # one-row strata because together they are over a tenth of the rows.
     # Index into idx rather than sampling it: sample() on a single number
     # draws from 1:idx, so a one-row stratum took a row from some other
     # stratum -- sometimes one already drawn -- and left its own in test.
@@ -529,13 +532,19 @@ tl_split <- function(data, prop = 0.8, stratify = NULL, seed = NULL) {
 #' column then made every row a stratum of one, and a stratum of one goes
 #' wholly to training, so the test set came back empty. A numeric column
 #' with more than five distinct values is cut at its quartiles instead,
-#' which is the default of rsample's \code{make_strata()}, and strata of a
-#' single row are pooled into one that is split like any other.
+#' which is the default of rsample's \code{make_strata()}.
+#'
+#' A stratum of one row still goes to training, so a level seen once is one
+#' the model was trained on; in test, \code{predict()} would refuse it as
+#' new. When such strata together hold more than a tenth of the rows -- the
+#' threshold of \code{make_strata()}'s \code{pool = 0.1} -- the column is
+#' ID-like, and they are pooled into one stratum that is split like any
+#' other.
 #'
 #' \code{make_strata()} goes further: it uses fewer bins when a bin would
-#' hold under 20 rows, pools strata under a tenth of the data, and assigns
-#' missing values to strata at random. A single split needs only two rows
-#' in a stratum, and missing values keep a stratum of their own.
+#' hold under 20 rows, pools any stratum under a tenth of the data, and
+#' assigns missing values to strata at random. A single split needs only
+#' two rows in a stratum, and missing values keep a stratum of their own.
 #'
 #' @param x The stratify column
 #' @return An integer stratum code per row
@@ -551,8 +560,11 @@ tl_split_strata <- function(x) {
   # split() drops an NA group, so rows missing the stratify value were in
   # no stratum, never drawn, and all landed in test. They form their own.
   strata <- as.integer(addNA(factor(x), ifany = TRUE))
-  sizes <- tabulate(strata)
-  strata[sizes[strata] < 2L] <- 0L
+  single <- tabulate(strata)[strata] == 1L
+  # One-row strata holding more than a tenth of the rows
+  if (10 * sum(single) > length(strata)) {
+    strata[single] <- 0L
+  }
   strata
 }
 
