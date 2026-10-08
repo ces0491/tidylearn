@@ -621,6 +621,14 @@
   `"forest"`. A transform that needs nothing from training, such as
   `log(hp)`, is fitted through gbm's formula interface as before.
 
+* **`tl_model(method = "boost")` reads a formula variable that is not a
+  column of the data from the formula's environment, as `lm()` does, at
+  fit and at `predict()`.** gbm rebuilt its predictors in its own
+  environment, which reaches only the global one, so `mpg ~ wt + z` with
+  `z` defined inside a function failed with `object 'z' not found`, and
+  where a global `z` existed as well, gbm fitted and predicted on the
+  global one while the response came from the data.
+
 * **`"xgboost"`, `"deep"`, `tl_tune_xgboost()` and `tl_tune_nn()` fit
   and score the response the formula computes.** The first three fitted
   `log(mpg) ~ wt + hp` to `mpg` itself, so `"xgboost"` predicted 21.0
