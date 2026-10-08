@@ -566,6 +566,33 @@ test_that("tl_cv explains a metric that no fold could compute", {
   )
 })
 
+test_that("tl_cv summarises a metric with no value on any fold as NA", {
+  # mean(na.rm = TRUE) over nothing is NaN, so the summary's mean was NaN
+  # where the note said NA, and where tl_compare_cv() reports NA
+  d <- data.frame(x = seq_len(10), y = 3)
+  set.seed(1)
+  cv <- suppressWarnings(suppressMessages(
+    tl_cv(d, y ~ x, method = "linear", folds = 5,
+          metrics = c("rsq", "mae"))
+  ))
+  rsq <- cv$summary[cv$summary$metric == "rsq", ]
+  expect_identical(rsq$mean, NA_real_)
+  expect_identical(rsq$sd, NA_real_)
+
+  # A metric with values is summarised over them as before
+  mae <- vapply(cv$folds, function(f) f$value[f$metric == "mae"], numeric(1))
+  expect_equal(cv$summary$mean[cv$summary$metric == "mae"], mean(mae))
+  expect_equal(cv$summary$sd[cv$summary$metric == "mae"], stats::sd(mae))
+
+  # The same for rsq on leave-one-out folds
+  set.seed(1)
+  n <- 10
+  d <- data.frame(x = stats::rnorm(n))
+  d$y <- d$x * 2 + stats::rnorm(n, sd = 0.2)
+  cv <- suppressWarnings(tl_cv(d, y ~ x, method = "linear", folds = n))
+  expect_identical(cv$summary$mean[cv$summary$metric == "rsq"], NA_real_)
+})
+
 test_that("tl_cv warns once that a leave-one-out fold scores one row", {
   # folds = nrow(data) is leave-one-out. rmse on one row is that row's
   # absolute error, so the summary's rmse was the mean absolute error, and

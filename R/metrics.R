@@ -945,7 +945,8 @@ tl_evaluate <- function(object, new_data = NULL, metrics = NULL, ...) {
 #'       performance across folds. A metric undefined on a fold -- auc
 #'       on a fold holding one class -- is \code{NA} there and left out
 #'       of the mean and sd. So is every metric of a fold none of whose
-#'       rows can be scored, with a warning giving the reason.}
+#'       rows can be scored, with a warning giving the reason. A metric
+#'       with no value on any fold has \code{NA} mean and sd.}
 #'   }
 #' @examples
 #' \donttest{
@@ -1081,21 +1082,22 @@ tl_cv <- function(data, formula, method, folds = 5, metrics = NULL,
   # Combine results
   all_results <- dplyr::bind_rows(cv_results)
 
-  # Calculate mean and sd for each metric
+  # Mean and sd of each metric over the folds with a value, as
+  # tl_compare_cv() summarises them. A metric with a value on no fold is
+  # NA: mean(na.rm = TRUE) over nothing gave NaN, where tl_compare_cv()
+  # and the note below say NA.
   summary_results <- all_results |>
     dplyr::group_by(.data$metric) |>
     dplyr::summarize(
-      mean = mean(.data$value, na.rm = TRUE),
-      sd = stats::sd(.data$value, na.rm = TRUE),
+      mean = tl_summarise_scored(.data$value, mean),
+      sd = tl_summarise_scored(.data$value, stats::sd),
       .groups = "drop"
     )
 
-  # A metric that is NA in every fold reaches the summary as NaN, from
-  # mean() over nothing. That is arithmetically right and reads as a
-  # malfunction: rsq needs variation in the truth, so it is undefined
-  # whenever a fold holds one observation. Say so once rather than leave a
-  # bare NaN. A metric the leave-one-out warning named has been explained
-  # already.
+  # A bare NA in the summary reads as a malfunction: rsq needs variation
+  # in the truth, so it is undefined whenever a fold holds one observation.
+  # Say so once. A metric the leave-one-out warning named has been
+  # explained already.
   undefined <- setdiff(
     summary_results$metric[!is.finite(summary_results$mean)], loo_warned
   )
