@@ -48,7 +48,8 @@ tl_fit_forest(
 
 - ...:
 
-  Additional arguments to pass to randomForest()
+  Additional arguments to pass to randomForest(). An offset is refused:
+  randomForest leaves it out of the fit.
 
 ## Value
 

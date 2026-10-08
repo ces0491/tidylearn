@@ -11,7 +11,7 @@ from a custom domain can add that domain here."><meta property="og:image" conten
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -60,8 +60,8 @@ from a custom domain can add that domain here.</p>
 
 <dl><dt id="arg-host">host<a class="anchor" aria-label="anchor" href="#arg-host"></a></dt>
 <dd><p>A character vector of host names to allow, or <code>NULL</code> to
-clear every host added this session. Bare host names only — not
-URLs, ports, paths or wildcards.</p></dd>
+clear every host added this session. Bare host names of at least
+three labels only — not URLs, ports, paths or wildcards.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -78,6 +78,10 @@ Additions are never persisted and are forgotten when the session ends.</p>
 <p>Hosts match themselves and their subdomains. Adding
 <code>"fits.example.com"</code> accepts <code>https://fits.example.com</code> and
 <code>https://a.fits.example.com</code>, and nothing else.</p>
+<p>Give the endpoint's full host name. A name of fewer than three labels,
+such as <code>"example.com"</code> or <code>"co.uk"</code>, is refused: two labels can be a
+public suffix, under which anyone can register a site, and allowing
+one would admit all of them.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

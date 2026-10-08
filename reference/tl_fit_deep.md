@@ -58,12 +58,15 @@ tl_fit_deep(
 
 - validation_split:
 
-  Proportion of data for validation
+  Proportion of the rows held out to validate on, drawn at random
+  (default: 0.2). Their row numbers are kept as `$validation_rows`. Pass
+  `validation_data` through `...` to validate on data of your own
+  instead.
 
 - learning_rate:
 
   Optimizer learning rate. NULL (default) leaves keras's own adam
-  default in place. (default: 0.2)
+  default in place.
 
 - verbose:
 
@@ -72,7 +75,8 @@ tl_fit_deep(
 
 - ...:
 
-  Additional arguments
+  Additional arguments to pass to keras's fit(). Case `weights` and an
+  offset are refused: neither is passed on.
 
 - compute:
 

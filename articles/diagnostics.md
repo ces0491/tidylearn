@@ -281,7 +281,7 @@ mtcars[outliers$outlier_indices, c("mpg", "hp", "wt")]
 #> Maserati Bora       15.0 335 3.570
 ```
 
-`method` also takes `"zscore"` and `"mahalanobis"`. The first two treat
+`method` also takes `"z-score"` and `"mahalanobis"`. The first two treat
 each variable separately; Mahalanobis distance accounts for the
 correlation between them, so it finds points that are unremarkable on
 every single axis and unusual in combination.
@@ -330,12 +330,12 @@ cv$summary
 #> # A tibble: 6 × 6
 #>   model  metric mean_value sd_value min_value max_value
 #>   <chr>  <chr>       <dbl>    <dbl>     <dbl>     <dbl>
-#> 1 full   rmse        2.93     0.708     2.17      3.93 
-#> 2 full   rsq         0.612    0.248     0.262     0.859
-#> 3 simple rmse        3.09     0.720     1.82      3.59 
-#> 4 simple rsq         0.530    0.414    -0.169     0.820
-#> 5 tree   rmse        4.42     1.60      2.21      6.58 
-#> 6 tree   rsq         0.148    0.527    -0.501     0.767
+#> 1 full   rmse      2.68       1.33      1.43      4.84 
+#> 2 full   rsq       0.739      0.164     0.586     0.920
+#> 3 simple rmse      2.95       1.42      1.79      5.32 
+#> 4 simple rsq       0.689      0.184     0.517     0.907
+#> 5 tree   rmse      5.03       0.878     3.70      5.76 
+#> 6 tree   rsq       0.00252    0.634    -0.902     0.505
 ```
 
 Per-fold scores are kept as well, which is what makes a test possible:
@@ -346,12 +346,12 @@ head(cv$fold_metrics)
 #> # A tibble: 6 × 4
 #>   metric value  fold model 
 #>   <chr>  <dbl> <int> <chr> 
-#> 1 rmse   3.35      1 simple
-#> 2 rsq    0.820     1 simple
-#> 3 rmse   1.82      2 simple
-#> 4 rsq    0.808     2 simple
-#> 5 rmse   3.29      3 simple
-#> 6 rsq    0.481     3 simple
+#> 1 rmse   1.79      1 simple
+#> 2 rsq    0.859     1 simple
+#> 3 rmse   2.85      2 simple
+#> 4 rsq    0.638     2 simple
+#> 5 rmse   2.88      3 simple
+#> 6 rsq    0.524     3 simple
 ```
 
 ### Is the difference real?
@@ -367,16 +367,32 @@ tl_test_model_difference(
   metric = "rmse",
   test = "t.test"
 )
-#>   metric model baseline  mean_diff   p_value     p_adj
-#> 1   rmse  full   simple -0.1657558 0.6102364 0.6102364
-#> 2   rmse  tree   simple  1.3264236 0.1504542 0.3009083
+#>   metric model baseline  mean_diff    p_value      p_adj
+#> 1   rmse  full   simple -0.2650263 0.51406818 0.51406818
+#> 2   rmse  tree   simple  2.0845970 0.04201286 0.08402572
 ```
 
 With five folds this has very little power, so treat a non-significant
 result as “these folds do not separate the models” rather than as
-evidence they are equivalent. `test = "wilcox.test"` drops the normality
-assumption, which matters more at small fold counts than the loss of
-power costs you.
+evidence they are equivalent.
+
+`test = "wilcox"` runs the signed-rank test instead, which drops the
+normality assumption but needs at least six folds to return a p-value
+below 0.05. On five pairs of fold scores the smallest two-sided p-value
+it can give is 0.0625, and only when one model wins every fold:
+
+``` r
+
+tl_test_model_difference(
+  cv,
+  baseline_model = "simple",
+  metric = "rmse",
+  test = "wilcox"
+)
+#>   metric model baseline  mean_diff p_value  p_adj
+#> 1   rmse  full   simple -0.2650263  0.4375 0.4375
+#> 2   rmse  tree   simple  2.0845970  0.0625 0.1250
+```
 
 ## Interactions
 
@@ -417,11 +433,11 @@ effects <- tl_interaction_effects(model_int, var = "wt", by_var = "hp")
 
 effects$slopes
 #>      by_value by_label     slope     slope_se
-#> Q0       52.0       Q0 -6.768521 5.695734e-16
-#> Q25      96.5      Q25 -5.529278 4.387243e-16
-#> Q50     123.0      Q50 -4.791302 6.071491e-16
-#> Q75     180.0      Q75 -3.203958 4.018576e-16
-#> Q100    335.0     Q100  1.112505 4.116338e-16
+#> Q0       52.0       Q0 -6.768521 3.505829e-16
+#> Q25      96.5      Q25 -5.529278 4.039654e-16
+#> Q50     123.0      Q50 -4.791302 3.746703e-16
+#> Q75     180.0      Q75 -3.203958 4.635819e-16
+#> Q100    335.0     Q100  1.112505 2.313524e-16
 ```
 
 The slope of `mpg` on `wt` weakens as `hp` rises — extra weight costs
@@ -486,7 +502,7 @@ eda$optimal_k
 #> [1] 2 3 4 5
 #> 
 #> $scores
-#> [1] 0.6810462 0.5528190 0.4980505 0.4887489
+#> [1] 0.6810462 0.5528190 0.4980505 0.4912400
 #> 
 #> $best_k
 #> [1] 2
@@ -512,7 +528,7 @@ get_pca_variance(eda$pca)
 plot(eda)
 ```
 
-![](diagnostics_files/figure-html/unnamed-chunk-28-1.png)
+![](diagnostics_files/figure-html/unnamed-chunk-29-1.png)
 
 ## A Checklist
 

@@ -41,6 +41,16 @@ tl_plot_tuning_results(
 A [`ggplot`](https://ggplot2.tidyverse.org/reference/ggplot.html)
 object.
 
+## Details
+
+A parameter whose candidates are not single values, such as
+`hidden_layers = list(c(10), c(20, 10))` or a `parms` list, is drawn as
+a categorical one, each value labelled as the verbose messages print it.
+The importance of a numeric parameter is the absolute correlation of its
+values with the score; that of a categorical one is eta squared from a
+one-way ANOVA of the score, and 0 when the sets that were scored all
+share one value.
+
 ## Examples
 
 ``` r

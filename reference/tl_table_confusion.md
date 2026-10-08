@@ -25,7 +25,9 @@ tl_table_confusion(model, new_data = NULL, ...)
 
 ## Value
 
-A [`gt`](https://gt.rstudio.com/reference/gt.html) table object.
+A [`gt`](https://gt.rstudio.com/reference/gt.html) table object, with a
+row and a column for each class the model was trained on. Rows of a
+class the model never saw are left out, with a warning.
 
 ## Examples
 

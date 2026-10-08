@@ -12,7 +12,7 @@ plot_knn_dist(data, k = 4, add_suggestion = TRUE, percentile = 0.95)
 
 - data:
 
-  A data frame or tidy_knn_dist result
+  A data frame, matrix, or tidy_knn_dist result
 
 - k:
 

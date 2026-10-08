@@ -1,8 +1,8 @@
-# Integration Functions: Combining Supervised and Unsupervised Learning
+# Feature Engineering via Dimensionality Reduction
 
-These functions demonstrate the power of tidylearn's unified approach by
-seamlessly integrating supervised and unsupervised learning techniques.
-Feature Engineering via Dimensionality Reduction
+Use PCA, MDS, or other dimensionality reduction as a preprocessing step
+for supervised learning. This can improve model performance and
+interpretability.
 
 ## Usage
 
@@ -28,11 +28,13 @@ tl_reduce_dimensions(
 
 - method:
 
-  Dimensionality reduction method: "pca", "mds"
+  Dimensionality reduction method: "pca" or "mds"
 
 - n_components:
 
-  Number of components to retain
+  Number of components to retain, at most the number the method
+  computes: one per numeric column for PCA, and `k` (default 2, passed
+  through `...`) for MDS. NULL keeps them all.
 
 - ...:
 
@@ -58,12 +60,6 @@ A list with components:
 - response:
 
   The response variable name, or `NULL`.
-
-## Details
-
-Use PCA, MDS, or other dimensionality reduction as a preprocessing step
-for supervised learning. This can improve model performance and
-interpretability.
 
 ## Examples
 

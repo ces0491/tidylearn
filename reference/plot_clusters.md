@@ -29,11 +29,13 @@ plot_clusters(
 
 - x_col:
 
-  X-axis variable (if NULL, uses first numeric column)
+  X-axis variable (if NULL, uses the first numeric column other than
+  `cluster_col`)
 
 - y_col:
 
-  Y-axis variable (if NULL, uses second numeric column)
+  Y-axis variable (if NULL, uses the second numeric column other than
+  `cluster_col`)
 
 - centers:
 

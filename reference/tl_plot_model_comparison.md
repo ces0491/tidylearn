@@ -16,7 +16,13 @@ tl_plot_model_comparison(..., new_data = NULL, metrics = NULL, names = NULL)
 
 - new_data:
 
-  Optional data frame for evaluation (if NULL, uses training data)
+  Optional data frame for evaluation. If NULL, the models are scored on
+  their training data, which they must share: models fitted on different
+  data are an error asking for `new_data`. A model fitted on engineered
+  features, as
+  [`tl_auto_ml()`](https://tidylearn.sheetsolved.com/reference/tl_auto_ml.md)
+  builds some of its candidates, is scored on the training data of the
+  others.
 
 - metrics:
 

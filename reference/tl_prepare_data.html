@@ -11,7 +11,7 @@ Prepare Data for Machine Learning"><meta property="og:image" content="https://ti
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -68,13 +68,15 @@ Prepare Data for Machine Learning</p>
 
 
 <dl><dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
-<dd><p>A data frame</p></dd>
+<dd><p>A data frame. A grouped tibble is prepared as a whole and
+returned ungrouped.</p></dd>
 
 
 <dt id="arg-formula">formula<a class="anchor" aria-label="anchor" href="#arg-formula"></a></dt>
-<dd><p>Optional formula (for supervised learning). Only its
-predictors are processed; a column it excludes, such as <code>- id</code>,
-is returned unchanged.</p></dd>
+<dd><p>Optional two-sided formula (for supervised learning),
+whose response must be a column of <code>data</code>. Only its predictors are
+processed; a column it excludes, such as <code>- id</code>, is returned
+unchanged. Leave it <code>NULL</code> to process every column.</p></dd>
 
 
 <dt id="arg-impute-method">impute_method<a class="anchor" aria-label="anchor" href="#arg-impute-method"></a></dt>
@@ -85,7 +87,8 @@ filled with the column's most frequent value.</p></dd>
 
 <dt id="arg-scale-method">scale_method<a class="anchor" aria-label="anchor" href="#arg-scale-method"></a></dt>
 <dd><p>Scaling method: "standardize",
-"normalize", "robust", "none"</p></dd>
+"normalize", "robust", "none". A column whose spread is zero or not
+finite, such as one holding an <code>Inf</code>, is left unscaled.</p></dd>
 
 
 <dt id="arg-encode-categorical">encode_categorical<a class="anchor" aria-label="anchor" href="#arg-encode-categorical"></a></dt>
@@ -102,7 +105,8 @@ variables (default: TRUE)</p></dd>
 
 
 <dt id="arg-correlation-cutoff">correlation_cutoff<a class="anchor" aria-label="anchor" href="#arg-correlation-cutoff"></a></dt>
-<dd><p>Correlation threshold for removal (default: 0.95)</p></dd>
+<dd><p>Correlation threshold for removal, greater than
+0 and at most 1 (default: 0.95)</p></dd>
 
 </dl></div>
     <div class="section level2">

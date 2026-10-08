@@ -12,7 +12,7 @@ tidy_dbscan(data, eps, minPts = 5, cols = NULL, distance = "euclidean")
 
 - data:
 
-  A data frame, tibble, or distance matrix
+  A data frame, tibble, numeric matrix, or dist object
 
 - eps:
 
@@ -24,24 +24,29 @@ tidy_dbscan(data, eps, minPts = 5, cols = NULL, distance = "euclidean")
 
 - cols:
 
-  Columns to include (tidy select). If NULL, uses all numeric columns.
+  Columns to include (tidy select). If NULL, uses all numeric columns,
+  or every column for `distance = "gower"`.
 
 - distance:
 
-  Distance metric if data is not a dist object (default: "euclidean")
+  Distance metric if data is not a dist object (default: "euclidean"):
+  any method [`dist`](https://rdrr.io/r/stats/dist.html) accepts, or
+  "gower" for mixed data types
 
 ## Value
 
 A list of class "tidy_dbscan" containing:
 
-- clusters: tibble with observation IDs and cluster assignments (0 =
-  noise)
+- clusters: tibble with observation IDs, cluster assignments (0 =
+  noise), and the logical flags `is_noise` and `is_core`
 
-- core_points: logical vector indicating core points
+- summary: tibble with each cluster's size and number of core points
 
 - n_clusters: number of clusters (excluding noise)
 
 - n_noise: number of noise points
+
+- eps, minPts: the parameters used
 
 - model: original dbscan object
 

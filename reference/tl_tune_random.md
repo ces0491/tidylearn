@@ -32,12 +32,16 @@ tl_tune_random(
 
 - method:
 
-  The modeling method to tune
+  The modeling method to tune, one of the supervised methods
+  [`tl_model`](https://tidylearn.sheetsolved.com/reference/tl_model.md)
+  fits
 
 - param_space:
 
-  A named list of parameter spaces to sample from. Each element is read
-  by its type and length:
+  A named list of parameter spaces to sample from, one element for each
+  [`tl_model`](https://tidylearn.sheetsolved.com/reference/tl_model.md)
+  argument to tune, named after it. Each element is read by its type and
+  length:
 
   a function
 
@@ -79,19 +83,31 @@ tl_tune_random(
 
 - n_iter:
 
-  Number of random parameter combinations to try
+  Number of random parameter combinations to try, a whole number of at
+  least 1
 
 - folds:
 
-  Number of cross-validation folds
+  Number of cross-validation folds, a whole number between 2 and
+  `nrow(data)`. `nrow(data)` leaves each row out in turn, and each fold
+  then scores a single prediction. `"accuracy"`, `"mae"`, `"mse"` and
+  `"mape"` average to their values over the left-out predictions. The
+  average `"rmse"` is the mean absolute error; `"precision"`,
+  `"recall"`, `"sensitivity"`, `"specificity"` and `"f1"` are undefined
+  on the folds whose one row gives them nothing to divide by; and
+  `"rsq"`, `"auc"` and `"pr_auc"` are undefined on every fold. A run
+  scoring any of these warns once.
 
 - metric:
 
-  Metric to optimize
+  Metric to optimize, as for
+  [`tl_tune_grid`](https://tidylearn.sheetsolved.com/reference/tl_tune_grid.md)
 
 - maximize:
 
-  Logical; whether to maximize (TRUE) or minimize (FALSE) the metric
+  Logical; whether to maximize (TRUE) or minimize (FALSE) the metric.
+  `NULL`, the default, follows the metric, as for
+  [`tl_tune_grid`](https://tidylearn.sheetsolved.com/reference/tl_tune_grid.md).
 
 - verbose:
 
@@ -103,7 +119,11 @@ tl_tune_random(
 
 - ...:
 
-  Additional arguments passed to tl_model
+  Additional arguments passed to
+  [`tl_model`](https://tidylearn.sheetsolved.com/reference/tl_model.md)
+  for every fold and for the final fit. Per-row arguments are refused,
+  as for
+  [`tl_tune_grid`](https://tidylearn.sheetsolved.com/reference/tl_tune_grid.md).
 
 ## Value
 

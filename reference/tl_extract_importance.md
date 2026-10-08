@@ -16,4 +16,5 @@ tl_extract_importance(model)
 
 ## Value
 
-A data frame with feature importance values
+A data frame with feature importance values, rescaled so the largest is
+100. Empty for a tree with no splits.

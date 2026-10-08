@@ -32,7 +32,27 @@ A `tidylearn_data` object containing the query results.
 ## Examples
 
 ``` r
-# \donttest{
-# data <- tl_read_sqlite("my_database.sqlite", "SELECT * FROM my_table")
-# }
+# RSQLite imports DBI, so both are available here
+path <- tempfile(fileext = ".sqlite")
+conn <- DBI::dbConnect(RSQLite::SQLite(), path)
+DBI::dbWriteTable(conn, "cars", mtcars)
+DBI::dbDisconnect(conn)
+
+tl_read_sqlite(path, "SELECT mpg, cyl, hp FROM cars WHERE cyl = 6")
+#> -- tidylearn data ---------
+#> Source: /tmp/RtmpK94WAU/file1cba67e403c2.sqlite 
+#> Format: sqlite 
+#> Read at: 2026-10-08 17:59:47 
+#> 
+#> # A tibble: 7 × 3
+#>     mpg   cyl    hp
+#> * <dbl> <dbl> <dbl>
+#> 1  21       6   110
+#> 2  21       6   110
+#> 3  21.4     6   110
+#> 4  18.1     6   105
+#> 5  19.2     6   123
+#> 6  17.8     6   123
+#> 7  19.7     6   175
+unlink(path)
 ```

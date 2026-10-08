@@ -25,7 +25,10 @@ tl_read_mysql(
 
   A MySQL connection string (e.g.,
   `"mysql://user:pass@host:port/dbname"`), or the database host if using
-  named parameters.
+  named parameters. Percent-encode special characters in the user name
+  and password (`@` as `%40`). Query parameters are refused, because
+  RMariaDB ignores arguments it does not know; pass its `dbConnect()`
+  arguments, such as `ssl.ca`, through `...`.
 
 - query:
 
@@ -41,11 +44,12 @@ tl_read_mysql(
 
 - password:
 
-  Password (if not in `dsn`).
+  Password (if not in `dsn`), which keeps it out of the connection
+  string.
 
 - port:
 
-  Port number. Default is 3306.
+  Port number (if not in `dsn`). Default is 3306.
 
 - ...:
 
@@ -59,13 +63,14 @@ A `tidylearn_data` object containing the query results.
 ## Examples
 
 ``` r
-# \donttest{
-# data <- tl_read_mysql(
-#   dsn = "localhost",
-#   query = "SELECT * FROM my_table",
-#   dbname = "mydb",
-#   user = "myuser",
-#   password = "mypass"
-# )
-# }
+if (FALSE) { # \dontrun{
+# Needs a running MySQL or MariaDB server
+tl_read_mysql(
+  dsn = "localhost",
+  query = "SELECT * FROM my_table",
+  dbname = "mydb",
+  user = "myuser",
+  password = Sys.getenv("MYSQL_PWD")
+)
+} # }
 ```

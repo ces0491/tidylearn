@@ -11,7 +11,7 @@ to the appropriate underlying package based on the method."><meta property="og:i
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -64,12 +64,15 @@ to the appropriate underlying package based on the method.</p>
 
 <dt id="arg-formula">formula<a class="anchor" aria-label="anchor" href="#arg-formula"></a></dt>
 <dd><p>A formula specifying the model. For
-unsupervised methods, use <code>~ vars</code> or NULL.</p></dd>
+unsupervised methods, use <code>~ vars</code> or NULL; a one-sided formula
+names columns, and <code>~ . - x</code> means every numeric column but
+<code>x</code>. Supervised methods need a two-sided formula.</p></dd>
 
 
 <dt id="arg-method">method<a class="anchor" aria-label="anchor" href="#arg-method"></a></dt>
 <dd><p>The modeling method. Supervised: "linear"
-(stats::lm), "logistic" (stats::glm), "tree" (rpart),
+(stats::lm), "polynomial" (stats::lm on polynomial terms),
+"logistic" (stats::glm), "tree" (rpart),
 "forest" (randomForest), "boost" (gbm),
 "ridge"/"lasso"/"elastic_net" (glmnet), "svm" (e1071),
 "nn" (nnet), "deep" (keras), "xgboost" (xgboost).
@@ -79,13 +82,14 @@ error rather than a meaningless fit: <code>"linear"</code> and
 needs exactly two classes, and every other supervised method takes
 either.
 Unsupervised: "pca" (stats::prcomp),
-"mds" (stats/MASS/smacof), "kmeans" (stats::kmeans),
-"pam"/"clara" (cluster), "hclust" (stats::hclust),
-"dbscan" (dbscan).</p></dd>
+"mds" (stats::cmdscale, or smacof or MASS through <code>mds_method</code>),
+"kmeans" (stats::kmeans), "pam"/"clara" (cluster),
+"hclust" (stats::hclust), "dbscan" (dbscan).</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments passed to the underlying model function</p></dd>
+<dd><p>Arguments for the method: see the Method arguments section.
+Anything else is passed to the underlying model function.</p></dd>
 
 
 <dt id="arg-compute">compute<a class="anchor" aria-label="anchor" href="#arg-compute"></a></dt>
@@ -104,7 +108,9 @@ with a warning.</p></dd>
     <p>A <code>tidylearn_model</code> object (S3) containing the fitted model
 (<code>$fit</code>, or <code>$fit$model</code> for an unsupervised method),
 model specification (<code>$spec</code>), and training data
-(<code>$data</code>). The object also inherits from a method-specific class
+(<code>$data</code>). <code><a href="https://rdrr.io/r/stats/update.html" class="external-link">update()</a></code> and <code><a href="https://rdrr.io/r/stats/step.html" class="external-link">step()</a></code> on <code>$fit</code>
+refit on the training rows and weights, whatever is in the calling
+environment. The object also inherits from a method-specific class
 (e.g., <code>tidylearn_linear</code>) and a paradigm class
 (<code>tidylearn_supervised</code> or <code>tidylearn_unsupervised</code>).</p>
     </div>
@@ -124,6 +130,98 @@ actually contains: subsetting a data frame keeps every factor level,
 and a level no row uses would otherwise be reported as a class, given
 its own (zero) probability column, and counted when deciding whether
 the problem is binary. The fit is unaffected.</p>
+<p>Whether a supervised model is a classification or a regression is
+decided by the response the formula computes, so <code>factor(cyl) ~ wt</code>
+is a classification even though <code>cyl</code> is numeric. A factor or text
+response is a classification. A logical response is a regression for
+every method but <code>"logistic"</code> – with <code>"linear"</code>, a linear
+probability model – so write <code>factor(y) ~ ...</code> to classify it.</p>
+<p>A categorical predictor stored as text, as <code><a href="tl_read.html">tl_read()</a></code> returns it,
+is made a factor before the fit and stored as one in <code>$data</code>, so
+every method treats it as a category. At <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code>, categorical
+columns in new data are read against the levels seen in training: new
+data may hold only some of them, and a level the model was not trained
+on is an error that names the column.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="method-arguments">Method arguments<a class="anchor" aria-label="anchor" href="#method-arguments"></a></h2>
+
+
+<p>Arguments in <code>...</code> are passed to the function the method wraps,
+except for these, which tidylearn takes itself:</p><dl><dt><code>"polynomial"</code></dt>
+<dd><p><code>degree</code> (default 2). Each numeric main
+effect is replaced by <code>poly(term, degree, raw = TRUE)</code> and the
+result fitted with <code><a href="https://rdrr.io/r/stats/lm.html" class="external-link">lm()</a></code>. A numeric term is one that computes a
+numeric vector, such as <code>wt</code> or <code>log(wt)</code>, or a one-column
+matrix, such as <code>scale(wt)</code>. One that is also part of an
+interaction keeps its own term and gains <code>I(x^2)</code> up to
+<code>I(x^degree)</code>, so the interaction is coded as written. Factor
+and other non-numeric terms, interactions, <code><a href="https://rdrr.io/r/base/AsIs.html" class="external-link">I()</a></code> terms, bases
+such as <code><a href="https://rdrr.io/r/stats/poly.html" class="external-link">poly()</a></code> or a spline's, the response as written, an
+<code><a href="https://rdrr.io/r/stats/offset.html" class="external-link">offset()</a></code> and a removed intercept are kept as they are.</p></dd>
+
+<dt><code>"ridge"</code>, <code>"lasso"</code>, <code>"elastic_net"</code></dt>
+<dd><p><code>alpha</code>, glmnet's mixing parameter (by default 0, 1 and 0.5);
+<code>lambda</code>, a single penalty to fit at, a sequence of penalties for
+<code><a href="https://glmnet.stanford.edu/reference/cv.glmnet.html" class="external-link">glmnet::cv.glmnet()</a></code> to choose from, or <code>NULL</code> (the
+default) to let it choose its own; and <code>cv_folds</code> (default 5),
+the number of folds for that cross-validation, which takes the place
+of glmnet's <code>nfolds</code>. <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> uses the <code>lambda.1se</code>
+penalty. tidylearn sets <code>x</code>, <code>y</code>, <code>family</code> and
+<code>nfolds</code> itself and refuses them, along with any argument glmnet
+does not take.</p></dd>
+
+<dt><code>"svm"</code></dt>
+<dd><p><code>tune</code> (default <code>FALSE</code>) and
+<code>tune_folds</code> (default 5), to choose <code>cost</code> by
+cross-validation before the fit, with <code>gamma</code> for a non-linear
+kernel and <code>degree</code> for a polynomial one.</p></dd>
+
+<dt><code>"deep"</code></dt>
+<dd><p><code>hidden_layers</code>, <code>activation</code>,
+<code>dropout</code>, <code>epochs</code>, <code>batch_size</code>,
+<code>validation_split</code> and <code>learning_rate</code>.</p></dd>
+
+<dt><code>"pca"</code></dt>
+<dd><p><code>scale</code> and <code>center</code> (both <code>TRUE</code>).</p></dd>
+
+<dt><code>"mds"</code></dt>
+<dd><p><code>mds_method</code>, the variant:
+<code>"classical"</code> (the default, <code><a href="https://rdrr.io/r/stats/cmdscale.html" class="external-link">stats::cmdscale()</a></code>),
+<code>"metric"</code> or <code>"nonmetric"</code> (smacof), or <code>"sammon"</code>
+or <code>"kruskal"</code> (MASS). <code>k</code>, or its alias <code>ndim</code>, is
+the number of dimensions (default 2).</p></dd>
+
+<dt><code>"kmeans"</code>, <code>"pam"</code>, <code>"clara"</code></dt>
+<dd><p><code>k</code>, the
+number of clusters (default 3); for <code>"pam"</code>, <code>metric</code>
+as well (default <code>"euclidean"</code>).</p></dd>
+
+<dt><code>"hclust"</code></dt>
+<dd><p><code>hclust_method</code>, the linkage:
+<code>"average"</code> (the default), <code>"ward.D"</code>, <code>"ward.D2"</code>,
+<code>"single"</code>, <code>"complete"</code>, <code>"mcquitty"</code>,
+<code>"median"</code> or <code>"centroid"</code>; and <code>distance</code> (default
+<code>"euclidean"</code>).</p></dd>
+
+<dt><code>"dbscan"</code></dt>
+<dd><p><code>eps</code> (default 0.5), <code>minPts</code>
+(default 5) and <code>distance</code> (default <code>"euclidean"</code>).</p></dd>
+
+
+</dl><p>Some defaults differ from the wrapped function's: <code>"forest"</code> computes
+importance (<code>importance = TRUE</code>), <code>"boost"</code> grows trees of
+<code>interaction.depth = 3</code>, and <code>"nn"</code> fits <code>size = 5</code>
+hidden units with <code>trace = FALSE</code>.</p>
+<p><code>weights</code> and <code>subset</code> take values, one per row of
+<code>data</code> (such as <code>weights = data$w</code>), not column names. A
+<code>subset</code> is applied before the fit, and <code>$data</code> holds only
+the rows it selects. Case weights are applied by every supervised method
+except <code>"svm"</code> and <code>"deep"</code>, which refuse them. An offset,
+written as <code><a href="https://rdrr.io/r/stats/offset.html" class="external-link">offset()</a></code> in the formula, is applied by
+<code>"linear"</code>, <code>"polynomial"</code> and <code>"logistic"</code>; the other
+methods refuse one, because their <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> would not add it
+back.</p>
     </div>
 
     <div class="section level2">
@@ -134,24 +232,24 @@ the problem is binary. The fit is unaffected.</p>
 <span class="r-in"><span><span class="va">model</span><span class="op">$</span><span class="va">fit</span>  <span class="co"># Access the raw randomForest object</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Call:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  randomForest(formula = Species ~ ., data = data, ntree = 500,      importance = TRUE) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  randomForest::randomForest(formula = Species ~ ., data = &lt;environment&gt;$data,      ntree = 500, importance = TRUE) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                Type of random forest: classification</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                      Number of trees: 500</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> No. of variables tried at each split: 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         OOB estimate of  error rate: 4.67%</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         OOB estimate of  error rate: 4%</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Confusion matrix:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>            setosa versicolor virginica class.error</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> setosa         50          0         0        0.00</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> versicolor      0         47         3        0.06</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> virginica       0          4        46        0.08</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> virginica       0          3        47        0.06</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Regression -&gt; wraps stats::lm()</span></span></span>
 <span class="r-in"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu">tl_model</span><span class="op">(</span><span class="va">mtcars</span>, <span class="va">mpg</span> <span class="op">~</span> <span class="va">wt</span> <span class="op">+</span> <span class="va">hp</span>, method <span class="op">=</span> <span class="st">"linear"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">model</span><span class="op">$</span><span class="va">fit</span>  <span class="co"># Access the raw lm object</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Call:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> lm(formula = mpg ~ wt + hp, data = data)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> lm(formula = mpg ~ wt + hp, data = &lt;environment&gt;$data)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Coefficients:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)           wt           hp  </span>
@@ -174,23 +272,23 @@ the problem is binary. The fit is unaffected.</p>
 <span class="r-in"><span><span class="co"># Clustering -&gt; wraps stats::kmeans()</span></span></span>
 <span class="r-in"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu">tl_model</span><span class="op">(</span><span class="va">iris</span>, method <span class="op">=</span> <span class="st">"kmeans"</span>, k <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">model</span><span class="op">$</span><span class="va">fit</span><span class="op">$</span><span class="va">model</span>  <span class="co"># The raw kmeans object</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> K-means clustering with 3 clusters of sizes 50, 62, 38</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> K-means clustering with 3 clusters of sizes 38, 62, 50</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Cluster means:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Sepal.Length Sepal.Width Petal.Length Petal.Width</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1     5.006000    3.428000     1.462000    0.246000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1     6.850000    3.073684     5.742105    2.071053</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2     5.901613    2.748387     4.393548    1.433871</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3     6.850000    3.073684     5.742105    2.071053</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3     5.006000    3.428000     1.462000    0.246000</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Clustering vector:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   [1] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [38] 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 3 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [75] 2 2 2 3 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 3 2 3 3 3 3 2 3 3 3 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [112] 3 3 2 2 3 3 3 3 2 3 2 3 2 3 3 2 2 3 3 3 3 3 2 3 3 3 3 2 3 3 3 2 3 3 3 2 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [149] 3 2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   [1] 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [38] 3 3 3 3 3 3 3 3 3 3 3 3 3 2 2 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [75] 2 2 2 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 2 1 1 1 1 2 1 1 1 1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [112] 1 1 2 2 1 1 1 1 2 1 2 1 2 1 1 2 2 1 1 1 1 1 2 1 1 1 1 2 1 1 1 2 1 1 1 2 1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [149] 1 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Within cluster sum of squares by cluster:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 15.15100 39.82097 23.87947</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 23.87947 39.82097 15.15100</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  (between_SS / total_SS =  88.4 %)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Available components:</span>

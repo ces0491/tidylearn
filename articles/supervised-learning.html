@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -86,9 +86,9 @@
 <div class="section level2">
 <h2 id="introduction">Introduction<a class="anchor" aria-label="anchor" href="#introduction"></a>
 </h2>
-<p>Classification and regression across the eleven supervised methods,
-and the one piece of bookkeeping that catches people out — replaying
-training preprocessing on the test set.</p>
+<p>Classification and regression with tidylearn’s thirteen supervised
+methods, and the one piece of bookkeeping that catches people out —
+replaying training preprocessing on the test set.</p>
 <p><strong>Wrapped packages include:</strong></p>
 <ul>
 <li>stats (<code><a href="https://rdrr.io/r/stats/lm.html" class="external-link">lm()</a></code>, <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code>) for linear and
@@ -476,7 +476,7 @@ complexity.</p>
 <span>  remove_correlated <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  correlation_cutoff <span class="op">=</span> <span class="fl">0.9</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt; Removing 1 highly correlated features</span></span>
+<span><span class="co">#&gt; Removing 1 highly correlated feature</span></span>
 <span><span class="co">#&gt; Scaling numeric features using method: standardize</span></span></code></pre></div>
 <div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Train on preprocessed data</span></span>
@@ -574,10 +574,12 @@ rows the model was fitted to tells you how well it memorised them.</li>
 <strong>Stratify classification splits</strong> so both sets carry
 the same class proportions as the source data.</li>
 <li>
-<strong>Scale inputs for methods that need it</strong> – regularised
-regression, SVM and neural networks – and replay the training
-transformation on the test set, as shown below. Trees and forests are
-scale-invariant.</li>
+<strong>Scale inputs for <code>"nn"</code></strong> and replay the
+training transformation on the test set, as shown below. nnet fits on
+the values it is given. The other methods do not need it: glmnet and
+e1071 standardise internally by default for the regularised methods and
+SVM, <code>"deep"</code> normalises its own inputs, and linear models
+and trees are scale-invariant.</li>
 <li>
 <strong>Compare several models</strong> on the same split before
 committing to one.</li>

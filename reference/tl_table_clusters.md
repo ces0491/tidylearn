@@ -1,7 +1,8 @@
 # Formatted cluster summary table
 
-Produces a styled gt table showing cluster sizes and mean feature
-values. Supports kmeans, pam, clara, dbscan, and hclust models.
+Produces a styled gt table showing cluster sizes and mean feature values
+for the columns the clustering used. Supports kmeans, pam, clara,
+dbscan, and hclust models.
 
 ## Usage
 

@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -58,11 +58,14 @@
 
 
 <dt id="arg-new-data">new_data<a class="anchor" aria-label="anchor" href="#arg-new-data"></a></dt>
-<dd><p>New data for predictions</p></dd>
+<dd><p>New data for predictions. NULL predicts the training
+rows from their stored cluster assignments, which works for every
+clustering method; new rows can be assigned by k-means only.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments</p></dd>
+<dd><p>Additional arguments passed to each cluster's model, such as
+<code>type</code></p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -70,7 +73,8 @@
     <p>A <a href="https://tibble.tidyverse.org/reference/tibble.html" class="external-link">tibble</a> of the columns each cluster's model
 returns for the requested <code>type</code> – <code>.pred</code> by default, one
 column per class for <code>type = "prob"</code> – and a <code>.cluster</code>
-column with cluster assignments.</p>
+column with cluster assignments. Rows of a single-class cluster are
+predicted as that class, with probability 1.</p>
     </div>
 
     <div class="section level2">

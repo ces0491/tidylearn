@@ -9,7 +9,7 @@ remove them or down-weight them before supervised learning."><meta property="og:
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -72,7 +72,7 @@ remove them or down-weight them before supervised learning.</p>
 
 
 <dt id="arg-response">response<a class="anchor" aria-label="anchor" href="#arg-response"></a></dt>
-<dd><p>Response variable name</p></dd>
+<dd><p>Response variable name, left out of the detection</p></dd>
 
 
 <dt id="arg-anomaly-method">anomaly_method<a class="anchor" aria-label="anchor" href="#arg-anomaly-method"></a></dt>
@@ -85,8 +85,9 @@ implemented; its noise points are the anomalies.</p></dd>
 <code>"downweight"</code> gives anomalies a case weight of 0.1, and needs a
 <code>supervised_method</code> that takes case weights: <code>"linear"</code>,
 <code>"polynomial"</code>, <code>"logistic"</code>, <code>"tree"</code>, <code>"ridge"</code>,
-<code>"lasso"</code>, <code>"elastic_net"</code> or <code>"forest"</code>. A forest reads
-them as sampling weights.</p></dd>
+<code>"lasso"</code>, <code>"elastic_net"</code>, <code>"forest"</code>, <code>"boost"</code>,
+<code>"nn"</code> or <code>"xgboost"</code>. A forest reads them as sampling
+weights. <code>"svm"</code> and <code>"deep"</code> take none and are refused.</p></dd>
 
 
 <dt id="arg-supervised-method">supervised_method<a class="anchor" aria-label="anchor" href="#arg-supervised-method"></a></dt>
@@ -97,7 +98,8 @@ on a response with more than two levels.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments</p></dd>
+<dd><p>Additional arguments for DBSCAN, such as <code>eps</code> and
+<code>minPts</code></p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -107,6 +109,13 @@ on a response with more than two levels.</p></dd>
 <code>anomaly_info</code> element with <code>anomaly_model</code>,
 <code>is_anomaly</code> (logical vector), <code>n_anomalies</code>, and
 <code>action</code>.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>DBSCAN runs on the predictors the formula names, on their own scale: its
+<code>eps</code> and <code>minPts</code> (defaults 0.5 and 5, passed through
+<code>...</code>) are a distance and a count in those units. If every row comes
+out as noise the call stops, since no normal data would be left to model.</p>
     </div>
 
     <div class="section level2">

@@ -12,7 +12,11 @@ tidy_silhouette(clusters, dist_mat)
 
 - clusters:
 
-  Vector of cluster assignments
+  Vector of cluster assignments: numeric, factor or character. Numeric
+  labels, or labels that read as whole numbers (such as the `cluster`
+  factor from
+  [`augment_kmeans()`](https://tidylearn.sheetsolved.com/reference/augment_kmeans.md)),
+  are kept as they are; other labels are reported as given.
 
 - dist_mat:
 

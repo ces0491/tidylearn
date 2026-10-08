@@ -24,7 +24,9 @@ tl_read_postgres(
 
   A PostgreSQL connection string (e.g.,
   `"postgres://user:pass@host:port/dbname"`), or the database host if
-  using named parameters.
+  using named parameters. Percent-encode special characters in the user
+  name and password (`@` as `%40`). Query parameters such as
+  `?sslmode=require` are passed to libpq as connection keywords.
 
 - query:
 
@@ -40,7 +42,8 @@ tl_read_postgres(
 
 - password:
 
-  Password (if not in `dsn`).
+  Password (if not in `dsn`), which keeps it out of the connection
+  string.
 
 - port:
 
@@ -58,13 +61,21 @@ A `tidylearn_data` object containing the query results.
 ## Examples
 
 ``` r
-# \donttest{
-# data <- tl_read_postgres(
-#   dsn = "localhost",
-#   query = "SELECT * FROM my_table",
-#   dbname = "mydb",
-#   user = "myuser",
-#   password = "mypass"
-# )
-# }
+if (FALSE) { # \dontrun{
+# Needs a running PostgreSQL server
+tl_read_postgres(
+  dsn = "localhost",
+  query = "SELECT * FROM my_table",
+  dbname = "mydb",
+  user = "myuser",
+  password = Sys.getenv("PGPASSWORD")
+)
+
+# The same connection as a URL, with the password still kept out of it
+tl_read_postgres(
+  "postgres://myuser@localhost:5432/mydb?sslmode=require",
+  query = "SELECT * FROM my_table",
+  password = Sys.getenv("PGPASSWORD")
+)
+} # }
 ```

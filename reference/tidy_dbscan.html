@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -53,7 +53,7 @@
 
 
 <dl><dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
-<dd><p>A data frame, tibble, or distance matrix</p></dd>
+<dd><p>A data frame, tibble, numeric matrix, or dist object</p></dd>
 
 
 <dt id="arg-eps">eps<a class="anchor" aria-label="anchor" href="#arg-eps"></a></dt>
@@ -66,21 +66,26 @@
 
 <dt id="arg-cols">cols<a class="anchor" aria-label="anchor" href="#arg-cols"></a></dt>
 <dd><p>Columns to include (tidy select).
-If NULL, uses all numeric columns.</p></dd>
+If NULL, uses all numeric columns, or every column for
+<code>distance = "gower"</code>.</p></dd>
 
 
 <dt id="arg-distance">distance<a class="anchor" aria-label="anchor" href="#arg-distance"></a></dt>
-<dd><p>Distance metric if data is not a
-dist object (default: "euclidean")</p></dd>
+<dd><p>Distance metric if data is not a dist object (default:
+"euclidean"): any method <code><a href="https://rdrr.io/r/stats/dist.html" class="external-link">dist</a></code> accepts, or "gower"
+for mixed data types</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A list of class "tidy_dbscan" containing:</p><ul><li><p>clusters: tibble with observation IDs and
-cluster assignments (0 = noise)</p></li>
-<li><p>core_points: logical vector indicating core points</p></li>
+    <p>A list of class "tidy_dbscan" containing:</p><ul><li><p>clusters: tibble with observation IDs, cluster assignments
+(0 = noise), and the logical flags <code>is_noise</code> and
+<code>is_core</code></p></li>
+<li><p>summary: tibble with each cluster's size and number of core
+points</p></li>
 <li><p>n_clusters: number of clusters (excluding noise)</p></li>
 <li><p>n_noise: number of noise points</p></li>
+<li><p>eps, minPts: the parameters used</p></li>
 <li><p>model: original dbscan object</p></li>
 </ul></div>
 

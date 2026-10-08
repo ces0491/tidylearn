@@ -30,10 +30,7 @@ A [`shinyApp`](https://rdrr.io/pkg/shiny/man/shinyApp.html) object.
 
 ``` r
 # \donttest{
-if (requireNamespace("shiny")) {
-  model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
-  app <- tl_dashboard(model)
-}
-#> Loading required namespace: shiny
+model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+app <- tl_dashboard(model)
 # }
 ```

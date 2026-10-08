@@ -21,7 +21,8 @@ tidy_dist(data, method = "euclidean", cols = NULL, ...)
 
 - cols:
 
-  Columns to include (tidy select). If NULL, uses all numeric columns.
+  Columns to include (tidy select). If NULL, uses all numeric columns,
+  or every column for `method = "gower"`.
 
 - ...:
 

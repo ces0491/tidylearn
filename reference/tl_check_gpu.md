@@ -1,13 +1,14 @@
 # Detect local GPU availability for tidylearn methods
 
 Reports whether the local machine has a CUDA-capable GPU and which
-tidylearn backends (`xgboost`, `keras`, `tensorflow`, `torch`) are
-positioned to use it. Detection is intentionally cheap: it parses
-`nvidia-smi` output and checks which R packages are installed, but does
-not load Python or fit a model. A backend reported as
-`gpu_likely_works = TRUE` may still fall back to CPU if it was not
-compiled or configured with CUDA support — confirm with a small real fit
-before relying on it for production workloads.
+tidylearn backends (`xgboost`, `keras`, `tensorflow`) are positioned to
+use it. Detection is intentionally cheap: it parses `nvidia-smi` output,
+giving up with a warning if `nvidia-smi` has not answered within 10
+seconds, and reads which R packages are installed from the library
+without loading them, so it neither starts Python nor fits a model. A
+backend reported as `gpu_likely_works = TRUE` may still fall back to CPU
+if it was not compiled or configured with CUDA support — confirm with a
+small real fit before relying on it for production workloads.
 
 ## Usage
 

@@ -16,7 +16,8 @@ tl_compare_pipeline_models(pipeline, metrics = NULL)
 
 - metrics:
 
-  Character vector of metrics to compare (if NULL, uses all available)
+  Character vector of metrics to compare, each one the pipeline scored
+  (if NULL, uses all available)
 
 ## Value
 

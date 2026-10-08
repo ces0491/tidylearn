@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -74,12 +74,14 @@ data</p></dd>
 
 
 <dt id="arg-method">method<a class="anchor" aria-label="anchor" href="#arg-method"></a></dt>
-<dd><p>The modeling method to tune</p></dd>
+<dd><p>The modeling method to tune, one of the supervised methods
+<code><a href="tl_model.html">tl_model</a></code> fits</p></dd>
 
 
 <dt id="arg-param-space">param_space<a class="anchor" aria-label="anchor" href="#arg-param-space"></a></dt>
-<dd><p>A named list of parameter spaces to sample from.
-Each element is read by its type and length:</p><dl><dt>a function</dt>
+<dd><p>A named list of parameter spaces to sample from, one
+element for each <code><a href="tl_model.html">tl_model</a></code> argument to tune, named after
+it. Each element is read by its type and length:</p><dl><dt>a function</dt>
 <dd><p>called with no arguments to draw one value</p></dd>
 
 <dt>a list</dt>
@@ -117,20 +119,30 @@ given, whether or not they are whole</p></dd>
 
 <dt id="arg-n-iter">n_iter<a class="anchor" aria-label="anchor" href="#arg-n-iter"></a></dt>
 <dd><p>Number of random parameter
-combinations to try</p></dd>
+combinations to try, a whole number of at least 1</p></dd>
 
 
 <dt id="arg-folds">folds<a class="anchor" aria-label="anchor" href="#arg-folds"></a></dt>
-<dd><p>Number of cross-validation folds</p></dd>
+<dd><p>Number of cross-validation folds, a whole number between 2
+and <code>nrow(data)</code>. <code>nrow(data)</code> leaves each row out in turn,
+and each fold then scores a single prediction. <code>"accuracy"</code>,
+<code>"mae"</code>, <code>"mse"</code> and <code>"mape"</code> average to their values
+over the left-out predictions. The average <code>"rmse"</code> is the mean
+absolute error; <code>"precision"</code>, <code>"recall"</code>,
+<code>"sensitivity"</code>, <code>"specificity"</code> and <code>"f1"</code> are
+undefined on the folds whose one row gives them nothing to divide by;
+and <code>"rsq"</code>, <code>"auc"</code> and <code>"pr_auc"</code> are undefined on
+every fold. A run scoring any of these warns once.</p></dd>
 
 
 <dt id="arg-metric">metric<a class="anchor" aria-label="anchor" href="#arg-metric"></a></dt>
-<dd><p>Metric to optimize</p></dd>
+<dd><p>Metric to optimize, as for <code><a href="tl_tune_grid.html">tl_tune_grid</a></code></p></dd>
 
 
 <dt id="arg-maximize">maximize<a class="anchor" aria-label="anchor" href="#arg-maximize"></a></dt>
 <dd><p>Logical; whether to maximize (TRUE)
-or minimize (FALSE) the metric</p></dd>
+or minimize (FALSE) the metric. <code>NULL</code>, the default, follows the
+metric, as for <code><a href="tl_tune_grid.html">tl_tune_grid</a></code>.</p></dd>
 
 
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
@@ -142,7 +154,9 @@ or minimize (FALSE) the metric</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments passed to tl_model</p></dd>
+<dd><p>Additional arguments passed to <code><a href="tl_model.html">tl_model</a></code> for
+every fold and for the final fit. Per-row arguments are refused, as for
+<code><a href="tl_tune_grid.html">tl_tune_grid</a></code>.</p></dd>
 
 </dl></div>
     <div class="section level2">

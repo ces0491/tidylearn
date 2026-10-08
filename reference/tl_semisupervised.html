@@ -9,7 +9,7 @@ and propagating labels within clusters."><meta property="og:image" content="http
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -54,7 +54,8 @@ and propagating labels within clusters.</p>
 <span>  <span class="va">labeled_indices</span>,</span>
 <span>  cluster_method <span class="op">=</span> <span class="st">"kmeans"</span>,</span>
 <span>  supervised_method <span class="op">=</span> <span class="st">"tree"</span>,</span>
-<span>  <span class="va">...</span></span>
+<span>  <span class="va">...</span>,</span>
+<span>  cluster_args <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -67,8 +68,13 @@ and propagating labels within clusters.</p>
 
 
 <dt id="arg-formula">formula<a class="anchor" aria-label="anchor" href="#arg-formula"></a></dt>
-<dd><p>Model formula. The response must be a factor, character
-or logical column.</p></dd>
+<dd><p>Model formula. The response must be categorical: a
+factor, character or logical column, or an expression that computes a
+factor or character vector from a column, such as <code>factor(am)</code> or
+<code>factor(mpg &gt; 20)</code>. For an expression, each row's propagated label
+is written to that column as its value in a labelled row of the same
+class. An expression that then computes other labels, such as
+<code>cut(mpg, 2)</code>, whose breaks follow the column's range, is refused.</p></dd>
 
 
 <dt id="arg-labeled-indices">labeled_indices<a class="anchor" aria-label="anchor" href="#arg-labeled-indices"></a></dt>
@@ -76,7 +82,9 @@ or logical column.</p></dd>
 
 
 <dt id="arg-cluster-method">cluster_method<a class="anchor" aria-label="anchor" href="#arg-cluster-method"></a></dt>
-<dd><p>Clustering method for label propagation</p></dd>
+<dd><p>Clustering method for label propagation:
+<code>"kmeans"</code> (default), <code>"pam"</code>, <code>"clara"</code> or
+<code>"hclust"</code>, whose tree is cut at k</p></dd>
 
 
 <dt id="arg-supervised-method">supervised_method<a class="anchor" aria-label="anchor" href="#arg-supervised-method"></a></dt>
@@ -87,7 +95,13 @@ than two levels.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments</p></dd>
+<dd><p>Additional arguments for the supervised model</p></dd>
+
+
+<dt id="arg-cluster-args">cluster_args<a class="anchor" aria-label="anchor" href="#arg-cluster-args"></a></dt>
+<dd><p>A named list of arguments for the clustering step,
+such as <code>list(nstart = 5)</code> for k-means. k is set from the
+labelled classes and cannot be given here.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -96,15 +110,20 @@ than two levels.</p></dd>
 <code>"tidylearn_semisupervised"</code>, trained on pseudo-labeled data. The
 model includes a <code>semisupervised_info</code> element with
 <code>labeled_indices</code>, <code>cluster_model</code>, <code>label_mapping</code>,
-and <code>n_unlabelled_dropped</code>, the number of rows left out because
-their cluster had no labelled observation.</p>
+and <code>n_unlabelled_dropped</code>, the number of rows left out for
+having no label to train on.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>Labels are propagated by majority vote within each cluster, so the
-response must be categorical. Rows in a cluster that holds no labelled
-observation have no label to take; they are left out of training, with
-a warning giving the count.</p>
+response must be categorical. The rows are clustered on the predictors
+the formula names, into as many clusters as the labelled rows hold
+classes. A labelled row whose label is missing takes no part in the
+vote. Rows in a cluster where no labelled observation carries a label
+have no label to take, and labelled rows whose own label is missing
+have none either; both are left out of training, with a warning giving
+the counts. The pseudo-labels keep the response's level order, so the
+second level stays the positive class.</p>
     </div>
 
     <div class="section level2">

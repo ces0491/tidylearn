@@ -27,11 +27,13 @@ tl_check_gpu()
 
 [`tl_check_gpu()`](https://tidylearn.sheetsolved.com/reference/tl_check_gpu.md)
 parses `nvidia-smi` and checks which GPU-capable backends are installed.
-It is cheap by design: it does not load Python, import TensorFlow, or
-fit anything. It returns an object with a
+It is cheap by design: it reads which packages are installed from the
+library without loading them, so it does not start Python, import
+TensorFlow, or fit anything, and it gives `nvidia-smi` 10 seconds to
+answer before warning and reporting no GPU. It returns an object with a
 [`print()`](https://rdrr.io/r/base/print.html) method describing the
-CUDA driver, the devices found, and which of xgboost, keras, tensorflow
-and torch are installed.
+CUDA driver, the devices found, and which of xgboost, keras and
+tensorflow are installed.
 
 ## Only two methods have a GPU path
 

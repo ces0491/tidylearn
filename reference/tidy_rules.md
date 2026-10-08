@@ -16,8 +16,13 @@ tidy_rules(rules)
 
 ## Value
 
-A tibble with columns `rule_id`, `lhs`, `rhs`, and quality measures
-(e.g., `support`, `confidence`, `lift`).
+A tibble with columns `rule_id`, `lhs`, `rhs`, the quality measures
+(e.g., `support`, `confidence`, `lift`), and the list columns
+`lhs_items` and `rhs_items`, each rule's items on that side as a
+character vector. The `lhs` and `rhs` labels are for reading; the
+helpers that match items read the lists, since an item name can hold the
+comma that separates items in a label. An empty rule set gives a
+zero-row tibble with the same columns.
 
 ## Examples
 

@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -68,7 +68,18 @@
 
 
 <dt id="arg-preprocessing">preprocessing<a class="anchor" aria-label="anchor" href="#arg-preprocessing"></a></dt>
-<dd><p>A list of preprocessing steps</p></dd>
+<dd><p>A named list of preprocessing switches, each
+<code>TRUE</code> or <code>FALSE</code>: <code>impute_missing</code> (default
+<code>TRUE</code>) replaces missing predictor values with the training
+median or mode; <code>standardize</code> (default <code>TRUE</code>) centres and
+scales numeric predictors where that leaves the model the formula
+describes unchanged. It leaves alone any column the formula uses
+inside a function call such as <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">log()</a></code>, <code><a href="https://rdrr.io/r/stats/poly.html" class="external-link">poly()</a></code> or
+<code><a href="https://rdrr.io/r/stats/offset.html" class="external-link">offset()</a></code>, every column when the formula has no intercept, and
+the columns of an interaction whose lower-order terms are not all in
+the formula; <code>dummy_encode</code> (default <code>TRUE</code>) only records that
+categorical predictors are encoded by each model's fitting function,
+and cannot be set to <code>FALSE</code>.</p></dd>
 
 
 <dt id="arg-models">models<a class="anchor" aria-label="anchor" href="#arg-models"></a></dt>
@@ -80,7 +91,8 @@
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments</p></dd>
+<dd><p>Not used. Anything passed here is an error, so a misspelt
+argument such as <code>evalution</code> is reported rather than ignored.</p></dd>
 
 </dl></div>
     <div class="section level2">

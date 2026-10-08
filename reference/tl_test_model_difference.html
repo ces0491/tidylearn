@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -66,7 +66,12 @@
 
 
 <dt id="arg-test">test<a class="anchor" aria-label="anchor" href="#arg-test"></a></dt>
-<dd><p>Type of statistical test: "t.test" or "wilcox"</p></dd>
+<dd><p>Type of statistical test: <code>"t.test"</code>, a paired t-test,
+or <code>"wilcox"</code>, a paired Wilcoxon signed-rank test
+(<code>"wilcox.test"</code> is read as <code>"wilcox"</code>). With no tied or zero
+differences the signed-rank test is exact, and the smallest two-sided
+p-value it can give for <code>n</code> folds is <code>2 / 2^n</code>: 0.0625 for 5
+folds, so it needs at least 6 to reach <code>p &lt; 0.05</code>.</p></dd>
 
 
 <dt id="arg-metric">metric<a class="anchor" aria-label="anchor" href="#arg-metric"></a></dt>
@@ -78,7 +83,10 @@
     <p>A data frame with columns <code>metric</code>, <code>model</code>,
 <code>baseline</code>, <code>mean_diff</code>, <code>p_value</code>, and
 <code>p_adj</code> (Holm-adjusted p-value) containing pairwise
-statistical comparisons against the baseline model.</p>
+statistical comparisons against the baseline model. Each comparison
+pairs the folds both models have a value for, and <code>mean_diff</code> is
+the mean of those paired differences. With fewer than two such folds
+the p-values are <code>NA</code>, with a warning.</p>
     </div>
 
     <div class="section level2">
@@ -88,8 +96,8 @@ statistical comparisons against the baseline model.</p>
 <span class="r-in"><span><span class="va">m2</span> <span class="op">&lt;-</span> <span class="fu"><a href="tl_model.html">tl_model</a></span><span class="op">(</span><span class="va">mtcars</span>, <span class="va">mpg</span> <span class="op">~</span> <span class="va">wt</span> <span class="op">+</span> <span class="va">hp</span>, method <span class="op">=</span> <span class="st">"linear"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">cv</span> <span class="op">&lt;-</span> <span class="fu"><a href="tl_compare_cv.html">tl_compare_cv</a></span><span class="op">(</span><span class="va">mtcars</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>simple <span class="op">=</span> <span class="va">m1</span>, full <span class="op">=</span> <span class="va">m2</span><span class="op">)</span>, folds <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">tl_test_model_difference</span><span class="op">(</span><span class="va">cv</span>, baseline_model <span class="op">=</span> <span class="st">"simple"</span>, metric <span class="op">=</span> <span class="st">"rmse"</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   metric model baseline  mean_diff    p_value      p_adj</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1   rmse  full   simple -0.3658751 0.05733879 0.05733879</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   metric model baseline  mean_diff   p_value     p_adj</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1   rmse  full   simple -0.1629699 0.4643829 0.4643829</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

@@ -16,7 +16,12 @@ suggest_eps(data, minPts = 5, method = "percentile", percentile = 0.95)
 
 - minPts:
 
-  Minimum points parameter (used as k for k-NN)
+  The `minPts` you will pass to
+  [`tidy_dbscan`](https://tidylearn.sheetsolved.com/reference/tidy_dbscan.md)
+  (default: 5). The k-NN distance is read at `k = minPts - 1`, the
+  neighbours a core point needs besides itself, as
+  [`kNNdistplot`](http://michael.hahsler.net/dbscan/reference/kNNdist.md)
+  does.
 
 - method:
 
@@ -41,5 +46,5 @@ A list containing:
 ``` r
 eps_info <- suggest_eps(iris, minPts = 5)
 eps_info$eps
-#> [1] 0.75757
+#> [1] 0.7179749
 ```

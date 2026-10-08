@@ -27,7 +27,8 @@ tl_auto_interactions(
 
 - top_n:
 
-  Number of top interactions to return
+  Number of top interactions to return, a whole number. With `0` none is
+  added.
 
 - min_r2_change:
 
@@ -48,7 +49,11 @@ tl_auto_interactions(
 A tidylearn model object (class `"tidylearn_model"`) fitted with the top
 significant interaction terms added to the formula. The interaction test
 results and selected interactions are stored as attributes
-`"interaction_tests"` and `"selected_interactions"`.
+`"interaction_tests"` and `"selected_interactions"`, data frames in the
+layout
+[`tl_test_interactions`](https://tidylearn.sheetsolved.com/reference/tl_test_interactions.md)
+returns. Both are present when no interaction is added, with no rows
+where there is nothing to report.
 
 ## Examples
 

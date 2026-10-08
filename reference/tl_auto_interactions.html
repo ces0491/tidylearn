@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -68,7 +68,8 @@
 
 
 <dt id="arg-top-n">top_n<a class="anchor" aria-label="anchor" href="#arg-top-n"></a></dt>
-<dd><p>Number of top interactions to return</p></dd>
+<dd><p>Number of top interactions to return, a whole number. With
+<code>0</code> none is added.</p></dd>
 
 
 <dt id="arg-min-r-change">min_r2_change<a class="anchor" aria-label="anchor" href="#arg-min-r-change"></a></dt>
@@ -91,7 +92,9 @@ Every name must be a predictor in <code>formula</code>.</p></dd>
 with the top significant interaction terms added to the formula.
 The interaction test results and selected interactions are stored as
 attributes <code>"interaction_tests"</code> and
-<code>"selected_interactions"</code>.</p>
+<code>"selected_interactions"</code>, data frames in the layout
+<code><a href="tl_test_interactions.html">tl_test_interactions</a></code> returns. Both are present when no
+interaction is added, with no rows where there is nothing to report.</p>
     </div>
 
     <div class="section level2">

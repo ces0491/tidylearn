@@ -16,11 +16,13 @@ tl_plot_svm_boundary(model, x_var = NULL, y_var = NULL, grid_size = 100, ...)
 
 - x_var:
 
-  Name of the x-axis variable
+  Name of the x-axis variable. Defaults to the first numeric predictor
+  in the model's formula.
 
 - y_var:
 
-  Name of the y-axis variable
+  Name of the y-axis variable. Defaults to the next numeric predictor in
+  the model's formula.
 
 - grid_size:
 
@@ -33,7 +35,9 @@ tl_plot_svm_boundary(model, x_var = NULL, y_var = NULL, grid_size = 100, ...)
 ## Value
 
 A [`ggplot`](https://ggplot2.tidyverse.org/reference/ggplot.html)
-object.
+object. The other predictors are held at their mean, or their most
+frequent level. A two-class model fitted with probabilities also gets
+the 0.5 probability contour.
 
 ## Examples
 

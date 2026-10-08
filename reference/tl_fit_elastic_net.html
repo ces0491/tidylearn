@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -79,8 +79,8 @@ Elastic Net)</p></dd>
 
 
 <dt id="arg-lambda">lambda<a class="anchor" aria-label="anchor" href="#arg-lambda"></a></dt>
-<dd><p>Regularization parameter (if NULL, uses
-cross-validation to select)</p></dd>
+<dd><p>Regularization parameter: a single penalty, or NULL or a
+sequence of penalties for cross-validation to choose from</p></dd>
 
 
 <dt id="arg-cv-folds">cv_folds<a class="anchor" aria-label="anchor" href="#arg-cv-folds"></a></dt>
@@ -89,7 +89,7 @@ cross-validation to select)</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments to pass to glmnet()</p></dd>
+<dd><p>Additional arguments to pass to glmnet() or cv.glmnet()</p></dd>
 
 </dl></div>
     <div class="section level2">

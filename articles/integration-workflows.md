@@ -337,12 +337,11 @@ stratified_models <- tl_stratified_models(mtcars, mpg ~ .,
                                           k = 3,
                                           supervised_method = "linear")
 #> Note: Response 'mpg' has 6 unique numeric values. Treating as regression. Convert to factor for classification.
-#> Note: Response 'mpg' has 8 unique numeric values. Treating as regression. Convert to factor for classification.
 
 # Check structure
 names(stratified_models)
-#> [1] "cluster_model"     "supervised_models" "formula"          
-#> [4] "data"
+#> [1] "cluster_model"         "clusters"              "supervised_models"    
+#> [4] "single_class_clusters" "formula"               "data"
 length(stratified_models$supervised_models)
 #> [1] 3
 ```

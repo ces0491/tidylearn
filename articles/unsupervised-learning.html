@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -83,7 +83,11 @@
 <span><span class="co">#&gt; The following objects are masked from 'package:base':</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;     intersect, setdiff, setequal, union</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span></code></pre></div>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># k-means, CLARA and the gap statistic start from random draws. Seeding once</span></span>
+<span><span class="co"># here makes the whole page reproduce when run from the top.</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">42</span><span class="op">)</span></span></code></pre></div>
 <div class="section level2">
 <h2 id="two-ways-in">Two Ways In<a class="anchor" aria-label="anchor" href="#two-ways-in"></a>
 </h2>
@@ -274,7 +278,7 @@ their own if that is all you need:</p>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span>     3         78.9</span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span>     4         57.2</span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span>     5         46.4</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span>     6         39.0</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span>     6         39.1</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="k-means">K-means<a class="anchor" aria-label="anchor" href="#k-means"></a>
@@ -285,24 +289,24 @@ their own if that is all you need:</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 3 × 5</span></span></span>
 <span><span class="co">#&gt;   cluster Sepal.Length Sepal.Width Petal.Length Petal.Width</span></span>
 <span><span class="co">#&gt;     <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>        <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>        <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span>       1         5.90        2.75         4.39       1.43 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span>       1         5.01        3.43         1.46       0.246</span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span>       2         6.85        3.07         5.74       2.07 </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span>       3         5.01        3.43         1.46       0.246</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span>       3         5.90        2.75         4.39       1.43</span></span></code></pre></div>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">km</span><span class="op">$</span><span class="va">clusters</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 150 × 2</span></span></span>
 <span><span class="co">#&gt;    .obs_id cluster</span></span>
 <span><span class="co">#&gt;    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;int&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> 1             3</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> 2             3</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> 3             3</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> 4             3</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> 5             3</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> 6             3</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> 7             3</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> 8             3</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span> 9             3</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> 10            3</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> 1             1</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> 2             1</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> 3             1</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> 4             1</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> 5             1</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> 6             1</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> 7             1</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> 8             1</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span> 9             1</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> 10            1</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># ℹ 140 more rows</span></span></span></code></pre></div>
 <p><code><a href="../reference/augment_kmeans.html">augment_kmeans()</a></code> puts the assignment back on the
 data:</p>
@@ -311,9 +315,9 @@ data:</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span>Cluster <span class="op">=</span> <span class="va">iris_clustered</span><span class="op">$</span><span class="va">cluster</span>, Species <span class="op">=</span> <span class="va">iris_clustered</span><span class="op">$</span><span class="va">Species</span><span class="op">)</span></span>
 <span><span class="co">#&gt;        Species</span></span>
 <span><span class="co">#&gt; Cluster setosa versicolor virginica</span></span>
-<span><span class="co">#&gt;       1      0         48        14</span></span>
+<span><span class="co">#&gt;       1     50          0         0</span></span>
 <span><span class="co">#&gt;       2      0          2        36</span></span>
-<span><span class="co">#&gt;       3     50          0         0</span></span></code></pre></div>
+<span><span class="co">#&gt;       3      0         48        14</span></span></code></pre></div>
 <div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_cluster_sizes.html">plot_cluster_sizes</a></span><span class="op">(</span><span class="va">km</span><span class="op">$</span><span class="va">clusters</span><span class="op">$</span><span class="va">cluster</span><span class="op">)</span></span></code></pre></div>
 <p><img src="unsupervised-learning_files/figure-html/unnamed-chunk-22-1.png" class="r-plt" alt="" width="672"></p>
@@ -339,23 +343,25 @@ side.</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 3 × 3</span></span></span>
 <span><span class="co">#&gt;   cluster     n avg_sil_width</span></span>
 <span><span class="co">#&gt;     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span>       1    62         0.417</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span>       1    50         0.798</span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span>       2    38         0.451</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span>       3    50         0.798</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span>       3    62         0.417</span></span></code></pre></div>
 <div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_silhouette.html">plot_silhouette</a></span><span class="op">(</span><span class="va">sil</span><span class="op">)</span></span></code></pre></div>
 <p><img src="unsupervised-learning_files/figure-html/unnamed-chunk-26-1.png" class="r-plt" alt="" width="672"></p>
-<p>Cluster 1 is clean; the other two are the
+<p>The <em>setosa</em> cluster is clean; the other two are the
 <em>versicolor</em>/<em>virginica</em> boundary, and their scores say so
-without needing the labels.</p>
+without needing the labels. k-means numbers its clusters arbitrarily;
+the table above shows which number <em>setosa</em> got.</p>
 <p><code><a href="../reference/calc_validation_metrics.html">calc_validation_metrics()</a></code> collects the summary numbers
 in one row:</p>
 <div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/calc_validation_metrics.html">calc_validation_metrics</a></span><span class="op">(</span><span class="va">km</span><span class="op">$</span><span class="va">clusters</span><span class="op">$</span><span class="va">cluster</span>, <span class="va">iris</span><span class="op">[</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">4</span><span class="op">]</span>, <span class="va">dist_mat</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 1 × 7</span></span></span>
-<span><span class="co">#&gt;       k min_size max_size avg_size avg_silhouette min_silhouette total_wss</span></span>
-<span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span>     3       38       62       50          0.553         0.026<span style="text-decoration: underline;">4</span>      78.9</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 1 × 8</span></span></span>
+<span><span class="co">#&gt;       k min_size max_size avg_size n_noise avg_silhouette min_silhouette</span></span>
+<span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span>     3       38       62       50       0          0.553         0.026<span style="text-decoration: underline;">4</span></span></span>
+<span><span class="co">#&gt; <span style="color: #949494;"># ℹ 1 more variable: total_wss &lt;dbl&gt;</span></span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
@@ -439,8 +445,10 @@ distances:</p>
 <span><span class="op">}</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   single  average complete  ward.D2 </span></span>
 <span><span class="co">#&gt;       98       64       72       64</span></span></code></pre></div>
-<p>Single linkage chains, so it puts almost everything in one cluster.
-That is a property of the linkage, not a finding about irises.</p>
+<p>Single linkage chains: its largest cluster takes 98 of the 150 rows,
+all of <em>versicolor</em> and nearly all of <em>virginica</em>, and
+leaves two rows as a cluster of their own. That is a property of the
+linkage, not a finding about irises.</p>
 </div>
 <div class="section level2">
 <h2 id="dbscan">DBSCAN<a class="anchor" aria-label="anchor" href="#dbscan"></a>
@@ -448,13 +456,15 @@ That is a property of the linkage, not a finding about irises.</p>
 <p>DBSCAN finds arbitrarily shaped clusters and labels sparse points as
 noise. It needs <code>eps</code> (the neighbourhood radius) and
 <code>minPts</code>. Rather than guessing, <code><a href="../reference/suggest_eps.html">suggest_eps()</a></code>
-reads it off the k-nearest-neighbour distance curve.</p>
+reads it off the k-nearest-neighbour distance curve, at
+<code>k = minPts - 1</code> because a core point’s <code>minPts</code>
+includes the point itself.</p>
 <div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">eps_suggestion</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/suggest_eps.html">suggest_eps</a></span><span class="op">(</span><span class="va">iris</span><span class="op">[</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">4</span><span class="op">]</span>, minPts <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
 <span><span class="va">eps_suggestion</span><span class="op">$</span><span class="va">eps</span></span>
-<span><span class="co">#&gt; [1] 0.75757</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 0.7179749</span></span></code></pre></div>
 <div class="sourceCode" id="cb38"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_knn_dist.html">plot_knn_dist</a></span><span class="op">(</span><span class="va">iris</span><span class="op">[</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">4</span><span class="op">]</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_knn_dist.html">plot_knn_dist</a></span><span class="op">(</span><span class="va">iris</span><span class="op">[</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">4</span><span class="op">]</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span></code></pre></div>
 <p><img src="unsupervised-learning_files/figure-html/unnamed-chunk-38-1.png" class="r-plt" alt="" width="672"></p>
 <p>The elbow in that curve is where points stop having close neighbours,
 which is the radius you want.</p>
@@ -463,15 +473,15 @@ which is the radius you want.</p>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>clusters <span class="op">=</span> <span class="va">db</span><span class="op">$</span><span class="va">n_clusters</span>, noise <span class="op">=</span> <span class="va">db</span><span class="op">$</span><span class="va">n_noise</span><span class="op">)</span></span>
 <span><span class="co">#&gt; clusters    noise </span></span>
-<span><span class="co">#&gt;        2        2</span></span></code></pre></div>
+<span><span class="co">#&gt;        2        3</span></span></code></pre></div>
 <div class="sourceCode" id="cb40"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">db_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/augment_dbscan.html">augment_dbscan</a></span><span class="op">(</span><span class="va">db</span>, <span class="va">iris</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span>Cluster <span class="op">=</span> <span class="va">db_data</span><span class="op">$</span><span class="va">cluster</span>, Species <span class="op">=</span> <span class="va">db_data</span><span class="op">$</span><span class="va">Species</span><span class="op">)</span></span>
 <span><span class="co">#&gt;        Species</span></span>
 <span><span class="co">#&gt; Cluster setosa versicolor virginica</span></span>
-<span><span class="co">#&gt;       0      0          0         2</span></span>
+<span><span class="co">#&gt;       0      0          0         3</span></span>
 <span><span class="co">#&gt;       1     50          0         0</span></span>
-<span><span class="co">#&gt;       2      0         50        48</span></span></code></pre></div>
+<span><span class="co">#&gt;       2      0         50        47</span></span></code></pre></div>
 <p>Cluster 0 is noise, not a cluster.</p>
 <p><code><a href="../reference/explore_dbscan_params.html">explore_dbscan_params()</a></code> sweeps the two parameters
 together, which is more informative than tuning either alone:</p>
@@ -556,13 +566,13 @@ same data side by side.</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">comparison</span></span>
-<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 4 × 8</span></span></span>
-<span><span class="co">#&gt;   method     k min_size max_size avg_size avg_silhouette min_silhouette</span></span>
-<span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> kmeans     3       38       62       50          0.553         0.026<span style="text-decoration: underline;">4</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> pam        3       38       62       50          0.553         0.026<span style="text-decoration: underline;">4</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> hclust     3       36       64       50          0.554        -<span style="color: #BB0000;">0.090</span><span style="color: #BB0000; text-decoration: underline;">1</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> dbscan     2        2       98       50          0.512        -<span style="color: #BB0000;">0.639</span> </span></span>
+<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 4 × 9</span></span></span>
+<span><span class="co">#&gt;   method     k min_size max_size avg_size n_noise avg_silhouette min_silhouette</span></span>
+<span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> kmeans     3       38       62     50         0          0.553         0.026<span style="text-decoration: underline;">4</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> pam        3       38       62     50         0          0.553         0.026<span style="text-decoration: underline;">4</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> hclust     3       36       64     50         0          0.554        -<span style="color: #BB0000;">0.090</span><span style="color: #BB0000; text-decoration: underline;">1</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> dbscan     2       50       97     73.5       3          0.694        -<span style="color: #BB0000;">0.137</span> </span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># ℹ 1 more variable: total_wss &lt;dbl&gt;</span></span></span></code></pre></div>
 <div class="sourceCode" id="cb47"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_cluster_comparison.html">plot_cluster_comparison</a></span><span class="op">(</span></span>
@@ -611,8 +621,8 @@ distances are what a cluster looks like here.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span>Cluster <span class="op">=</span> <span class="va">final_data</span><span class="op">$</span><span class="va">cluster</span>, Species <span class="op">=</span> <span class="va">final_data</span><span class="op">$</span><span class="va">Species</span><span class="op">)</span></span>
 <span><span class="co">#&gt;        Species</span></span>
 <span><span class="co">#&gt; Cluster setosa versicolor virginica</span></span>
-<span><span class="co">#&gt;       1     50          0         0</span></span>
-<span><span class="co">#&gt;       2      0         50        50</span></span></code></pre></div>
+<span><span class="co">#&gt;       1      0         50        50</span></span>
+<span><span class="co">#&gt;       2     50          0         0</span></span></code></pre></div>
 <div class="sourceCode" id="cb53"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_clusters.html">plot_clusters</a></span><span class="op">(</span><span class="va">final_data</span>, cluster_col <span class="op">=</span> <span class="st">"cluster"</span>,</span>
 <span>              x_col <span class="op">=</span> <span class="st">"Petal.Length"</span>, y_col <span class="op">=</span> <span class="st">"Petal.Width"</span><span class="op">)</span></span></code></pre></div>

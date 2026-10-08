@@ -4,7 +4,9 @@
 
 Two families turn a fitted model into something publishable.
 [`plot()`](https://rdrr.io/r/graphics/plot.default.html) and the
-`tl_plot_*()` functions return ggplot2 objects;
+`tl_plot_*()` functions return ggplot2 objects, with the exceptions
+listed under [Interactive Reporting with
+plotly](#interactive-reporting-with-plotly);
 [`tl_table()`](https://tidylearn.sheetsolved.com/reference/tl_table.md)
 and the `tl_table_*()` functions return `gt` tables. Both dispatch on
 model type, so the same call covers a forest and a lasso fit, and both
@@ -166,9 +168,9 @@ tl_table_coefficients(model_lasso)
 |----|----|----|
 | lambda = 1.399 (1se) |  |  |
 | Term | Coefficient | \|Coefficient\| |
-| (Intercept) | 33.9411 | 33.9411 |
-| wt | −2.3645 | 2.3645 |
-| cyl | −0.8434 | 0.8434 |
+| (Intercept) | 33.9405 | 33.9405 |
+| wt | −2.3659 | 2.3659 |
+| cyl | −0.8430 | 0.8430 |
 | hp | −0.0070 | 0.0070 |
 | disp | 0.0000 | 0.0000 |
 | drat | 0.0000 | 0.0000 |
@@ -310,9 +312,9 @@ tl_table_comparison(
 
 ## Interactive Reporting with plotly
 
-Every plot function returns a ggplot2 object, so
+Most plot functions return a ggplot2 object, and
 [`ggplotly()`](https://rdrr.io/pkg/plotly/man/ggplotly.html) takes any
-of them without special handling:
+of those without special handling:
 
 ``` r
 
@@ -322,6 +324,35 @@ ggplotly(plot(model_reg, type = "actual_predicted"))
 ggplotly(tidy_pca_biplot(pca, label_obs = TRUE))
 ggplotly(tl_plot_regularization_path(model_lasso))
 ```
+
+These do not return a single ggplot2 object:
+
+- [`plot_dendrogram()`](https://tidylearn.sheetsolved.com/reference/plot_dendrogram.md),
+  which [`plot()`](https://rdrr.io/r/graphics/plot.default.html) uses
+  for an hclust model,
+  [`tl_plot_tree()`](https://tidylearn.sheetsolved.com/reference/tl_plot_tree.md)
+  and
+  [`tl_plot_nn_architecture()`](https://tidylearn.sheetsolved.com/reference/tl_plot_nn_architecture.md)
+  draw with base graphics.
+- [`tl_plot_xgboost_tree()`](https://tidylearn.sheetsolved.com/reference/tl_plot_xgboost_tree.md)
+  returns a DiagrammeR widget,
+  [`tl_plot_deep_architecture()`](https://tidylearn.sheetsolved.com/reference/tl_plot_deep_architecture.md)
+  draws the keras model diagram, and
+  `visualize_rules(method = "paracoord")` draws with grid.
+- [`tl_diagnostic_dashboard()`](https://tidylearn.sheetsolved.com/reference/tl_diagnostic_dashboard.md)
+  and
+  [`plot_cluster_comparison()`](https://tidylearn.sheetsolved.com/reference/plot_cluster_comparison.md)
+  return an arranged grid of panels. `plot(model, type = "diagnostics")`
+  and
+  [`create_cluster_dashboard()`](https://tidylearn.sheetsolved.com/reference/create_cluster_dashboard.md)
+  return a list of ggplot2 objects, which
+  [`ggplotly()`](https://rdrr.io/pkg/plotly/man/ggplotly.html) takes one
+  at a time.
+- [`plot()`](https://rdrr.io/r/graphics/plot.default.html) on a
+  [`tl_explore()`](https://tidylearn.sheetsolved.com/reference/tl_explore.md)
+  result draws its plot and returns the exploration result, and
+  [`tl_dashboard()`](https://tidylearn.sheetsolved.com/reference/tl_dashboard.md)
+  returns a Shiny app.
 
 ## Putting It Together
 
@@ -337,11 +368,11 @@ model <- tl_model(split$train, Species ~ ., method = "forest")
 tl_table_metrics(model, new_data = split$test)
 ```
 
-| Model Evaluation Metrics                                       |        |
-|----------------------------------------------------------------|--------|
-| Metric                                                         | Value  |
-| Accuracy                                                       | 0.9333 |
-| tidylearn \| forest (classification) \| Species ~ . \| n = 105 |        |
+| Model Evaluation Metrics                                      |        |
+|---------------------------------------------------------------|--------|
+| Metric                                                        | Value  |
+| Accuracy                                                      | 0.9333 |
+| tidylearn \| forest (classification) \| Species ~ . \| n = 45 |        |
 
 ``` r
 
@@ -369,5 +400,8 @@ tl_table_importance(model, top_n = 4)
 | Sepal.Width                                                    | 13.44      |
 | tidylearn \| forest (classification) \| Species ~ . \| n = 105 |            |
 
-Swap `method = "forest"` for `method = "tree"` or `method = "svm"` and
-the reporting code above works without modification.
+Swap `method = "forest"` for `method = "tree"` and the reporting code
+above works without modification.
+[`tl_table_importance()`](https://tidylearn.sheetsolved.com/reference/tl_table_importance.md)
+covers the tree-based and regularised methods only, so for a method such
+as `"svm"` or `"nn"`, leave out the last call.

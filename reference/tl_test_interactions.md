@@ -27,7 +27,9 @@ tl_test_interactions(
 - formula:
 
   A formula specifying the base model without interactions, or a string
-  that parses as one. `.` and `- var` are expanded against `data`.
+  that parses as one. `.` and `- var` are expanded against `data`. The
+  models are fitted with [`lm()`](https://rdrr.io/r/stats/lm.html), so
+  the response must be numeric or logical.
 
 - var1:
 

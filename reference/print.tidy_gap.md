@@ -36,8 +36,8 @@ print(gap)
 #> 
 #> Alternative methods:
 #>   firstSEmax: k = 4 (most conservative)
-#>   globalmax:  k = 6 (middle ground)
-#>   firstmax:   k = 6 (most liberal)
+#>   firstmax:   k = 6 (middle ground)
+#>   globalmax:  k = 6 (most liberal)
 #> 
 #> Gap Statistics (first 10):
 #> # A tibble: 6 × 5

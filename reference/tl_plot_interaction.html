@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,7 +77,9 @@
 
 
 <dt id="arg-fixed-values">fixed_values<a class="anchor" aria-label="anchor" href="#arg-fixed-values"></a></dt>
-<dd><p>Named list of values for other variables in the model</p></dd>
+<dd><p>Named list of values for other variables in the
+model. A variable not named is held at its median if it is numeric, and
+otherwise at its most frequent value, a tie going to the earlier level.</p></dd>
 
 
 <dt id="arg-confidence">confidence<a class="anchor" aria-label="anchor" href="#arg-confidence"></a></dt>
@@ -97,7 +99,12 @@ response scale. For any other fit a message says no band was drawn.</p></dd>
     <p>A <code><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></code> object. Two numeric variables are
 drawn as a filled contour of the prediction; a numeric and a categorical
 variable as one line per category; two categorical variables as dodged
-bars.</p>
+bars. A factor, character or logical variable is categorical, and only
+the values the data holds are drawn. For a classification model the
+prediction is the probability of the second class, so the response
+must have two classes. The plot's data holds the prediction in a column
+named <code>prediction</code>, and a band in <code>.lower</code> and <code>.upper</code>,
+so a model variable with one of those names is refused.</p>
     </div>
 
     <div class="section level2">

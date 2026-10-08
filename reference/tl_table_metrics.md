@@ -29,7 +29,8 @@ tl_table_metrics(model, new_data = NULL, digits = 4, ...)
 
 ## Value
 
-A [`gt`](https://gt.rstudio.com/reference/gt.html) table object.
+A [`gt`](https://gt.rstudio.com/reference/gt.html) table object. Its
+source note counts the rows scored.
 
 ## Examples
 

@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -386,12 +386,11 @@ fit to be estimable.</p>
 <span>                                          k <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>                                          supervised_method <span class="op">=</span> <span class="st">"linear"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Note: Response 'mpg' has 6 unique numeric values. Treating as regression. Convert to factor for classification.</span></span>
-<span><span class="co">#&gt; Note: Response 'mpg' has 8 unique numeric values. Treating as regression. Convert to factor for classification.</span></span>
 <span></span>
 <span><span class="co"># Check structure</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">stratified_models</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "cluster_model"     "supervised_models" "formula"          </span></span>
-<span><span class="co">#&gt; [4] "data"</span></span>
+<span><span class="co">#&gt; [1] "cluster_model"         "clusters"              "supervised_models"    </span></span>
+<span><span class="co">#&gt; [4] "single_class_clusters" "formula"               "data"</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">stratified_models</span><span class="op">$</span><span class="va">supervised_models</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 3</span></span></code></pre></div>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">

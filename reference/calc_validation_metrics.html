@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -53,11 +53,15 @@
 
 
 <dl><dt id="arg-clusters">clusters<a class="anchor" aria-label="anchor" href="#arg-clusters"></a></dt>
-<dd><p>Vector of cluster assignments</p></dd>
+<dd><p>Vector of cluster assignments: numeric, factor or
+character. A label of 0 marks noise, as <code><a href="tidy_dbscan.html">tidy_dbscan</a></code>
+reports it: noise points are left out of every measure and counted in
+<code>n_noise</code>.</p></dd>
 
 
 <dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
-<dd><p>Original data frame (for WSS calculation)</p></dd>
+<dd><p>Original data frame (for WSS calculation). WSS is taken
+over its numeric columns, so it needs at least one.</p></dd>
 
 
 <dt id="arg-dist-mat">dist_mat<a class="anchor" aria-label="anchor" href="#arg-dist-mat"></a></dt>
@@ -67,9 +71,10 @@
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A single-row tibble with columns <code>k</code>, <code>min_size</code>,
-<code>max_size</code>, <code>avg_size</code>, and optionally <code>avg_silhouette</code>,
-<code>min_silhouette</code> (if <code>dist_mat</code> provided), and <code>total_wss</code>
-(if <code>data</code> provided).</p>
+<code>max_size</code>, <code>avg_size</code>, <code>n_noise</code>, and optionally
+<code>avg_silhouette</code>, <code>min_silhouette</code> (if <code>dist_mat</code>
+provided; <code>NA</code> for a single cluster), and <code>total_wss</code> (if
+<code>data</code> provided).</p>
     </div>
 
     <div class="section level2">

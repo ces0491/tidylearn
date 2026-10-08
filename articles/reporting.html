@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,11 +77,11 @@
 </h2>
 <p>Two families turn a fitted model into something publishable.
 <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> and the <code>tl_plot_*()</code> functions return
-ggplot2 objects; <code><a href="../reference/tl_table.html">tl_table()</a></code> and the
-<code>tl_table_*()</code> functions return <code>gt</code> tables. Both
-dispatch on model type, so the same call covers a forest and a lasso
-fit, and both hand back an object you can keep editing rather than
-printed output you cannot.</p>
+ggplot2 objects, with the exceptions listed under <a href="#interactive-reporting-with-plotly">Interactive Reporting with
+plotly</a>; <code><a href="../reference/tl_table.html">tl_table()</a></code> and the <code>tl_table_*()</code>
+functions return <code>gt</code> tables. Both dispatch on model type, so
+the same call covers a forest and a lasso fit, and both hand back an
+object you can keep editing rather than printed output you cannot.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://tidylearn.sheetsolved.com">tidylearn</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://dplyr.tidyverse.org" class="external-link">dplyr</a></span><span class="op">)</span></span>
@@ -2124,18 +2124,18 @@ here rather than a column of <code>NA</code>:</p>
 <tbody class="gt_table_body">
 <tr>
 <td headers="term" class="gt_row gt_left">(Intercept)</td>
-<td headers="estimate" class="gt_row gt_right">33.9411</td>
-<td headers="abs_estimate" class="gt_row gt_right">33.9411</td>
+<td headers="estimate" class="gt_row gt_right">33.9405</td>
+<td headers="abs_estimate" class="gt_row gt_right">33.9405</td>
 </tr>
 <tr>
 <td headers="term" class="gt_row gt_left gt_striped">wt</td>
-<td headers="estimate" class="gt_row gt_right gt_striped">−2.3645</td>
-<td headers="abs_estimate" class="gt_row gt_right gt_striped">2.3645</td>
+<td headers="estimate" class="gt_row gt_right gt_striped">−2.3659</td>
+<td headers="abs_estimate" class="gt_row gt_right gt_striped">2.3659</td>
 </tr>
 <tr>
 <td headers="term" class="gt_row gt_left">cyl</td>
-<td headers="estimate" class="gt_row gt_right">−0.8434</td>
-<td headers="abs_estimate" class="gt_row gt_right">0.8434</td>
+<td headers="estimate" class="gt_row gt_right">−0.8430</td>
+<td headers="abs_estimate" class="gt_row gt_right">0.8430</td>
 </tr>
 <tr>
 <td headers="term" class="gt_row gt_left gt_striped">hp</td>
@@ -2689,7 +2689,7 @@ the diagonal:</p>
 </tr>
 </tbody>
 <tfoot><tr class="gt_sourcenotes">
-<td class="gt_sourcenote" colspan="4">tidylearn | forest (classification) | Species ~ . | n = 105</td>
+<td class="gt_sourcenote" colspan="4">tidylearn | forest (classification) | Species ~ . | n = 45</td>
     </tr></tfoot>
 </table>
 </div>
@@ -5196,14 +5196,36 @@ negative loadings:</p>
 <div class="section level2">
 <h2 id="interactive-reporting-with-plotly">Interactive Reporting with plotly<a class="anchor" aria-label="anchor" href="#interactive-reporting-with-plotly"></a>
 </h2>
-<p>Every plot function returns a ggplot2 object, so
-<code><a href="https://rdrr.io/pkg/plotly/man/ggplotly.html" class="external-link">ggplotly()</a></code> takes any of them without special handling:</p>
+<p>Most plot functions return a ggplot2 object, and
+<code><a href="https://rdrr.io/pkg/plotly/man/ggplotly.html" class="external-link">ggplotly()</a></code> takes any of those without special handling:</p>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://plotly-r.com" class="external-link">plotly</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/plotly/man/ggplotly.html" class="external-link">ggplotly</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">model_reg</span>, type <span class="op">=</span> <span class="st">"actual_predicted"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/plotly/man/ggplotly.html" class="external-link">ggplotly</a></span><span class="op">(</span><span class="fu"><a href="../reference/tidy_pca_biplot.html">tidy_pca_biplot</a></span><span class="op">(</span><span class="va">pca</span>, label_obs <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/plotly/man/ggplotly.html" class="external-link">ggplotly</a></span><span class="op">(</span><span class="fu"><a href="../reference/tl_plot_regularization_path.html">tl_plot_regularization_path</a></span><span class="op">(</span><span class="va">model_lasso</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p>These do not return a single ggplot2 object:</p>
+<ul>
+<li>
+<code><a href="../reference/plot_dendrogram.html">plot_dendrogram()</a></code>, which <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> uses for
+an hclust model, <code><a href="../reference/tl_plot_tree.html">tl_plot_tree()</a></code> and
+<code><a href="../reference/tl_plot_nn_architecture.html">tl_plot_nn_architecture()</a></code> draw with base graphics.</li>
+<li>
+<code><a href="../reference/tl_plot_xgboost_tree.html">tl_plot_xgboost_tree()</a></code> returns a DiagrammeR widget,
+<code><a href="../reference/tl_plot_deep_architecture.html">tl_plot_deep_architecture()</a></code> draws the keras model diagram,
+and <code>visualize_rules(method = "paracoord")</code> draws with
+grid.</li>
+<li>
+<code><a href="../reference/tl_diagnostic_dashboard.html">tl_diagnostic_dashboard()</a></code> and
+<code><a href="../reference/plot_cluster_comparison.html">plot_cluster_comparison()</a></code> return an arranged grid of
+panels. <code>plot(model, type = "diagnostics")</code> and
+<code><a href="../reference/create_cluster_dashboard.html">create_cluster_dashboard()</a></code> return a list of ggplot2
+objects, which <code><a href="https://rdrr.io/pkg/plotly/man/ggplotly.html" class="external-link">ggplotly()</a></code> takes one at a time.</li>
+<li>
+<code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> on a <code><a href="../reference/tl_explore.html">tl_explore()</a></code> result draws its
+plot and returns the exploration result, and <code><a href="../reference/tl_dashboard.html">tl_dashboard()</a></code>
+returns a Shiny app.</li>
+</ul>
 </div>
 <div class="section level2">
 <h2 id="putting-it-together">Putting It Together<a class="anchor" aria-label="anchor" href="#putting-it-together"></a>
@@ -5680,7 +5702,7 @@ reporting sections:</p>
 <td headers="value" class="gt_row gt_right">0.9333</td>
 </tr></tbody>
 <tfoot><tr class="gt_sourcenotes">
-<td class="gt_sourcenote" colspan="2">tidylearn | forest (classification) | Species ~ . | n = 105</td>
+<td class="gt_sourcenote" colspan="2">tidylearn | forest (classification) | Species ~ . | n = 45</td>
     </tr></tfoot>
 </table>
 </div>
@@ -6179,8 +6201,10 @@ reporting sections:</p>
 </table>
 </div>
 <p>Swap <code>method = "forest"</code> for <code>method = "tree"</code>
-or <code>method = "svm"</code> and the reporting code above works
-without modification.</p>
+and the reporting code above works without modification.
+<code><a href="../reference/tl_table_importance.html">tl_table_importance()</a></code> covers the tree-based and regularised
+methods only, so for a method such as <code>"svm"</code> or
+<code>"nn"</code>, leave out the last call.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

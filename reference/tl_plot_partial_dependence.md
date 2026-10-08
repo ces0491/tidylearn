@@ -29,7 +29,11 @@ tl_plot_partial_dependence(model, var, n.pts = 20, ...)
 ## Value
 
 A [`ggplot`](https://ggplot2.tidyverse.org/reference/ggplot.html)
-object.
+object. Its data has a `var_value` column and the mean prediction over
+the model's training rows, `y`, at each value. For classification, `y`
+is a mean class probability and a `class` column says which class: the
+positive class (the second level) alone for a two-class model, and every
+class, one line each, for more.
 
 ## Examples
 
@@ -37,30 +41,6 @@ object.
 # \donttest{
 model <- tl_model(mtcars, mpg ~ ., method = "forest")
 tl_plot_partial_dependence(model, var = "wt")
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: argument is not numeric or logical: returning NA
-#> Warning: Removed 20 rows containing missing values or values outside the scale range
-#> (`geom_line()`).
-#> Warning: Removed 20 rows containing missing values or values outside the scale range
-#> (`geom_point()`).
 
 # }
 ```

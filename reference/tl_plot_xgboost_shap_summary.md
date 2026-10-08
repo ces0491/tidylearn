@@ -29,14 +29,15 @@ tl_plot_xgboost_shap_summary(model, data = NULL, top_n = 10, n_samples = 100)
 ## Value
 
 A [`ggplot`](https://ggplot2.tidyverse.org/reference/ggplot.html)
-object.
+object. Features are ranked by mean absolute SHAP value; a multiclass
+model is drawn one panel per class.
 
 ## Examples
 
 ``` r
 # \donttest{
 if (requireNamespace("xgboost", quietly = TRUE)) {
-  model <- tl_model(mtcars, mpg ~ ., method = "xgboost")
+  model <- tl_model(mtcars, mpg ~ ., method = "xgboost", nthread = 2)
   tl_plot_xgboost_shap_summary(model, n_samples = 20)
 }
 

@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -99,12 +99,25 @@ in terminal nodes (default: 10)</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments to pass to gbm()</p></dd>
+<dd><p>Additional arguments to pass to gbm(), including case
+<code>weights</code>. <code>verbose</code>, and for regression
+<code>distribution</code>, replace the defaults used here. An offset is
+refused: predict.gbm() does not add it back.</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A fitted gradient boosting model</p>
+    </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>The distribution follows the response: <code>"gaussian"</code> for
+regression, <code>"bernoulli"</code> for two classes and
+<code>"multinomial"</code> for more. gbm describes its multinomial
+distribution as currently broken, kept only for backwards
+compatibility, and warns to that effect on every multiclass fit. For
+three or more classes, <code>method = "forest"</code> or
+<code>method = "xgboost"</code> are the better supported choices.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

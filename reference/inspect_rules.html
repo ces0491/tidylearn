@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -53,11 +53,13 @@
 
 
 <dl><dt id="arg-rules-obj">rules_obj<a class="anchor" aria-label="anchor" href="#arg-rules-obj"></a></dt>
-<dd><p>A tidy_apriori object or rules object</p></dd>
+<dd><p>A tidy_apriori object, an arules rules or itemsets
+object, or a tibble of rules</p></dd>
 
 
 <dt id="arg-by">by<a class="anchor" aria-label="anchor" href="#arg-by"></a></dt>
-<dd><p>Sort by: "support", "confidence", "lift" (default), "count"</p></dd>
+<dd><p>Sort by: "support", "confidence", "lift" (default), "count".
+Itemsets have no lift, so for them the default sorts by support.</p></dd>
 
 
 <dt id="arg-n">n<a class="anchor" aria-label="anchor" href="#arg-n"></a></dt>
@@ -65,13 +67,15 @@
 
 
 <dt id="arg-decreasing">decreasing<a class="anchor" aria-label="anchor" href="#arg-decreasing"></a></dt>
-<dd><p>Sort in decreasing order? (default: TRUE)</p></dd>
+<dd><p>If TRUE (default), the <code>n</code> rules with the
+highest values of <code>by</code>, highest first; if FALSE, the <code>n</code>
+with the lowest, lowest first, as in arules' <code>head(by = )</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A tibble of the top <code>n</code> rules sorted by the specified quality
-measure.</p>
+    <p>A tibble of the <code>n</code> rules ranked highest (or, with
+<code>decreasing = FALSE</code>, lowest) by the quality measure <code>by</code>.</p>
     </div>
 
     <div class="section level2">
@@ -82,35 +86,15 @@ measure.</p>
 <span class="r-in"><span>  <span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="tidy_apriori.html">tidy_apriori</a></span><span class="op">(</span><span class="va">Groceries</span>, support <span class="op">=</span> <span class="fl">0.001</span>, confidence <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="fu">inspect_rules</span><span class="op">(</span><span class="va">res</span>, by <span class="op">=</span> <span class="st">"lift"</span>, n <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Apriori</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Parameter specification:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  confidence minval smax arem  aval originalSupport maxtime support minlen</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         0.5    0.1    1 none FALSE            TRUE       5   0.001      2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  maxlen target  ext</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      10  rules TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Algorithmic control:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  filter tree heap memopt load sort verbose</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Absolute minimum support count: 9 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> set item appearances ...[0 item(s)] done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sorting and recoding items ... [157 item(s)] done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> creating transaction tree ... done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> checking subsets of size 1 2 3 4 5 6 done [0.01s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> writing ... [5668 rule(s)] done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> creating S4 object  ... done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 5 × 8</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   rule_id lhs                      rhs   support confidence coverage  lift count</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span>      53 {Instant food products,… {ham… 0.001<span style="text-decoration: underline;">22</span>      0.632  0.001<span style="text-decoration: underline;">93</span>  19.0    12</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span>      37 {soda,popcorn}           {sal… 0.001<span style="text-decoration: underline;">22</span>      0.632  0.001<span style="text-decoration: underline;">93</span>  16.7    12</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span>     444 {flour,baking powder}    {sug… 0.001<span style="text-decoration: underline;">02</span>      0.556  0.001<span style="text-decoration: underline;">83</span>  16.4    10</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span>     327 {ham,processed cheese}   {whi… 0.001<span style="text-decoration: underline;">93</span>      0.633  0.003<span style="text-decoration: underline;">05</span>  15.0    19</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">5</span>      55 {whole milk,Instant foo… {ham… 0.001<span style="text-decoration: underline;">53</span>      0.5    0.003<span style="text-decoration: underline;">05</span>  15.0    15</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 5 × 10</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   rule_id lhs            rhs   support confidence coverage  lift count lhs_items</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;list&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span>      53 {Instant food… {ham… 0.001<span style="text-decoration: underline;">22</span>      0.632  0.001<span style="text-decoration: underline;">93</span>  19.0    12 <span style="color: #949494;">&lt;chr [2]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span>      37 {soda,popcorn} {sal… 0.001<span style="text-decoration: underline;">22</span>      0.632  0.001<span style="text-decoration: underline;">93</span>  16.7    12 <span style="color: #949494;">&lt;chr [2]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span>     444 {flour,baking… {sug… 0.001<span style="text-decoration: underline;">02</span>      0.556  0.001<span style="text-decoration: underline;">83</span>  16.4    10 <span style="color: #949494;">&lt;chr [2]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span>     327 {ham,processe… {whi… 0.001<span style="text-decoration: underline;">93</span>      0.633  0.003<span style="text-decoration: underline;">05</span>  15.0    19 <span style="color: #949494;">&lt;chr [2]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">5</span>      55 {whole milk,I… {ham… 0.001<span style="text-decoration: underline;">53</span>      0.5    0.003<span style="text-decoration: underline;">05</span>  15.0    15 <span style="color: #949494;">&lt;chr [2]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 1 more variable: rhs_items &lt;list&gt;</span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>

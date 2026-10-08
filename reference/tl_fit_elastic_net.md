@@ -36,7 +36,8 @@ tl_fit_elastic_net(
 
 - lambda:
 
-  Regularization parameter (if NULL, uses cross-validation to select)
+  Regularization parameter: a single penalty, or NULL or a sequence of
+  penalties for cross-validation to choose from
 
 - cv_folds:
 
@@ -44,7 +45,7 @@ tl_fit_elastic_net(
 
 - ...:
 
-  Additional arguments to pass to glmnet()
+  Additional arguments to pass to glmnet() or cv.glmnet()
 
 ## Value
 

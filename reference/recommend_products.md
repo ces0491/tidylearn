@@ -12,7 +12,10 @@ recommend_products(rules_obj, basket, top_n = 5, min_confidence = 0.5)
 
 - rules_obj:
 
-  A tidy_apriori object
+  A tidy_apriori object, an arules rules object, or a tibble of rules
+  from
+  [`tidy_rules`](https://tidylearn.sheetsolved.com/reference/tidy_rules.md),
+  which must keep its `lhs_items` and `rhs_items` columns
 
 - basket:
 
@@ -29,7 +32,9 @@ recommend_products(rules_obj, basket, top_n = 5, min_confidence = 0.5)
 ## Value
 
 A tibble with columns `rhs` (recommended item), `confidence`, `lift`,
-and `support`, sorted by lift in descending order.
+and `support`, sorted by lift in descending order. A rule is used when
+the basket holds its whole left-hand side and none of its right-hand
+side, and each product is listed once, from its highest-lift rule.
 
 ## Examples
 
@@ -43,27 +48,6 @@ if (requireNamespace("arules", quietly = TRUE)) {
   # confidence floor
   recommend_products(res, basket = c("flour", "baking powder"))
 }
-#> Apriori
-#> 
-#> Parameter specification:
-#>  confidence minval smax arem  aval originalSupport maxtime support minlen
-#>         0.5    0.1    1 none FALSE            TRUE       5   0.001      2
-#>  maxlen target  ext
-#>      10  rules TRUE
-#> 
-#> Algorithmic control:
-#>  filter tree heap memopt load sort verbose
-#>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE
-#> 
-#> Absolute minimum support count: 9 
-#> 
-#> set item appearances ...[0 item(s)] done [0.00s].
-#> set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].
-#> sorting and recoding items ... [157 item(s)] done [0.00s].
-#> creating transaction tree ... done [0.00s].
-#> checking subsets of size 1 2 3 4 5 6 done [0.01s].
-#> writing ... [5668 rule(s)] done [0.00s].
-#> creating S4 object  ... done [0.00s].
 #> # A tibble: 2 × 4
 #>   rhs          confidence  lift support
 #>   <chr>             <dbl> <dbl>   <dbl>

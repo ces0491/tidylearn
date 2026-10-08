@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -57,13 +57,18 @@
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments</p></dd>
+<dd><p>Additional arguments passed to the <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> method keras
+provides for its models, such as <code>to_file</code> or <code>dpi</code>.
+<code>show_shapes</code> and <code>show_layer_names</code> default to <code>TRUE</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>The return value of <code>keras::plot_model()</code>, an architecture
-diagram of the Keras model.</p>
+    <p><code>NULL</code>, invisibly. Called for its side effect: keras draws
+the architecture diagram on the current graphics device, or writes it
+to <code>to_file</code>. keras renders it through the Python packages
+<code>pydot</code> and <code>graphviz</code>, and errors saying so when they are
+not installed.</p>
     </div>
 
     <div class="section level2">

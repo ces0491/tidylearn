@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -102,13 +102,15 @@ classification problem</p></dd>
 
 
 <dt id="arg-validation-split">validation_split<a class="anchor" aria-label="anchor" href="#arg-validation-split"></a></dt>
-<dd><p>Proportion of data for validation</p></dd>
+<dd><p>Proportion of the rows held out to validate on,
+drawn at random (default: 0.2). Their row numbers are kept as
+<code>$validation_rows</code>. Pass <code>validation_data</code> through <code>...</code>
+to validate on data of your own instead.</p></dd>
 
 
 <dt id="arg-learning-rate">learning_rate<a class="anchor" aria-label="anchor" href="#arg-learning-rate"></a></dt>
 <dd><p>Optimizer learning rate. NULL (default) leaves
-keras's own adam default in place.
-(default: 0.2)</p></dd>
+keras's own adam default in place.</p></dd>
 
 
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
@@ -117,7 +119,8 @@ keras's own adam default in place.
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments</p></dd>
+<dd><p>Additional arguments to pass to keras's fit(). Case
+<code>weights</code> and an offset are refused: neither is passed on.</p></dd>
 
 
 <dt id="arg-compute">compute<a class="anchor" aria-label="anchor" href="#arg-compute"></a></dt>

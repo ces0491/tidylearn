@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -53,16 +53,19 @@
 
 
 <dl><dt id="arg-rules-obj">rules_obj<a class="anchor" aria-label="anchor" href="#arg-rules-obj"></a></dt>
-<dd><p>A tidy_apriori object, rules object, or rules tibble</p></dd>
+<dd><p>A tidy_apriori object or an arules rules object. A
+table of rules is refused: the plots need the rules object.</p></dd>
 
 
 <dt id="arg-method">method<a class="anchor" aria-label="anchor" href="#arg-method"></a></dt>
-<dd><p>Visualization method: "scatter"
-(default), "graph", "grouped", "paracoord"</p></dd>
+<dd><p>Visualization method: "scatter" (default), drawn by
+tidylearn, or a method of <span class="pkg">arulesViz</span>'s <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code>, such as
+"graph", "grouped", "matrix" or "paracoord"</p></dd>
 
 
 <dt id="arg-top-n">top_n<a class="anchor" aria-label="anchor" href="#arg-top-n"></a></dt>
-<dd><p>Number of top rules to visualize (default: 50)</p></dd>
+<dd><p>Number of rules to visualize, those with the highest lift
+(default: 50)</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -71,10 +74,10 @@
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A <code><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></code> object when
-<code>method = "scatter"</code>.
-For other methods, the plot is produced as a side effect via
-<span class="pkg">arulesViz</span>.</p>
+    <p>For <code>method = "scatter"</code>, a <code><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></code>
+object. Other methods return what <span class="pkg">arulesViz</span>'s <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code>
+returns: a ggplot object for "graph", "grouped" and "matrix", and for
+"paracoord", which draws with grid, a grid <code>vpPath</code>.</p>
     </div>
 
     <div class="section level2">
@@ -85,27 +88,6 @@ For other methods, the plot is produced as a side effect via
 <span class="r-in"><span>  <span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="tidy_apriori.html">tidy_apriori</a></span><span class="op">(</span><span class="va">Groceries</span>, support <span class="op">=</span> <span class="fl">0.001</span>, confidence <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="fu">visualize_rules</span><span class="op">(</span><span class="va">res</span>, method <span class="op">=</span> <span class="st">"scatter"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Apriori</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Parameter specification:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  confidence minval smax arem  aval originalSupport maxtime support minlen</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         0.5    0.1    1 none FALSE            TRUE       5   0.001      2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  maxlen target  ext</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      10  rules TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Algorithmic control:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  filter tree heap memopt load sort verbose</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Absolute minimum support count: 9 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> set item appearances ...[0 item(s)] done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sorting and recoding items ... [157 item(s)] done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> creating transaction tree ... done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> checking subsets of size 1 2 3 4 5 6 done [0.01s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> writing ... [5668 rule(s)] done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> creating S4 object  ... done [0.00s].</span>
 <span class="r-plt img"><img src="visualize_rules-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>

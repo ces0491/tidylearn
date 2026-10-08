@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -65,7 +65,9 @@
 
 
 <dt id="arg-at-values">at_values<a class="anchor" aria-label="anchor" href="#arg-at-values"></a></dt>
-<dd><p>Named list of values at which to hold other variables</p></dd>
+<dd><p>Named list of values at which to hold other variables.
+A variable not named is held at its median if it is numeric, and
+otherwise at its most frequent value, a tie going to the earlier level.</p></dd>
 
 
 <dt id="arg-intervals">intervals<a class="anchor" aria-label="anchor" href="#arg-intervals"></a></dt>
@@ -85,12 +87,19 @@ predicted values across the variable range for each value of
 <code>var</code>: a data frame of predicted values at each factor level for
 each level of <code>by_var</code>. A numeric <code>by_var</code> is evaluated at its
 quartiles; quartiles that tie are evaluated once, with a label naming
-each quartile they stand for, such as <code>"Q0/Q25"</code>.</p>
+each quartile they stand for, such as <code>"Q0/Q25"</code>. A factor,
+character or logical variable is categorical, and is evaluated at the
+values the data holds: a level no row uses, and a missing value, are
+left out. A factor is returned as a factor with the model's levels.</p>
 <p><code>fit</code>, <code>lower</code>, <code>upper</code> and <code>slope</code> are on the
-response scale whatever <code>intervals</code> is set to: predicted
-probabilities for a logistic model. <code>slope</code> is the slope of a
-straight line fitted to <code>fit</code> across the range of <code>var</code>, so
-for a non-linear link it is an average rate of change over that range.</p>
+response scale whatever <code>intervals</code> is set to. For a
+classification model that is the predicted probability of the second
+class, so the response must have two classes. <code>slope</code> is the slope
+of a straight line fitted to <code>fit</code> across the range of <code>var</code>,
+so for a non-linear link it is an average rate of change over that
+range. A model variable named <code>fit</code>, <code>by_value</code> or
+<code>by_label</code>, or with intervals <code>lower</code> or <code>upper</code>, would
+be overwritten by these columns and is refused.</p>
 <p><code>slopes$slope_se</code> is the standard error of a straight line fitted
 to the prediction grid, not the sampling uncertainty of the marginal
 effect. For a linear model the grid is exactly linear in <code>var</code>,
@@ -116,11 +125,11 @@ interaction coefficient itself.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6 1.710525 52 31.98539 29.74867 34.22211       52       Q0</span>
 <span class="r-in"><span><span class="va">effects</span><span class="op">$</span><span class="va">slopes</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>      by_value by_label     slope     slope_se</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Q0       52.0       Q0 -6.768521 5.695734e-16</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Q25      96.5      Q25 -5.529278 4.387243e-16</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Q50     123.0      Q50 -4.791302 6.071491e-16</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Q75     180.0      Q75 -3.203958 4.018576e-16</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Q100    335.0     Q100  1.112505 4.116338e-16</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Q0       52.0       Q0 -6.768521 3.505829e-16</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Q25      96.5      Q25 -5.529278 4.039654e-16</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Q50     123.0      Q50 -4.791302 3.746703e-16</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Q75     180.0      Q75 -3.203958 4.635819e-16</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Q100    335.0     Q100  1.112505 2.313524e-16</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># slopes$slope_se describes the fitted grid, not the sampling</span></span></span>
 <span class="r-in"><span><span class="co"># uncertainty of the marginal effect -- for that, read the coefficient</span></span></span>

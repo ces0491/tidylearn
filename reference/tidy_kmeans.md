@@ -52,6 +52,8 @@ A list of class "tidy_kmeans" containing:
 
 - metrics: tibble with clustering quality metrics
 
+- sizes: integer vector of cluster sizes
+
 - model: original kmeans object
 
 ## Examples

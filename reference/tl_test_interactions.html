@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -69,7 +69,8 @@
 <dt id="arg-formula">formula<a class="anchor" aria-label="anchor" href="#arg-formula"></a></dt>
 <dd><p>A formula specifying the base model without interactions,
 or a string that parses as one. <code>.</code> and <code>- var</code> are expanded
-against <code>data</code>.</p></dd>
+against <code>data</code>. The models are fitted with <code><a href="https://rdrr.io/r/stats/lm.html" class="external-link">lm()</a></code>, so the
+response must be numeric or logical.</p></dd>
 
 
 <dt id="arg-var-">var1<a class="anchor" aria-label="anchor" href="#arg-var-"></a></dt>

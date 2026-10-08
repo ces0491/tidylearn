@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -57,11 +57,13 @@
 
 
 <dt id="arg-tree-index">tree_index<a class="anchor" aria-label="anchor" href="#arg-tree-index"></a></dt>
-<dd><p>Index of the tree to plot (default: 0, first tree)</p></dd>
+<dd><p>Index of the tree to plot, counting the first tree as
+0 (default: 0). A multiclass model grows one tree per class in each
+round.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments</p></dd>
+<dd><p>Additional arguments passed to <code><a href="https://rdrr.io/pkg/xgboost/man/xgb.plot.tree.html" class="external-link">xgboost::xgb.plot.tree()</a></code></p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -75,12 +77,12 @@ tree diagram rendered via the <span class="pkg">DiagrammeR</span> package.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"xgboost"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">&amp;&amp;</span></span></span>
 <span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"DiagrammeR"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span>  <span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="tl_model.html">tl_model</a></span><span class="op">(</span><span class="va">iris</span>, <span class="va">Species</span> <span class="op">~</span> <span class="va">.</span>, method <span class="op">=</span> <span class="st">"xgboost"</span>, nrounds <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="tl_model.html">tl_model</a></span><span class="op">(</span><span class="va">iris</span>, <span class="va">Species</span> <span class="op">~</span> <span class="va">.</span>, method <span class="op">=</span> <span class="st">"xgboost"</span>, nrounds <span class="op">=</span> <span class="fl">10</span>,</span></span>
+<span class="r-in"><span>    nthread <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>  <span class="co"># tree_index is zero-based, so this is the first tree</span></span></span>
 <span class="r-in"><span>  <span class="fu">tl_plot_xgboost_tree</span><span class="op">(</span><span class="va">model</span>, tree_index <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>Passed unrecognized parameters: tree_index. This warning will become an error in a future version.</span>
 <div id="htmlwidget-ac96cb3ee4656e2e9ec3" style="width:700px;height:432.632880098888px;" class="grViz html-widget"></div>
 <script type="application/json" data-for="htmlwidget-ac96cb3ee4656e2e9ec3">{"x":{"diagram":"digraph {\n    graph [ rankdir=TB ]\n\n    0 [ label=\"Petal.Length<3\" ]\n    0 -> 1 [label=\"yes\" color=\"#FF0000\"]\n    0 -> 2 [label=\"no, missing\" color=\"#0000FF\"]\n\n    1 [ label=\"leaf=0.430622011\" ]\n\n    2 [ label=\"leaf=-0.220048919\" ]\n}","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script><span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>

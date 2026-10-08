@@ -15,8 +15,8 @@ tl_cloud_allow_host(host)
 - host:
 
   A character vector of host names to allow, or `NULL` to clear every
-  host added this session. Bare host names only — not URLs, ports, paths
-  or wildcards.
+  host added this session. Bare host names of at least three labels only
+  — not URLs, ports, paths or wildcards.
 
 ## Value
 
@@ -33,6 +33,11 @@ never persisted and are forgotten when the session ends.
 Hosts match themselves and their subdomains. Adding `"fits.example.com"`
 accepts `https://fits.example.com` and `https://a.fits.example.com`, and
 nothing else.
+
+Give the endpoint's full host name. A name of fewer than three labels,
+such as `"example.com"` or `"co.uk"`, is refused: two labels can be a
+public suffix, under which anyone can register a site, and allowing one
+would admit all of them.
 
 ## See also
 

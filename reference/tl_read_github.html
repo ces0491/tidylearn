@@ -11,7 +11,7 @@ owner/repo shorthand with a file path."><meta property="og:image" content="https
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -51,7 +51,7 @@ owner/repo shorthand with a file path."><meta property="og:image" content="https
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">tl_read_github</span><span class="op">(</span><span class="va">source</span>, path <span class="op">=</span> <span class="cn">NULL</span>, ref <span class="op">=</span> <span class="st">"main"</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">tl_read_github</span><span class="op">(</span><span class="va">source</span>, path <span class="op">=</span> <span class="cn">NULL</span>, ref <span class="op">=</span> <span class="st">"main"</span>, <span class="va">...</span>, trust_rds <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -59,7 +59,13 @@ owner/repo shorthand with a file path."><meta property="og:image" content="https
 
 
 <dl><dt id="arg-source">source<a class="anchor" aria-label="anchor" href="#arg-source"></a></dt>
-<dd><p>A GitHub URL or <code>"owner/repo"</code> string.</p></dd>
+<dd><p>A GitHub URL or <code>"owner/repo"</code> string. A URL is either
+a file page (<code>https://github.com/&lt;owner&gt;/&lt;repo&gt;/blob/&lt;ref&gt;/&lt;path&gt;</code>,
+with <code>raw</code> in place of <code>blob</code> or with neither, and with or
+without <code>www.</code> and a query such as <code>?raw=true</code>) or a
+raw file (<code>https://raw.githubusercontent.com/...</code>), whose query is
+kept for the download. Zip archives are not read from GitHub: download
+the file and read it with <code><a href="tl_read_zip.html">tl_read_zip()</a></code>.</p></dd>
 
 
 <dt id="arg-path">path<a class="anchor" aria-label="anchor" href="#arg-path"></a></dt>
@@ -74,20 +80,35 @@ owner/repo shorthand with a file path."><meta property="og:image" content="https
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>Additional arguments passed to the format-specific reader.</p></dd>
 
+
+<dt id="arg-trust-rds">trust_rds<a class="anchor" aria-label="anchor" href="#arg-trust-rds"></a></dt>
+<dd><p>Logical. Read an <code>.rds</code>, <code>.rdata</code> or
+<code>.rda</code> file on R older than 4.4.0? Those versions can run code
+embedded in a crafted file as it is read (CVE-2024-27322), so such
+files are refused there unless this is <code>TRUE</code>. It has no effect
+on R 4.4.0 or later. Default <code>FALSE</code>.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A <code>tidylearn_data</code> object containing the downloaded data.</p>
     </div>
+    <div class="section level2">
+    <h2 id="reading-r-serialisation-files">Reading R serialisation files<a class="anchor" aria-label="anchor" href="#reading-r-serialisation-files"></a></h2>
+
+
+<p>An <code>.rds</code> or <code>.rdata</code> file is rebuilt with <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS()</a></code> or
+<code><a href="https://rdrr.io/r/base/load.html" class="external-link">load()</a></code>, which recreate whatever R objects the file describes.
+Read them only from a repository you trust, on any version of R.</p>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
-<span class="r-in"><span><span class="co"># data &lt;- tl_read_github("user/repo", path = "data/file.csv")</span></span></span>
-<span class="r-in"><span><span class="co"># data &lt;- tl_read_github(</span></span></span>
-<span class="r-in"><span><span class="co">#   "https://github.com/user/repo/blob/main/data/file.csv"</span></span></span>
-<span class="r-in"><span><span class="co"># )</span></span></span>
-<span class="r-in"><span><span class="co"># }</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
+<span class="r-in"><span><span class="co"># Downloads over the network</span></span></span>
+<span class="r-in"><span><span class="fu">tl_read_github</span><span class="op">(</span><span class="st">"user/repo"</span>, path <span class="op">=</span> <span class="st">"data/file.csv"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">tl_read_github</span><span class="op">(</span><span class="st">"https://github.com/user/repo/blob/main/data/file.csv"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

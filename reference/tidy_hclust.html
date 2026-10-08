@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -69,7 +69,8 @@ dist object (default: "euclidean")</p></dd>
 
 <dt id="arg-cols">cols<a class="anchor" aria-label="anchor" href="#arg-cols"></a></dt>
 <dd><p>Columns to include (tidy select).
-If NULL, uses all numeric columns.</p></dd>
+If NULL, uses all numeric columns, or every column for
+<code>distance = "gower"</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -77,6 +78,7 @@ If NULL, uses all numeric columns.</p></dd>
     <p>A list of class "tidy_hclust" containing:</p><ul><li><p>model: hclust object</p></li>
 <li><p>dist: distance matrix used</p></li>
 <li><p>method: linkage method used</p></li>
+<li><p>distance_method: distance metric used</p></li>
 <li><p>data: original data (for plotting)</p></li>
 </ul></div>
 

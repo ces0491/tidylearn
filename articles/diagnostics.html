@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -314,7 +314,7 @@ independently of any fit.</p>
 <span><span class="co">#&gt; Chrysler Imperial   14.7 230 5.345</span></span>
 <span><span class="co">#&gt; Toyota Corolla      33.9  65 1.835</span></span>
 <span><span class="co">#&gt; Maserati Bora       15.0 335 3.570</span></span></code></pre></div>
-<p><code>method</code> also takes <code>"zscore"</code> and
+<p><code>method</code> also takes <code>"z-score"</code> and
 <code>"mahalanobis"</code>. The first two treat each variable
 separately; Mahalanobis distance accounts for the correlation between
 them, so it finds points that are unremarkable on every single axis and
@@ -357,12 +357,12 @@ folds.</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 6 × 6</span></span></span>
 <span><span class="co">#&gt;   model  metric mean_value sd_value min_value max_value</span></span>
 <span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> full   rmse        2.93     0.708     2.17      3.93 </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> full   rsq         0.612    0.248     0.262     0.859</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> simple rmse        3.09     0.720     1.82      3.59 </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> simple rsq         0.530    0.414    -<span style="color: #BB0000;">0.169</span>     0.820</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> tree   rmse        4.42     1.60      2.21      6.58 </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> tree   rsq         0.148    0.527    -<span style="color: #BB0000;">0.501</span>     0.767</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> full   rmse      2.68       1.33      1.43      4.84 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> full   rsq       0.739      0.164     0.586     0.920</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> simple rmse      2.95       1.42      1.79      5.32 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> simple rsq       0.689      0.184     0.517     0.907</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> tree   rmse      5.03       0.878     3.70      5.76 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> tree   rsq       0.002<span style="text-decoration: underline;">52</span>    0.634    -<span style="color: #BB0000;">0.902</span>     0.505</span></span></code></pre></div>
 <p>Per-fold scores are kept as well, which is what makes a test
 possible:</p>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
@@ -370,12 +370,12 @@ possible:</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 6 × 4</span></span></span>
 <span><span class="co">#&gt;   metric value  fold model </span></span>
 <span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> rmse   3.35      1 simple</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> rsq    0.820     1 simple</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> rmse   1.82      2 simple</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> rsq    0.808     2 simple</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> rmse   3.29      3 simple</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> rsq    0.481     3 simple</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> rmse   1.79      1 simple</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> rsq    0.859     1 simple</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> rmse   2.85      2 simple</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> rsq    0.638     2 simple</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> rmse   2.88      3 simple</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> rsq    0.524     3 simple</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="is-the-difference-real">Is the difference real?<a class="anchor" aria-label="anchor" href="#is-the-difference-real"></a>
 </h3>
@@ -388,14 +388,27 @@ baseline using the per-fold scores.</p>
 <span>  metric <span class="op">=</span> <span class="st">"rmse"</span>,</span>
 <span>  test <span class="op">=</span> <span class="st">"t.test"</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt;   metric model baseline  mean_diff   p_value     p_adj</span></span>
-<span><span class="co">#&gt; 1   rmse  full   simple -0.1657558 0.6102364 0.6102364</span></span>
-<span><span class="co">#&gt; 2   rmse  tree   simple  1.3264236 0.1504542 0.3009083</span></span></code></pre></div>
+<span><span class="co">#&gt;   metric model baseline  mean_diff    p_value      p_adj</span></span>
+<span><span class="co">#&gt; 1   rmse  full   simple -0.2650263 0.51406818 0.51406818</span></span>
+<span><span class="co">#&gt; 2   rmse  tree   simple  2.0845970 0.04201286 0.08402572</span></span></code></pre></div>
 <p>With five folds this has very little power, so treat a
 non-significant result as “these folds do not separate the models”
-rather than as evidence they are equivalent.
-<code>test = "wilcox.test"</code> drops the normality assumption, which
-matters more at small fold counts than the loss of power costs you.</p>
+rather than as evidence they are equivalent.</p>
+<p><code>test = "wilcox"</code> runs the signed-rank test instead, which
+drops the normality assumption but needs at least six folds to return a
+p-value below 0.05. On five pairs of fold scores the smallest two-sided
+p-value it can give is 0.0625, and only when one model wins every
+fold:</p>
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/tl_test_model_difference.html">tl_test_model_difference</a></span><span class="op">(</span></span>
+<span>  <span class="va">cv</span>,</span>
+<span>  baseline_model <span class="op">=</span> <span class="st">"simple"</span>,</span>
+<span>  metric <span class="op">=</span> <span class="st">"rmse"</span>,</span>
+<span>  test <span class="op">=</span> <span class="st">"wilcox"</span></span>
+<span><span class="op">)</span></span>
+<span><span class="co">#&gt;   metric model baseline  mean_diff p_value  p_adj</span></span>
+<span><span class="co">#&gt; 1   rmse  full   simple -0.2650263  0.4375 0.4375</span></span>
+<span><span class="co">#&gt; 2   rmse  tree   simple  2.0845970  0.0625 0.1250</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
@@ -403,7 +416,7 @@ matters more at small fold counts than the loss of power costs you.</p>
 </h2>
 <p><code><a href="../reference/tl_test_interactions.html">tl_test_interactions()</a></code> fits each candidate interaction
 and reports whether it earns its degrees of freedom.</p>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">interactions</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_test_interactions.html">tl_test_interactions</a></span><span class="op">(</span></span>
 <span>  <span class="va">mtcars</span>, <span class="va">mpg</span> <span class="op">~</span> <span class="va">wt</span> <span class="op">+</span> <span class="va">hp</span> <span class="op">+</span> <span class="va">disp</span>,</span>
 <span>  all_pairs <span class="op">=</span> <span class="cn">TRUE</span></span>
@@ -425,17 +438,17 @@ single pair with <code>var1</code> and <code>var2</code>.</p>
 </h3>
 <p>Once a term is in the model, <code><a href="../reference/tl_interaction_effects.html">tl_interaction_effects()</a></code>
 says what it does at different levels of the moderator.</p>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">model_int</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_model.html">tl_model</a></span><span class="op">(</span><span class="va">mtcars</span>, <span class="va">mpg</span> <span class="op">~</span> <span class="va">wt</span> <span class="op">*</span> <span class="va">hp</span>, method <span class="op">=</span> <span class="st">"linear"</span><span class="op">)</span></span>
 <span><span class="va">effects</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_interaction_effects.html">tl_interaction_effects</a></span><span class="op">(</span><span class="va">model_int</span>, var <span class="op">=</span> <span class="st">"wt"</span>, by_var <span class="op">=</span> <span class="st">"hp"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">effects</span><span class="op">$</span><span class="va">slopes</span></span>
 <span><span class="co">#&gt;      by_value by_label     slope     slope_se</span></span>
-<span><span class="co">#&gt; Q0       52.0       Q0 -6.768521 5.695734e-16</span></span>
-<span><span class="co">#&gt; Q25      96.5      Q25 -5.529278 4.387243e-16</span></span>
-<span><span class="co">#&gt; Q50     123.0      Q50 -4.791302 6.071491e-16</span></span>
-<span><span class="co">#&gt; Q75     180.0      Q75 -3.203958 4.018576e-16</span></span>
-<span><span class="co">#&gt; Q100    335.0     Q100  1.112505 4.116338e-16</span></span></code></pre></div>
+<span><span class="co">#&gt; Q0       52.0       Q0 -6.768521 3.505829e-16</span></span>
+<span><span class="co">#&gt; Q25      96.5      Q25 -5.529278 4.039654e-16</span></span>
+<span><span class="co">#&gt; Q50     123.0      Q50 -4.791302 3.746703e-16</span></span>
+<span><span class="co">#&gt; Q75     180.0      Q75 -3.203958 4.635819e-16</span></span>
+<span><span class="co">#&gt; Q100    335.0     Q100  1.112505 2.313524e-16</span></span></code></pre></div>
 <p>The slope of <code>mpg</code> on <code>wt</code> weakens as
 <code>hp</code> rises — extra weight costs less fuel economy in a
 high-powered car, which already had little to lose.</p>
@@ -444,7 +457,7 @@ prediction grid rather than the sampling uncertainty of the marginal
 effect — for a linear model the grid is exactly linear, so it is near
 zero by construction. Use <code><a href="../reference/tl_coefficients.html">tl_coefficients()</a></code> for inference
 on the interaction coefficient itself.</p>
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/tl_coefficients.html">tl_coefficients</a></span><span class="op">(</span><span class="va">model_int</span>, conf_int <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 4 × 7</span></span></span>
 <span><span class="co">#&gt;   term        estimate std_error conf_low conf_high statistic  p_value</span></span>
@@ -456,7 +469,7 @@ on the interaction coefficient itself.</p>
 <p><code><a href="../reference/tl_auto_interactions.html">tl_auto_interactions()</a></code> does the search and the refit in
 one step, returning a model with the surviving interactions already in
 the formula:</p>
-<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">auto</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_auto_interactions.html">tl_auto_interactions</a></span><span class="op">(</span><span class="va">mtcars</span>, <span class="va">mpg</span> <span class="op">~</span> <span class="va">wt</span> <span class="op">+</span> <span class="va">hp</span> <span class="op">+</span> <span class="va">disp</span><span class="op">)</span></span>
 <span><span class="va">auto</span><span class="op">$</span><span class="va">spec</span><span class="op">$</span><span class="va">formula</span></span>
 <span><span class="co">#&gt; mpg ~ wt + hp + disp + wt:hp + hp:disp + wt:disp</span></span></code></pre></div>
@@ -468,7 +481,7 @@ the formula:</p>
 <p><code><a href="../reference/tl_explore.html">tl_explore()</a></code> runs PCA, picks a cluster count, clusters,
 and computes a distance summary in one call. It is a first look at a
 dataset, not a diagnostic of a fit.</p>
-<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">eda</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_explore.html">tl_explore</a></span><span class="op">(</span><span class="va">iris</span>, response <span class="op">=</span> <span class="st">"Species"</span>, max_components <span class="op">=</span> <span class="fl">4</span>, k_range <span class="op">=</span> <span class="fl">2</span><span class="op">:</span><span class="fl">5</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Running Exploratory Data Analysis...</span></span>
 <span><span class="co">#&gt; [1/4] PCA analysis...</span></span>
@@ -479,20 +492,20 @@ dataset, not a diagnostic of a fit.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">eda</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "data"      "response"  "pca"       "optimal_k" "kmeans"    "hclust"   </span></span>
 <span><span class="co">#&gt; [7] "summary"</span></span></code></pre></div>
-<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">eda</span><span class="op">$</span><span class="va">optimal_k</span></span>
 <span><span class="co">#&gt; $k_values</span></span>
 <span><span class="co">#&gt; [1] 2 3 4 5</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $scores</span></span>
-<span><span class="co">#&gt; [1] 0.6810462 0.5528190 0.4980505 0.4887489</span></span>
+<span><span class="co">#&gt; [1] 0.6810462 0.5528190 0.4980505 0.4912400</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $best_k</span></span>
 <span><span class="co">#&gt; [1] 2</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $best_score</span></span>
 <span><span class="co">#&gt; [1] 0.6810462</span></span></code></pre></div>
-<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/get_pca_variance.html">get_pca_variance</a></span><span class="op">(</span><span class="va">eda</span><span class="op">$</span><span class="va">pca</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 4 × 5</span></span></span>
 <span><span class="co">#&gt;   component  sdev variance prop_variance cum_variance</span></span>
@@ -501,9 +514,9 @@ dataset, not a diagnostic of a fit.</p>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> PC2       0.956   0.914        0.229          0.958</span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> PC3       0.383   0.147        0.036<span style="text-decoration: underline;">7</span>         0.995</span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> PC4       0.144   0.020<span style="text-decoration: underline;">7</span>       0.005<span style="text-decoration: underline;">18</span>        1</span></span></code></pre></div>
-<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">eda</span><span class="op">)</span></span></code></pre></div>
-<p><img src="diagnostics_files/figure-html/unnamed-chunk-28-1.png" class="r-plt" alt="" width="672"></p>
+<p><img src="diagnostics_files/figure-html/unnamed-chunk-29-1.png" class="r-plt" alt="" width="672"></p>
 </div>
 <div class="section level2">
 <h2 id="a-checklist">A Checklist<a class="anchor" aria-label="anchor" href="#a-checklist"></a>

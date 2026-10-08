@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -52,7 +52,11 @@
 <span>  alpha <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  lambda <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  cv_folds <span class="op">=</span> <span class="fl">5</span>,</span>
-<span>  <span class="va">...</span></span>
+<span>  <span class="va">...</span>,</span>
+<span>  weights <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  foldid <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  subset <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  offset <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -79,8 +83,9 @@ between 0-1 for Elastic Net)</p></dd>
 
 
 <dt id="arg-lambda">lambda<a class="anchor" aria-label="anchor" href="#arg-lambda"></a></dt>
-<dd><p>Regularization parameter (if NULL, uses
-cross-validation to select)</p></dd>
+<dd><p>Regularization parameter: a single penalty to fit at, or
+<code>NULL</code> (the default) or a sequence of penalties, from which
+cross-validation chooses one</p></dd>
 
 
 <dt id="arg-cv-folds">cv_folds<a class="anchor" aria-label="anchor" href="#arg-cv-folds"></a></dt>
@@ -89,7 +94,29 @@ cross-validation to select)</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments to pass to glmnet()</p></dd>
+<dd><p>Additional arguments to pass to glmnet() or cv.glmnet(). A
+name neither function takes is an error, as are <code>x</code>, <code>y</code>,
+<code>family</code> and <code>nfolds</code>, which tidylearn sets itself, and
+<code>relax = TRUE</code> and <code>gamma</code>: predictions and coefficients
+come from the unrelaxed fit.</p></dd>
+
+
+<dt id="arg-weights">weights<a class="anchor" aria-label="anchor" href="#arg-weights"></a></dt>
+<dd><p>Optional case weights, one per row of <code>data</code></p></dd>
+
+
+<dt id="arg-foldid">foldid<a class="anchor" aria-label="anchor" href="#arg-foldid"></a></dt>
+<dd><p>Optional fold for each row of <code>data</code>, for the
+cross-validation that chooses lambda</p></dd>
+
+
+<dt id="arg-subset">subset<a class="anchor" aria-label="anchor" href="#arg-subset"></a></dt>
+<dd><p>Optional rows of <code>data</code> to fit on</p></dd>
+
+
+<dt id="arg-offset">offset<a class="anchor" aria-label="anchor" href="#arg-offset"></a></dt>
+<dd><p>Not supported: glmnet would need the offset again at
+every prediction. An error if supplied.</p></dd>
 
 </dl></div>
     <div class="section level2">

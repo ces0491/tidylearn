@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -76,8 +76,9 @@
 <dd><p>Boosting iterations to predict with, as
 <code>c(start, end)</code> – base-1 and inclusive of both ends, so
 <code>c(1, 20)</code> predicts from the first twenty iterations and
-<code>end</code> may not exceed the number fitted. NULL (default) uses
-every iteration.</p></dd>
+<code>end</code> may not exceed the number fitted. It is translated for
+xgboost before 3.0, which reads the end as exclusive. NULL (default)
+uses every iteration.</p></dd>
 
 
 <dt id="arg-ntreelimit">ntreelimit<a class="anchor" aria-label="anchor" href="#arg-ntreelimit"></a></dt>

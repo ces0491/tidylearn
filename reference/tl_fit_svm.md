@@ -61,7 +61,9 @@ tl_fit_svm(
 
 - ...:
 
-  Additional arguments to pass to svm()
+  Additional arguments to pass to svm(). `type` and `probability`
+  replace the defaults chosen from the task. Case `weights` are refused:
+  e1071 has none. So is an offset, which e1071 leaves out of the fit.
 
 ## Value
 

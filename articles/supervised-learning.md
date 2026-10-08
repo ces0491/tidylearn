@@ -16,9 +16,9 @@ library(dplyr)
 
 ## Introduction
 
-Classification and regression across the eleven supervised methods, and
-the one piece of bookkeeping that catches people out — replaying
-training preprocessing on the test set.
+Classification and regression with tidylearn’s thirteen supervised
+methods, and the one piece of bookkeeping that catches people out —
+replaying training preprocessing on the test set.
 
 **Wrapped packages include:**
 
@@ -446,7 +446,7 @@ processed <- tl_prepare_data(
   remove_correlated = TRUE,
   correlation_cutoff = 0.9
 )
-#> Removing 1 highly correlated features
+#> Removing 1 highly correlated feature
 #> Scaling numeric features using method: standardize
 ```
 
@@ -543,9 +543,12 @@ model_imputed <- tl_model(processed_missing$data, mpg ~ ., method = "linear")
     was fitted to tells you how well it memorised them.
 2.  **Stratify classification splits** so both sets carry the same class
     proportions as the source data.
-3.  **Scale inputs for methods that need it** – regularised regression,
-    SVM and neural networks – and replay the training transformation on
-    the test set, as shown below. Trees and forests are scale-invariant.
+3.  **Scale inputs for `"nn"`** and replay the training transformation
+    on the test set, as shown below. nnet fits on the values it is
+    given. The other methods do not need it: glmnet and e1071
+    standardise internally by default for the regularised methods and
+    SVM, `"deep"` normalises its own inputs, and linear models and trees
+    are scale-invariant.
 4.  **Compare several models** on the same split before committing to
     one.
 5.  **Reach for regularisation** when predictors outnumber observations,

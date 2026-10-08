@@ -21,11 +21,14 @@ tl_explore(data, response = NULL, max_components = 5, k_range = 2:6)
 
 - max_components:
 
-  Maximum PCA components to compute (default: 5)
+  Maximum number of PCA components to keep (default: 5), or fewer if the
+  data has fewer numeric columns
 
 - k_range:
 
-  Range of k values for clustering (default: 2:6)
+  Range of k values for clustering (default: 2:6). Each is a whole
+  number from 2 to one less than the number of rows, the range a
+  silhouette is defined over.
 
 ## Value
 
@@ -41,7 +44,8 @@ A list with class `"tidylearn_eda"` containing:
 
 - pca:
 
-  The fitted PCA model.
+  The fitted PCA model, keeping the first `max_components` components,
+  as `prcomp(rank. = max_components)` would.
 
 - optimal_k:
 
@@ -57,7 +61,8 @@ A list with class `"tidylearn_eda"` containing:
 
 - summary:
 
-  List with `n_obs`, `n_vars`, `n_components`, and `best_k`.
+  List with `n_obs`, `n_vars`, `n_components` (the number kept), and
+  `best_k`.
 
 ## Examples
 

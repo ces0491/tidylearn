@@ -27,9 +27,17 @@ tl_check_assumptions(model, test = TRUE, verbose = TRUE)
 A named list with one element per assumption checked (`linearity`,
 `independence`, `homoscedasticity`, `normality`, `multicollinearity`,
 `outliers`), each containing `assumption` (character label), `check`
-(logical or `NULL`), `details` (character), and `recommendation`
-(character). An additional `overall` element summarises the number of
-assumptions checked, violated, and satisfied.
+(logical, `NA` when the test could not decide, or `NULL` when no test
+was run), `details` (character), and `recommendation` (character). An
+additional `overall` element summarises the number of assumptions
+checked, violated, and satisfied; an `NA` or `NULL` check counts as
+neither.
+
+Logistic regression assumes neither normal residuals nor a constant
+variance, so for a logistic model `normality` and `homoscedasticity`
+have a `NULL` check and a note saying so. For a factor,
+multicollinearity is judged on `GVIF^(1/Df)`, the generalised VIF on the
+scale of an ordinary one.
 
 ## Examples
 
@@ -93,8 +101,7 @@ tl_check_assumptions(model)
 #> [1] "Homoscedasticity"
 #> 
 #> $homoscedasticity$check
-#>   BP 
-#> TRUE 
+#> [1] TRUE
 #> 
 #> $homoscedasticity$details
 #> [1] "Breusch-Pagan test p-value: 0.6438"

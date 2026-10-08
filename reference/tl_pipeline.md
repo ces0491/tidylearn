@@ -27,7 +27,19 @@ tl_pipeline(
 
 - preprocessing:
 
-  A list of preprocessing steps
+  A named list of preprocessing switches, each `TRUE` or `FALSE`:
+  `impute_missing` (default `TRUE`) replaces missing predictor values
+  with the training median or mode; `standardize` (default `TRUE`)
+  centres and scales numeric predictors where that leaves the model the
+  formula describes unchanged. It leaves alone any column the formula
+  uses inside a function call such as
+  [`log()`](https://rdrr.io/r/base/Log.html),
+  [`poly()`](https://rdrr.io/r/stats/poly.html) or
+  [`offset()`](https://rdrr.io/r/stats/offset.html), every column when
+  the formula has no intercept, and the columns of an interaction whose
+  lower-order terms are not all in the formula; `dummy_encode` (default
+  `TRUE`) only records that categorical predictors are encoded by each
+  model's fitting function, and cannot be set to `FALSE`.
 
 - models:
 
@@ -39,7 +51,8 @@ tl_pipeline(
 
 - ...:
 
-  Additional arguments
+  Not used. Anything passed here is an error, so a misspelt argument
+  such as `evalution` is reported rather than ignored.
 
 ## Value
 

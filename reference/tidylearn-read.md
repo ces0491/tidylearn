@@ -11,7 +11,8 @@ is a tibble subclass carrying metadata about the data source.
 
 Supported file formats:
 
-- **CSV**: `.csv` files via readr (with base R fallback)
+- **CSV**: `.csv` files via readr (with base R fallback), and `.txt`
+  files named directly
 
 - **TSV**: `.tsv` files via readr (with base R fallback)
 
@@ -19,13 +20,17 @@ Supported file formats:
 
 - **Parquet**: `.parquet` files via nanoparquet
 
-- **JSON**: `.json` files via jsonlite
+- **JSON**: `.json` files, and newline-delimited `.ndjson` files, via
+  jsonlite
 
 - **RDS**: `.rds` files via base
   [`readRDS()`](https://rdrr.io/r/base/readRDS.html)
 
 - **RData**: `.rdata`, `.rda` files via base
   [`load()`](https://rdrr.io/r/base/load.html)
+
+CSV and TSV files compressed with gzip, bzip2 or xz (`data.csv.gz`) are
+recognised by the extension under the compression one.
 
 Supported databases (via DBI):
 
@@ -35,7 +40,7 @@ Supported databases (via DBI):
 
 - **MySQL/MariaDB**: via RMariaDB
 
-- **BigQuery**: via bigrquery
+- **BigQuery**: `bigquery://project/dataset` URIs via bigrquery
 
 Supported cloud/API sources:
 
@@ -44,6 +49,10 @@ Supported cloud/API sources:
 - **GitHub**: raw file download from repositories
 
 - **Kaggle**: dataset download via Kaggle CLI
+
+A `file://` URL is read as the local path it names. Other web URLs, and
+URLs with any other scheme such as `ftp://`, are not read; download the
+file first.
 
 Multi-file reading:
 
@@ -60,4 +69,10 @@ Multi-file reading:
   extracts and reads from `.zip` files
 
 When combining multiple files, a `source_file` column is added to
-identify the origin of each row.
+identify the origin of each row: the file's path below the directory or
+archive it came from, or, for paths given directly, below the deepest
+folder they share. Files in one folder are labelled by their bare names.
+
+Directory and archive scans read the extensions listed above except
+`.txt`, which in a folder is as likely to hold notes as data. Name a
+`.txt` file directly, or select it with `pattern`, to read it.

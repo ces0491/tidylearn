@@ -41,7 +41,7 @@ print(eda)
 #> Variables: 4 
 #> Optimal clusters: 2 
 #> 
-#> PCA Variance Explained (first 5 components):
+#> PCA Variance Explained (first 4 components):
 #> # A tibble: 4 × 5
 #>   component  sdev variance prop_variance cum_variance
 #>   <chr>     <dbl>    <dbl>         <dbl>        <dbl>

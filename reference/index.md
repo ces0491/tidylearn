@@ -74,8 +74,7 @@ object through the `$fit` slot.
 - [`tl_step_selection()`](https://tidylearn.sheetsolved.com/reference/tl_step_selection.md)
   : Perform stepwise selection on a linear model
 - [`tl_reduce_dimensions()`](https://tidylearn.sheetsolved.com/reference/tl_reduce_dimensions.md)
-  : Integration Functions: Combining Supervised and Unsupervised
-  Learning
+  : Feature Engineering via Dimensionality Reduction
 - [`tl_add_cluster_features()`](https://tidylearn.sheetsolved.com/reference/tl_add_cluster_features.md)
   : Cluster-Based Features
 

@@ -353,16 +353,16 @@ file.show(system.file("security/threat-model.md", package = "tidylearn"))
 
 ## Unified Visualization
 
-Consistent ggplot2-based plotting regardless of model type:
+ggplot2-based plotting for most model types:
 
 ``` r
 
 # Generic plot method works for all model types
 plot(forest_model)       # Automatic visualization based on model type
-plot(linear_model)       # Diagnostic plots for regression
+plot(linear_model)       # Actual vs predicted for regression
 plot(pca_model)          # Variance explained for PCA
 plot(kmeans_model)       # Cluster scatter plot
-plot(hclust_model)       # Dendrogram
+plot(hclust_model)       # Dendrogram, drawn with base graphics
 
 # The lower-level helpers take data frames rather than models
 plot_clusters(cluster_data, cluster_col = "cluster")
@@ -406,8 +406,9 @@ what they are doing — every method documents the function it calls, and
 a supervised model’s `$fit` is the object that function returned (an
 unsupervised one keeps it at `$fit$model`, next to the tidied
 components). What tidylearn adds is one signature across all 20 methods,
-and output that is already a tibble or a ggplot2 object, so results move
-into dplyr and the rest of the tidyverse without conversion.
+and predictions, metrics and most plots that are already tibbles or
+ggplot2 objects, so results move into dplyr and the rest of the
+tidyverse without conversion.
 
 ## Documentation
 

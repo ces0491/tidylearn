@@ -286,7 +286,7 @@ split <- tl_split(iris, prop = 0.7, stratify = "Species", seed = 42)
 
 pipe <- tl_pipeline(
   split$train, Species ~ .,
-  preprocessing = list(standardize = TRUE, dummy_encode = FALSE),
+  preprocessing = list(standardize = TRUE),
   models = list(
     tree = list(method = "tree"),
     forest = list(method = "forest", ntree = 300)
@@ -304,7 +304,7 @@ print(pipe)
 #> =================
 #> Formula: Species ~ . 
 #> Data: 105 observations, 5 variables
-#> Preprocessing: impute_missing, standardize 
+#> Preprocessing: impute_missing, standardize, dummy_encode 
 #> Models: tree, forest 
 #> Evaluation:  cv (3 folds)
 #> Metrics: accuracy, f1 
@@ -340,7 +340,7 @@ print(run)
 #> =================
 #> Formula: Species ~ . 
 #> Data: 105 observations, 5 variables
-#> Preprocessing: impute_missing, standardize 
+#> Preprocessing: impute_missing, standardize, dummy_encode 
 #> Models: tree, forest 
 #> Evaluation:  cv (3 folds)
 #> Metrics: accuracy, f1 

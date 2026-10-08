@@ -51,7 +51,21 @@ tl_step_selection(
 A `tidylearn_model` object of class `tidylearn_linear` wrapping the
 selected [`lm`](https://rdrr.io/r/stats/lm.html) model. Access the
 underlying model via `$fit` and the selected formula via
-`$spec$formula`.
+`$spec$formula`. `$data` is the data passed in.
+
+## Details
+
+Every candidate model is fitted on the same rows: those with no missing
+value in any variable of `formula`. When that leaves out rows a
+candidate could otherwise use, a message gives the count, and the fit
+records the rows in its `na.action`, as
+[`lm()`](https://rdrr.io/r/stats/lm.html) records the rows it drops
+itself.
+
+Forward and both-direction selection start from a model holding the
+intercept, or none if `formula` removes it with `- 1`, and any
+[`offset()`](https://rdrr.io/r/stats/offset.html) terms in `formula`.
+Neither is ever dropped.
 
 ## Examples
 

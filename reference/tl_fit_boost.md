@@ -54,8 +54,19 @@ tl_fit_boost(
 
 - ...:
 
-  Additional arguments to pass to gbm()
+  Additional arguments to pass to gbm(), including case `weights`.
+  `verbose`, and for regression `distribution`, replace the defaults
+  used here. An offset is refused: predict.gbm() does not add it back.
 
 ## Value
 
 A fitted gradient boosting model
+
+## Details
+
+The distribution follows the response: `"gaussian"` for regression,
+`"bernoulli"` for two classes and `"multinomial"` for more. gbm
+describes its multinomial distribution as currently broken, kept only
+for backwards compatibility, and warns to that effect on every
+multiclass fit. For three or more classes, `method = "forest"` or
+`method = "xgboost"` are the better supported choices.

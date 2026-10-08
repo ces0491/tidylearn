@@ -2,7 +2,8 @@
 
 Automatically explores multiple modeling approaches including
 dimensionality reduction, clustering, and various supervised methods.
-Returns the best performing model based on cross-validation.
+Returns the best performing model, scored by cross-validation where the
+time budget allows.
 
 ## Usage
 
@@ -31,7 +32,16 @@ tl_auto_ml(
 
 - task:
 
-  Task type: "classification", "regression", or "auto" (default)
+  Task type: "classification", "regression", or "auto" (default), which
+  takes it from the response the formula computes, so `factor(am) ~ .`
+  is a classification although `am` is numeric. A factor or character
+  response is a classification and any other a regression. An explicit
+  task has to agree: every candidate but logistic regression takes its
+  task from the response, so a contradicting task would be scored on
+  metrics the candidates cannot produce. A 0/1 numeric response is
+  therefore a regression; convert it with
+  [`factor()`](https://rdrr.io/r/base/factor.html) to treat its values
+  as classes.
 
 - use_reduction:
 
@@ -43,35 +53,33 @@ tl_auto_ml(
 
 - time_budget:
 
-  Time budget in seconds (default: 300). Controls which models are
-  attempted and whether cross-validation is used for evaluation. The
-  budget is checked **between** model fits, not during them – once a
-  model starts training it runs to completion because R cannot safely
-  interrupt C-level code (e.g. randomForest, xgboost, e1071).
+  Time budget in seconds (default: 300). The budget is checked between
+  model fits, not during them: once a model starts training it runs to
+  completion, because R cannot safely interrupt C-level code
+  (randomForest, xgboost, e1071). A run can therefore overshoot the
+  budget by the length of the last fit it started.
 
-  How the budget shapes the workflow:
+  The budget gates the workflow as follows:
 
-  - **Under 30s**: Only fast models are attempted (tree,
-    logistic/linear). Cross-validation is skipped; models are ranked on
-    training-set metrics only. Expect 2 models in the leaderboard. Use
-    this for quick sanity checks or interactive exploration.
+  - Baseline models: a tree, with linear regression for a numeric
+    response or logistic regression for a two-class one. A random forest
+    is added when `time_budget` is 30 or more.
 
-  - **30–120s**: All baseline models are attempted including random
-    forest. Cross-validation runs when enough time remains after each
-    model fit; otherwise training metrics are used. Advanced models
-    (SVM, XGBoost / ridge, lasso) are attempted if 40\\ remains after
-    baselines. Dimensionality reduction and clustering pipelines run if
-    enabled and 10\\
+  - PCA and cluster variants, when enabled: each phase starts only if
+    more than `max(5, 0.1 * time_budget)` seconds remain, and fits one
+    variant per baseline method while at least
+    `max(2, 0.05 * time_budget)` seconds remain.
 
-  - **120s+ (recommended)**: The full pipeline runs – all baselines,
-    advanced models, PCA-augmented variants, and cluster-augmented
-    variants, each with cross-validation. Expect 9–11 models in the
-    leaderboard.
+  - Advanced models (SVM and XGBoost for classification, ridge and lasso
+    for regression): only when `time_budget` is 30 or more and more than
+    40\\
 
-  Because individual model fits (especially forest, SVM, XGBoost
-  with CV) can take 5–30s each depending on data size, the actual
-  wall-clock time may modestly exceed the budget by the duration of the
-  last model that was started before the budget expired.
+  - Scoring: a model is cross-validated when more than 30\\ budget
+    remains at the moment it is scored, and scored on its own training
+    data otherwise. The leaderboard's `evaluation` column records which.
+
+  The example below, with `time_budget = 10` on the three-class `iris`,
+  fits a single tree and cross-validates it.
 
 - cv_folds:
 
@@ -81,8 +89,11 @@ tl_auto_ml(
 
 - metric:
 
-  Evaluation metric (default: auto-selected based on task). For
-  classification: "accuracy"; for regression: "rmse".
+  Evaluation metric (default: "accuracy" for classification, "rmse" for
+  regression). Classification takes "accuracy", "precision", "recall",
+  "sensitivity", "specificity", "f1", "auc" or "pr_auc"; regression
+  takes "rmse", "mse", "mae", "mape" or "rsq". It is checked before any
+  model is fitted.
 
 ## Value
 
@@ -116,6 +127,13 @@ A list with class `"tidylearn_automl"` containing:
 - runtime:
 
   Total elapsed time as a difftime object
+
+## Details
+
+The PCA and cluster variants are built from the formula's predictors
+only, so a column the formula leaves out (`y ~ . - id`) reaches no
+candidate. The cluster variants add the cluster assignment to the
+formula's terms.
 
 ## Examples
 

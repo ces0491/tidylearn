@@ -33,7 +33,7 @@
 
     <a class="navbar-brand me-2" href="index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -452,14 +452,14 @@
 <div class="section level2">
 <h2 id="unified-visualization">Unified Visualization<a class="anchor" aria-label="anchor" href="#unified-visualization"></a>
 </h2>
-<p>Consistent ggplot2-based plotting regardless of model type:</p>
+<p>ggplot2-based plotting for most model types:</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Generic plot method works for all model types</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">forest_model</span><span class="op">)</span>       <span class="co"># Automatic visualization based on model type</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">linear_model</span><span class="op">)</span>       <span class="co"># Diagnostic plots for regression</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">linear_model</span><span class="op">)</span>       <span class="co"># Actual vs predicted for regression</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">pca_model</span><span class="op">)</span>          <span class="co"># Variance explained for PCA</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">kmeans_model</span><span class="op">)</span>       <span class="co"># Cluster scatter plot</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hclust_model</span><span class="op">)</span>       <span class="co"># Dendrogram</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hclust_model</span><span class="op">)</span>       <span class="co"># Dendrogram, drawn with base graphics</span></span>
 <span></span>
 <span><span class="co"># The lower-level helpers take data frames rather than models</span></span>
 <span><span class="fu"><a href="reference/plot_clusters.html">plot_clusters</a></span><span class="op">(</span><span class="va">cluster_data</span>, cluster_col <span class="op">=</span> <span class="st">"cluster"</span><span class="op">)</span></span>
@@ -491,7 +491,7 @@
 <div class="section level2">
 <h2 id="philosophy">Philosophy<a class="anchor" aria-label="anchor" href="#philosophy"></a>
 </h2>
-<p>The underlying packages do the real work, and tidylearn does not hide what they are doing — every method documents the function it calls, and a supervised model’s <code>$fit</code> is the object that function returned (an unsupervised one keeps it at <code>$fit$model</code>, next to the tidied components). What tidylearn adds is one signature across all 20 methods, and output that is already a tibble or a ggplot2 object, so results move into dplyr and the rest of the tidyverse without conversion.</p>
+<p>The underlying packages do the real work, and tidylearn does not hide what they are doing — every method documents the function it calls, and a supervised model’s <code>$fit</code> is the object that function returned (an unsupervised one keeps it at <code>$fit$model</code>, next to the tidied components). What tidylearn adds is one signature across all 20 methods, and predictions, metrics and most plots that are already tibbles or ggplot2 objects, so results move into dplyr and the rest of the tidyverse without conversion.</p>
 </div>
 <div class="section level2">
 <h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>

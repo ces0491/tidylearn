@@ -12,7 +12,11 @@ tl_fit_regularized(
   alpha = 0,
   lambda = NULL,
   cv_folds = 5,
-  ...
+  ...,
+  weights = NULL,
+  foldid = NULL,
+  subset = NULL,
+  offset = NULL
 )
 ```
 
@@ -37,7 +41,9 @@ tl_fit_regularized(
 
 - lambda:
 
-  Regularization parameter (if NULL, uses cross-validation to select)
+  Regularization parameter: a single penalty to fit at, or `NULL` (the
+  default) or a sequence of penalties, from which cross-validation
+  chooses one
 
 - cv_folds:
 
@@ -45,7 +51,28 @@ tl_fit_regularized(
 
 - ...:
 
-  Additional arguments to pass to glmnet()
+  Additional arguments to pass to glmnet() or cv.glmnet(). A name
+  neither function takes is an error, as are `x`, `y`, `family` and
+  `nfolds`, which tidylearn sets itself, and `relax = TRUE` and `gamma`:
+  predictions and coefficients come from the unrelaxed fit.
+
+- weights:
+
+  Optional case weights, one per row of `data`
+
+- foldid:
+
+  Optional fold for each row of `data`, for the cross-validation that
+  chooses lambda
+
+- subset:
+
+  Optional rows of `data` to fit on
+
+- offset:
+
+  Not supported: glmnet would need the offset again at every prediction.
+  An error if supplied.
 
 ## Value
 

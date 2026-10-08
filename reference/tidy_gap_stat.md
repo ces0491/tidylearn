@@ -36,11 +36,16 @@ A list of class `"tidy_gap"` containing:
 
 - gap_data: tibble with gap statistics for each k
 
-- k_firstSEmax: optimal k via firstSEmax method (most conservative)
+- k_firstSEmax: optimal k via
+  [`maxSE`](https://rdrr.io/pkg/cluster/man/clusGap.html)'s firstSEmax
+  method, the smallest k within one standard error of the first local
+  maximum (most conservative)
 
-- k_globalmax: optimal k via globalmax method
+- k_globalmax: optimal k via the globalmax method, the k with the
+  largest gap (most liberal)
 
-- k_firstmax: optimal k via firstmax method
+- k_firstmax: optimal k via the firstmax method, the first local maximum
+  of the gap
 
 - recommended_k: recommended k (uses firstSEmax)
 

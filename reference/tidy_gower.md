@@ -21,7 +21,9 @@ tidy_gower(data, weights = NULL)
 ## Value
 
 A [`dist`](https://rdrr.io/r/stats/dist.html) object containing Gower
-distances, with the `method` attribute set to `"gower"`.
+distances, with the `method` attribute set to `"gower"`. A pair of rows
+with no variable observed in both has no defined distance and is `NA`,
+as in [`daisy`](https://rdrr.io/pkg/cluster/man/daisy.html).
 
 ## Details
 

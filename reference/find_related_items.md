@@ -12,11 +12,15 @@ find_related_items(rules_obj, item, min_lift = 1.5, top_n = 10)
 
 - rules_obj:
 
-  A tidy_apriori object
+  A tidy_apriori object, an arules rules object, or a tibble of rules
+  from
+  [`tidy_rules`](https://tidylearn.sheetsolved.com/reference/tidy_rules.md),
+  which must keep its `lhs_items` and `rhs_items` columns
 
 - item:
 
-  Character; item to find associations for
+  Character; one item name to find associations for, matched against
+  whole items
 
 - min_lift:
 
@@ -40,39 +44,19 @@ if (requireNamespace("arules", quietly = TRUE)) {
   res <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
   find_related_items(res, "whole milk", min_lift = 1.5)
 }
-#> Apriori
-#> 
-#> Parameter specification:
-#>  confidence minval smax arem  aval originalSupport maxtime support minlen
-#>         0.5    0.1    1 none FALSE            TRUE       5   0.001      2
-#>  maxlen target  ext
-#>      10  rules TRUE
-#> 
-#> Algorithmic control:
-#>  filter tree heap memopt load sort verbose
-#>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE
-#> 
-#> Absolute minimum support count: 9 
-#> 
-#> set item appearances ...[0 item(s)] done [0.00s].
-#> set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].
-#> sorting and recoding items ... [157 item(s)] done [0.00s].
-#> creating transaction tree ... done [0.00s].
-#> checking subsets of size 1 2 3 4 5 6 done [0.01s].
-#> writing ... [5668 rule(s)] done [0.00s].
-#> creating S4 object  ... done [0.00s].
-#> # A tibble: 10 × 8
-#>    rule_id lhs                     rhs   support confidence coverage  lift count
-#>      <int> <chr>                   <chr>   <dbl>      <dbl>    <dbl> <dbl> <int>
-#>  1      55 {whole milk,Instant fo… {ham… 0.00153      0.5    0.00305 15.0     15
-#>  2    5638 {tropical fruit,other … {but… 0.00102      0.625  0.00163 11.3     10
-#>  3    5633 {tropical fruit,root v… {bee… 0.00112      0.55   0.00203 10.5     11
-#>  4    4734 {tropical fruit,whole … {but… 0.00102      0.556  0.00183 10.0     10
-#>  5    1827 {whole milk,whipped/so… {but… 0.00142      0.538  0.00264  9.72    14
-#>  6    1826 {whole milk,butter,har… {whi… 0.00142      0.667  0.00214  9.30    14
-#>  7    4820 {citrus fruit,other ve… {dom… 0.00112      0.579  0.00193  9.12    11
-#>  8    4810 {whole milk,curd,yogur… {whi… 0.00112      0.647  0.00173  9.03    11
-#>  9    5044 {other vegetables,whol… {but… 0.00102      0.5    0.00203  9.02    10
-#> 10    2699 {citrus fruit,whole mi… {dom… 0.00163      0.571  0.00285  9.01    16
+#> # A tibble: 10 × 10
+#>    rule_id lhs           rhs   support confidence coverage  lift count lhs_items
+#>      <int> <chr>         <chr>   <dbl>      <dbl>    <dbl> <dbl> <int> <list>   
+#>  1      55 {whole milk,… {ham… 0.00153      0.5    0.00305 15.0     15 <chr [2]>
+#>  2    5638 {tropical fr… {but… 0.00102      0.625  0.00163 11.3     10 <chr [5]>
+#>  3    5633 {tropical fr… {bee… 0.00112      0.55   0.00203 10.5     11 <chr [5]>
+#>  4    4734 {tropical fr… {but… 0.00102      0.556  0.00183 10.0     10 <chr [4]>
+#>  5    1827 {whole milk,… {but… 0.00142      0.538  0.00264  9.72    14 <chr [3]>
+#>  6    1826 {whole milk,… {whi… 0.00142      0.667  0.00214  9.30    14 <chr [3]>
+#>  7    4820 {citrus frui… {dom… 0.00112      0.579  0.00193  9.12    11 <chr [4]>
+#>  8    4810 {whole milk,… {whi… 0.00112      0.647  0.00173  9.03    11 <chr [4]>
+#>  9    5044 {other veget… {but… 0.00102      0.5    0.00203  9.02    10 <chr [4]>
+#> 10    2699 {citrus frui… {dom… 0.00163      0.571  0.00285  9.01    16 <chr [3]>
+#> # ℹ 1 more variable: rhs_items <list>
 # }
 ```

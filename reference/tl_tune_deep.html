@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -48,7 +48,7 @@
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">tl_tune_deep</span><span class="op">(</span></span>
 <span>  <span class="va">data</span>,</span>
 <span>  <span class="va">formula</span>,</span>
-<span>  is_classification <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  is_classification <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  hidden_layers_options <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">32</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">64</span>, <span class="fl">32</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">128</span>, <span class="fl">64</span>, <span class="fl">32</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  learning_rates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.01</span>, <span class="fl">0.001</span>, <span class="fl">1e-04</span><span class="op">)</span>,</span>
 <span>  batch_sizes <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">16</span>, <span class="fl">32</span>, <span class="fl">64</span><span class="op">)</span>,</span>
@@ -72,7 +72,10 @@
 
 <dt id="arg-is-classification">is_classification<a class="anchor" aria-label="anchor" href="#arg-is-classification"></a></dt>
 <dd><p>Logical indicating if this is a
-classification problem</p></dd>
+classification problem. <code>NULL</code> (default) reads it from the
+response, as <code><a href="tl_model.html">tl_model</a></code> does: a factor or character
+response is classification. <code>FALSE</code> with such a response is an
+error.</p></dd>
 
 
 <dt id="arg-hidden-layers-options">hidden_layers_options<a class="anchor" aria-label="anchor" href="#arg-hidden-layers-options"></a></dt>
@@ -95,18 +98,25 @@ layer configurations to try</p></dd>
 
 
 <dt id="arg-validation-split">validation_split<a class="anchor" aria-label="anchor" href="#arg-validation-split"></a></dt>
-<dd><p>Proportion of data for validation
-(default: 0.2)</p></dd>
+<dd><p>Proportion of the rows held out to score each
+configuration on, drawn at random (default: 0.2). Every configuration
+is scored on the same rows.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments</p></dd>
+<dd><p>Additional arguments passed to keras's fit() for every
+configuration; <code>verbose</code> (default 0) replaces the value used
+otherwise. Arguments with one value per row – <code>weights</code>,
+<code>subset</code>, <code>offset</code>, <code>foldid</code>, <code>strata</code> – are
+refused, since each configuration is fitted on part of the rows.</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A list with elements <code>model</code> (the best fitted deep learning
-model), <code>best_hidden_layers</code> (optimal layer configuration),
+    <p>A list with elements <code>model</code> (the best configuration refitted
+as a <code>tidylearn_model</code>, so <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> and the deep plots take
+it; the keras model is at <code>$model$fit$model</code>),
+<code>best_hidden_layers</code> (optimal layer configuration),
 <code>best_learning_rate</code>, <code>best_batch_size</code>, and
 <code>tuning_results</code> (a data frame of all hyperparameter combinations
 and their validation losses).</p>
@@ -117,10 +127,10 @@ and their validation losses).</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
 <span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"keras"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
 <span class="r-in"><span>  <span class="va">result</span> <span class="op">&lt;-</span> <span class="fu">tl_tune_deep</span><span class="op">(</span><span class="va">iris</span>, <span class="va">Species</span> <span class="op">~</span> <span class="va">.</span>,</span></span>
-<span class="r-in"><span>    is_classification <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
 <span class="r-in"><span>    hidden_layers_options <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>    learning_rates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.01</span>, <span class="fl">0.001</span><span class="op">)</span>, batch_sizes <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">32</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>    epochs <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">model</span>, <span class="va">iris</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="op">]</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 <span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
 </code></pre></div>

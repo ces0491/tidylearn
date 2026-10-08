@@ -12,7 +12,8 @@ tl_semisupervised(
   labeled_indices,
   cluster_method = "kmeans",
   supervised_method = "tree",
-  ...
+  ...,
+  cluster_args = list()
 )
 ```
 
@@ -24,8 +25,13 @@ tl_semisupervised(
 
 - formula:
 
-  Model formula. The response must be a factor, character or logical
-  column.
+  Model formula. The response must be categorical: a factor, character
+  or logical column, or an expression that computes a factor or
+  character vector from a column, such as `factor(am)` or
+  `factor(mpg > 20)`. For an expression, each row's propagated label is
+  written to that column as its value in a labelled row of the same
+  class. An expression that then computes other labels, such as
+  `cut(mpg, 2)`, whose breaks follow the column's range, is refused.
 
 - labeled_indices:
 
@@ -33,7 +39,8 @@ tl_semisupervised(
 
 - cluster_method:
 
-  Clustering method for label propagation
+  Clustering method for label propagation: `"kmeans"` (default),
+  `"pam"`, `"clara"` or `"hclust"`, whose tree is cut at k
 
 - supervised_method:
 
@@ -43,7 +50,13 @@ tl_semisupervised(
 
 - ...:
 
-  Additional arguments
+  Additional arguments for the supervised model
+
+- cluster_args:
+
+  A named list of arguments for the clustering step, such as
+  `list(nstart = 5)` for k-means. k is set from the labelled classes and
+  cannot be given here.
 
 ## Value
 
@@ -51,14 +64,19 @@ A tidylearn model object with additional class
 `"tidylearn_semisupervised"`, trained on pseudo-labeled data. The model
 includes a `semisupervised_info` element with `labeled_indices`,
 `cluster_model`, `label_mapping`, and `n_unlabelled_dropped`, the number
-of rows left out because their cluster had no labelled observation.
+of rows left out for having no label to train on.
 
 ## Details
 
 Labels are propagated by majority vote within each cluster, so the
-response must be categorical. Rows in a cluster that holds no labelled
-observation have no label to take; they are left out of training, with a
-warning giving the count.
+response must be categorical. The rows are clustered on the predictors
+the formula names, into as many clusters as the labelled rows hold
+classes. A labelled row whose label is missing takes no part in the
+vote. Rows in a cluster where no labelled observation carries a label
+have no label to take, and labelled rows whose own label is missing have
+none either; both are left out of training, with a warning giving the
+counts. The pseudo-labels keep the response's level order, so the second
+level stays the positive class.
 
 ## Examples
 

@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -61,7 +61,13 @@
 
 
 <dt id="arg-stratify">stratify<a class="anchor" aria-label="anchor" href="#arg-stratify"></a></dt>
-<dd><p>Column name for stratified splitting</p></dd>
+<dd><p>Column name for stratified splitting. Each stratum is
+split at <code>prop</code>. A numeric column with more than five distinct
+values is stratified by its quartiles, and rows missing the value form
+a stratum of their own. A stratum of a single row goes to the training
+set, unless such strata together hold more than a tenth of the rows, as
+in an ID column; then they are pooled into one stratum and split
+together.</p></dd>
 
 
 <dt id="arg-seed">seed<a class="anchor" aria-label="anchor" href="#arg-seed"></a></dt>
@@ -77,7 +83,8 @@
 <dd><p>A data frame containing the test subset.</p></dd>
 
 
-</dl></div>
+</dl><p>A split that leaves the test set empty, as a single row does, warns.</p>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>

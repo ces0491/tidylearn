@@ -19,7 +19,7 @@ the data source."><meta property="og:image" content="https://tidylearn.sheetsolv
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -65,30 +65,45 @@ the data source.</p>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>Supported file formats:</p><ul><li><p><strong>CSV</strong>: <code>.csv</code> files via <span class="pkg">readr</span>
-(with base R fallback)</p></li>
+(with base R fallback), and <code>.txt</code> files named directly</p></li>
 <li><p><strong>TSV</strong>: <code>.tsv</code> files via <span class="pkg">readr</span>
 (with base R fallback)</p></li>
 <li><p><strong>Excel</strong>: <code>.xls</code>, <code>.xlsx</code>,
 <code>.xlsm</code> files via <span class="pkg">readxl</span></p></li>
 <li><p><strong>Parquet</strong>: <code>.parquet</code> files via <span class="pkg">nanoparquet</span></p></li>
-<li><p><strong>JSON</strong>: <code>.json</code> files via <span class="pkg">jsonlite</span></p></li>
+<li><p><strong>JSON</strong>: <code>.json</code> files, and newline-delimited
+<code>.ndjson</code> files, via <span class="pkg">jsonlite</span></p></li>
 <li><p><strong>RDS</strong>: <code>.rds</code> files via base <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS()</a></code></p></li>
 <li><p><strong>RData</strong>: <code>.rdata</code>, <code>.rda</code>
 files via base <code><a href="https://rdrr.io/r/base/load.html" class="external-link">load()</a></code></p></li>
-</ul><p>Supported databases (via <span class="pkg">DBI</span>):</p><ul><li><p><strong>SQLite</strong>: <code>.sqlite</code>, <code>.db</code> files via <span class="pkg">RSQLite</span></p></li>
+</ul><p>CSV and TSV files compressed with gzip, bzip2 or xz
+(<code>data.csv.gz</code>) are recognised by the extension under the
+compression one.</p>
+<p>Supported databases (via <span class="pkg">DBI</span>):</p><ul><li><p><strong>SQLite</strong>: <code>.sqlite</code>, <code>.db</code> files via <span class="pkg">RSQLite</span></p></li>
 <li><p><strong>PostgreSQL</strong>: via <span class="pkg">RPostgres</span></p></li>
 <li><p><strong>MySQL/MariaDB</strong>: via <span class="pkg">RMariaDB</span></p></li>
-<li><p><strong>BigQuery</strong>: via <span class="pkg">bigrquery</span></p></li>
+<li><p><strong>BigQuery</strong>: <code>bigquery://project/dataset</code> URIs via
+<span class="pkg">bigrquery</span></p></li>
 </ul><p>Supported cloud/API sources:</p><ul><li><p><strong>S3</strong>: <code>s3://</code> URIs via <span class="pkg">paws.storage</span></p></li>
 <li><p><strong>GitHub</strong>: raw file download from repositories</p></li>
 <li><p><strong>Kaggle</strong>: dataset download via Kaggle CLI</p></li>
-</ul><p>Multi-file reading:</p><ul><li><p><strong>Multiple paths</strong>: pass a character vector to <code><a href="tl_read.html">tl_read()</a></code></p></li>
+</ul><p>A <code>file://</code> URL is read as the local path it names. Other web
+URLs, and URLs with any other scheme such as <code>ftp://</code>, are not
+read; download the file first.</p>
+<p>Multi-file reading:</p><ul><li><p><strong>Multiple paths</strong>: pass a character vector to <code><a href="tl_read.html">tl_read()</a></code></p></li>
 <li><p><strong>Directories</strong>: <code><a href="tl_read_dir.html">tl_read_dir()</a></code> scans for data files with
 optional pattern/format filtering and recursive scanning</p></li>
 <li><p><strong>Zip archives</strong>: <code><a href="tl_read_zip.html">tl_read_zip()</a></code> extracts and reads from
 <code>.zip</code> files</p></li>
 </ul><p>When combining multiple files, a <code>source_file</code> column is added to
-identify the origin of each row.</p>
+identify the origin of each row: the file's path below the directory
+or archive it came from, or, for paths given directly, below the
+deepest folder they share. Files in one folder are labelled by their
+bare names.</p>
+<p>Directory and archive scans read the extensions listed above except
+<code>.txt</code>, which in a folder is as likely to hold notes as data.
+Name a <code>.txt</code> file directly, or select it with <code>pattern</code>,
+to read it.</p>
     </div>
 
   </main></div>

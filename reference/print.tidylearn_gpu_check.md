@@ -36,7 +36,6 @@ print(tl_check_gpu())
 #>   xgboost     CPU only
 #>   tensorflow  CPU only
 #>   keras       CPU only
-#>   torch       not installed
 #> 
 #> Notes:
 #>   - No NVIDIA CUDA driver detected. All GPU paths fall back to CPU.

@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -58,7 +58,8 @@
 
 <dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
 <dd><p>Data for SHAP value calculation
-(default: NULL, uses training data)</p></dd>
+(default: NULL, uses training data). The response column is not
+needed.</p></dd>
 
 
 <dt id="arg-n-samples">n_samples<a class="anchor" aria-label="anchor" href="#arg-n-samples"></a></dt>
@@ -66,21 +67,28 @@
 
 
 <dt id="arg-trees-idx">trees_idx<a class="anchor" aria-label="anchor" href="#arg-trees-idx"></a></dt>
-<dd><p>Trees to include (default: NULL, uses all trees)</p></dd>
+<dd><p>Boosting rounds to include, as a run of consecutive
+rounds counted from 1 such as <code>1:20</code> (default: NULL, uses every
+round)</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A data frame with one column of SHAP values per feature, a
-<code>BIAS</code> column, a <code>row_id</code> column, and the original data columns
-appended for reference.</p>
+    <p>A data frame with one column of SHAP values per feature (the
+columns of the model's design matrix), a <code>BIAS</code> column and a
+<code>row_id</code> column giving the row of the (sampled) data each row
+explains. For a multiclass model there is one block of rows per class,
+told apart by a <code>class</code> column. The columns of <code>data</code> whose
+names are not already taken – the response, and any factor predictor,
+whose SHAP columns are named after its levels – are appended for
+reference.</p>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"xgboost"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span>  <span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="tl_model.html">tl_model</a></span><span class="op">(</span><span class="va">mtcars</span>, <span class="va">mpg</span> <span class="op">~</span> <span class="va">.</span>, method <span class="op">=</span> <span class="st">"xgboost"</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="tl_model.html">tl_model</a></span><span class="op">(</span><span class="va">mtcars</span>, <span class="va">mpg</span> <span class="op">~</span> <span class="va">.</span>, method <span class="op">=</span> <span class="st">"xgboost"</span>, nthread <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="va">shap</span> <span class="op">&lt;-</span> <span class="fu">tl_xgboost_shap</span><span class="op">(</span><span class="va">model</span>, n_samples <span class="op">=</span> <span class="fl">20</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>

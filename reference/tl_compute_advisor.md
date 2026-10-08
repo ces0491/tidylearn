@@ -58,13 +58,22 @@ tl_compute_advisor(x, ...)
 - formula:
 
   Optional formula. Used to determine the number of effective
-  predictors. Ignored when `x` is a fitted model.
+  predictors: the terms it expands to against `data`, so `y ~ . - id`
+  counts every column but `y` and `id`. Ignored when `x` is a fitted
+  model.
 
 - hyperparams:
 
-  Named list of hyperparameters that affect runtime (e.g.
-  `list(nrounds = 1000)` for xgboost, `list(epochs = 50, units = 256)`
-  for deep learning). Missing entries fall back to per-method defaults.
+  Named list of hyperparameters that affect runtime: `degree`
+  (polynomial), `ntree` (forest), `n.trees` (boost), `nrounds`
+  (xgboost), `size` and `maxit` (nn), and `epochs` and `hidden_layers`
+  (deep), e.g. `list(nrounds = 1000)` or
+  `list(epochs = 50, hidden_layers = c(64, 32))`. Each must be a
+  positive number, or a vector of them for `hidden_layers`. Missing
+  entries take the defaults of the method's fit function, so the
+  estimate is for the fit
+  [`tl_model()`](https://tidylearn.sheetsolved.com/reference/tl_model.md)
+  would run; other entries are ignored.
 
 - gpu_check:
 
@@ -113,9 +122,10 @@ print(advice)
 #>   - Cloud integration is not yet configured in tidylearn. Estimates shown so users can see the tier's shape; actual submission is not yet supported.
 
 # \donttest{
-# Dispatching on a fitted model requires the backend to be installed
+# Dispatching on a fitted model requires the backend to be installed.
+# CRAN asks examples to use at most two threads.
 if (requireNamespace("xgboost", quietly = TRUE)) {
-  model <- tl_model(iris, Species ~ ., method = "xgboost")
+  model <- tl_model(iris, Species ~ ., method = "xgboost", nthread = 2)
   tl_compute_advisor(model)
 }
 #> <tidylearn compute advice>

@@ -4,6 +4,12 @@
 
 library(tidylearn)
 library(dplyr)
+
+# Cross-validation folds, forests and the k-means behind the cluster
+# features all draw random numbers. Seeding once here makes the page
+# reproduce when run from the top, unless a machine is slow enough to close
+# one of the time gates described below.
+set.seed(42)
 ```
 
 ## Introduction
@@ -36,14 +42,14 @@ result$leaderboard
 #> # A tibble: 8 × 3
 #>   model            score evaluation
 #>   <chr>            <dbl> <chr>     
-#> 1 clustered_tree   0.953 cv        
-#> 2 baseline_tree    0.947 cv        
+#> 1 advanced_svm     0.953 cv        
+#> 2 advanced_xgboost 0.953 cv        
 #> 3 baseline_forest  0.947 cv        
-#> 4 clustered_forest 0.947 cv        
-#> 5 advanced_svm     0.947 cv        
-#> 6 advanced_xgboost 0.947 cv        
-#> 7 pca_tree         0.9   cv        
-#> 8 pca_forest       0.873 cv
+#> 4 clustered_tree   0.947 cv        
+#> 5 clustered_forest 0.947 cv        
+#> 6 baseline_tree    0.933 cv        
+#> 7 pca_tree         0.913 cv        
+#> 8 pca_forest       0.893 cv
 ```
 
 Three columns: which model, what it scored, and how the score was
@@ -55,7 +61,7 @@ result$best_model
 #> tidylearn Model
 #> ===============
 #> Paradigm: supervised 
-#> Method: tree 
+#> Method: svm 
 #> Task: Classification 
 #> Formula: Species ~ . 
 #> 
@@ -69,7 +75,7 @@ result$task
 result$metric
 #> [1] "accuracy"
 round(as.numeric(result$runtime, units = "secs"), 1)
-#> [1] 0.7
+#> [1] 1.1
 ```
 
 Regression is the same call with a numeric response — `task = "auto"`
@@ -93,17 +99,17 @@ result_reg$leaderboard
 #> # A tibble: 11 × 3
 #>    model            score evaluation
 #>    <chr>            <dbl> <chr>     
-#>  1 clustered_forest  2.67 cv        
-#>  2 baseline_forest   2.70 cv        
-#>  3 advanced_lasso    2.85 cv        
-#>  4 pca_linear        2.97 cv        
-#>  5 advanced_ridge    2.98 cv        
-#>  6 baseline_linear   3.32 cv        
-#>  7 baseline_tree     4.11 cv        
-#>  8 pca_forest        4.16 cv        
-#>  9 clustered_linear  4.34 cv        
-#> 10 clustered_tree    4.48 cv        
-#> 11 pca_tree          4.65 cv
+#>  1 pca_linear        2.46 cv        
+#>  2 clustered_forest  2.67 cv        
+#>  3 baseline_forest   2.83 cv        
+#>  4 advanced_ridge    2.89 cv        
+#>  5 advanced_lasso    3.28 cv        
+#>  6 clustered_linear  3.61 cv        
+#>  7 pca_tree          3.79 cv        
+#>  8 pca_forest        3.97 cv        
+#>  9 baseline_tree     4.31 cv        
+#> 10 clustered_tree    4.54 cv        
+#> 11 baseline_linear   4.61 cv
 ```
 
 ## How the Search Works
@@ -148,7 +154,7 @@ names(binary_result$models)
 ```
 
 That call emits a run of `glm.fit: algorithm did not converge` warnings,
-which this chunk hides only because there are a dozen of them. They are
+which this chunk hides only because there are several of them. They are
 worth understanding rather than ignoring: *versicolor* and *virginica*
 overlap only slightly, and a three-fold split of 100 rows will sometimes
 produce a fold where the two are perfectly separable. Logistic
@@ -215,24 +221,34 @@ sweep <- lapply(budgets, function(b) {
 })
 
 do.call(rbind, sweep)
-#>   budget elapsed models cv_scored             best
-#> 1      2     0.0      1         1    baseline_tree
-#> 2      5     0.0      1         1    baseline_tree
-#> 3     10     0.1      3         3    baseline_tree
-#> 4     30     0.6      8         8 clustered_forest
+#>   budget elapsed models cv_scored          best
+#> 1      2     0.0      1         1 baseline_tree
+#> 2      5     0.0      1         1 baseline_tree
+#> 3     10     0.2      3         3 baseline_tree
+#> 4     30     0.7      8         8  advanced_svm
 ```
 
 iris is 150 rows, so everything here is quick and the budget is barely
-touched. On data where a single forest fit takes ten seconds the same
-numbers look very different, so run the sweep on your own data.
+touched. What changes across the sweep is which of these gates each
+budget opens:
 
-Two things are worth knowing regardless of size:
+- The forest baseline, its PCA and cluster variants, and the advanced
+  models are only attempted when `time_budget >= 30`.
+- The PCA and cluster phases start only while more than 5 seconds and
+  more than 10% of the budget remain, and stop adding variants once
+  fewer than 2 seconds or 5% are left. A budget of 5 seconds or less
+  never reaches them.
+- The advanced phase starts only while more than 40% of the budget
+  remains.
+- A model is cross-validated only while more than 30% of the budget
+  remains when it is scored. After that it is scored on the training
+  data, and the `evaluation` column says `"train"`.
 
-- The forest baseline and every advanced model are only attempted when
-  `time_budget >= 30`.
-- Cross-validation is the expensive step. `tl_cv(folds = 5)` fits five
-  models where a plain fit costs one, so `cv_folds` is the most
-  effective lever.
+On data where a single forest fit takes ten seconds, the last three
+gates close early and the same budgets give very different results, so
+run the sweep on your own data. Cross-validation is the expensive step:
+`tl_cv(folds = 5)` fits five models where a plain fit costs one, so
+`cv_folds` is the most effective lever.
 
 ## Controlling the Search
 
@@ -282,17 +298,17 @@ by_f1$leaderboard
 #> # A tibble: 11 × 3
 #>    model              score evaluation
 #>    <chr>              <dbl> <chr>     
-#>  1 advanced_svm       0.947 cv        
-#>  2 clustered_logistic 0.932 cv        
-#>  3 baseline_logistic  0.928 cv        
-#>  4 clustered_tree     0.928 cv        
-#>  5 clustered_forest   0.923 cv        
-#>  6 advanced_xgboost   0.921 cv        
-#>  7 baseline_forest    0.905 cv        
-#>  8 baseline_tree      0.893 cv        
-#>  9 pca_forest         0.888 cv        
-#> 10 pca_logistic       0.845 cv        
-#> 11 pca_tree           0.764 cv
+#>  1 advanced_svm       0.935 cv        
+#>  2 advanced_xgboost   0.927 cv        
+#>  3 pca_forest         0.927 cv        
+#>  4 clustered_logistic 0.921 cv        
+#>  5 baseline_logistic  0.921 cv        
+#>  6 clustered_forest   0.916 cv        
+#>  7 baseline_forest    0.908 cv        
+#>  8 baseline_tree      0.904 cv        
+#>  9 pca_logistic       0.876 cv        
+#> 10 clustered_tree     0.848 cv        
+#> 11 pca_tree           0.815 cv
 ```
 
 ## Using the Result
@@ -305,7 +321,7 @@ automl <- tl_auto_ml(split$train, Species ~ ., time_budget = 30, cv_folds = 3)
 
 test_preds <- predict(automl$best_model, new_data = split$test)
 mean(test_preds$.pred == split$test$Species)
-#> [1] 0.9111111
+#> [1] 0.9333333
 ```
 
 Any model on the leaderboard can be pulled out by name:
@@ -336,7 +352,7 @@ data.frame(model = available, test_accuracy = round(scores, 3),
 #> 5 clustered_forest         0.911
 #> 6 advanced_xgboost         0.911
 #> 7         pca_tree         0.889
-#> 8       pca_forest         0.867
+#> 8       pca_forest         0.844
 ```
 
 Comparing the leaderboard against held-out accuracy is worth doing: the
@@ -360,7 +376,7 @@ data.frame(
 )
 #>                 approach test_accuracy
 #> 1 forest, chosen by hand         0.933
-#> 2            AutoML best         0.911
+#> 2            AutoML best         0.933
 ```
 
 On iris a random forest is already the right answer, so the search does
@@ -399,9 +415,14 @@ a message explaining why and never reaches the leaderboard. Run without
 `message = FALSE` to see which and why.
 
 A model that evaluates but produces no value for the chosen metric
-appears with an `NA` score. That usually means the metric is not one
-[`tl_evaluate()`](https://tidylearn.sheetsolved.com/reference/tl_evaluate.md)
-recognises for the task. If every score is `NA`,
+appears with an `NA` score.
+[`tl_auto_ml()`](https://tidylearn.sheetsolved.com/reference/tl_auto_ml.md)
+refuses an unrecognised metric name before fitting anything, so an `NA`
+means the metric was undefined on the rows scored: `auc` needs rows of
+at least two classes, for instance, and is undefined on a fold that
+holds one. Cross-validation leaves such folds out of its average, so a
+cross-validated score is `NA` only when the metric was undefined in
+every fold. If every score is `NA`,
 [`tl_auto_ml()`](https://tidylearn.sheetsolved.com/reference/tl_auto_ml.md)
 warns and returns the first model trained rather than pretending to have
 ranked them.
@@ -430,7 +451,7 @@ winner:
 
 winner <- automl$best_model$spec$method
 winner
-#> [1] "forest"
+#> [1] "tree"
 ```
 
 ``` r
@@ -444,29 +465,30 @@ tuned <- tl_tune_grid(
 )
 
 attr(tuned, "tuning_results")$best_params
-#> $mtry
-#> [1] 2
+#> $cp
+#> [1] 0.01
 #> 
-#> $ntree
-#> [1] 100
+#> $minsplit
+#> [1] 10
 ```
 
 ``` r
 
 mean(predict(tuned, new_data = split$test)$.pred == split$test$Species)
-#> [1] 0.9333333
+#> [1] 0.9777778
 ```
 
 ## Guidance
 
 1.  **Start at `time_budget = 10`** to confirm the call is well formed,
-    then raise it. Nothing about a 10-second run tells you which model
-    is best.
-2.  **Lower `cv_folds` before lowering `time_budget`.** Going from 5
-    folds to 2 removes 60% of the evaluation cost and still gives
-    out-of-sample estimates. A 30-second budget at `cv_folds = 2` is
-    more informative than the same budget at the default 5, which will
-    skip CV entirely.
+    then raise it. Below 30 seconds the forest and the advanced models
+    are never tried, so a 10-second run cannot tell you which model is
+    best.
+2.  **Lower `cv_folds` before lowering `time_budget`.** When fits are
+    slow, the 30% gate above leaves the later models with training-set
+    scores. Two folds fit two models per evaluation instead of five and
+    still give out-of-sample estimates, which leaves more of the budget
+    for cross-validating the rest.
 3.  **Preprocess first.** AutoML does not impute or scale.
 4.  **Score on held-out data.** The leaderboard ranks; it does not
     report final performance.

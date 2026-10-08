@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -53,11 +53,14 @@
 
 
 <dl><dt id="arg-rules-obj">rules_obj<a class="anchor" aria-label="anchor" href="#arg-rules-obj"></a></dt>
-<dd><p>A tidy_apriori object or tibble of rules</p></dd>
+<dd><p>A tidy_apriori object, an arules rules object, or a
+tibble of rules from <code><a href="tidy_rules.html">tidy_rules</a></code>, which must keep its
+<code>lhs_items</code> and <code>rhs_items</code> columns</p></dd>
 
 
 <dt id="arg-item">item<a class="anchor" aria-label="anchor" href="#arg-item"></a></dt>
-<dd><p>Character; item to filter by</p></dd>
+<dd><p>Character; one item name, matched against whole items, so
+"coffee" does not match "instant coffee"</p></dd>
 
 
 <dt id="arg-where">where<a class="anchor" aria-label="anchor" href="#arg-where"></a></dt>
@@ -78,41 +81,21 @@ requested position.</p>
 <span class="r-in"><span>  <span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="tidy_apriori.html">tidy_apriori</a></span><span class="op">(</span><span class="va">Groceries</span>, support <span class="op">=</span> <span class="fl">0.001</span>, confidence <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="fu">filter_rules_by_item</span><span class="op">(</span><span class="va">res</span>, <span class="st">"whole milk"</span>, where <span class="op">=</span> <span class="st">"rhs"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Apriori</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Parameter specification:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  confidence minval smax arem  aval originalSupport maxtime support minlen</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         0.5    0.1    1 none FALSE            TRUE       5   0.001      2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  maxlen target  ext</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      10  rules TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Algorithmic control:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  filter tree heap memopt load sort verbose</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Absolute minimum support count: 9 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> set item appearances ...[0 item(s)] done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sorting and recoding items ... [157 item(s)] done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> creating transaction tree ... done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> checking subsets of size 1 2 3 4 5 6 done [0.01s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> writing ... [5668 rule(s)] done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> creating S4 object  ... done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 2,679 × 8</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    rule_id lhs                     rhs   support confidence coverage  lift count</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span>       1 {honey}                 {who… 0.001<span style="text-decoration: underline;">12</span>      0.733  0.001<span style="text-decoration: underline;">53</span>  2.87    11</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span>       3 {cocoa drinks}          {who… 0.001<span style="text-decoration: underline;">32</span>      0.591  0.002<span style="text-decoration: underline;">24</span>  2.31    13</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span>       4 {pudding powder}        {who… 0.001<span style="text-decoration: underline;">32</span>      0.565  0.002<span style="text-decoration: underline;">34</span>  2.21    13</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span>       5 {cooking chocolate}     {who… 0.001<span style="text-decoration: underline;">32</span>      0.52   0.002<span style="text-decoration: underline;">54</span>  2.04    13</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span>       6 {cereals}               {who… 0.003<span style="text-decoration: underline;">66</span>      0.643  0.005<span style="text-decoration: underline;">69</span>  2.52    36</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span>       7 {jam}                   {who… 0.002<span style="text-decoration: underline;">95</span>      0.547  0.005<span style="text-decoration: underline;">39</span>  2.14    29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span>      10 {rice}                  {who… 0.004<span style="text-decoration: underline;">68</span>      0.613  0.007<span style="text-decoration: underline;">63</span>  2.40    46</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span>      11 {baking powder}         {who… 0.009<span style="text-decoration: underline;">25</span>      0.523  0.017<span style="text-decoration: underline;">7</span>   2.05    91</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span>      12 {liver loaf,yogurt}     {who… 0.001<span style="text-decoration: underline;">02</span>      0.667  0.001<span style="text-decoration: underline;">53</span>  2.61    10</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span>      14 {curd cheese,rolls/bun… {who… 0.001<span style="text-decoration: underline;">02</span>      0.625  0.001<span style="text-decoration: underline;">63</span>  2.45    10</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 2,679 × 10</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    rule_id lhs           rhs   support confidence coverage  lift count lhs_items</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;list&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span>       1 {honey}       {who… 0.001<span style="text-decoration: underline;">12</span>      0.733  0.001<span style="text-decoration: underline;">53</span>  2.87    11 <span style="color: #949494;">&lt;chr [1]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span>       3 {cocoa drink… {who… 0.001<span style="text-decoration: underline;">32</span>      0.591  0.002<span style="text-decoration: underline;">24</span>  2.31    13 <span style="color: #949494;">&lt;chr [1]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span>       4 {pudding pow… {who… 0.001<span style="text-decoration: underline;">32</span>      0.565  0.002<span style="text-decoration: underline;">34</span>  2.21    13 <span style="color: #949494;">&lt;chr [1]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span>       5 {cooking cho… {who… 0.001<span style="text-decoration: underline;">32</span>      0.52   0.002<span style="text-decoration: underline;">54</span>  2.04    13 <span style="color: #949494;">&lt;chr [1]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span>       6 {cereals}     {who… 0.003<span style="text-decoration: underline;">66</span>      0.643  0.005<span style="text-decoration: underline;">69</span>  2.52    36 <span style="color: #949494;">&lt;chr [1]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span>       7 {jam}         {who… 0.002<span style="text-decoration: underline;">95</span>      0.547  0.005<span style="text-decoration: underline;">39</span>  2.14    29 <span style="color: #949494;">&lt;chr [1]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span>      10 {rice}        {who… 0.004<span style="text-decoration: underline;">68</span>      0.613  0.007<span style="text-decoration: underline;">63</span>  2.40    46 <span style="color: #949494;">&lt;chr [1]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span>      11 {baking powd… {who… 0.009<span style="text-decoration: underline;">25</span>      0.523  0.017<span style="text-decoration: underline;">7</span>   2.05    91 <span style="color: #949494;">&lt;chr [1]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span>      12 {liver loaf,… {who… 0.001<span style="text-decoration: underline;">02</span>      0.667  0.001<span style="text-decoration: underline;">53</span>  2.61    10 <span style="color: #949494;">&lt;chr [2]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span>      14 {curd cheese… {who… 0.001<span style="text-decoration: underline;">02</span>      0.625  0.001<span style="text-decoration: underline;">63</span>  2.45    10 <span style="color: #949494;">&lt;chr [2]&gt;</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 2,669 more rows</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 1 more variable: rhs_items &lt;list&gt;</span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>

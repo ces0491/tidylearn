@@ -9,7 +9,7 @@ to understand data structure before modeling"><meta property="og:image" content=
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -64,11 +64,14 @@ to understand data structure before modeling</p>
 
 
 <dt id="arg-max-components">max_components<a class="anchor" aria-label="anchor" href="#arg-max-components"></a></dt>
-<dd><p>Maximum PCA components to compute (default: 5)</p></dd>
+<dd><p>Maximum number of PCA components to keep (default:
+5), or fewer if the data has fewer numeric columns</p></dd>
 
 
 <dt id="arg-k-range">k_range<a class="anchor" aria-label="anchor" href="#arg-k-range"></a></dt>
-<dd><p>Range of k values for clustering (default: 2:6)</p></dd>
+<dd><p>Range of k values for clustering (default: 2:6). Each is
+a whole number from 2 to one less than the number of rows, the range a
+silhouette is defined over.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -80,7 +83,9 @@ to understand data structure before modeling</p>
 <dd><p>The response variable name, or <code>NULL</code>.</p></dd>
 
 <dt>pca</dt>
-<dd><p>The fitted PCA model.</p></dd>
+<dd><p>The fitted PCA model, keeping the first
+<code>max_components</code> components, as
+<code>prcomp(rank. = max_components)</code> would.</p></dd>
 
 <dt>optimal_k</dt>
 <dd><p>List with optimal cluster count results.</p></dd>
@@ -93,7 +98,7 @@ to understand data structure before modeling</p>
 
 <dt>summary</dt>
 <dd><p>List with <code>n_obs</code>, <code>n_vars</code>,
-<code>n_components</code>, and <code>best_k</code>.</p></dd>
+<code>n_components</code> (the number kept), and <code>best_k</code>.</p></dd>
 
 
 </dl></div>

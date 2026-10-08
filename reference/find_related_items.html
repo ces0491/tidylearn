@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -53,11 +53,14 @@
 
 
 <dl><dt id="arg-rules-obj">rules_obj<a class="anchor" aria-label="anchor" href="#arg-rules-obj"></a></dt>
-<dd><p>A tidy_apriori object</p></dd>
+<dd><p>A tidy_apriori object, an arules rules object, or a
+tibble of rules from <code><a href="tidy_rules.html">tidy_rules</a></code>, which must keep its
+<code>lhs_items</code> and <code>rhs_items</code> columns</p></dd>
 
 
 <dt id="arg-item">item<a class="anchor" aria-label="anchor" href="#arg-item"></a></dt>
-<dd><p>Character; item to find associations for</p></dd>
+<dd><p>Character; one item name to find associations for, matched
+against whole items</p></dd>
 
 
 <dt id="arg-min-lift">min_lift<a class="anchor" aria-label="anchor" href="#arg-min-lift"></a></dt>
@@ -82,40 +85,20 @@
 <span class="r-in"><span>  <span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="tidy_apriori.html">tidy_apriori</a></span><span class="op">(</span><span class="va">Groceries</span>, support <span class="op">=</span> <span class="fl">0.001</span>, confidence <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="fu">find_related_items</span><span class="op">(</span><span class="va">res</span>, <span class="st">"whole milk"</span>, min_lift <span class="op">=</span> <span class="fl">1.5</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Apriori</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Parameter specification:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  confidence minval smax arem  aval originalSupport maxtime support minlen</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         0.5    0.1    1 none FALSE            TRUE       5   0.001      2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  maxlen target  ext</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      10  rules TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Algorithmic control:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  filter tree heap memopt load sort verbose</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Absolute minimum support count: 9 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> set item appearances ...[0 item(s)] done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sorting and recoding items ... [157 item(s)] done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> creating transaction tree ... done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> checking subsets of size 1 2 3 4 5 6 done [0.01s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> writing ... [5668 rule(s)] done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> creating S4 object  ... done [0.00s].</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 10 × 8</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    rule_id lhs                     rhs   support confidence coverage  lift count</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span>      55 {whole milk,Instant fo… {ham… 0.001<span style="text-decoration: underline;">53</span>      0.5    0.003<span style="text-decoration: underline;">05</span> 15.0     15</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span>    <span style="text-decoration: underline;">5</span>638 {tropical fruit,other … {but… 0.001<span style="text-decoration: underline;">02</span>      0.625  0.001<span style="text-decoration: underline;">63</span> 11.3     10</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span>    <span style="text-decoration: underline;">5</span>633 {tropical fruit,root v… {bee… 0.001<span style="text-decoration: underline;">12</span>      0.55   0.002<span style="text-decoration: underline;">03</span> 10.5     11</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span>    <span style="text-decoration: underline;">4</span>734 {tropical fruit,whole … {but… 0.001<span style="text-decoration: underline;">02</span>      0.556  0.001<span style="text-decoration: underline;">83</span> 10.0     10</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span>    <span style="text-decoration: underline;">1</span>827 {whole milk,whipped/so… {but… 0.001<span style="text-decoration: underline;">42</span>      0.538  0.002<span style="text-decoration: underline;">64</span>  9.72    14</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span>    <span style="text-decoration: underline;">1</span>826 {whole milk,butter,har… {whi… 0.001<span style="text-decoration: underline;">42</span>      0.667  0.002<span style="text-decoration: underline;">14</span>  9.30    14</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span>    <span style="text-decoration: underline;">4</span>820 {citrus fruit,other ve… {dom… 0.001<span style="text-decoration: underline;">12</span>      0.579  0.001<span style="text-decoration: underline;">93</span>  9.12    11</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span>    <span style="text-decoration: underline;">4</span>810 {whole milk,curd,yogur… {whi… 0.001<span style="text-decoration: underline;">12</span>      0.647  0.001<span style="text-decoration: underline;">73</span>  9.03    11</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span>    <span style="text-decoration: underline;">5</span>044 {other vegetables,whol… {but… 0.001<span style="text-decoration: underline;">02</span>      0.5    0.002<span style="text-decoration: underline;">03</span>  9.02    10</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span>    <span style="text-decoration: underline;">2</span>699 {citrus fruit,whole mi… {dom… 0.001<span style="text-decoration: underline;">63</span>      0.571  0.002<span style="text-decoration: underline;">85</span>  9.01    16</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 10 × 10</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    rule_id lhs           rhs   support confidence coverage  lift count lhs_items</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;list&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span>      55 {whole milk,… {ham… 0.001<span style="text-decoration: underline;">53</span>      0.5    0.003<span style="text-decoration: underline;">05</span> 15.0     15 <span style="color: #949494;">&lt;chr [2]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span>    <span style="text-decoration: underline;">5</span>638 {tropical fr… {but… 0.001<span style="text-decoration: underline;">02</span>      0.625  0.001<span style="text-decoration: underline;">63</span> 11.3     10 <span style="color: #949494;">&lt;chr [5]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span>    <span style="text-decoration: underline;">5</span>633 {tropical fr… {bee… 0.001<span style="text-decoration: underline;">12</span>      0.55   0.002<span style="text-decoration: underline;">03</span> 10.5     11 <span style="color: #949494;">&lt;chr [5]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span>    <span style="text-decoration: underline;">4</span>734 {tropical fr… {but… 0.001<span style="text-decoration: underline;">02</span>      0.556  0.001<span style="text-decoration: underline;">83</span> 10.0     10 <span style="color: #949494;">&lt;chr [4]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span>    <span style="text-decoration: underline;">1</span>827 {whole milk,… {but… 0.001<span style="text-decoration: underline;">42</span>      0.538  0.002<span style="text-decoration: underline;">64</span>  9.72    14 <span style="color: #949494;">&lt;chr [3]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span>    <span style="text-decoration: underline;">1</span>826 {whole milk,… {whi… 0.001<span style="text-decoration: underline;">42</span>      0.667  0.002<span style="text-decoration: underline;">14</span>  9.30    14 <span style="color: #949494;">&lt;chr [3]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span>    <span style="text-decoration: underline;">4</span>820 {citrus frui… {dom… 0.001<span style="text-decoration: underline;">12</span>      0.579  0.001<span style="text-decoration: underline;">93</span>  9.12    11 <span style="color: #949494;">&lt;chr [4]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span>    <span style="text-decoration: underline;">4</span>810 {whole milk,… {whi… 0.001<span style="text-decoration: underline;">12</span>      0.647  0.001<span style="text-decoration: underline;">73</span>  9.03    11 <span style="color: #949494;">&lt;chr [4]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span>    <span style="text-decoration: underline;">5</span>044 {other veget… {but… 0.001<span style="text-decoration: underline;">02</span>      0.5    0.002<span style="text-decoration: underline;">03</span>  9.02    10 <span style="color: #949494;">&lt;chr [4]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span>    <span style="text-decoration: underline;">2</span>699 {citrus frui… {dom… 0.001<span style="text-decoration: underline;">63</span>      0.571  0.002<span style="text-decoration: underline;">85</span>  9.01    16 <span style="color: #949494;">&lt;chr [3]&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 1 more variable: rhs_items &lt;list&gt;</span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>

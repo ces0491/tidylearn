@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -53,7 +53,10 @@
 
 
 <dl><dt id="arg-clusters">clusters<a class="anchor" aria-label="anchor" href="#arg-clusters"></a></dt>
-<dd><p>Vector of cluster assignments</p></dd>
+<dd><p>Vector of cluster assignments: numeric, factor or
+character. Numeric labels, or labels that read as whole numbers (such
+as the <code>cluster</code> factor from <code><a href="augment_kmeans.html">augment_kmeans()</a></code>), are kept
+as they are; other labels are reported as given.</p></dd>
 
 
 <dt id="arg-dist-mat">dist_mat<a class="anchor" aria-label="anchor" href="#arg-dist-mat"></a></dt>

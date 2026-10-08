@@ -13,6 +13,10 @@ library(dplyr)
 #> 
 #>     intersect, setdiff, setequal, union
 library(ggplot2)
+
+# k-means, CLARA and the gap statistic start from random draws. Seeding once
+# here makes the whole page reproduce when run from the top.
+set.seed(42)
 ```
 
 ## Two Ways In
@@ -273,7 +277,7 @@ calc_wss(iris[, 1:4], max_k = 6)
 #> 3     3         78.9
 #> 4     4         57.2
 #> 5     5         46.4
-#> 6     6         39.0
+#> 6     6         39.1
 ```
 
 ## K-means
@@ -285,9 +289,9 @@ km$centers
 #> # A tibble: 3 × 5
 #>   cluster Sepal.Length Sepal.Width Petal.Length Petal.Width
 #>     <int>        <dbl>       <dbl>        <dbl>       <dbl>
-#> 1       1         5.90        2.75         4.39       1.43 
+#> 1       1         5.01        3.43         1.46       0.246
 #> 2       2         6.85        3.07         5.74       2.07 
-#> 3       3         5.01        3.43         1.46       0.246
+#> 3       3         5.90        2.75         4.39       1.43
 ```
 
 ``` r
@@ -296,16 +300,16 @@ km$clusters
 #> # A tibble: 150 × 2
 #>    .obs_id cluster
 #>    <chr>     <int>
-#>  1 1             3
-#>  2 2             3
-#>  3 3             3
-#>  4 4             3
-#>  5 5             3
-#>  6 6             3
-#>  7 7             3
-#>  8 8             3
-#>  9 9             3
-#> 10 10            3
+#>  1 1             1
+#>  2 2             1
+#>  3 3             1
+#>  4 4             1
+#>  5 5             1
+#>  6 6             1
+#>  7 7             1
+#>  8 8             1
+#>  9 9             1
+#> 10 10            1
 #> # ℹ 140 more rows
 ```
 
@@ -318,9 +322,9 @@ iris_clustered <- augment_kmeans(km, iris)
 table(Cluster = iris_clustered$cluster, Species = iris_clustered$Species)
 #>        Species
 #> Cluster setosa versicolor virginica
-#>       1      0         48        14
+#>       1     50          0         0
 #>       2      0          2        36
-#>       3     50          0         0
+#>       3      0         48        14
 ```
 
 ``` r
@@ -359,9 +363,9 @@ sil$cluster_avg
 #> # A tibble: 3 × 3
 #>   cluster     n avg_sil_width
 #>     <dbl> <int>         <dbl>
-#> 1       1    62         0.417
+#> 1       1    50         0.798
 #> 2       2    38         0.451
-#> 3       3    50         0.798
+#> 3       3    62         0.417
 ```
 
 ``` r
@@ -371,8 +375,10 @@ plot_silhouette(sil)
 
 ![](unsupervised-learning_files/figure-html/unnamed-chunk-26-1.png)
 
-Cluster 1 is clean; the other two are the *versicolor*/*virginica*
-boundary, and their scores say so without needing the labels.
+The *setosa* cluster is clean; the other two are the
+*versicolor*/*virginica* boundary, and their scores say so without
+needing the labels. k-means numbers its clusters arbitrarily; the table
+above shows which number *setosa* got.
 
 [`calc_validation_metrics()`](https://tidylearn.sheetsolved.com/reference/calc_validation_metrics.md)
 collects the summary numbers in one row:
@@ -380,10 +386,11 @@ collects the summary numbers in one row:
 ``` r
 
 calc_validation_metrics(km$clusters$cluster, iris[, 1:4], dist_mat)
-#> # A tibble: 1 × 7
-#>       k min_size max_size avg_size avg_silhouette min_silhouette total_wss
-#>   <int>    <int>    <int>    <dbl>          <dbl>          <dbl>     <dbl>
-#> 1     3       38       62       50          0.553         0.0264      78.9
+#> # A tibble: 1 × 8
+#>       k min_size max_size avg_size n_noise avg_silhouette min_silhouette
+#>   <int>    <int>    <int>    <dbl>   <int>          <dbl>          <dbl>
+#> 1     3       38       62       50       0          0.553         0.0264
+#> # ℹ 1 more variable: total_wss <dbl>
 ```
 
 ## PAM and CLARA
@@ -498,8 +505,10 @@ sapply(linkages, function(m) {
 #>       98       64       72       64
 ```
 
-Single linkage chains, so it puts almost everything in one cluster. That
-is a property of the linkage, not a finding about irises.
+Single linkage chains: its largest cluster takes 98 of the 150 rows, all
+of *versicolor* and nearly all of *virginica*, and leaves two rows as a
+cluster of their own. That is a property of the linkage, not a finding
+about irises.
 
 ## DBSCAN
 
@@ -507,18 +516,19 @@ DBSCAN finds arbitrarily shaped clusters and labels sparse points as
 noise. It needs `eps` (the neighbourhood radius) and `minPts`. Rather
 than guessing,
 [`suggest_eps()`](https://tidylearn.sheetsolved.com/reference/suggest_eps.md)
-reads it off the k-nearest-neighbour distance curve.
+reads it off the k-nearest-neighbour distance curve, at `k = minPts - 1`
+because a core point’s `minPts` includes the point itself.
 
 ``` r
 
 eps_suggestion <- suggest_eps(iris[, 1:4], minPts = 5)
 eps_suggestion$eps
-#> [1] 0.75757
+#> [1] 0.7179749
 ```
 
 ``` r
 
-plot_knn_dist(iris[, 1:4], k = 5)
+plot_knn_dist(iris[, 1:4], k = 4)
 ```
 
 ![](unsupervised-learning_files/figure-html/unnamed-chunk-38-1.png)
@@ -532,7 +542,7 @@ db <- tidy_dbscan(iris[, 1:4], eps = eps_suggestion$eps, minPts = 5)
 
 c(clusters = db$n_clusters, noise = db$n_noise)
 #> clusters    noise 
-#>        2        2
+#>        2        3
 ```
 
 ``` r
@@ -541,9 +551,9 @@ db_data <- augment_dbscan(db, iris)
 table(Cluster = db_data$cluster, Species = db_data$Species)
 #>        Species
 #> Cluster setosa versicolor virginica
-#>       0      0          0         2
+#>       0      0          0         3
 #>       1     50          0         0
-#>       2      0         50        48
+#>       2      0         50        47
 ```
 
 Cluster 0 is noise, not a cluster.
@@ -650,13 +660,13 @@ comparison <- compare_clusterings(
 )
 
 comparison
-#> # A tibble: 4 × 8
-#>   method     k min_size max_size avg_size avg_silhouette min_silhouette
-#>   <chr>  <int>    <int>    <int>    <dbl>          <dbl>          <dbl>
-#> 1 kmeans     3       38       62       50          0.553         0.0264
-#> 2 pam        3       38       62       50          0.553         0.0264
-#> 3 hclust     3       36       64       50          0.554        -0.0901
-#> 4 dbscan     2        2       98       50          0.512        -0.639 
+#> # A tibble: 4 × 9
+#>   method     k min_size max_size avg_size n_noise avg_silhouette min_silhouette
+#>   <chr>  <int>    <int>    <int>    <dbl>   <int>          <dbl>          <dbl>
+#> 1 kmeans     3       38       62     50         0          0.553         0.0264
+#> 2 pam        3       38       62     50         0          0.553         0.0264
+#> 3 hclust     3       36       64     50         0          0.554        -0.0901
+#> 4 dbscan     2       50       97     73.5       3          0.694        -0.137 
 #> # ℹ 1 more variable: total_wss <dbl>
 ```
 
@@ -726,8 +736,8 @@ final_data <- augment_kmeans(final_km, iris)
 table(Cluster = final_data$cluster, Species = final_data$Species)
 #>        Species
 #> Cluster setosa versicolor virginica
-#>       1     50          0         0
-#>       2      0         50        50
+#>       1      0         50        50
+#>       2     50          0         0
 ```
 
 ``` r

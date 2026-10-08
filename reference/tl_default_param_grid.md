@@ -12,7 +12,7 @@ tl_default_param_grid(method, size = "medium", is_classification = TRUE)
 
 - method:
 
-  Model method ("tree", "forest", "boost", "svm", etc.)
+  Model method ("tree", "forest", "boost", "svm", "xgboost", etc.)
 
 - size:
 
@@ -20,7 +20,12 @@ tl_default_param_grid(method, size = "medium", is_classification = TRUE)
 
 - is_classification:
 
-  Whether the task is classification or regression
+  Whether the grid is for a classification task (the default) or a
+  regression one. For regression, an `"svm"` grid also tunes `epsilon`,
+  the width of the band within which e1071's regression SVM ignores
+  errors, and the large `"forest"` grid centres `nodesize` on
+  randomForest's regression default of 5 rather than its classification
+  default of 1. The other grids are the same for both tasks.
 
 ## Value
 
@@ -32,9 +37,13 @@ Each element is a numeric or character vector of candidate values for
 that hyperparameter, or for `"deep"`'s `hidden_layers` a list of
 layer-size vectors. The grid is built without the data, so a `"forest"`
 `mtry` can exceed the number of predictors; the tuners cap it.
-`"polynomial"` tunes `degree`. `"linear"` and `"logistic"` have no
-tuneable hyperparameter and return an empty list with a warning, as does
-an unknown method.
+`"polynomial"` tunes `degree`. The `"xgboost"` grids draw on the values
+[`tl_tune_xgboost`](https://tidylearn.sheetsolved.com/reference/tl_tune_xgboost.md)
+searches by default, and add `nrounds`, which that function chooses by
+early stopping and
+[`tl_tune_grid`](https://tidylearn.sheetsolved.com/reference/tl_tune_grid.md)
+has to tune. `"linear"` and `"logistic"` have no tuneable hyperparameter
+and return an empty list with a warning, as does an unknown method.
 
 ## Examples
 
@@ -42,5 +51,6 @@ an unknown method.
 # \donttest{
 grid <- tl_default_param_grid("tree", size = "small")
 grid <- tl_default_param_grid("forest", size = "medium")
+grid <- tl_default_param_grid("svm", is_classification = FALSE)
 # }
 ```

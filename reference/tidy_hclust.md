@@ -25,7 +25,8 @@ tidy_hclust(data, method = "average", distance = "euclidean", cols = NULL)
 
 - cols:
 
-  Columns to include (tidy select). If NULL, uses all numeric columns.
+  Columns to include (tidy select). If NULL, uses all numeric columns,
+  or every column for `distance = "gower"`.
 
 ## Value
 
@@ -36,6 +37,8 @@ A list of class "tidy_hclust" containing:
 - dist: distance matrix used
 
 - method: linkage method used
+
+- distance_method: distance metric used
 
 - data: original data (for plotting)
 

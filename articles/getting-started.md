@@ -3,10 +3,11 @@
 ## Introduction
 
 Every machine learning package in R has its own API and its own output
-format. tidylearn puts one signature over 20 of them:
+format. tidylearn puts one signature over 20 methods from 13 of them:
 [`tl_model()`](https://tidylearn.sheetsolved.com/reference/tl_model.md)
-picks the underlying package from the `method` you name, and whatever
-comes back is a tibble or a ggplot2 object.
+picks the underlying package from the `method` you name, and
+predictions, metrics and most plots come back as tibbles or ggplot2
+objects.
 
 The algorithms are untouched. glmnet, randomForest, xgboost, e1071,
 cluster and dbscan do the fitting, and `model$fit` hands you the object
@@ -244,8 +245,11 @@ table(clusters$cluster, iris$Species)
 ## Data Preprocessing
 
 [`tl_prepare_data()`](https://tidylearn.sheetsolved.com/reference/tl_prepare_data.md)
-handles imputation, scaling and encoding in one call, and records what
-it did so the same transformation can be replayed on new data:
+handles imputation, scaling and encoding in one call, and records the
+parameters it learned, such as each column’s training mean and standard
+deviation. Applying them to new data is a step you take yourself;
+[`tl_pipeline()`](https://tidylearn.sheetsolved.com/reference/tl_pipeline.md)
+takes it for you:
 
 ``` r
 

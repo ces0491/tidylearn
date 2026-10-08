@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -71,25 +71,39 @@
 
 
 <dt id="arg-method">method<a class="anchor" aria-label="anchor" href="#arg-method"></a></dt>
-<dd><p>The modeling method to tune</p></dd>
+<dd><p>The modeling method to tune, one of the supervised methods
+<code><a href="tl_model.html">tl_model</a></code> fits</p></dd>
 
 
 <dt id="arg-param-grid">param_grid<a class="anchor" aria-label="anchor" href="#arg-param-grid"></a></dt>
-<dd><p>A named list of parameter values
-to tune</p></dd>
+<dd><p>A named list of candidate values, one element for each
+<code><a href="tl_model.html">tl_model</a></code> argument to tune, named after it</p></dd>
 
 
 <dt id="arg-folds">folds<a class="anchor" aria-label="anchor" href="#arg-folds"></a></dt>
-<dd><p>Number of cross-validation folds</p></dd>
+<dd><p>Number of cross-validation folds, a whole number between 2
+and <code>nrow(data)</code>. <code>nrow(data)</code> leaves each row out in turn,
+and each fold then scores a single prediction. <code>"accuracy"</code>,
+<code>"mae"</code>, <code>"mse"</code> and <code>"mape"</code> average to their values
+over the left-out predictions. The average <code>"rmse"</code> is the mean
+absolute error; <code>"precision"</code>, <code>"recall"</code>,
+<code>"sensitivity"</code>, <code>"specificity"</code> and <code>"f1"</code> are
+undefined on the folds whose one row gives them nothing to divide by;
+and <code>"rsq"</code>, <code>"auc"</code> and <code>"pr_auc"</code> are undefined on
+every fold. A run scoring any of these warns once.</p></dd>
 
 
 <dt id="arg-metric">metric<a class="anchor" aria-label="anchor" href="#arg-metric"></a></dt>
-<dd><p>Metric to optimize</p></dd>
+<dd><p>Metric to optimize: one of the names
+<code><a href="tl_evaluate.html">tl_evaluate</a></code> computes for the task. Defaults to
+<code>"accuracy"</code> for classification and <code>"rmse"</code> for regression.</p></dd>
 
 
 <dt id="arg-maximize">maximize<a class="anchor" aria-label="anchor" href="#arg-maximize"></a></dt>
 <dd><p>Logical; whether to maximize (TRUE)
-or minimize (FALSE) the metric</p></dd>
+or minimize (FALSE) the metric. <code>NULL</code>, the default, maximizes
+every metric but the error metrics <code>"rmse"</code>, <code>"mse"</code>,
+<code>"mae"</code> and <code>"mape"</code>.</p></dd>
 
 
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
@@ -97,7 +111,11 @@ or minimize (FALSE) the metric</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments passed to tl_model</p></dd>
+<dd><p>Additional arguments passed to <code><a href="tl_model.html">tl_model</a></code> for
+every fold and for the final fit. Arguments holding one value per row
+of <code>data</code> – <code>weights</code>, <code>subset</code>, <code>offset</code>,
+<code>foldid</code> and <code>strata</code> – are refused, since they cannot
+follow the rows into a fold.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -110,16 +128,24 @@ a list containing <code>param_grid</code>, <code>results</code>, <code>best_para
 (the mean over the folds that produced a score), <code>n_folds_ok</code> (how
 many of the <code>folds</code> did), and a column per parameter. A parameter
 with a vector-valued candidate, such as <code>hidden_layers</code>, is a list
-column.</p>
+column. A fold produces no score when its fit fails, when the metric
+is undefined on it – <code>"auc"</code> on a fold holding one class, or
+<code>"precision"</code> on one where nothing is predicted positive – or
+when none of its rows can be scored, as when every predictor is
+missing there, which is warned about.</p>
 <p>Only combinations with <code>n_folds_ok</code> equal to <code>folds</code> are
 eligible to be best, since a mean over the folds that happened to
 succeed is not comparable with a mean over all of them. If no
-combination completed every fold, the best of those scored on the most
-folds is used, with a warning. If every combination failed in every
-fold, the function stops.</p>
+combination was scored on every fold, the best of those scored on the
+most folds is used, with a warning saying whether fits failed or the
+metric was undefined. If no combination was scored on any fold, the
+function stops.</p>
 <p>For <code>method = "forest"</code>, an <code>mtry</code> above the number of
 predictors is capped at that number, with a warning, and duplicate
-combinations that result are evaluated once.</p>
+combinations that result are evaluated once. Predictors are counted as
+the forest is fitted on them, so a column removed with <code>- id</code> is
+not one, and a matrix-valued term such as <code>poly(hp, 2)</code> is one per
+column.</p>
     </div>
 
     <div class="section level2">

@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -106,7 +106,10 @@ during tuning (default: 5)</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments to pass to svm()</p></dd>
+<dd><p>Additional arguments to pass to svm(). <code>type</code> and
+<code>probability</code> replace the defaults chosen from the task. Case
+<code>weights</code> are refused: e1071 has none. So is an offset, which
+e1071 leaves out of the fit.</p></dd>
 
 </dl></div>
     <div class="section level2">

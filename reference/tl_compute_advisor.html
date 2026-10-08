@@ -15,7 +15,7 @@ problem is laptop-sized, GPU-sized, or cloud-sized."><meta property="og:image" c
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -107,13 +107,21 @@ training data).</p></dd>
 
 <dt id="arg-formula">formula<a class="anchor" aria-label="anchor" href="#arg-formula"></a></dt>
 <dd><p>Optional formula. Used to determine the number of
-effective predictors. Ignored when <code>x</code> is a fitted model.</p></dd>
+effective predictors: the terms it expands to against <code>data</code>, so
+<code>y ~ . - id</code> counts every column but <code>y</code> and <code>id</code>. Ignored when <code>x</code>
+is a fitted model.</p></dd>
 
 
 <dt id="arg-hyperparams">hyperparams<a class="anchor" aria-label="anchor" href="#arg-hyperparams"></a></dt>
-<dd><p>Named list of hyperparameters that affect runtime
-(e.g. <code>list(nrounds = 1000)</code> for xgboost, <code>list(epochs = 50, units = 256)</code> for deep learning). Missing entries fall back to
-per-method defaults.</p></dd>
+<dd><p>Named list of hyperparameters that affect runtime:
+<code>degree</code> (polynomial), <code>ntree</code> (forest), <code>n.trees</code> (boost), <code>nrounds</code>
+(xgboost), <code>size</code> and <code>maxit</code> (nn), and <code>epochs</code> and <code>hidden_layers</code>
+(deep), e.g. <code>list(nrounds = 1000)</code> or
+<code>list(epochs = 50, hidden_layers = c(64, 32))</code>. Each must be a
+positive number, or a vector of them for <code>hidden_layers</code>. Missing
+entries take the defaults of the method's fit function, so the
+estimate is for the fit <code><a href="tl_model.html">tl_model()</a></code> would run; other entries are
+ignored.</p></dd>
 
 
 <dt id="arg-gpu-check">gpu_check<a class="anchor" aria-label="anchor" href="#arg-gpu-check"></a></dt>
@@ -162,9 +170,10 @@ Treat the recommendation as a starting point, not gospel.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   - Cloud integration is not yet configured in tidylearn. Estimates shown so users can see the tier's shape; actual submission is not yet supported.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># \donttest{</span></span></span>
-<span class="r-in"><span><span class="co"># Dispatching on a fitted model requires the backend to be installed</span></span></span>
+<span class="r-in"><span><span class="co"># Dispatching on a fitted model requires the backend to be installed.</span></span></span>
+<span class="r-in"><span><span class="co"># CRAN asks examples to use at most two threads.</span></span></span>
 <span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"xgboost"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span>  <span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="tl_model.html">tl_model</a></span><span class="op">(</span><span class="va">iris</span>, <span class="va">Species</span> <span class="op">~</span> <span class="va">.</span>, method <span class="op">=</span> <span class="st">"xgboost"</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="tl_model.html">tl_model</a></span><span class="op">(</span><span class="va">iris</span>, <span class="va">Species</span> <span class="op">~</span> <span class="va">.</span>, method <span class="op">=</span> <span class="st">"xgboost"</span>, nthread <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="fu">tl_compute_advisor</span><span class="op">(</span><span class="va">model</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> &lt;tidylearn compute advice&gt;</span>

@@ -78,7 +78,12 @@ tl_fit_xgboost(
 
 - early_stopping_rounds:
 
-  Early stopping rounds (default: NULL)
+  Early stopping rounds (default: NULL). It needs data to stop on, which
+  a fit on all the rows does not have, so it is refused unless a
+  validation set is passed as `evals` (or `watchlist` before xgboost
+  3.0).
+  [`tl_tune_xgboost`](https://tidylearn.sheetsolved.com/reference/tl_tune_xgboost.md)
+  chooses the number of rounds by cross-validation instead.
 
 - nthread:
 
@@ -90,7 +95,13 @@ tl_fit_xgboost(
 
 - ...:
 
-  Additional arguments to pass to xgb.train()
+  Arguments `xgb.train()` takes, which go to it; case `weights`, which
+  go to the training `xgb.DMatrix()`; and booster parameters such as
+  `max_leaves` or `tree_method`, which go into `params`. A booster
+  parameter given here, including `objective` and `eval_metric`,
+  replaces the value set from the arguments above. With
+  `booster = "gblinear"`, the tree parameters above are left out unless
+  named. An offset is refused: predictions would not apply it.
 
 - compute:
 

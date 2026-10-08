@@ -20,23 +20,31 @@ tl_plot_xgboost_importance(model, top_n = 10, importance_type = "gain", ...)
 
 - importance_type:
 
-  Type of importance: "gain", "cover", "frequency"
+  Type of importance: "gain" (default), "cover", "frequency" or
+  "weight", read from the matching column of
+  [`xgboost::xgb.importance()`](https://rdrr.io/pkg/xgboost/man/xgb.importance.html).
+  A linear booster (`booster = "gblinear"`) reports only "weight", its
+  coefficients, which it uses when `importance_type` is left out; they
+  are ranked by size, and for a multiclass model by their mean size over
+  the classes. A coefficient's size depends on its predictor's scale.
 
 - ...:
 
-  Additional arguments
+  Additional arguments passed to
+  [`xgboost::xgb.importance()`](https://rdrr.io/pkg/xgboost/man/xgb.importance.html)
 
 ## Value
 
 A [`ggplot`](https://ggplot2.tidyverse.org/reference/ggplot.html)
-object.
+object. Its data holds the `top_n` features and their `importance`,
+relative to the most important feature's.
 
 ## Examples
 
 ``` r
 # \donttest{
 if (requireNamespace("xgboost", quietly = TRUE)) {
-  model <- tl_model(mtcars, mpg ~ ., method = "xgboost")
+  model <- tl_model(mtcars, mpg ~ ., method = "xgboost", nthread = 2)
   tl_plot_xgboost_importance(model)
 }
 

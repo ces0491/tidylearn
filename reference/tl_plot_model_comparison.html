@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -57,8 +57,11 @@
 
 
 <dt id="arg-new-data">new_data<a class="anchor" aria-label="anchor" href="#arg-new-data"></a></dt>
-<dd><p>Optional data frame for evaluation
-(if NULL, uses training data)</p></dd>
+<dd><p>Optional data frame for evaluation. If NULL, the models
+are scored on their training data, which they must share: models
+fitted on different data are an error asking for <code>new_data</code>. A
+model fitted on engineered features, as <code><a href="tl_auto_ml.html">tl_auto_ml()</a></code> builds some
+of its candidates, is scored on the training data of the others.</p></dd>
 
 
 <dt id="arg-metrics">metrics<a class="anchor" aria-label="anchor" href="#arg-metrics"></a></dt>

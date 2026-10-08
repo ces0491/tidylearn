@@ -5,14 +5,17 @@ Performs CLARA clustering (scalable version of PAM)
 ## Usage
 
 ``` r
-tidy_clara(data, k, metric = "euclidean", samples = 50, sampsize = NULL)
+tidy_clara(data, k, metric = "euclidean", samples = 50, sampsize = NULL, ...)
 ```
 
 ## Arguments
 
 - data:
 
-  A data frame or tibble
+  A data frame or tibble. CLARA samples observations, so it takes no
+  distance matrix; use
+  [`tidy_pam`](https://tidylearn.sheetsolved.com/reference/tidy_pam.md)
+  for a dist object.
 
 - k:
 
@@ -29,6 +32,14 @@ tidy_clara(data, k, metric = "euclidean", samples = 50, sampsize = NULL)
 - sampsize:
 
   Sample size (default: min(n, 40 + 2\*k))
+
+- ...:
+
+  Further arguments passed to
+  [`clara`](https://rdrr.io/pkg/cluster/man/clara.html), such as
+  `correct.d`, `pamLike` or `rngR`. `cluster.only = TRUE` and
+  `medoids.x = FALSE` are refused, under any abbreviation R would
+  accept, since the result needs the fit and its medoids.
 
 ## Value
 

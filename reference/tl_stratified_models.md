@@ -11,7 +11,8 @@ tl_stratified_models(
   cluster_method = "kmeans",
   k = 3,
   supervised_method = "tree",
-  ...
+  ...,
+  cluster_args = list()
 )
 ```
 
@@ -27,7 +28,9 @@ tl_stratified_models(
 
 - cluster_method:
 
-  Clustering method
+  Clustering method: `"kmeans"` (default), `"pam"`, `"clara"` or
+  `"hclust"`, whose tree is cut at `k`. Only k-means can assign new
+  rows, so the others predict their training data alone.
 
 - k:
 
@@ -36,13 +39,17 @@ tl_stratified_models(
 - supervised_method:
 
   Supervised learning method (default: `"tree"`, which handles both
-  regression and classification). `"linear"` silently fits
-  [`lm()`](https://rdrr.io/r/stats/lm.html) to a factor response rather
-  than refusing it, so it is not a safe default here.
+  regression and classification). `"linear"` needs a numeric response
+  and refuses a factor.
 
 - ...:
 
-  Additional arguments
+  Additional arguments for the supervised models
+
+- cluster_args:
+
+  A named list of arguments for the clustering step, such as
+  `list(nstart = 5)` for k-means. Pass k as `k`.
 
 ## Value
 
@@ -52,9 +59,19 @@ A list with class `"tidylearn_stratified"` containing:
 
   The fitted clustering model.
 
+- clusters:
+
+  The training rows' cluster assignments.
+
 - supervised_models:
 
-  Named list of tidylearn models, one per cluster.
+  Named list of tidylearn models, one per cluster that holds more than
+  one class.
+
+- single_class_clusters:
+
+  Named character vector giving, for each cluster whose rows all hold
+  one class, that class.
 
 - formula:
 
@@ -64,13 +81,19 @@ A list with class `"tidylearn_stratified"` containing:
 
   The original training data.
 
+## Details
+
+The rows are clustered on the predictors the formula names, and a model
+is fitted to each cluster. A cluster whose rows all hold one class has
+nothing for a classifier to separate, so it gets no model and its rows
+are predicted as that class.
+
 ## Examples
 
 ``` r
 # \donttest{
 models <- tl_stratified_models(mtcars, mpg ~ ., cluster_method = "kmeans",
                                 k = 3, supervised_method = "linear")
-#> Note: Response 'mpg' has 8 unique numeric values. Treating as regression. Convert to factor for classification.
 #> Note: Response 'mpg' has 6 unique numeric values. Treating as regression. Convert to factor for classification.
 # }
 ```

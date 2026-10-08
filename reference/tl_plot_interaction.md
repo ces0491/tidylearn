@@ -36,7 +36,9 @@ tl_plot_interaction(
 
 - fixed_values:
 
-  Named list of values for other variables in the model
+  Named list of values for other variables in the model. A variable not
+  named is held at its median if it is numeric, and otherwise at its
+  most frequent value, a tie going to the earlier level.
 
 - confidence:
 
@@ -55,7 +57,13 @@ tl_plot_interaction(
 A [`ggplot`](https://ggplot2.tidyverse.org/reference/ggplot.html)
 object. Two numeric variables are drawn as a filled contour of the
 prediction; a numeric and a categorical variable as one line per
-category; two categorical variables as dodged bars.
+category; two categorical variables as dodged bars. A factor, character
+or logical variable is categorical, and only the values the data holds
+are drawn. For a classification model the prediction is the probability
+of the second class, so the response must have two classes. The plot's
+data holds the prediction in a column named `prediction`, and a band in
+`.lower` and `.upper`, so a model variable with one of those names is
+refused.
 
 ## Examples
 

@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -76,10 +76,10 @@
 <h2 id="introduction">Introduction<a class="anchor" aria-label="anchor" href="#introduction"></a>
 </h2>
 <p>Every machine learning package in R has its own API and its own
-output format. tidylearn puts one signature over 20 of them:
-<code><a href="../reference/tl_model.html">tl_model()</a></code> picks the underlying package from the
-<code>method</code> you name, and whatever comes back is a tibble or a
-ggplot2 object.</p>
+output format. tidylearn puts one signature over 20 methods from 13 of
+them: <code><a href="../reference/tl_model.html">tl_model()</a></code> picks the underlying package from the
+<code>method</code> you name, and predictions, metrics and most plots
+come back as tibbles or ggplot2 objects.</p>
 <p>The algorithms are untouched. glmnet, randomForest, xgboost, e1071,
 cluster and dbscan do the fitting, and <code>model$fit</code> hands you
 the object they returned — <code>model$fit$model</code> for an
@@ -288,8 +288,10 @@ handle it:</p>
 <h2 id="data-preprocessing">Data Preprocessing<a class="anchor" aria-label="anchor" href="#data-preprocessing"></a>
 </h2>
 <p><code><a href="../reference/tl_prepare_data.html">tl_prepare_data()</a></code> handles imputation, scaling and
-encoding in one call, and records what it did so the same transformation
-can be replayed on new data:</p>
+encoding in one call, and records the parameters it learned, such as
+each column’s training mean and standard deviation. Applying them to new
+data is a step you take yourself; <code><a href="../reference/tl_pipeline.html">tl_pipeline()</a></code> takes it
+for you:</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Prepare data with multiple preprocessing steps</span></span>
 <span><span class="va">processed</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/tl_prepare_data.html">tl_prepare_data</a></span><span class="op">(</span></span>

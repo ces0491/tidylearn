@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -67,8 +67,10 @@ If NULL, uses training data.</p></dd>
 <code>"response"</code> (default), <code>"prob"</code> or <code>"class"</code>. Note
 that <code>"response"</code> is method-dependent – logistic regression
 returns probabilities, trees and forests return class labels – so
-pass <code>"class"</code> explicitly when you want labels. Ignored by
-unsupervised models, whose output is determined by the method.</p></dd>
+pass <code>"class"</code> explicitly when you want labels. <code>"prob"</code>
+and <code>"class"</code> need a classification model, and any other value
+is an error. Ignored by unsupervised models, whose output is
+determined by the method.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -79,10 +81,12 @@ unsupervised models, whose output is determined by the method.</p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>For supervised models, a <a href="https://tibble.tidyverse.org/reference/tibble.html" class="external-link">tibble</a> with a
 <code>.pred</code> column; with <code>type = "prob"</code>, one column per class
-instead. For unsupervised models, the method's natural output: an
-<code>.obs_id</code> column plus component scores for <code>"pca"</code> and
-<code>"mds"</code>, or plus a <code>cluster</code> column for the clustering
-methods.</p>
+instead. It has one row per row of <code>new_data</code>, in order, and
+zero rows for zero-row <code>new_data</code>. For unsupervised models, the
+method's natural output: an <code>.obs_id</code> column, the row names of
+the data predicted on, plus component scores for <code>"pca"</code> and
+<code>"mds"</code> (as many as the model keeps), or plus a <code>cluster</code>
+column for the clustering methods.</p>
 <p>Unsupervised models differ in whether they can handle new data.
 <code>"pca"</code> projects it and <code>"kmeans"</code> assigns it to the
 nearest centre; <code>"pam"</code>, <code>"clara"</code>, <code>"dbscan"</code>,

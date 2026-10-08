@@ -13,7 +13,7 @@ credentials."><meta property="og:image" content="https://tidylearn.sheetsolved.c
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -54,7 +54,7 @@ credentials.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">tl_read_s3</span><span class="op">(</span><span class="va">source</span>, format <span class="op">=</span> <span class="cn">NULL</span>, region <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">tl_read_s3</span><span class="op">(</span><span class="va">source</span>, format <span class="op">=</span> <span class="cn">NULL</span>, region <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">...</span>, trust_rds <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -62,7 +62,9 @@ credentials.</p>
 
 
 <dl><dt id="arg-source">source<a class="anchor" aria-label="anchor" href="#arg-source"></a></dt>
-<dd><p>An S3 URI (e.g., <code>"s3://bucket/path/to/file.csv"</code>).</p></dd>
+<dd><p>An S3 URI (e.g., <code>"s3://bucket/path/to/file.csv"</code>).
+Zip archives are not read from S3: download the object and read it
+with <code><a href="tl_read_zip.html">tl_read_zip()</a></code>.</p></dd>
 
 
 <dt id="arg-format">format<a class="anchor" aria-label="anchor" href="#arg-format"></a></dt>
@@ -78,18 +80,35 @@ configuration.</p></dd>
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>Additional arguments passed to the format-specific reader.</p></dd>
 
+
+<dt id="arg-trust-rds">trust_rds<a class="anchor" aria-label="anchor" href="#arg-trust-rds"></a></dt>
+<dd><p>Logical. Read an <code>.rds</code>, <code>.rdata</code> or
+<code>.rda</code> object on R older than 4.4.0? Those versions can run code
+embedded in a crafted file as it is read (CVE-2024-27322), so such
+objects are refused there unless this is <code>TRUE</code>. It has no
+effect on R 4.4.0 or later. Default <code>FALSE</code>.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A <code>tidylearn_data</code> object containing the downloaded data.</p>
     </div>
+    <div class="section level2">
+    <h2 id="reading-r-serialisation-files">Reading R serialisation files<a class="anchor" aria-label="anchor" href="#reading-r-serialisation-files"></a></h2>
+
+
+<p>An <code>.rds</code> or <code>.rdata</code> object is rebuilt with <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS()</a></code>
+or <code><a href="https://rdrr.io/r/base/load.html" class="external-link">load()</a></code>, which recreate whatever R objects the file describes.
+Read them only from a bucket you trust, on any version of R.</p>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
-<span class="r-in"><span><span class="co"># data &lt;- tl_read_s3("s3://my-bucket/data/sales.csv")</span></span></span>
-<span class="r-in"><span><span class="co"># data &lt;- tl_read_s3("s3://my-bucket/data/results.parquet")</span></span></span>
-<span class="r-in"><span><span class="co"># }</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
+<span class="r-in"><span><span class="co"># Needs AWS credentials</span></span></span>
+<span class="r-in"><span><span class="fu">tl_read_s3</span><span class="op">(</span><span class="st">"s3://my-bucket/data/sales.csv"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">tl_read_s3</span><span class="op">(</span><span class="st">"s3://my-bucket/data/results.parquet"</span>, region <span class="op">=</span> <span class="st">"eu-west-1"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

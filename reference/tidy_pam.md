@@ -5,7 +5,7 @@ Performs PAM clustering with tidy output
 ## Usage
 
 ``` r
-tidy_pam(data, k, metric = "euclidean", cols = NULL)
+tidy_pam(data, k, metric = "euclidean", cols = NULL, ...)
 ```
 
 ## Arguments
@@ -27,15 +27,29 @@ tidy_pam(data, k, metric = "euclidean", cols = NULL)
 
   Columns to include (tidy select). If NULL, uses all columns.
 
+- ...:
+
+  Further arguments passed to
+  [`pam`](https://rdrr.io/pkg/cluster/man/pam.html), such as `nstart`,
+  `variant` or starting `medoids`. `cluster.only = TRUE` and `diss` are
+  refused, under any abbreviation R would accept: the first leaves no
+  fit to build the result from, and tidy_pam() sets the second itself
+  from `data`.
+
 ## Value
 
 A list of class "tidy_pam" containing:
 
 - clusters: tibble with observation IDs and cluster assignments
 
-- medoids: tibble of medoid indices and values
+- medoids: tibble with one row per cluster: the medoid's row position in
+  the data (`medoid_index`, an integer) and, unless `data` was a dist
+  object, its values
 
-- silhouette: average silhouette width
+- silhouette_avg: average silhouette width
+
+- silhouette_data: the silhouette information `pam()` returns (its
+  `silinfo`)
 
 - model: original pam object
 

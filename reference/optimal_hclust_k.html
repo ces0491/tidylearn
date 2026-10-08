@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -57,7 +57,10 @@
 
 
 <dt id="arg-method">method<a class="anchor" aria-label="anchor" href="#arg-method"></a></dt>
-<dd><p>Character; "silhouette" (default) or "gap"</p></dd>
+<dd><p>Character; "silhouette" (default) or "gap". The gap
+statistic resamples the observations' numeric columns, so it refuses a
+tree built from a dist object, and one built with
+<code>distance = "gower"</code> on non-numeric columns.</p></dd>
 
 
 <dt id="arg-max-k">max_k<a class="anchor" aria-label="anchor" href="#arg-max-k"></a></dt>

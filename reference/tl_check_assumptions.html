@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -69,10 +69,17 @@
     <p>A named list with one element per assumption checked
 (<code>linearity</code>, <code>independence</code>, <code>homoscedasticity</code>,
 <code>normality</code>, <code>multicollinearity</code>, <code>outliers</code>), each
-containing <code>assumption</code> (character label), <code>check</code> (logical
-or <code>NULL</code>), <code>details</code> (character), and
-<code>recommendation</code> (character). An additional <code>overall</code> element
-summarises the number of assumptions checked, violated, and satisfied.</p>
+containing <code>assumption</code> (character label), <code>check</code> (logical,
+<code>NA</code> when the test could not decide, or <code>NULL</code> when no test
+was run), <code>details</code> (character), and <code>recommendation</code>
+(character). An additional <code>overall</code> element summarises the
+number of assumptions checked, violated, and satisfied; an <code>NA</code> or
+<code>NULL</code> check counts as neither.</p>
+<p>Logistic regression assumes neither normal residuals nor a constant
+variance, so for a logistic model <code>normality</code> and
+<code>homoscedasticity</code> have a <code>NULL</code> check and a note saying so.
+For a factor, multicollinearity is judged on <code>GVIF^(1/Df)</code>, the
+generalised VIF on the scale of an ordinary one.</p>
     </div>
 
     <div class="section level2">
@@ -136,8 +143,7 @@ summarises the number of assumptions checked, violated, and satisfied.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Homoscedasticity"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $homoscedasticity$check</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   BP </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> TRUE </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] TRUE</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $homoscedasticity$details</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Breusch-Pagan test p-value: 0.6438"</span>

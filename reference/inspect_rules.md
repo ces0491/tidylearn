@@ -12,11 +12,13 @@ inspect_rules(rules_obj, by = "lift", n = 10, decreasing = TRUE)
 
 - rules_obj:
 
-  A tidy_apriori object or rules object
+  A tidy_apriori object, an arules rules or itemsets object, or a tibble
+  of rules
 
 - by:
 
-  Sort by: "support", "confidence", "lift" (default), "count"
+  Sort by: "support", "confidence", "lift" (default), "count". Itemsets
+  have no lift, so for them the default sorts by support.
 
 - n:
 
@@ -24,11 +26,14 @@ inspect_rules(rules_obj, by = "lift", n = 10, decreasing = TRUE)
 
 - decreasing:
 
-  Sort in decreasing order? (default: TRUE)
+  If TRUE (default), the `n` rules with the highest values of `by`,
+  highest first; if FALSE, the `n` with the lowest, lowest first, as in
+  arules' `head(by = )`.
 
 ## Value
 
-A tibble of the top `n` rules sorted by the specified quality measure.
+A tibble of the `n` rules ranked highest (or, with `decreasing = FALSE`,
+lowest) by the quality measure `by`.
 
 ## Examples
 
@@ -39,34 +44,14 @@ if (requireNamespace("arules", quietly = TRUE)) {
   res <- tidy_apriori(Groceries, support = 0.001, confidence = 0.5)
   inspect_rules(res, by = "lift", n = 5)
 }
-#> Apriori
-#> 
-#> Parameter specification:
-#>  confidence minval smax arem  aval originalSupport maxtime support minlen
-#>         0.5    0.1    1 none FALSE            TRUE       5   0.001      2
-#>  maxlen target  ext
-#>      10  rules TRUE
-#> 
-#> Algorithmic control:
-#>  filter tree heap memopt load sort verbose
-#>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE
-#> 
-#> Absolute minimum support count: 9 
-#> 
-#> set item appearances ...[0 item(s)] done [0.00s].
-#> set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].
-#> sorting and recoding items ... [157 item(s)] done [0.00s].
-#> creating transaction tree ... done [0.00s].
-#> checking subsets of size 1 2 3 4 5 6 done [0.01s].
-#> writing ... [5668 rule(s)] done [0.00s].
-#> creating S4 object  ... done [0.00s].
-#> # A tibble: 5 × 8
-#>   rule_id lhs                      rhs   support confidence coverage  lift count
-#>     <int> <chr>                    <chr>   <dbl>      <dbl>    <dbl> <dbl> <int>
-#> 1      53 {Instant food products,… {ham… 0.00122      0.632  0.00193  19.0    12
-#> 2      37 {soda,popcorn}           {sal… 0.00122      0.632  0.00193  16.7    12
-#> 3     444 {flour,baking powder}    {sug… 0.00102      0.556  0.00183  16.4    10
-#> 4     327 {ham,processed cheese}   {whi… 0.00193      0.633  0.00305  15.0    19
-#> 5      55 {whole milk,Instant foo… {ham… 0.00153      0.5    0.00305  15.0    15
+#> # A tibble: 5 × 10
+#>   rule_id lhs            rhs   support confidence coverage  lift count lhs_items
+#>     <int> <chr>          <chr>   <dbl>      <dbl>    <dbl> <dbl> <int> <list>   
+#> 1      53 {Instant food… {ham… 0.00122      0.632  0.00193  19.0    12 <chr [2]>
+#> 2      37 {soda,popcorn} {sal… 0.00122      0.632  0.00193  16.7    12 <chr [2]>
+#> 3     444 {flour,baking… {sug… 0.00102      0.556  0.00183  16.4    10 <chr [2]>
+#> 4     327 {ham,processe… {whi… 0.00193      0.633  0.00305  15.0    19 <chr [2]>
+#> 5      55 {whole milk,I… {ham… 0.00153      0.5    0.00305  15.0    15 <chr [2]>
+#> # ℹ 1 more variable: rhs_items <list>
 # }
 ```

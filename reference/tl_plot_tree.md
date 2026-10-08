@@ -30,10 +30,6 @@ called for its side effect of drawing the tree.
 # \donttest{
 model <- tl_model(iris, Species ~ ., method = "tree")
 tl_plot_tree(model)
-#> Warning: Cannot retrieve the data used to build the model (so cannot determine roundint and is.binary for the variables).
-#> To silence this warning:
-#>     Call rpart.plot with roundint=FALSE,
-#>     or rebuild the rpart model with model=TRUE.
 
 # }
 ```

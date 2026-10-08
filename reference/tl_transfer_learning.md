@@ -1,7 +1,8 @@
 # Transfer Learning Workflow
 
-Use unsupervised pre-training (e.g., autoencoder features) before
-supervised learning
+Use unsupervised pre-training before supervised learning: the predictors
+the formula names are projected onto their principal components, and the
+supervised model is fitted on the component scores.
 
 ## Usage
 
@@ -23,11 +24,14 @@ tl_transfer_learning(
 
 - formula:
 
-  Model formula
+  Model formula, or a string that parses as one. The PCA is fitted on
+  the numeric predictors it names.
 
 - pretrain_method:
 
-  Pre-training method: "pca", "autoencoder"
+  Pre-training method. Only `"pca"` is available:
+  [`predict()`](https://rdrr.io/r/stats/predict.html) has to project new
+  rows, and PCA is the reduction that can.
 
 - supervised_method:
 
@@ -38,7 +42,9 @@ tl_transfer_learning(
 
 - ...:
 
-  Additional arguments
+  Additional arguments passed to
+  [`tl_reduce_dimensions`](https://tidylearn.sheetsolved.com/reference/tl_reduce_dimensions.md),
+  such as `n_components`
 
 ## Value
 

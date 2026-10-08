@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,9 +75,13 @@
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A list of class <code>"tidy_gap"</code> containing:</p><ul><li><p>gap_data: tibble with gap statistics for each k</p></li>
-<li><p>k_firstSEmax: optimal k via firstSEmax method (most conservative)</p></li>
-<li><p>k_globalmax: optimal k via globalmax method</p></li>
-<li><p>k_firstmax: optimal k via firstmax method</p></li>
+<li><p>k_firstSEmax: optimal k via <code><a href="https://rdrr.io/pkg/cluster/man/clusGap.html" class="external-link">maxSE</a></code>'s
+firstSEmax method, the smallest k within one standard error of the
+first local maximum (most conservative)</p></li>
+<li><p>k_globalmax: optimal k via the globalmax method, the k with the
+largest gap (most liberal)</p></li>
+<li><p>k_firstmax: optimal k via the firstmax method, the first local
+maximum of the gap</p></li>
 <li><p>recommended_k: recommended k (uses firstSEmax)</p></li>
 <li><p>model: the <code><a href="https://rdrr.io/pkg/cluster/man/clusGap.html" class="external-link">clusGap</a></code> result</p></li>
 </ul></div>

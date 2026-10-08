@@ -49,7 +49,9 @@ tl_fit_nn(
 
 - ...:
 
-  Additional arguments to pass to nnet()
+  Additional arguments to pass to nnet(), including case `weights`. For
+  regression, `linout` replaces the default `TRUE`. An offset is
+  refused: nnet leaves it out of the fit.
 
 ## Value
 

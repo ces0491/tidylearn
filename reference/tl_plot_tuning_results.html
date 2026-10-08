@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -86,6 +86,16 @@ or scatter plots)</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A <code><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></code> object.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>A parameter whose candidates are not single values, such as
+<code>hidden_layers = list(c(10), c(20, 10))</code> or a <code>parms</code> list,
+is drawn as a categorical one, each value labelled as the verbose
+messages print it. The importance of a numeric parameter is the
+absolute correlation of its values with the score; that of a
+categorical one is eta squared from a one-way ANOVA of the score,
+and 0 when the sets that were scored all share one value.</p>
     </div>
 
     <div class="section level2">

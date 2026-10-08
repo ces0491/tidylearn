@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -71,6 +71,10 @@ learned from the training data, replayed by
 list of per-model fits and metrics), <code>$best_model_name</code>,
 <code>$best_model</code> (the winning <code>tidylearn_model</code>), and
 <code>$metric_values</code>.</p>
+<p>The training data is every row when <code>validation = "cv"</code>: each
+model is scored across the folds and then refitted on all of them.
+With <code>validation = "split"</code> it is the training split alone, since
+the models kept are the ones fitted there and scored on the test rows.</p>
     </div>
 
     <div class="section level2">

@@ -26,7 +26,11 @@ tidy_mds(data, method = "classical", ndim = 2, distance = "euclidean", ...)
 - distance:
 
   Character; distance metric if data is not already a dist object
-  (default: "euclidean")
+  (default: "euclidean"): any method
+  [`dist`](https://rdrr.io/r/stats/dist.html) accepts, on the numeric
+  columns, or "gower" (see
+  [`tidy_gower`](https://tidylearn.sheetsolved.com/reference/tidy_gower.md)),
+  on every column
 
 - ...:
 

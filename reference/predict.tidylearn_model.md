@@ -25,8 +25,9 @@ predict(object, new_data = NULL, type = "response", ...)
   (default), `"prob"` or `"class"`. Note that `"response"` is
   method-dependent – logistic regression returns probabilities, trees
   and forests return class labels – so pass `"class"` explicitly when
-  you want labels. Ignored by unsupervised models, whose output is
-  determined by the method.
+  you want labels. `"prob"` and `"class"` need a classification model,
+  and any other value is an error. Ignored by unsupervised models, whose
+  output is determined by the method.
 
 - ...:
 
@@ -36,10 +37,12 @@ predict(object, new_data = NULL, type = "response", ...)
 
 For supervised models, a
 [tibble](https://tibble.tidyverse.org/reference/tibble.html) with a
-`.pred` column; with `type = "prob"`, one column per class instead. For
-unsupervised models, the method's natural output: an `.obs_id` column
-plus component scores for `"pca"` and `"mds"`, or plus a `cluster`
-column for the clustering methods.
+`.pred` column; with `type = "prob"`, one column per class instead. It
+has one row per row of `new_data`, in order, and zero rows for zero-row
+`new_data`. For unsupervised models, the method's natural output: an
+`.obs_id` column, the row names of the data predicted on, plus component
+scores for `"pca"` and `"mds"` (as many as the model keeps), or plus a
+`cluster` column for the clustering methods.
 
 Unsupervised models differ in whether they can handle new data. `"pca"`
 projects it and `"kmeans"` assigns it to the nearest centre; `"pam"`,

@@ -29,7 +29,7 @@ tl_anomaly_aware(
 
 - response:
 
-  Response variable name
+  Response variable name, left out of the detection
 
 - anomaly_method:
 
@@ -41,8 +41,9 @@ tl_anomaly_aware(
   Action to take: "remove", "flag", "downweight". `"downweight"` gives
   anomalies a case weight of 0.1, and needs a `supervised_method` that
   takes case weights: `"linear"`, `"polynomial"`, `"logistic"`,
-  `"tree"`, `"ridge"`, `"lasso"`, `"elastic_net"` or `"forest"`. A
-  forest reads them as sampling weights.
+  `"tree"`, `"ridge"`, `"lasso"`, `"elastic_net"`, `"forest"`,
+  `"boost"`, `"nn"` or `"xgboost"`. A forest reads them as sampling
+  weights. `"svm"` and `"deep"` take none and are refused.
 
 - supervised_method:
 
@@ -53,7 +54,7 @@ tl_anomaly_aware(
 
 - ...:
 
-  Additional arguments
+  Additional arguments for DBSCAN, such as `eps` and `minPts`
 
 ## Value
 
@@ -61,6 +62,13 @@ A tidylearn model object with additional class
 `"tidylearn_anomaly_aware"`. The model includes an `anomaly_info`
 element with `anomaly_model`, `is_anomaly` (logical vector),
 `n_anomalies`, and `action`.
+
+## Details
+
+DBSCAN runs on the predictors the formula names, on their own scale: its
+`eps` and `minPts` (defaults 0.5 and 5, passed through `...`) are a
+distance and a count in those units. If every row comes out as noise the
+call stops, since no normal data would be left to model.
 
 ## Examples
 

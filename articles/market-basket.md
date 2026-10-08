@@ -53,27 +53,6 @@ rules <- tidy_apriori(
   confidence = 0.5,     # right-hand side follows at least half the time
   minlen = 2            # rules with something on both sides
 )
-#> Apriori
-#> 
-#> Parameter specification:
-#>  confidence minval smax arem  aval originalSupport maxtime support minlen
-#>         0.5    0.1    1 none FALSE            TRUE       5   0.001      2
-#>  maxlen target  ext
-#>      10  rules TRUE
-#> 
-#> Algorithmic control:
-#>  filter tree heap memopt load sort verbose
-#>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE
-#> 
-#> Absolute minimum support count: 9 
-#> 
-#> set item appearances ...[0 item(s)] done [0.00s].
-#> set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].
-#> sorting and recoding items ... [157 item(s)] done [0.00s].
-#> creating transaction tree ... done [0.00s].
-#> checking subsets of size 1 2 3 4 5 6 done [0.01s].
-#> writing ... [5668 rule(s)] done [0.00s].
-#> creating S4 object  ... done [0.00s].
 ```
 
 ``` r
@@ -114,20 +93,21 @@ The tibble is the part you work with:
 ``` r
 
 rules$rules_tbl
-#> # A tibble: 5,668 × 8
-#>    rule_id lhs                 rhs       support confidence coverage  lift count
-#>      <int> <chr>               <chr>       <dbl>      <dbl>    <dbl> <dbl> <int>
-#>  1       1 {honey}             {whole m… 0.00112      0.733  0.00153  2.87    11
-#>  2       2 {tidbits}           {rolls/b… 0.00122      0.522  0.00234  2.84    12
-#>  3       3 {cocoa drinks}      {whole m… 0.00132      0.591  0.00224  2.31    13
-#>  4       4 {pudding powder}    {whole m… 0.00132      0.565  0.00234  2.21    13
-#>  5       5 {cooking chocolate} {whole m… 0.00132      0.52   0.00254  2.04    13
-#>  6       6 {cereals}           {whole m… 0.00366      0.643  0.00569  2.52    36
-#>  7       7 {jam}               {whole m… 0.00295      0.547  0.00539  2.14    29
-#>  8       8 {specialty cheese}  {other v… 0.00427      0.5    0.00854  2.58    42
-#>  9       9 {rice}              {other v… 0.00397      0.52   0.00763  2.69    39
-#> 10      10 {rice}              {whole m… 0.00468      0.613  0.00763  2.40    46
+#> # A tibble: 5,668 × 10
+#>    rule_id lhs           rhs   support confidence coverage  lift count lhs_items
+#>      <int> <chr>         <chr>   <dbl>      <dbl>    <dbl> <dbl> <int> <list>   
+#>  1       1 {honey}       {who… 0.00112      0.733  0.00153  2.87    11 <chr [1]>
+#>  2       2 {tidbits}     {rol… 0.00122      0.522  0.00234  2.84    12 <chr [1]>
+#>  3       3 {cocoa drink… {who… 0.00132      0.591  0.00224  2.31    13 <chr [1]>
+#>  4       4 {pudding pow… {who… 0.00132      0.565  0.00234  2.21    13 <chr [1]>
+#>  5       5 {cooking cho… {who… 0.00132      0.52   0.00254  2.04    13 <chr [1]>
+#>  6       6 {cereals}     {who… 0.00366      0.643  0.00569  2.52    36 <chr [1]>
+#>  7       7 {jam}         {who… 0.00295      0.547  0.00539  2.14    29 <chr [1]>
+#>  8       8 {specialty c… {oth… 0.00427      0.5    0.00854  2.58    42 <chr [1]>
+#>  9       9 {rice}        {oth… 0.00397      0.52   0.00763  2.69    39 <chr [1]>
+#> 10      10 {rice}        {who… 0.00468      0.613  0.00763  2.40    46 <chr [1]>
 #> # ℹ 5,658 more rows
+#> # ℹ 1 more variable: rhs_items <list>
 ```
 
 ``` r
@@ -155,195 +135,6 @@ grid <- expand.grid(
 grid$n_rules <- mapply(function(s, c) {
   tidy_apriori(Groceries, support = s, confidence = c)$n_rules
 }, grid$support, grid$confidence)
-#> Apriori
-#> 
-#> Parameter specification:
-#>  confidence minval smax arem  aval originalSupport maxtime support minlen
-#>         0.3    0.1    1 none FALSE            TRUE       5   0.001      2
-#>  maxlen target  ext
-#>      10  rules TRUE
-#> 
-#> Algorithmic control:
-#>  filter tree heap memopt load sort verbose
-#>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE
-#> 
-#> Absolute minimum support count: 9 
-#> 
-#> set item appearances ...[0 item(s)] done [0.00s].
-#> set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].
-#> sorting and recoding items ... [157 item(s)] done [0.00s].
-#> creating transaction tree ... done [0.00s].
-#> checking subsets of size 1 2 3 4 5 6 done [0.01s].
-#> writing ... [13770 rule(s)] done [0.00s].
-#> creating S4 object  ... done [0.00s].
-#> Apriori
-#> 
-#> Parameter specification:
-#>  confidence minval smax arem  aval originalSupport maxtime support minlen
-#>         0.3    0.1    1 none FALSE            TRUE       5   0.005      2
-#>  maxlen target  ext
-#>      10  rules TRUE
-#> 
-#> Algorithmic control:
-#>  filter tree heap memopt load sort verbose
-#>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE
-#> 
-#> Absolute minimum support count: 49 
-#> 
-#> set item appearances ...[0 item(s)] done [0.00s].
-#> set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].
-#> sorting and recoding items ... [120 item(s)] done [0.00s].
-#> creating transaction tree ... done [0.00s].
-#> checking subsets of size 1 2 3 4 done [0.00s].
-#> writing ... [482 rule(s)] done [0.00s].
-#> creating S4 object  ... done [0.00s].
-#> Apriori
-#> 
-#> Parameter specification:
-#>  confidence minval smax arem  aval originalSupport maxtime support minlen
-#>         0.3    0.1    1 none FALSE            TRUE       5    0.01      2
-#>  maxlen target  ext
-#>      10  rules TRUE
-#> 
-#> Algorithmic control:
-#>  filter tree heap memopt load sort verbose
-#>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE
-#> 
-#> Absolute minimum support count: 98 
-#> 
-#> set item appearances ...[0 item(s)] done [0.00s].
-#> set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].
-#> sorting and recoding items ... [88 item(s)] done [0.00s].
-#> creating transaction tree ... done [0.00s].
-#> checking subsets of size 1 2 3 4 done [0.00s].
-#> writing ... [125 rule(s)] done [0.00s].
-#> creating S4 object  ... done [0.00s].
-#> Apriori
-#> 
-#> Parameter specification:
-#>  confidence minval smax arem  aval originalSupport maxtime support minlen
-#>         0.5    0.1    1 none FALSE            TRUE       5   0.001      2
-#>  maxlen target  ext
-#>      10  rules TRUE
-#> 
-#> Algorithmic control:
-#>  filter tree heap memopt load sort verbose
-#>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE
-#> 
-#> Absolute minimum support count: 9 
-#> 
-#> set item appearances ...[0 item(s)] done [0.00s].
-#> set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].
-#> sorting and recoding items ... [157 item(s)] done [0.00s].
-#> creating transaction tree ... done [0.00s].
-#> checking subsets of size 1 2 3 4 5 6 done [0.01s].
-#> writing ... [5668 rule(s)] done [0.00s].
-#> creating S4 object  ... done [0.00s].
-#> Apriori
-#> 
-#> Parameter specification:
-#>  confidence minval smax arem  aval originalSupport maxtime support minlen
-#>         0.5    0.1    1 none FALSE            TRUE       5   0.005      2
-#>  maxlen target  ext
-#>      10  rules TRUE
-#> 
-#> Algorithmic control:
-#>  filter tree heap memopt load sort verbose
-#>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE
-#> 
-#> Absolute minimum support count: 49 
-#> 
-#> set item appearances ...[0 item(s)] done [0.00s].
-#> set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].
-#> sorting and recoding items ... [120 item(s)] done [0.00s].
-#> creating transaction tree ... done [0.00s].
-#> checking subsets of size 1 2 3 4 done [0.00s].
-#> writing ... [120 rule(s)] done [0.00s].
-#> creating S4 object  ... done [0.00s].
-#> Apriori
-#> 
-#> Parameter specification:
-#>  confidence minval smax arem  aval originalSupport maxtime support minlen
-#>         0.5    0.1    1 none FALSE            TRUE       5    0.01      2
-#>  maxlen target  ext
-#>      10  rules TRUE
-#> 
-#> Algorithmic control:
-#>  filter tree heap memopt load sort verbose
-#>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE
-#> 
-#> Absolute minimum support count: 98 
-#> 
-#> set item appearances ...[0 item(s)] done [0.00s].
-#> set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].
-#> sorting and recoding items ... [88 item(s)] done [0.00s].
-#> creating transaction tree ... done [0.00s].
-#> checking subsets of size 1 2 3 4 done [0.00s].
-#> writing ... [15 rule(s)] done [0.00s].
-#> creating S4 object  ... done [0.00s].
-#> Apriori
-#> 
-#> Parameter specification:
-#>  confidence minval smax arem  aval originalSupport maxtime support minlen
-#>         0.7    0.1    1 none FALSE            TRUE       5   0.001      2
-#>  maxlen target  ext
-#>      10  rules TRUE
-#> 
-#> Algorithmic control:
-#>  filter tree heap memopt load sort verbose
-#>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE
-#> 
-#> Absolute minimum support count: 9 
-#> 
-#> set item appearances ...[0 item(s)] done [0.00s].
-#> set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].
-#> sorting and recoding items ... [157 item(s)] done [0.00s].
-#> creating transaction tree ... done [0.00s].
-#> checking subsets of size 1 2 3 4 5 6 done [0.01s].
-#> writing ... [1279 rule(s)] done [0.00s].
-#> creating S4 object  ... done [0.00s].
-#> Apriori
-#> 
-#> Parameter specification:
-#>  confidence minval smax arem  aval originalSupport maxtime support minlen
-#>         0.7    0.1    1 none FALSE            TRUE       5   0.005      2
-#>  maxlen target  ext
-#>      10  rules TRUE
-#> 
-#> Algorithmic control:
-#>  filter tree heap memopt load sort verbose
-#>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE
-#> 
-#> Absolute minimum support count: 49 
-#> 
-#> set item appearances ...[0 item(s)] done [0.00s].
-#> set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].
-#> sorting and recoding items ... [120 item(s)] done [0.00s].
-#> creating transaction tree ... done [0.00s].
-#> checking subsets of size 1 2 3 4 done [0.00s].
-#> writing ... [1 rule(s)] done [0.00s].
-#> creating S4 object  ... done [0.00s].
-#> Apriori
-#> 
-#> Parameter specification:
-#>  confidence minval smax arem  aval originalSupport maxtime support minlen
-#>         0.7    0.1    1 none FALSE            TRUE       5    0.01      2
-#>  maxlen target  ext
-#>      10  rules TRUE
-#> 
-#> Algorithmic control:
-#>  filter tree heap memopt load sort verbose
-#>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE
-#> 
-#> Absolute minimum support count: 98 
-#> 
-#> set item appearances ...[0 item(s)] done [0.00s].
-#> set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].
-#> sorting and recoding items ... [88 item(s)] done [0.00s].
-#> creating transaction tree ... done [0.00s].
-#> checking subsets of size 1 2 3 4 done [0.00s].
-#> writing ... [0 rule(s)] done [0.00s].
-#> creating S4 object  ... done [0.00s].
 
 grid
 #>   support confidence n_rules
@@ -370,19 +161,20 @@ sorts and takes the head, which is what you want almost every time:
 ``` r
 
 inspect_rules(rules, by = "lift", n = 10)
-#> # A tibble: 10 × 8
-#>    rule_id lhs                     rhs   support confidence coverage  lift count
-#>      <int> <chr>                   <chr>   <dbl>      <dbl>    <dbl> <dbl> <int>
-#>  1      53 {Instant food products… {ham… 0.00122      0.632  0.00193  19.0    12
-#>  2      37 {soda,popcorn}          {sal… 0.00122      0.632  0.00193  16.7    12
-#>  3     444 {flour,baking powder}   {sug… 0.00102      0.556  0.00183  16.4    10
-#>  4     327 {ham,processed cheese}  {whi… 0.00193      0.633  0.00305  15.0    19
-#>  5      55 {whole milk,Instant fo… {ham… 0.00153      0.5    0.00305  15.0    15
-#>  6    4807 {other vegetables,curd… {cre… 0.00102      0.588  0.00173  14.8    10
-#>  7     330 {processed cheese,dome… {whi… 0.00112      0.524  0.00214  12.4    11
-#>  8    4858 {tropical fruit,other … {but… 0.00102      0.667  0.00153  12.0    10
-#>  9    2261 {hamburger meat,yogurt… {but… 0.00102      0.625  0.00163  11.3    10
-#> 10    5638 {tropical fruit,other … {but… 0.00102      0.625  0.00163  11.3    10
+#> # A tibble: 10 × 10
+#>    rule_id lhs           rhs   support confidence coverage  lift count lhs_items
+#>      <int> <chr>         <chr>   <dbl>      <dbl>    <dbl> <dbl> <int> <list>   
+#>  1      53 {Instant foo… {ham… 0.00122      0.632  0.00193  19.0    12 <chr [2]>
+#>  2      37 {soda,popcor… {sal… 0.00122      0.632  0.00193  16.7    12 <chr [2]>
+#>  3     444 {flour,bakin… {sug… 0.00102      0.556  0.00183  16.4    10 <chr [2]>
+#>  4     327 {ham,process… {whi… 0.00193      0.633  0.00305  15.0    19 <chr [2]>
+#>  5      55 {whole milk,… {ham… 0.00153      0.5    0.00305  15.0    15 <chr [2]>
+#>  6    4807 {other veget… {cre… 0.00102      0.588  0.00173  14.8    10 <chr [4]>
+#>  7     330 {processed c… {whi… 0.00112      0.524  0.00214  12.4    11 <chr [2]>
+#>  8    4858 {tropical fr… {but… 0.00102      0.667  0.00153  12.0    10 <chr [4]>
+#>  9    2261 {hamburger m… {but… 0.00102      0.625  0.00163  11.3    10 <chr [3]>
+#> 10    5638 {tropical fr… {but… 0.00102      0.625  0.00163  11.3    10 <chr [5]>
+#> # ℹ 1 more variable: rhs_items <list>
 ```
 
 `by` also accepts `"support"`, `"confidence"` and `"count"`. Set
@@ -534,10 +326,10 @@ That empty result is the honest answer rather than a failure.
 `whole milk` appears in about a quarter of all baskets, so very little
 follows it with 50% confidence.
 
-`min_confidence` filters the rules you already mined, so raising the
-ceiling means re-mining, not re-filtering. `rules` above was mined at
-`confidence = 0.5`, and no amount of filtering will produce a rule that
-was never generated:
+`min_confidence` filters the rules you already mined, so lowering the
+confidence floor below the one you mined at means mining again. `rules`
+above was mined at `confidence = 0.5`, and no amount of filtering will
+produce a rule that was never generated:
 
 ``` r
 
@@ -545,27 +337,6 @@ broad <- tidy_apriori(
   Groceries,
   support = 0.001, confidence = 0.15, minlen = 2
 )
-#> Apriori
-#> 
-#> Parameter specification:
-#>  confidence minval smax arem  aval originalSupport maxtime support minlen
-#>        0.15    0.1    1 none FALSE            TRUE       5   0.001      2
-#>  maxlen target  ext
-#>      10  rules TRUE
-#> 
-#> Algorithmic control:
-#>  filter tree heap memopt load sort verbose
-#>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE
-#> 
-#> Absolute minimum support count: 9 
-#> 
-#> set item appearances ...[0 item(s)] done [0.00s].
-#> set transactions ...[169 item(s), 9835 transaction(s)] done [0.00s].
-#> sorting and recoding items ... [157 item(s)] done [0.00s].
-#> creating transaction tree ... done [0.00s].
-#> checking subsets of size 1 2 3 4 5 6 done [0.01s].
-#> writing ... [26820 rule(s)] done [0.00s].
-#> creating S4 object  ... done [0.00s].
 
 broad$n_rules
 #> [1] 26820
@@ -585,14 +356,15 @@ recommend_products(
 #> 1 {domestic eggs}           0.218  3.43 0.00600
 #> 2 {whipped/sour cream}      0.244  3.40 0.00671
 #> 3 {curd}                    0.177  3.32 0.00488
-#> 4 {domestic eggs}           0.174  2.75 0.00966
-#> 5 {root vegetables}         0.299  2.74 0.00824
+#> 4 {root vegetables}         0.299  2.74 0.00824
+#> 5 {yogurt}                  0.339  2.43 0.00935
 ```
 
-Confidence around 0.2 is weak on its own — one basket in five. Lift near
-3.4 is what makes these worth reading: eggs are three times more likely
-in a basket that already holds milk and butter than in a basket picked
-at random. For common items, mine wide and rank on lift.
+These confidences are weak on their own: none of the suggestions follows
+in even half the baskets that hold milk and butter, which is why `rules`
+found nothing. Lift is what makes them worth reading: eggs, at the top,
+are more than three times as likely in such a basket as in a basket
+picked at random. For common items, mine wide and rank on lift.
 
 ## Visualising
 
@@ -608,8 +380,8 @@ visualize_rules(rules, method = "scatter", top_n = 200)
 ![](market-basket_files/figure-html/unnamed-chunk-20-1.png)
 
 Support on one axis against confidence on the other, coloured by lift,
-is the standard first look. Rules sitting well away from the main cloud
-are the ones to read.
+is the standard first look; `top_n` keeps the rules with the highest
+lift. Rules sitting well away from the main cloud are the ones to read.
 
 ``` r
 
@@ -618,9 +390,10 @@ visualize_rules(rules, method = "graph", top_n = 20)
 
 ![](market-basket_files/figure-html/unnamed-chunk-21-1.png)
 
-The graph method needs arulesViz and draws items as nodes with rules as
-edges, which is the more useful view once you have narrowed to a handful
-of rules worth reading.
+The graph method needs arulesViz. It draws each rule as a circle, sized
+by support and coloured by lift, with arrows in from its left-hand items
+and out to its right-hand item, which is the more useful view once you
+have narrowed to a handful of rules worth reading.
 
 ## From a Data Frame
 
@@ -653,27 +426,6 @@ small_rules <- tidy_apriori(
   transactions,
   support = 0.4, confidence = 0.6, minlen = 2
 )
-#> Apriori
-#> 
-#> Parameter specification:
-#>  confidence minval smax arem  aval originalSupport maxtime support minlen
-#>         0.6    0.1    1 none FALSE            TRUE       5     0.4      2
-#>  maxlen target  ext
-#>      10  rules TRUE
-#> 
-#> Algorithmic control:
-#>  filter tree heap memopt load sort verbose
-#>     0.1 TRUE TRUE  FALSE TRUE    2    TRUE
-#> 
-#> Absolute minimum support count: 2 
-#> 
-#> set item appearances ...[0 item(s)] done [0.00s].
-#> set transactions ...[4 item(s), 5 transaction(s)] done [0.00s].
-#> sorting and recoding items ... [3 item(s)] done [0.00s].
-#> creating transaction tree ... done [0.00s].
-#> checking subsets of size 1 2 3 done [0.00s].
-#> writing ... [9 rule(s)] done [0.00s].
-#> creating S4 object  ... done [0.00s].
 
 small_rules$rules_tbl |>
   arrange(desc(lift)) |>

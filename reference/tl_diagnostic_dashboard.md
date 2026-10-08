@@ -18,7 +18,8 @@ tl_diagnostic_dashboard(
 
 - model:
 
-  A tidylearn model object
+  A tidylearn model object whose fit is an `lm` or `glm`: method
+  `"linear"`, `"polynomial"` or `"logistic"`
 
 - include_influence:
 

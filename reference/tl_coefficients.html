@@ -17,7 +17,7 @@ tl_table_importance for those.'><meta property="og:image" content="https://tidyl
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -84,8 +84,9 @@ columns (default <code>FALSE</code>). Not available for regularised methods.</p>
 
 
 <dt id="arg-level">level<a class="anchor" aria-label="anchor" href="#arg-level"></a></dt>
-<dd><p>Confidence level for the interval (default 0.95). Ignored
-unless <code>conf_int = TRUE</code>.</p></dd>
+<dd><p>Confidence level for the interval (default 0.95), a number
+strictly between 0 and 1. Used only when <code>conf_int = TRUE</code>, but
+checked either way, so a percentage such as <code>95</code> is an error.</p></dd>
 
 
 <dt id="arg-exponentiate">exponentiate<a class="anchor" aria-label="anchor" href="#arg-exponentiate"></a></dt>

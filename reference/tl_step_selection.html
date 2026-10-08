@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -94,7 +94,18 @@
     <p>A <code>tidylearn_model</code> object of class
 <code>tidylearn_linear</code> wrapping the selected <code><a href="https://rdrr.io/r/stats/lm.html" class="external-link">lm</a></code>
 model. Access the underlying model via <code>$fit</code> and the selected
-formula via <code>$spec$formula</code>.</p>
+formula via <code>$spec$formula</code>. <code>$data</code> is the data passed in.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>Every candidate model is fitted on the same rows: those with no
+missing value in any variable of <code>formula</code>. When that leaves out
+rows a candidate could otherwise use, a message gives the count, and
+the fit records the rows in its <code>na.action</code>, as <code><a href="https://rdrr.io/r/stats/lm.html" class="external-link">lm()</a></code>
+records the rows it drops itself.</p>
+<p>Forward and both-direction selection start from a model holding the
+intercept, or none if <code>formula</code> removes it with <code>- 1</code>, and
+any <code><a href="https://rdrr.io/r/stats/offset.html" class="external-link">offset()</a></code> terms in <code>formula</code>. Neither is ever dropped.</p>
     </div>
 
     <div class="section level2">

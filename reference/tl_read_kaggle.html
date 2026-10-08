@@ -11,7 +11,7 @@ configured (pip install kaggle)."><meta property="og:image" content="https://tid
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -60,22 +60,31 @@ configured (<code>pip install kaggle</code>).</p>
 
 <dl><dt id="arg-source">source<a class="anchor" aria-label="anchor" href="#arg-source"></a></dt>
 <dd><p>A Kaggle dataset slug (e.g., <code>"user/dataset-name"</code>) or a
-Kaggle URL.</p></dd>
+Kaggle URL. A URL may point at any tab of the dataset or competition
+page (<code>/data</code>, <code>/code</code>, <code>/versions/2</code>) and may carry a
+query; a competition URL is read as a competition without
+<code>type</code> being set.</p></dd>
 
 
 <dt id="arg-file">file<a class="anchor" aria-label="anchor" href="#arg-file"></a></dt>
-<dd><p>The specific file to read from the dataset. If <code>NULL</code> and
-the dataset contains exactly one file, it is read automatically.</p></dd>
+<dd><p>The specific file to read from the dataset, as a path within
+it; a file the CLI saved under its base name is found too. If
+<code>NULL</code>, the download is searched for files these readers handle
+(CSV, TSV, Excel, Parquet and JSON, with compressed CSV/TSV and
+<code>.ndjson</code>); with several, the newest is read and a message names
+it.</p></dd>
 
 
 <dt id="arg-dest">dest<a class="anchor" aria-label="anchor" href="#arg-dest"></a></dt>
-<dd><p>Directory to download files to. The default is a fresh
-per-dataset directory under <code><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir()</a></code>; supply a path to keep
-the download.</p></dd>
+<dd><p>Directory to keep the download in. The default is a fresh
+per-dataset directory under <code><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir()</a></code>. A supplied <code>dest</code>
+receives this download's files, replacing files of the same name;
+nothing else in it is read, unpacked or changed.</p></dd>
 
 
 <dt id="arg-type">type<a class="anchor" aria-label="anchor" href="#arg-type"></a></dt>
-<dd><p>Either <code>"dataset"</code> (default) or <code>"competition"</code>.</p></dd>
+<dd><p>Either <code>"dataset"</code> (default) or <code>"competition"</code>.
+Left unset, a competition URL in <code>source</code> sets it.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -89,10 +98,13 @@ the download.</p></dd>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
-<span class="r-in"><span><span class="co"># data &lt;- tl_read_kaggle("zillow/zecon", file = "Zip_time_series.csv")</span></span></span>
-<span class="r-in"><span><span class="co"># data &lt;- tl_read_kaggle("titanic", file = "train.csv", type = "competition")</span></span></span>
-<span class="r-in"><span><span class="co"># }</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
+<span class="r-in"><span><span class="co"># Needs the Kaggle CLI and Kaggle credentials</span></span></span>
+<span class="r-in"><span><span class="fu">tl_read_kaggle</span><span class="op">(</span><span class="st">"zillow/zecon"</span>, file <span class="op">=</span> <span class="st">"Zip_time_series.csv"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">tl_read_kaggle</span><span class="op">(</span><span class="st">"titanic"</span>, file <span class="op">=</span> <span class="st">"train.csv"</span>, type <span class="op">=</span> <span class="st">"competition"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">tl_read_kaggle</span><span class="op">(</span><span class="st">"https://www.kaggle.com/competitions/titanic/data"</span>,</span></span>
+<span class="r-in"><span>               file <span class="op">=</span> <span class="st">"train.csv"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

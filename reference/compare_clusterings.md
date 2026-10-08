@@ -12,7 +12,8 @@ compare_clusterings(cluster_list, data, dist_mat = NULL)
 
 - cluster_list:
 
-  Named list of cluster assignment vectors
+  Named list of cluster assignment vectors. An entry without a name is
+  reported as `clustering_<position>`.
 
 - data:
 
@@ -36,11 +37,11 @@ plus a `method` column identifying the clustering.
 km3 <- kmeans(iris[, 1:4], 3, nstart = 25)$cluster
 km4 <- kmeans(iris[, 1:4], 4, nstart = 25)$cluster
 compare_clusterings(list(k3 = km3, k4 = km4), iris[, 1:4])
-#> # A tibble: 2 × 8
-#>   method     k min_size max_size avg_size avg_silhouette min_silhouette
-#>   <chr>  <int>    <int>    <int>    <dbl>          <dbl>          <dbl>
-#> 1 k3         3       38       62     50            0.553         0.0264
-#> 2 k4         4       28       50     37.5          0.498        -0.0181
+#> # A tibble: 2 × 9
+#>   method     k min_size max_size avg_size n_noise avg_silhouette min_silhouette
+#>   <chr>  <int>    <int>    <int>    <dbl>   <int>          <dbl>          <dbl>
+#> 1 k3         3       38       62     50         0          0.553         0.0264
+#> 2 k4         4       28       50     37.5       0          0.498        -0.0181
 #> # ℹ 1 more variable: total_wss <dbl>
 # }
 ```

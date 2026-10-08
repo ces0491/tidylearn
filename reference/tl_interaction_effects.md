@@ -24,7 +24,9 @@ tl_interaction_effects(model, var, by_var, at_values = NULL, intervals = TRUE)
 
 - at_values:
 
-  Named list of values at which to hold other variables
+  Named list of values at which to hold other variables. A variable not
+  named is held at its median if it is numeric, and otherwise at its
+  most frequent value, a tie going to the earlier level.
 
 - intervals:
 
@@ -42,13 +44,19 @@ frame with the slope of `var` at each value of `by_var`). For
 categorical `var`: a data frame of predicted values at each factor level
 for each level of `by_var`. A numeric `by_var` is evaluated at its
 quartiles; quartiles that tie are evaluated once, with a label naming
-each quartile they stand for, such as `"Q0/Q25"`.
+each quartile they stand for, such as `"Q0/Q25"`. A factor, character or
+logical variable is categorical, and is evaluated at the values the data
+holds: a level no row uses, and a missing value, are left out. A factor
+is returned as a factor with the model's levels.
 
 `fit`, `lower`, `upper` and `slope` are on the response scale whatever
-`intervals` is set to: predicted probabilities for a logistic model.
+`intervals` is set to. For a classification model that is the predicted
+probability of the second class, so the response must have two classes.
 `slope` is the slope of a straight line fitted to `fit` across the range
 of `var`, so for a non-linear link it is an average rate of change over
-that range.
+that range. A model variable named `fit`, `by_value` or `by_label`, or
+with intervals `lower` or `upper`, would be overwritten by these columns
+and is refused.
 
 `slopes$slope_se` is the standard error of a straight line fitted to the
 prediction grid, not the sampling uncertainty of the marginal effect.
@@ -75,11 +83,11 @@ head(effects$effects)
 #> 6 1.710525 52 31.98539 29.74867 34.22211       52       Q0
 effects$slopes
 #>      by_value by_label     slope     slope_se
-#> Q0       52.0       Q0 -6.768521 5.695734e-16
-#> Q25      96.5      Q25 -5.529278 4.387243e-16
-#> Q50     123.0      Q50 -4.791302 6.071491e-16
-#> Q75     180.0      Q75 -3.203958 4.018576e-16
-#> Q100    335.0     Q100  1.112505 4.116338e-16
+#> Q0       52.0       Q0 -6.768521 3.505829e-16
+#> Q25      96.5      Q25 -5.529278 4.039654e-16
+#> Q50     123.0      Q50 -4.791302 3.746703e-16
+#> Q75     180.0      Q75 -3.203958 4.635819e-16
+#> Q100    335.0     Q100  1.112505 2.313524e-16
 
 # slopes$slope_se describes the fitted grid, not the sampling
 # uncertainty of the marginal effect -- for that, read the coefficient

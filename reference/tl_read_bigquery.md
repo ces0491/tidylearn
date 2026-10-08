@@ -14,7 +14,8 @@ tl_read_bigquery(project, query, dataset = NULL, ...)
 
 - project:
 
-  Google Cloud project ID.
+  Google Cloud project ID, or a `bigquery://project/dataset` URI, whose
+  dataset is used when `dataset` is not given.
 
 - query:
 
@@ -22,7 +23,7 @@ tl_read_bigquery(project, query, dataset = NULL, ...)
 
 - dataset:
 
-  Optional default dataset for unqualified table names.
+  Optional default dataset for unqualified table names, in `project`.
 
 - ...:
 
@@ -36,10 +37,18 @@ A `tidylearn_data` object containing the query results.
 ## Examples
 
 ``` r
-# \donttest{
-# data <- tl_read_bigquery(
-#   project = "my-project",
-#   query = "SELECT * FROM `my_dataset.my_table` LIMIT 1000"
-# )
-# }
+if (FALSE) { # \dontrun{
+# Needs Google Cloud credentials
+tl_read_bigquery(
+  project = "my-project",
+  query = "SELECT * FROM `my_dataset.my_table` LIMIT 1000"
+)
+
+# Unqualified table names resolve against `dataset`
+tl_read_bigquery(
+  project = "my-project",
+  query = "SELECT * FROM my_table LIMIT 1000",
+  dataset = "my_dataset"
+)
+} # }
 ```

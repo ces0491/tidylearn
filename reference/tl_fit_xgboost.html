@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -121,7 +121,11 @@ needed in a child (default: 1)</p></dd>
 
 
 <dt id="arg-early-stopping-rounds">early_stopping_rounds<a class="anchor" aria-label="anchor" href="#arg-early-stopping-rounds"></a></dt>
-<dd><p>Early stopping rounds (default: NULL)</p></dd>
+<dd><p>Early stopping rounds (default: NULL). It
+needs data to stop on, which a fit on all the rows does not have, so
+it is refused unless a validation set is passed as <code>evals</code> (or
+<code>watchlist</code> before xgboost 3.0). <code><a href="tl_tune_xgboost.html">tl_tune_xgboost</a></code>
+chooses the number of rounds by cross-validation instead.</p></dd>
 
 
 <dt id="arg-nthread">nthread<a class="anchor" aria-label="anchor" href="#arg-nthread"></a></dt>
@@ -133,7 +137,14 @@ needed in a child (default: 1)</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments to pass to xgb.train()</p></dd>
+<dd><p>Arguments <code>xgb.train()</code> takes, which go to it; case
+<code>weights</code>, which go to the training <code>xgb.DMatrix()</code>; and
+booster parameters such as <code>max_leaves</code> or <code>tree_method</code>,
+which go into <code>params</code>. A booster parameter given here, including
+<code>objective</code> and <code>eval_metric</code>, replaces the value set from
+the arguments above. With <code>booster = "gblinear"</code>, the tree
+parameters above are left out unless named. An offset is refused:
+predictions would not apply it.</p></dd>
 
 
 <dt id="arg-compute">compute<a class="anchor" aria-label="anchor" href="#arg-compute"></a></dt>

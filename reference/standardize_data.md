@@ -25,7 +25,12 @@ standardize_data(data, center = TRUE, scale = TRUE)
 ## Value
 
 A tibble with numeric variables centered and/or scaled as specified;
-non-numeric columns are returned unchanged.
+non-numeric columns are returned unchanged. A grouped tibble is
+standardised within each group, as
+[`dplyr::mutate()`](https://dplyr.tidyverse.org/reference/mutate.html)
+works on it; a rowwise tibble is standardised over its whole columns,
+since a single value has no spread. Grouping and rowwise identifier
+columns are left as they are.
 
 ## Examples
 

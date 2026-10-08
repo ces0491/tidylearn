@@ -22,13 +22,15 @@ tl_prepare_data(
 
 - data:
 
-  A data frame
+  A data frame. A grouped tibble is prepared as a whole and returned
+  ungrouped.
 
 - formula:
 
-  Optional formula (for supervised learning). Only its predictors are
-  processed; a column it excludes, such as `- id`, is returned
-  unchanged.
+  Optional two-sided formula (for supervised learning), whose response
+  must be a column of `data`. Only its predictors are processed; a
+  column it excludes, such as `- id`, is returned unchanged. Leave it
+  `NULL` to process every column.
 
 - impute_method:
 
@@ -38,7 +40,9 @@ tl_prepare_data(
 
 - scale_method:
 
-  Scaling method: "standardize", "normalize", "robust", "none"
+  Scaling method: "standardize", "normalize", "robust", "none". A column
+  whose spread is zero or not finite, such as one holding an `Inf`, is
+  left unscaled.
 
 - encode_categorical:
 
@@ -54,7 +58,8 @@ tl_prepare_data(
 
 - correlation_cutoff:
 
-  Correlation threshold for removal (default: 0.95)
+  Correlation threshold for removal, greater than 0 and at most 1
+  (default: 0.95)
 
 ## Value
 

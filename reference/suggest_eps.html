@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -57,7 +57,10 @@
 
 
 <dt id="arg-minpts">minPts<a class="anchor" aria-label="anchor" href="#arg-minpts"></a></dt>
-<dd><p>Minimum points parameter (used as k for k-NN)</p></dd>
+<dd><p>The <code>minPts</code> you will pass to <code><a href="tidy_dbscan.html">tidy_dbscan</a></code>
+(default: 5). The k-NN distance is read at <code>k = minPts - 1</code>, the
+neighbours a core point needs besides itself, as
+<code><a href="http://michael.hahsler.net/dbscan/reference/kNNdist.html" class="external-link">kNNdistplot</a></code> does.</p></dd>
 
 
 <dt id="arg-method">method<a class="anchor" aria-label="anchor" href="#arg-method"></a></dt>
@@ -80,7 +83,7 @@ percentile to use (default: 0.95)</p></dd>
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">eps_info</span> <span class="op">&lt;-</span> <span class="fu">suggest_eps</span><span class="op">(</span><span class="va">iris</span>, minPts <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">eps_info</span><span class="op">$</span><span class="va">eps</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.75757</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.7179749</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

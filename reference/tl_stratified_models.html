@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -51,7 +51,8 @@
 <span>  cluster_method <span class="op">=</span> <span class="st">"kmeans"</span>,</span>
 <span>  k <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>  supervised_method <span class="op">=</span> <span class="st">"tree"</span>,</span>
-<span>  <span class="va">...</span></span>
+<span>  <span class="va">...</span>,</span>
+<span>  cluster_args <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -68,7 +69,10 @@
 
 
 <dt id="arg-cluster-method">cluster_method<a class="anchor" aria-label="anchor" href="#arg-cluster-method"></a></dt>
-<dd><p>Clustering method</p></dd>
+<dd><p>Clustering method: <code>"kmeans"</code> (default),
+<code>"pam"</code>, <code>"clara"</code> or <code>"hclust"</code>, whose tree is cut at
+<code>k</code>. Only k-means can assign new rows, so the others predict
+their training data alone.</p></dd>
 
 
 <dt id="arg-k">k<a class="anchor" aria-label="anchor" href="#arg-k"></a></dt>
@@ -78,12 +82,16 @@
 <dt id="arg-supervised-method">supervised_method<a class="anchor" aria-label="anchor" href="#arg-supervised-method"></a></dt>
 <dd><p>Supervised learning method (default:
 <code>"tree"</code>, which handles both regression and classification).
-<code>"linear"</code> silently fits <code><a href="https://rdrr.io/r/stats/lm.html" class="external-link">lm()</a></code> to a factor response
-rather than refusing it, so it is not a safe default here.</p></dd>
+<code>"linear"</code> needs a numeric response and refuses a factor.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments</p></dd>
+<dd><p>Additional arguments for the supervised models</p></dd>
+
+
+<dt id="arg-cluster-args">cluster_args<a class="anchor" aria-label="anchor" href="#arg-cluster-args"></a></dt>
+<dd><p>A named list of arguments for the clustering step,
+such as <code>list(nstart = 5)</code> for k-means. Pass k as <code>k</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -91,9 +99,16 @@ rather than refusing it, so it is not a safe default here.</p></dd>
     <p>A list with class <code>"tidylearn_stratified"</code> containing:</p><dl><dt>cluster_model</dt>
 <dd><p>The fitted clustering model.</p></dd>
 
+<dt>clusters</dt>
+<dd><p>The training rows' cluster assignments.</p></dd>
+
 <dt>supervised_models</dt>
 <dd><p>Named list of tidylearn models, one per
-cluster.</p></dd>
+cluster that holds more than one class.</p></dd>
+
+<dt>single_class_clusters</dt>
+<dd><p>Named character vector giving, for each
+cluster whose rows all hold one class, that class.</p></dd>
 
 <dt>formula</dt>
 <dd><p>The model formula.</p></dd>
@@ -103,13 +118,19 @@ cluster.</p></dd>
 
 
 </dl></div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>The rows are clustered on the predictors the formula names, and a
+model is fitted to each cluster. A cluster whose rows all hold one class
+has nothing for a classifier to separate, so it gets no model and its
+rows are predicted as that class.</p>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="va">models</span> <span class="op">&lt;-</span> <span class="fu">tl_stratified_models</span><span class="op">(</span><span class="va">mtcars</span>, <span class="va">mpg</span> <span class="op">~</span> <span class="va">.</span>, cluster_method <span class="op">=</span> <span class="st">"kmeans"</span>,</span></span>
 <span class="r-in"><span>                                k <span class="op">=</span> <span class="fl">3</span>, supervised_method <span class="op">=</span> <span class="st">"linear"</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Note: Response 'mpg' has 8 unique numeric values. Treating as regression. Convert to factor for classification.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Note: Response 'mpg' has 6 unique numeric values. Treating as regression. Convert to factor for classification.</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>

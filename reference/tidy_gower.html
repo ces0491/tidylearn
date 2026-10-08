@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -64,7 +64,9 @@ weights (default: equal weights)</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A <code><a href="https://rdrr.io/r/stats/dist.html" class="external-link">dist</a></code> object containing Gower distances, with
-the <code>method</code> attribute set to <code>"gower"</code>.</p>
+the <code>method</code> attribute set to <code>"gower"</code>. A pair of rows with
+no variable observed in both has no defined distance and is <code>NA</code>,
+as in <code><a href="https://rdrr.io/pkg/cluster/man/daisy.html" class="external-link">daisy</a></code>.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>

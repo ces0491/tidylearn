@@ -28,6 +28,8 @@ tidy_pca(data, cols = NULL, scale = TRUE, center = TRUE, method = "prcomp")
 - center:
 
   Logical; should variables be centered? Default TRUE.
+  `method = "princomp"` always centres, so it warns and records
+  `center = TRUE` when asked not to.
 
 - method:
 

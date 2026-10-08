@@ -20,7 +20,10 @@ tl_plot_model(model, type = "auto", ...)
   Plot type. For regression: "auto", "actual_predicted", "residuals",
   "diagnostics". For classification: "auto", "confusion", "roc",
   "precision_recall", "calibration", "lift", "gain". "importance" is
-  available for tree-based and regularized models.
+  available for tree-based and regularized models. "diagnostics" needs a
+  model fitted by [`lm()`](https://rdrr.io/r/stats/lm.html) or
+  [`glm()`](https://rdrr.io/r/stats/glm.html): method "linear",
+  "polynomial" or "logistic".
 
 - ...:
 

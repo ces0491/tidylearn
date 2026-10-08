@@ -28,9 +28,12 @@ create_cluster_dashboard(
 
 ## Value
 
-Invisibly returns a list of
-[`ggplot`](https://ggplot2.tidyverse.org/reference/ggplot.html) objects.
-The combined plot grid is drawn as a side effect via
+Invisibly returns a named list of the
+[`ggplot`](https://ggplot2.tidyverse.org/reference/ggplot.html) objects
+drawn: `clusters`, the scatter plot, when the data has two numeric
+columns besides `cluster_col`; `sizes`; and `metrics`, when
+`validation_metrics` is given. The combined plot grid is drawn as a side
+effect via
 [`grid.arrange`](https://rdrr.io/pkg/gridExtra/man/arrangeGrob.html).
 
 ## Examples

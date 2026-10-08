@@ -16,7 +16,8 @@ plot_dendrogram(
 
 - hclust_obj:
 
-  Hierarchical clustering object (hclust or tidy_hclust)
+  Hierarchical clustering object: an `hclust`, a `tidy_hclust`, or a
+  tidylearn model fitted with `method = "hclust"`
 
 - k:
 

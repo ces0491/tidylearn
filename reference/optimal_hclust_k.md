@@ -16,7 +16,10 @@ optimal_hclust_k(hclust_obj, method = "silhouette", max_k = 10)
 
 - method:
 
-  Character; "silhouette" (default) or "gap"
+  Character; "silhouette" (default) or "gap". The gap statistic
+  resamples the observations' numeric columns, so it refuses a tree
+  built from a dist object, and one built with `distance = "gower"` on
+  non-numeric columns.
 
 - max_k:
 

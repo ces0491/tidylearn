@@ -16,12 +16,17 @@ tl_plot_deep_architecture(model, ...)
 
 - ...:
 
-  Additional arguments
+  Additional arguments passed to the
+  [`plot()`](https://rdrr.io/r/graphics/plot.default.html) method keras
+  provides for its models, such as `to_file` or `dpi`. `show_shapes` and
+  `show_layer_names` default to `TRUE`.
 
 ## Value
 
-The return value of `keras::plot_model()`, an architecture diagram of
-the Keras model.
+`NULL`, invisibly. Called for its side effect: keras draws the
+architecture diagram on the current graphics device, or writes it to
+`to_file`. keras renders it through the Python packages `pydot` and
+`graphviz`, and errors saying so when they are not installed.
 
 ## Examples
 

@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -97,11 +97,13 @@ might not.</li>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/tl_check_gpu.html">tl_check_gpu</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p><code><a href="../reference/tl_check_gpu.html">tl_check_gpu()</a></code> parses <code>nvidia-smi</code> and checks
-which GPU-capable backends are installed. It is cheap by design: it does
-not load Python, import TensorFlow, or fit anything. It returns an
-object with a <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> method describing the CUDA driver,
-the devices found, and which of xgboost, keras, tensorflow and torch are
-installed.</p>
+which GPU-capable backends are installed. It is cheap by design: it
+reads which packages are installed from the library without loading
+them, so it does not start Python, import TensorFlow, or fit anything,
+and it gives <code>nvidia-smi</code> 10 seconds to answer before warning
+and reporting no GPU. It returns an object with a <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code>
+method describing the CUDA driver, the devices found, and which of
+xgboost, keras and tensorflow are installed.</p>
 </div>
 <div class="section level2">
 <h2 id="only-two-methods-have-a-gpu-path">Only two methods have a GPU path<a class="anchor" aria-label="anchor" href="#only-two-methods-have-a-gpu-path"></a>

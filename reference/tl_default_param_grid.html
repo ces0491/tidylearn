@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -54,7 +54,7 @@
 
 <dl><dt id="arg-method">method<a class="anchor" aria-label="anchor" href="#arg-method"></a></dt>
 <dd><p>Model method ("tree", "forest",
-"boost", "svm", etc.)</p></dd>
+"boost", "svm", "xgboost", etc.)</p></dd>
 
 
 <dt id="arg-size">size<a class="anchor" aria-label="anchor" href="#arg-size"></a></dt>
@@ -62,8 +62,13 @@
 
 
 <dt id="arg-is-classification">is_classification<a class="anchor" aria-label="anchor" href="#arg-is-classification"></a></dt>
-<dd><p>Whether the task is
-classification or regression</p></dd>
+<dd><p>Whether the grid is for a classification task
+(the default) or a regression one. For regression, an <code>"svm"</code>
+grid also tunes <code>epsilon</code>, the width of the band within which
+e1071's regression SVM ignores errors, and the large <code>"forest"</code>
+grid centres <code>nodesize</code> on randomForest's regression default of
+5 rather than its classification default of 1. The other grids are
+the same for both tasks.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -74,7 +79,10 @@ element is a numeric or character vector of candidate values for
 that hyperparameter, or for <code>"deep"</code>'s <code>hidden_layers</code> a list
 of layer-size vectors. The grid is built without the data, so a
 <code>"forest"</code> <code>mtry</code> can exceed the number of predictors; the
-tuners cap it. <code>"polynomial"</code> tunes <code>degree</code>.
+tuners cap it. <code>"polynomial"</code> tunes <code>degree</code>. The
+<code>"xgboost"</code> grids draw on the values <code><a href="tl_tune_xgboost.html">tl_tune_xgboost</a></code>
+searches by default, and add <code>nrounds</code>, which that function
+chooses by early stopping and <code><a href="tl_tune_grid.html">tl_tune_grid</a></code> has to tune.
 <code>"linear"</code> and <code>"logistic"</code> have no tuneable
 hyperparameter and return an empty list with a warning, as does an
 unknown method.</p>
@@ -85,6 +93,7 @@ unknown method.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="va">grid</span> <span class="op">&lt;-</span> <span class="fu">tl_default_param_grid</span><span class="op">(</span><span class="st">"tree"</span>, size <span class="op">=</span> <span class="st">"small"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">grid</span> <span class="op">&lt;-</span> <span class="fu">tl_default_param_grid</span><span class="op">(</span><span class="st">"forest"</span>, size <span class="op">=</span> <span class="st">"medium"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">grid</span> <span class="op">&lt;-</span> <span class="fu">tl_default_param_grid</span><span class="op">(</span><span class="st">"svm"</span>, is_classification <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

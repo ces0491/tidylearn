@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -58,8 +58,14 @@
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A tibble with columns <code>rule_id</code>, <code>lhs</code>, <code>rhs</code>, and
-quality measures (e.g., <code>support</code>, <code>confidence</code>, <code>lift</code>).</p>
+    <p>A tibble with columns <code>rule_id</code>, <code>lhs</code>, <code>rhs</code>,
+the quality measures (e.g., <code>support</code>, <code>confidence</code>,
+<code>lift</code>), and the list columns <code>lhs_items</code> and
+<code>rhs_items</code>, each rule's items on that side as a character
+vector. The <code>lhs</code> and <code>rhs</code> labels are for reading; the
+helpers that match items read the lists, since an item name can hold
+the comma that separates items in a label. An empty rule set gives a
+zero-row tibble with the same columns.</p>
     </div>
 
     <div class="section level2">

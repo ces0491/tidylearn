@@ -34,8 +34,9 @@ tl_coefficients(
 
 - level:
 
-  Confidence level for the interval (default 0.95). Ignored unless
-  `conf_int = TRUE`.
+  Confidence level for the interval (default 0.95), a number strictly
+  between 0 and 1. Used only when `conf_int = TRUE`, but checked either
+  way, so a percentage such as `95` is an error.
 
 - exponentiate:
 

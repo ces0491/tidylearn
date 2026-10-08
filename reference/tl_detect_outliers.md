@@ -59,12 +59,15 @@ A list with outlier detection results:
 
 - outlier_flags:
 
-  A logical matrix (observations x variables).
+  A logical matrix (observations x variables), `NA` where a value is
+  missing. For `"cook"` and `"mahalanobis"` a row's flags are the same
+  in every column, and `NA` when any of its values is missing.
 
 - any_outlier:
 
   Logical vector indicating if each observation is an outlier in any
-  variable.
+  variable. Missing flags are ignored, so a row with no flag at all is
+  `FALSE`.
 
 - outlier_counts:
 
