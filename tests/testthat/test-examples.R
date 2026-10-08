@@ -2,14 +2,12 @@
 # runnable thing a new user is pointed at. Nothing else executes it, so a
 # rename or a signature change breaks it silently.
 
-unified_workflow_path <- function() {
-  system.file("examples", "unified_workflow.R", package = "tidylearn")
-}
-
-test_that("the shipped unified workflow example runs end to end", {
+# One test, because sourcing the script fits every model in it, so each
+# summary line is checked against that single run
+test_that("the shipped example runs end to end and reports what it built", {
   skip_on_cran()
 
-  path <- unified_workflow_path()
+  path <- system.file("examples", "unified_workflow.R", package = "tidylearn")
   skip_if(path == "", "example script not installed")
 
   env <- new.env(parent = globalenv())
@@ -26,17 +24,6 @@ test_that("the shipped unified workflow example runs end to end", {
   # iris has four predictors; asking for three components must report three
   expect_match(output, "Reduced from 4 to 3 features", fixed = TRUE,
                all = FALSE)
-})
-
-test_that("the example's summary lines describe the objects it built", {
-  skip_on_cran()
-
-  path <- unified_workflow_path()
-  skip_if(path == "", "example script not installed")
-
-  output <- utils::capture.output(suppressMessages(
-    source(path, local = new.env(parent = globalenv()), echo = FALSE)
-  ))
 
   # A transfer-learning result keeps its method at $method. The script read
   # $spec$method, which that result does not have, and printed
