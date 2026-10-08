@@ -1478,6 +1478,45 @@ test_that("compare_clusterings refuses data with no numeric column", {
   )
 })
 
+test_that("calc_validation_metrics refuses WSS without a numeric column", {
+  # WSS summed squares over no columns and reported total_wss = 0, a perfect
+  # score, for iris["Species"], with or without a distance for the
+  # silhouette
+  by_row <- rep(1:3, each = 50)
+  d <- stats::dist(iris[, 1:4])
+  refusal <- paste0(
+    "The within-cluster sum of squares needs at least one numeric column, ",
+    "but none were found."
+  )
+  expect_error(
+    calc_validation_metrics(by_row, iris["Species"]), refusal, fixed = TRUE
+  )
+  expect_error(
+    calc_validation_metrics(by_row, iris["Species"], d), refusal, fixed = TRUE
+  )
+  # compare_clusterings() given its distances passes the data on for WSS
+  expect_error(
+    compare_clusterings(list(by_row = by_row), iris["Species"], d),
+    refusal,
+    fixed = TRUE
+  )
+
+  # Without data there is no WSS to take, so a distance alone still scores
+  alone <- calc_validation_metrics(by_row, dist_mat = d)
+  expect_false("total_wss" %in% names(alone))
+  expect_equal(
+    alone$avg_silhouette, mean(cluster::silhouette(by_row, d)[, 3])
+  )
+
+  # Numeric data gives the WSS by hand, its non-numeric columns left out
+  x <- as.matrix(iris[, 1:4])
+  by_hand <- sum(vapply(1:3, function(cl) {
+    rows <- x[by_row == cl, , drop = FALSE]
+    sum(sweep(rows, 2, colMeans(rows))^2)
+  }, numeric(1)))
+  expect_equal(calc_validation_metrics(by_row, iris, d)$total_wss, by_hand)
+})
+
 # ---- MDS and PCA arguments -------------------------------------------
 
 test_that("tl_model(method = 'mds') reaches every variant and ndim", {

@@ -445,7 +445,8 @@ plot_gap_stat <- function(gap_obj, show_methods = FALSE) {
 #'   character. A label of 0 marks noise, as \code{\link{tidy_dbscan}}
 #'   reports it: noise points are left out of every measure and counted in
 #'   \code{n_noise}.
-#' @param data Original data frame (for WSS calculation)
+#' @param data Original data frame (for WSS calculation). WSS is taken
+#'   over its numeric columns, so it needs at least one.
 #' @param dist_mat Distance matrix (for silhouette)
 #'
 #' @return A single-row tibble with columns \code{k}, \code{min_size},
@@ -499,9 +500,18 @@ calc_validation_metrics <- function(clusters, data = NULL, dist_mat = NULL) {
     metrics$min_silhouette <- if (is.matrix(sil)) min(sil[, 3]) else NA_real_
   }
 
-  # WSS if data provided
+  # WSS if data provided. Over no numeric column it is a sum of nothing,
+  # 0, which reads as a perfect score.
   if (!is.null(data)) {
-    data_numeric <- tl_select_columns(data)[!noise, , drop = FALSE]
+    data_numeric <- tl_select_columns(data)
+    if (ncol(data_numeric) == 0) {
+      stop(
+        "The within-cluster sum of squares needs at least one numeric ",
+        "column, but none were found.",
+        call. = FALSE
+      )
+    }
+    data_numeric <- data_numeric[!noise, , drop = FALSE]
 
     # Total within-cluster sum of squares
     wss <- sum(vapply(unique(kept), function(cl) {
