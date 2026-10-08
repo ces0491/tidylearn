@@ -114,9 +114,10 @@ tl_fit_rows <- function(model) {
 #' predictor itself, and with a weight when weights are given. The model
 #' keeps the weights' name but not their values, so counting the rows with
 #' a response alone gave 116 for airquality where ten missing weights left
-#' 108. The count is read off the training \code{xgb.DMatrix}, which the
-#' booster's call holds. A model read back from disk holds a DMatrix that
-#' no longer exists, and falls back to the rows with a response.
+#' 108. \code{tl_fit_xgboost()} records the count as the booster's
+#' \code{training_rows} attribute. A model saved without it falls back to
+#' the training \code{xgb.DMatrix} its call held, while that still exists,
+#' and then to the rows with a response.
 #'
 #' @param model A tidylearn xgboost model.
 #' @return The number of training rows, as an integer.
@@ -124,6 +125,12 @@ tl_fit_rows <- function(model) {
 #' @noRd
 tl_xgb_fit_rows <- function(model) {
   fit <- model$fit
+  # tl_fit_xgboost() records the rows it trained on, missing weights
+  # left out; a model saved before it did falls back to what remains
+  recorded <- attr(fit, "training_rows")
+  if (!is.null(recorded)) {
+    return(as.integer(recorded))
+  }
   # The call is an attribute from xgboost 3.0, an element before it
   dtrain <- (attr(fit, "call") %||% fit$call)$data
   n <- if (inherits(dtrain, "xgb.DMatrix")) {

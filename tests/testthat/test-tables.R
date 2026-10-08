@@ -297,14 +297,19 @@ test_that("the row count sees missing weights and svm with no fitted values", {
     length(tl_xgb_training_rows(Ozone ~ Temp + Wind, airquality, w)$y)
   )
 
-  # A model read back from disk holds a training DMatrix that no longer
-  # exists, and counts the rows with a response instead of failing
-  unweighted <- tl_model(airquality, Ozone ~ Temp + Wind, method = "xgboost",
-                         nrounds = 5)
+  # The count is recorded on the booster, so a model read back from disk
+  # keeps it
   path <- tempfile(fileext = ".rds")
   on.exit(unlink(path), add = TRUE)
-  saveRDS(unweighted, path)
-  expect_identical(tl_fit_rows(readRDS(path)), sum(!is.na(airquality$Ozone)))
+  saveRDS(xgb, path)
+  expect_identical(tl_fit_rows(readRDS(path)), tl_fit_rows(xgb))
+
+  # A model saved without the count, as an earlier version saved it,
+  # counts the rows with a response instead of failing
+  unweighted <- tl_model(airquality, Ozone ~ Temp + Wind, method = "xgboost",
+                         nrounds = 5)
+  attr(unweighted$fit, "training_rows") <- NULL
+  expect_identical(tl_fit_rows(unweighted), sum(!is.na(airquality$Ozone)))
 })
 
 test_that("models fitted on one frame still share it as the default", {
