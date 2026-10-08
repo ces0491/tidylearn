@@ -487,6 +487,63 @@ test_that("tl_prepare_data reports scaling only when it scales", {
   expect_equal(out$data$z, (d$z - mean(d$z)) / stats::sd(d$z))
 })
 
+test_that("tl_prepare_data reports encoding only for what it one-hot encodes", {
+  # A two-level factor is left as it is, yet the call said "Encoding 1
+  # categorical variables" and recorded an encoding step with an empty map
+  d <- data.frame(
+    y = c(1, 4, 2, 8, 5, 7), x = c(3, 1, 4, 1, 5, 9),
+    am = factor(c("a", "m", "a", "m", "m", "a"))
+  )
+  expect_no_message(
+    out <- tl_prepare_data(d, y ~ ., scale_method = "none"),
+    message = "Encoding"
+  )
+  expect_null(out$preprocessing_steps$encoding)
+  expect_identical(out$data$am, d$am)
+
+  # A two-level text column still becomes a factor
+  d$side <- c("l", "r", "r", "l", "r", "l")
+  out <- tl_prepare_data(d, y ~ ., scale_method = "none")
+  expect_identical(out$data$side, factor(d$side))
+
+  # Only a factor with more levels is counted, in the singular for one
+  d$g <- factor(c("p", "q", "r", "p", "q", "r"))
+  messages <- testthat::capture_messages(
+    out <- tl_prepare_data(d, y ~ ., scale_method = "none")
+  )
+  expect_identical(messages, "Encoding 1 categorical variable\n")
+  expect_identical(out$preprocessing_steps$encoding$encoding_map,
+                   list(g = c("g_p", "g_q", "g_r")))
+  expect_equal(out$data$g_q, as.numeric(d$g == "q"))
+
+  d$h <- as.character(rev(d$g))
+  messages <- testthat::capture_messages(
+    out <- tl_prepare_data(d, y ~ ., scale_method = "none")
+  )
+  expect_identical(messages, "Encoding 2 categorical variables\n")
+  expect_named(out$preprocessing_steps$encoding$encoding_map, c("g", "h"))
+})
+
+test_that("tl_prepare_data counts one removed feature in the singular", {
+  # "Removing 1 zero-variance features"
+  d <- data.frame(y = c(1, 4, 2, 8, 5, 7), x = c(3, 1, 4, 1, 5, 9),
+                  flat = 2)
+  messages <- testthat::capture_messages(
+    out <- tl_prepare_data(d, y ~ ., scale_method = "none")
+  )
+  expect_identical(messages, "Removing 1 zero-variance feature\n")
+  expect_identical(out$preprocessing_steps$zero_variance, "flat")
+
+  d <- data.frame(y = c(1, 4, 2, 8, 5, 7), x = c(3, 1, 4, 1, 5, 9),
+                  twice = c(6, 2, 8, 2, 10, 18), z = c(2, 7, 1, 8, 2, 8))
+  messages <- testthat::capture_messages(
+    out <- tl_prepare_data(d, y ~ ., scale_method = "none",
+                           remove_correlated = TRUE)
+  )
+  expect_identical(messages, "Removing 1 highly correlated feature\n")
+  expect_length(out$preprocessing_steps$high_correlation, 1L)
+})
+
 test_that("a single row is returned without scaling", {
   # One value has an NA variance, and NA in the zero-variance selection
   # failed with "Selections can't have missing values"

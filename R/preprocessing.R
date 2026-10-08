@@ -167,11 +167,19 @@ tl_prepare_data <- function(data, formula = NULL,
       )
     ]
 
+    # A factor of one or two levels is left as it is, and a text one only
+    # becomes a factor, so the count is of the one-hot encoded variables
+    # alone. Counting every categorical one, a lone two-level factor said
+    # "Encoding 1 categorical variables" and recorded an empty map.
     if (length(cat_vars) > 0) {
-      message("Encoding ", length(cat_vars), " categorical variables")
       encoding_info <- encode_categoricals(predictor_data, cat_vars)
       predictor_data <- encoding_info$data
-      preprocessing_steps$encoding <- encoding_info
+      encoded <- length(encoding_info$encoding_map)
+      if (encoded > 0L) {
+        message("Encoding ", encoded, " categorical ",
+                ngettext(encoded, "variable", "variables"))
+        preprocessing_steps$encoding <- encoding_info
+      }
     }
   }
 
@@ -179,7 +187,8 @@ tl_prepare_data <- function(data, formula = NULL,
   if (remove_zero_variance) {
     zero_var_cols <- find_zero_variance(predictor_data)
     if (length(zero_var_cols) > 0) {
-      message("Removing ", length(zero_var_cols), " zero-variance features")
+      message("Removing ", length(zero_var_cols), " zero-variance ",
+              ngettext(length(zero_var_cols), "feature", "features"))
       predictor_data <- predictor_data |>
         dplyr::select(-dplyr::all_of(zero_var_cols))
       preprocessing_steps$zero_variance <- zero_var_cols
@@ -194,7 +203,8 @@ tl_prepare_data <- function(data, formula = NULL,
       high_cor <- find_high_correlation(cor_matrix, cutoff = correlation_cutoff)
 
       if (length(high_cor) > 0) {
-        message("Removing ", length(high_cor), " highly correlated features")
+        message("Removing ", length(high_cor), " highly correlated ",
+                ngettext(length(high_cor), "feature", "features"))
         predictor_data <- predictor_data |>
           dplyr::select(-dplyr::all_of(high_cor))
         preprocessing_steps$high_correlation <- high_cor
