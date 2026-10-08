@@ -36,8 +36,9 @@ tl_override_args <- function(defaults, overrides) {
 #' predict() never adds back, and randomForest, e1071, nnet, keras and
 #' xgboost leave it out of the fit. Held at the same predictors, each
 #' method's prediction moved by 0 when the offset moved by 100. Passed as
-#' an argument, an offset was ignored by randomForest, e1071 and xgboost
-#' without a word.
+#' an argument, an offset was ignored without a word by rpart.control(),
+#' randomForest, e1071, nnet and keras; xgboost 3.x warned that it did not
+#' recognise it, and gbm stopped on an unused argument.
 #'
 #' @param formula The model formula
 #' @param data The training data, to expand a dot against
@@ -320,20 +321,24 @@ tl_fit_forest_frame <- function(formula, data, args) {
   frame <- stats::model.frame(formula, data = data, na.action = na_action)
   model_terms <- attr(frame, "terms")
 
-  # Interactions are read as their parts, as the formula interface reads
-  # them. The formula's environment stays behind the terms, so a function
-  # the caller defined is still found at predict().
-  predictor_formula <- stats::reformulate(attr(model_terms, "term.labels"))
-  environment(predictor_formula) <- environment(formula)
-  predictor_terms <- stats::terms(predictor_formula)
+  # The terms keep the predvars model.frame() recorded: the training centre
+  # and scale of scale(hp), the coefficients of poly(hp, 2). Terms rebuilt
+  # from their labels lost them, so each term was recomputed on whatever
+  # rows predict() was handed -- five rows alone predicted differently from
+  # the same rows in the full frame, and one row, whose sd is NA, predicted
+  # NA. The formula's environment stays behind the terms, so a function the
+  # caller defined is still found at predict().
+  predictor_terms <- stats::delete.response(model_terms)
 
-  frame_vars <- as.list(attr(model_terms, "variables"))[-1]
-  columns <- vapply(
-    as.list(attr(predictor_terms, "variables"))[-1],
-    function(v) which(vapply(frame_vars, identical, logical(1), v))[1],
-    integer(1)
+  # Each variable a term uses is a predictor, as randomForest's formula
+  # interface reads them: an interaction as its parts. A variable only a
+  # subtracted term names is not. This path runs only for a formula with a
+  # transformed term, so there is always a term.
+  used <- which(rowSums(attr(predictor_terms, "factors")) > 0)
+  response <- attr(model_terms, "response")
+  x <- tl_forest_flatten(
+    frame[, setdiff(seq_along(frame), response)[used], drop = FALSE]
   )
-  x <- frame[, columns, drop = FALSE]
   y <- stats::model.response(frame)
 
   # The stored call names its values rather than spelling out the frame,
@@ -344,11 +349,46 @@ tl_fit_forest_frame <- function(formula, data, args) {
   }
   fit$terms <- model_terms
   fit$tl_predictor_terms <- predictor_terms
-  fit$tl_xlevels <- stats::.getXlevels(predictor_terms, x)
+  fit$tl_predictor_columns <- used
+  fit$tl_xlevels <- stats::.getXlevels(model_terms, frame)
   if (!is.null(attr(frame, "na.action"))) {
     fit$na.action <- attr(frame, "na.action")
   }
   fit
+}
+
+#' A predictor frame randomForest can take
+#'
+#' A matrix-valued term -- poly(hp, 2), ns(), bs() -- is one column of the
+#' model frame holding a matrix, which randomForest cannot read, and the
+#' fit failed with "number of items to replace is not a multiple of
+#' replacement length". Each of its columns becomes a predictor, named as
+#' model.matrix() names them. A one-column matrix, such as scale(hp)
+#' returns, keeps the term's name.
+#'
+#' @param frame Model-frame columns, one per variable
+#' @return A data frame of vector columns
+#' @keywords internal
+#' @noRd
+tl_forest_flatten <- function(frame) {
+  columns <- list()
+  for (name in names(frame)) {
+    column <- frame[[name]]
+    if (!is.matrix(column)) {
+      columns[[name]] <- column
+    } else if (ncol(column) == 1L) {
+      columns[[name]] <- as.vector(column)
+    } else {
+      suffix <- colnames(column)
+      if (is.null(suffix)) {
+        suffix <- seq_len(ncol(column))
+      }
+      for (j in seq_len(ncol(column))) {
+        columns[[paste0(name, suffix[j])]] <- as.vector(column[, j])
+      }
+    }
+  }
+  as.data.frame(columns, check.names = FALSE, stringsAsFactors = FALSE)
 }
 
 #' Predict from a forest fitted by tl_fit_forest_frame()
@@ -363,10 +403,13 @@ tl_fit_forest_frame <- function(formula, data, args) {
 #' @keywords internal
 #' @noRd
 tl_forest_frame_predict <- function(fit, new_data, type) {
-  x <- stats::model.frame(
+  # Evaluated through the stored predvars, so each term is computed as it
+  # was in training, whatever rows arrive
+  frame <- stats::model.frame(
     fit$tl_predictor_terms, new_data,
     na.action = stats::na.pass, xlev = fit$tl_xlevels
   )
+  x <- tl_forest_flatten(frame[, fit$tl_predictor_columns, drop = FALSE])
   keep <- stats::complete.cases(x)
   rows <- x[keep, , drop = FALSE]
 

@@ -52,7 +52,9 @@ test_that("the backends refuse an offset they cannot apply at predict()", {
   # moved by 100, for every method here: rpart and gbm fit an offset()
   # term as a shift of the response that their predict() never adds back,
   # and the rest left it out of the fit. Passed as an argument, it was
-  # ignored by randomForest, e1071 and xgboost without a word.
+  # ignored without a word by tree, forest, svm, nn and deep; xgboost 3.x
+  # warned that it did not recognise it, and gbm stopped on an unused
+  # argument.
   d <- make_regression_data()
   d$off <- rep(c(0, 100), length.out = nrow(d))
   methods <- c("tree", "forest", "boost", "svm", "nn", "deep")
@@ -206,6 +208,48 @@ test_that("a forest fits transformed terms", {
   # A formula of plain columns keeps randomForest's own formula interface
   plain <- tl_model(mtcars, mpg ~ hp + wt, method = "forest", ntree = 10)
   expect_s3_class(plain$fit, "randomForest.formula")
+})
+
+test_that("a forest's computed terms reuse what training computed", {
+  skip_if_not_installed("randomForest")
+
+  # The predictor terms were rebuilt from their labels, dropping what
+  # model.frame() records for prediction: scale(hp) was recomputed on
+  # whatever rows predict() was handed, so five rows alone predicted
+  # differently from the same rows inside the full frame, and one row,
+  # whose sd is NA, predicted NA. poly(hp, 2) failed to fit.
+  set.seed(1)
+  scaled <- tl_model(mtcars, mpg ~ scale(hp) + wt, method = "forest",
+                     ntree = 50)
+  full <- predict(scaled, mtcars)$.pred
+  expect_equal(predict(scaled, mtcars[1:5, ])$.pred, full[1:5])
+  expect_equal(predict(scaled, mtcars[7, ])$.pred, full[7])
+
+  # A matrix-valued term enters as one column per basis function: the same
+  # forest randomForest grows on the basis directly
+  set.seed(1)
+  curved <- tl_model(mtcars, mpg ~ poly(hp, 2) + wt, method = "forest",
+                     ntree = 50)
+  as_frame <- function(basis) {
+    x <- data.frame(basis[, 1], basis[, 2], mtcars$wt)
+    names(x) <- c("poly(hp, 2)1", "poly(hp, 2)2", "wt")
+    x
+  }
+  basis <- stats::poly(mtcars$hp, 2)
+  set.seed(1)
+  direct <- randomForest::randomForest(as_frame(basis), mtcars$mpg,
+                                       ntree = 50, importance = TRUE)
+  expect_equal(unname(stats::predict(curved$fit, as_frame(basis))),
+               unname(stats::predict(direct, as_frame(basis))))
+
+  # New data is put through the training coefficients, as predict.poly()
+  # does -- which can differ from the training basis in the last bit, and
+  # so fall the other side of a split
+  rebased <- as_frame(stats::predict(basis, mtcars$hp))
+  expect_equal(predict(curved, mtcars)$.pred,
+               unname(stats::predict(direct, rebased)))
+  expect_equal(predict(curved, mtcars[3, ])$.pred,
+               predict(curved, mtcars)$.pred[3])
 })
 
 # ---- partial dependence ----------------------------------------------
@@ -480,6 +524,27 @@ test_that("svm refuses case weights, which e1071 does not have", {
   expect_s3_class(model, "tidylearn_svm")
 })
 
+test_that("svm predicts NA rows when no row has every predictor", {
+  skip_if_not_installed("e1071")
+
+  # predict.svm() refused the empty frame left once the incomplete rows
+  # were set aside: "test data does not match model !"
+  regression <- tl_model(mtcars, mpg ~ wt + hp, method = "svm")
+  gappy <- mtcars[1:3, ]
+  gappy$wt <- NA
+  preds <- predict(regression, gappy)
+  expect_equal(nrow(preds), 3L)
+  expect_true(all(is.na(preds$.pred)))
+
+  classifier <- tl_model(iris, Species ~ ., method = "svm")
+  flowers <- iris[1:3, ]
+  flowers$Petal.Length <- NA
+  classes <- predict(classifier, flowers, type = "class")
+  expect_equal(nrow(classes), 3L)
+  expect_true(all(is.na(classes$.pred)))
+  expect_identical(levels(classes$.pred), levels(iris$Species))
+})
+
 test_that("svm takes the caller's probability and type", {
   skip_if_not_installed("e1071")
 
@@ -693,6 +758,28 @@ test_that("tl_tune_nn reads the task from the response", {
   set.seed(1)
   reg <- tl_tune_nn(mtcars, mpg ~ wt, sizes = 2, decays = 0, folds = 2)
   expect_true(all(is.finite(reg$tuning_results$error)))
+
+  # TRUE is refused for a computed response that is not a factor:
+  # factor() could not be written back over a computed response, so the
+  # folds classified while tl_model() would refit a regression, and the
+  # scoring failed on "level sets of factors are different"
+  cars <- rbind(mtcars, mtcars)
+  expect_error(
+    tl_tune_nn(cars, I(mpg > 20) ~ wt + hp, is_classification = TRUE,
+               sizes = 2, decays = 0, folds = 2),
+    "is_classification = TRUE, but 'I\\(mpg > 20\\)' is computed as logical"
+  )
+  # A bare numeric column is still converted, and factor() on the
+  # left-hand side classifies a computed one
+  set.seed(1)
+  coded <- tl_tune_nn(cars, am ~ wt + hp, is_classification = TRUE,
+                      sizes = 2, decays = 0, folds = 2)
+  expect_identical(coded$model$lev, c("0", "1"))
+  set.seed(1)
+  computed <- tl_tune_nn(cars, factor(mpg > 20) ~ wt + hp,
+                         is_classification = TRUE, sizes = 2, decays = 0,
+                         folds = 2)
+  expect_identical(computed$model$lev, c("FALSE", "TRUE"))
 })
 
 test_that("tl_tune_nn scores the response the formula computes", {
@@ -742,8 +829,9 @@ test_that("tl_tune_nn takes the caller's maxit", {
 test_that("tl_tune_nn and tl_tune_deep refuse per-row arguments", {
   skip_if_not_installed("nnet")
 
-  # A weight vector went whole into every fold, a subset of the rows:
-  # nnet failed on the lengths, and keras on an argument it does not take
+  # A weight vector cannot follow the rows into a fold: tl_tune_nn()
+  # failed with "..1 used in an incorrect context", and tl_tune_deep() ran
+  # with keras ignoring the weights
   w <- rep(c(1, 2), length.out = nrow(iris))
   expect_error(
     tl_tune_nn(iris, Species ~ ., sizes = 2, decays = 0, folds = 2,
@@ -781,6 +869,36 @@ test_that("xgboost applies case weights through its DMatrix", {
                          nrounds = 20)
   expect_false(isTRUE(all.equal(predict(model, mtcars)$.pred,
                                 predict(unweighted, mtcars)$.pred)))
+})
+
+test_that("an unweighted xgboost fit hands xgb.DMatrix() no weight", {
+  skip_if_not_installed("xgboost")
+
+  # weight = NULL was always passed. xgboost before 3.0 takes it through
+  # ..., as information to set on the matrix, where NULL fails the length
+  # check, so every unweighted fit failed there
+  passed <- list()
+  real <- xgboost::xgb.DMatrix
+  local_mocked_bindings(
+    xgb.DMatrix = function(...) {
+      passed[[length(passed) + 1L]] <<- names(list(...))
+      real(...)
+    },
+    .package = "xgboost"
+  )
+  tl_model(mtcars, mpg ~ wt + hp, method = "xgboost", nrounds = 2)
+  tl_tune_xgboost(mtcars, mpg ~ wt + hp, cv_folds = 2, nrounds = 2,
+                  param_grid = list(max_depth = 2), verbose = FALSE)
+  expect_gt(length(passed), 0L)
+  for (arguments in passed) {
+    expect_false("weight" %in% arguments)
+  }
+
+  # And a weighted one still sets them
+  passed <- list()
+  tl_model(mtcars, mpg ~ wt + hp, method = "xgboost", nrounds = 2,
+           weights = rep(c(1, 2), 16))
+  expect_true("weight" %in% passed[[1]])
 })
 
 test_that("xgboost settings passed to tl_model() reach params", {
@@ -847,6 +965,45 @@ test_that("early_stopping_rounds without data to stop on is refused by name", {
     model$fit$niter
   }
   expect_lt(rounds, 200)
+})
+
+test_that("watchlist reaches xgboost 3.x as evals", {
+  skip_if_not_installed("xgboost")
+  skip_if_not(xgb_v3(), "xgboost before 3.0 takes watchlist itself")
+
+  # xgboost 3.x renamed watchlist to evals. Not one of xgb.train()'s
+  # arguments any more, it was put among the booster parameters, which
+  # ignored it with a note, and no evaluation ran
+  validation <- xgboost::xgb.DMatrix(
+    stats::model.matrix(mpg ~ wt + hp, mtcars[25:32, ])[, -1],
+    label = mtcars$mpg[25:32]
+  )
+  notes <- utils::capture.output(
+    model <- tl_model(mtcars[1:24, ], mpg ~ wt + hp, method = "xgboost",
+                      nrounds = 5, watchlist = list(validation = validation)),
+    type = "message"
+  )
+  expect_false(any(grepl("are not used", notes)))
+  expect_named(attributes(model$fit)$evaluation_log,
+               c("iter", "validation_rmse"))
+
+  # Early stopping counts it as data to stop on
+  stopped <- tl_model(mtcars[1:24, ], mpg ~ wt + hp, method = "xgboost",
+                      nrounds = 200, early_stopping_rounds = 3,
+                      watchlist = list(validation = validation))
+  expect_lt(xgboost::xgb.get.num.boosted.rounds(stopped$fit), 200)
+
+  # The tuner's refit takes it, rather than the cross-validation
+  notes <- utils::capture.output(
+    tuned <- tl_tune_xgboost(mtcars[1:24, ], mpg ~ wt + hp, cv_folds = 2,
+                             nrounds = 3, param_grid = list(max_depth = 2),
+                             verbose = FALSE,
+                             watchlist = list(validation = validation)),
+    type = "message"
+  )
+  expect_false(any(grepl("are not used", notes)))
+  expect_named(attributes(tuned$fit)$evaluation_log,
+               c("iter", "validation_rmse"))
 })
 
 test_that("xgboost drops a missing response and keeps missing predictors", {
@@ -932,8 +1089,12 @@ test_that("predict()'s iterationrange follows the installed xgboost", {
 test_that("the extra-columns warning in xgboost predict has no call", {
   skip_if_not_installed("xgboost")
 
-  # Every other message in the file is raised with call. = FALSE
+  # Every other message in the file is raised with call. = FALSE. The
+  # warning comes from a model that records no training terms, whose
+  # matrix is built from the formula on the new data, where a dot takes in
+  # columns the model never saw.
   model <- tl_model(mtcars[, 1:4], mpg ~ ., method = "xgboost", nrounds = 5)
+  attr(model$spec$xlev, "terms") <- NULL
   w <- expect_warning(
     tl_predict_xgboost(model, mtcars),
     "New data contains columns not in the training data"
@@ -946,10 +1107,11 @@ test_that("a gblinear booster gets no tree parameters", {
 
   # max_depth, subsample and the other tree parameters were always set,
   # so a linear booster printed "Parameters: { ... } are not used" on
-  # every fit
+  # every fit.
+  #
   # gblinear's default updater runs its coordinate updates in parallel,
   # and on several threads the result depends on their timing, so both
-  # fits use one thread and the same seed
+  # fits use one thread and the same seed.
   notes <- utils::capture.output(
     model <- tl_model(mtcars, mpg ~ wt + hp, method = "xgboost",
                       nrounds = 10, booster = "gblinear", seed = 1,
@@ -1006,9 +1168,49 @@ test_that("tl_plot_xgboost_importance is a ggplot of xgboost's importance", {
   expect_identical(as.character(by_cover$data$feature), cover$Feature)
 
   expect_error(
-    tl_plot_xgboost_importance(model, importance_type = "weight"),
+    tl_plot_xgboost_importance(model, importance_type = "permutation"),
     "'importance_type' must be one of"
   )
+  expect_error(
+    tl_plot_xgboost_importance(model, importance_type = "weight"),
+    "reports no Weight for this model, only Gain, Cover, Frequency"
+  )
+})
+
+test_that("tl_plot_xgboost_importance draws a linear booster's weights", {
+  skip_if_not_installed("xgboost")
+
+  # A gblinear model has coefficients, reported as Weight, and no gain.
+  # Asked for the default gain, the plot refused a model 0.5.0 drew.
+  set.seed(1)
+  model <- tl_model(mtcars, mpg ~ wt + hp + qsec, method = "xgboost",
+                    nrounds = 10, booster = "gblinear", nthread = 1)
+  importance <- as.data.frame(xgboost::xgb.importance(model = model$fit))
+  by_size <- importance[order(-abs(importance$Weight)), ]
+
+  p <- tl_plot_xgboost_importance(model)
+  expect_identical(as.character(p$data$feature), by_size$Feature)
+  expect_equal(p$data$importance,
+               abs(by_size$Weight) / max(abs(by_size$Weight)))
+  expect_match(p$labels$y, "weight")
+  by_name <- tl_plot_xgboost_importance(model, importance_type = "weight")
+  expect_equal(by_name$data, p$data)
+
+  # A measure it does not have is refused, pointing to the one it has
+  expect_error(
+    tl_plot_xgboost_importance(model, importance_type = "cover"),
+    "only Weight; use importance_type = \"weight\""
+  )
+
+  # Multiclass: one weight per class, ranked by the mean absolute weight
+  set.seed(1)
+  multi <- tl_model(iris, Species ~ ., method = "xgboost", nrounds = 5,
+                    booster = "gblinear", nthread = 1)
+  per_class <- as.data.frame(xgboost::xgb.importance(model = multi$fit))
+  mean_abs <- tapply(abs(per_class$Weight), per_class$Feature, mean)
+  pm <- tl_plot_xgboost_importance(multi)
+  expect_equal(pm$data$importance,
+               as.vector(sort(mean_abs, decreasing = TRUE)) / max(mean_abs))
 })
 
 test_that("tl_plot_xgboost_tree draws the tree tree_index names", {
@@ -1278,8 +1480,8 @@ test_that("the SHAP dependence plot pairs each SHAP value with its own row", {
 # ---- deep learning -------------------------------------------------------
 
 test_that("deep refuses case weights, which it does not pass to keras", {
-  # They reached keras's fit() as an argument it does not take, and the
-  # fit failed with Python's TypeError. Refused before keras is needed.
+  # keras's fit() accepted them through its ... and ignored them, so a
+  # weighted fit was an unweighted one. Refused before keras is needed.
   w <- rep(c(1, 2), length.out = nrow(mtcars))
   expect_error(
     tl_model(mtcars, mpg ~ wt + hp, method = "deep", weights = w),
@@ -1359,9 +1561,9 @@ test_that("a deep fit holds out a random set of rows for validation", {
   skip_if_no_tensorflow()
 
   # keras's validation_split takes the last rows as given, before any
-  # shuffling. iris is sorted by species, so the default 0.2 held out
-  # every virginica row: the model never trained on that class and was
-  # validated on nothing else.
+  # shuffling. iris is sorted by species, so the default 0.2 held out rows
+  # 121 to 150, 30 of the 50 virginica rows, and validated on virginica
+  # alone.
   tensorflow::set_random_seed(1)
   model <- tl_model(iris, Species ~ ., method = "deep", epochs = 1,
                     hidden_layers = 8, dropout = 0, verbose = 0)

@@ -176,7 +176,19 @@ tl_tuner_task <- function(data, formula, is_classification) {
   }
 
   # A computed response is left to the formula: writing factor(am) back
-  # over am would change what the formula computes
+  # over am would change what the formula computes. So it cannot be made a
+  # factor here, and a computed one that is not already a factor would be
+  # classified in the folds and refitted as a regression by tl_model(),
+  # where nnet scoring failed on "level sets of factors are different".
+  if (is_classification && !categorical && !is.name(lhs)) {
+    stop(
+      "is_classification = TRUE, but '", response_label, "' is computed ",
+      "as ", class(unclass(y))[1], ". To classify it, write factor() ",
+      "around it on the left-hand side, as in factor(", response_label,
+      ") ~ ..., or leave is_classification out.",
+      call. = FALSE
+    )
+  }
   if (is_classification && is.name(lhs)) {
     data[[response_label]] <- tl_normalise_response(y)
   }
@@ -319,8 +331,8 @@ tl_tune_nn <- function(data, formula, is_classification = NULL,
   data <- task$data
   is_classification <- task$is_classification
 
-  # A per-row argument went whole into every fold, a subset of the rows,
-  # and nnet failed on "variable lengths differ"
+  # A per-row argument holds one value per row of data, and each fold fits
+  # a subset of the rows, so it cannot be passed on whole
   tl_check_per_row_args(names2(list(...)), "tl_tune_nn()")
 
   # maxit and trace are defaults, not fixed values: set alongside ..., the

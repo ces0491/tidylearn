@@ -179,10 +179,11 @@ tl_fit_deep <- function(data, formula,
   )
 
   # keras's validation_split holds out the last rows as given, before any
-  # shuffling. iris is sorted by species, so the default 0.2 held out
-  # every virginica row: the model never trained on that class and was
-  # validated on nothing else. Hold out a random set of rows instead,
-  # unless the caller supplies validation data of their own.
+  # shuffling. iris is sorted by species, so the default 0.2 held out rows
+  # 121 to 150, 30 of the 50 virginica rows: the model trained on 20
+  # virginica against 50 of each other class and was validated on virginica
+  # alone. Hold out a random set of rows instead, unless the caller
+  # supplies validation data of their own.
   n <- nrow(x_scaled)
   held_out <- if (validation_split > 0 && is.null(dots$validation_data)) {
     sort(sample.int(n, floor(n * validation_split)))
@@ -483,8 +484,9 @@ tl_tune_deep <- function(data, formula,
                          batch_sizes = c(16, 32, 64),
                          epochs = 30,
                          validation_split = 0.2, ...) {
-  # A per-row argument went whole into every configuration's fit, which
-  # holds out some of the rows. Refused before a backend is needed.
+  # A per-row argument cannot follow the rows each configuration's fit
+  # holds out, and keras ignored weights passed this way. Refused before
+  # a backend is needed.
   tl_check_per_row_args(names2(list(...)), "tl_tune_deep()")
 
   # Check if keras is installed

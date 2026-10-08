@@ -189,7 +189,8 @@ tl_predict_svm <- function(model, new_data,
       }
 
       # Get class probabilities. predict.svm() fails on zero rows, which
-      # is what is left when every row misses a predictor.
+      # is what is left when every row misses a predictor; the other types
+      # below are guarded the same way.
       probs <- if (any(keep)) {
         attr(
           predict(
@@ -214,8 +215,12 @@ tl_predict_svm <- function(model, new_data,
       probs <- tl_realign_prob_matrix(probs, keep)
       tibble::as_tibble(as.data.frame(probs))
     } else if (type == "class" || type == "response") {
-      # Get predicted classes
-      preds <- predict(fit, newdata = predict_data, ...)
+      # Get predicted classes, none when no row is complete
+      preds <- if (any(keep)) {
+        predict(fit, newdata = predict_data, ...)
+      } else {
+        factor(character(0), levels = fit$levels)
+      }
       tl_realign_predictions(preds, keep)
     } else {
       stop(
@@ -226,8 +231,13 @@ tl_predict_svm <- function(model, new_data,
       )
     }
   } else {
-    # Regression predictions
-    preds <- predict(fit, newdata = predict_data, ...)
+    # Regression predictions. With no complete row, predict.svm() refuses
+    # the empty frame: "test data does not match model !"
+    preds <- if (any(keep)) {
+      predict(fit, newdata = predict_data, ...)
+    } else {
+      numeric(0)
+    }
     tl_realign_predictions(preds, keep)
   }
 }

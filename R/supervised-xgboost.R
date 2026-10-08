@@ -60,6 +60,51 @@ tl_xgb_training_rows <- function(formula, data, weights = NULL) {
   )
 }
 
+#' The training DMatrix, with weights only when there are some
+#'
+#' xgboost before 3.0 takes \code{weight} through \code{...} as information
+#' to set on the matrix, where \code{NULL} fails the length check, so it is
+#' passed only when set. \code{nthread} likewise.
+#'
+#' @param x The design matrix
+#' @param label The response, coded for the objective
+#' @param weights Case weights, or NULL
+#' @param nthread Threads for building the matrix, or NULL
+#' @return An \code{xgb.DMatrix}
+#' @keywords internal
+#' @noRd
+tl_xgb_dmatrix <- function(x, label, weights = NULL, nthread = NULL) {
+  args <- list(data = as.matrix(x), label = label)
+  if (!is.null(weights)) {
+    args$weight <- weights
+  }
+  if (!is.null(nthread)) {
+    args$nthread <- nthread
+  }
+  do.call(xgboost::xgb.DMatrix, args)
+}
+
+#' Give evaluation sets the name the installed xgboost takes
+#'
+#' xgboost 3.0 renamed \code{xgb.train()}'s \code{watchlist} to
+#' \code{evals}. Passed under the name the installed version lacks, it was
+#' put among the booster parameters, which ignored it with a note, and no
+#' evaluation ran.
+#'
+#' @param dots The caller's arguments
+#' @return \code{dots}, with \code{watchlist} or \code{evals} renamed
+#' @keywords internal
+#' @noRd
+tl_xgb_rename_evals <- function(dots) {
+  current <- if (tl_xgb_v3()) "evals" else "watchlist"
+  former <- setdiff(c("evals", "watchlist"), current)
+  given <- names2(dots) == former
+  if (any(given) && !current %in% names2(dots)) {
+    names(dots)[given] <- current
+  }
+  dots
+}
+
 #' Fit an XGBoost model
 #'
 #' @param data A data frame containing the training data
@@ -107,7 +152,7 @@ tl_fit_xgboost <- function(data, formula, is_classification = FALSE,
                            compute = "cpu") {
   # Check if xgboost is installed
   tl_check_packages("xgboost")
-  dots <- list(...)
+  dots <- tl_xgb_rename_evals(list(...))
   tl_refuse_offset(formula, data, dots, "xgboost", "xgb.train()")
 
   # Parse formula
@@ -148,10 +193,7 @@ tl_fit_xgboost <- function(data, formula, is_classification = FALSE,
   }
 
   # Create DMatrix object
-  dtrain <- xgboost::xgb.DMatrix(
-    data = as.matrix(x_mat), label = y_numeric,
-    weight = rows$weights, nthread = nthread
-  )
+  dtrain <- tl_xgb_dmatrix(x_mat, y_numeric, rows$weights, nthread)
 
   # Set parameters
   params <- list(
@@ -438,9 +480,13 @@ tl_predict_xgboost <- function(model, new_data,
 #'
 #' @param model A tidylearn XGBoost model object
 #' @param top_n Number of top features to display (default: 10)
-#' @param importance_type Type of importance: "gain" (default), "cover" or
-#'   "frequency", read from the matching column of
-#'   \code{xgboost::xgb.importance()}
+#' @param importance_type Type of importance: "gain" (default), "cover",
+#'   "frequency" or "weight", read from the matching column of
+#'   \code{xgboost::xgb.importance()}. A linear booster
+#'   (\code{booster = "gblinear"}) reports only "weight", its coefficients,
+#'   which it uses when \code{importance_type} is left out; they are ranked
+#'   by size, and for a multiclass model by their mean size over the
+#'   classes. A coefficient's size depends on its predictor's scale.
 #' @param ... Additional arguments passed to \code{xgboost::xgb.importance()}
 #' @return A \code{\link[ggplot2]{ggplot}} object. Its data holds the
 #'   \code{top_n} features and their \code{importance}, relative to the
@@ -461,12 +507,14 @@ tl_plot_xgboost_importance <- function(model, top_n = 10,
     stop("This function requires an XGBoost model", call. = FALSE)
   }
 
-  measures <- c(gain = "Gain", cover = "Cover", frequency = "Frequency")
+  measures <- c(gain = "Gain", cover = "Cover", frequency = "Frequency",
+                weight = "Weight")
   if (!is.character(importance_type) || length(importance_type) != 1L ||
         !importance_type %in% names(measures)) {
     stop(
-      "'importance_type' must be one of \"gain\", \"cover\" or ",
-      "\"frequency\"; got ", tl_describe_value(importance_type), ".",
+      "'importance_type' must be one of \"gain\", \"cover\", ",
+      "\"frequency\" or \"weight\"; got ",
+      tl_describe_value(importance_type), ".",
       call. = FALSE
     )
   }
@@ -481,13 +529,33 @@ tl_plot_xgboost_importance <- function(model, top_n = 10,
     ...
   ))
 
+  # A linear booster has coefficients, which xgb.importance() reports as
+  # Weight, and no gain. Left at the default, such a model plots its
+  # weights: refused for the missing gain, it was a model 0.5.0 drew.
+  available <- intersect(measures, names(importance))
+  if (missing(importance_type) && identical(available, "Weight")) {
+    importance_type <- "weight"
+  }
   measure <- measures[[importance_type]]
   if (!measure %in% names(importance)) {
     stop(
       "xgb.importance() reports no ", measure, " for this model, only ",
-      paste(setdiff(names(importance), "Feature"), collapse = ", "), ".",
+      paste(available, collapse = ", "),
+      if (length(available) == 1L) {
+        paste0("; use importance_type = \"", tolower(available), "\"")
+      },
+      ".",
       call. = FALSE
     )
+  }
+
+  # A weight is a coefficient, so it is ranked by its size; a multiclass
+  # linear booster has one per class, ranked by their mean size
+  values <- importance[[measure]]
+  if (measure == "Weight") {
+    values <- tapply(abs(values), importance$Feature, mean)
+    importance <- data.frame(Feature = names(values))
+    values <- as.vector(values)
   }
 
   # Drawn with ggplot2 like the package's other importance plots. This
@@ -495,7 +563,7 @@ tl_plot_xgboost_importance <- function(model, top_n = 10,
   # side effect, and never read importance_type.
   plot_data <- tibble::tibble(
     feature = importance$Feature,
-    importance = importance[[measure]] / max(importance[[measure]])
+    importance = values / max(values)
   ) |>
     dplyr::arrange(dplyr::desc(.data$importance)) |>
     dplyr::slice_head(n = top_n)
@@ -699,6 +767,14 @@ tl_tune_xgboost <- function(data, formula, is_classification = NULL,
   # ignores them with a note, and tune on every row.
   tl_check_per_row_args(names2(dots), "tl_tune_xgboost()")
 
+  # An evaluation set is xgb.train()'s, which xgb.cv() has no use for: the
+  # refit gets it, under the name the installed xgboost takes. Among the
+  # booster parameters it was ignored with a note.
+  eval_sets <- tl_xgb_rename_evals(
+    dots[names2(dots) %in% c("evals", "watchlist")]
+  )
+  dots <- dots[!names2(dots) %in% c("evals", "watchlist")]
+
   cv_formals <- setdiff(
     names(formals(xgboost::xgb.cv)), c("...", "params", "objective")
   )
@@ -737,10 +813,8 @@ tl_tune_xgboost <- function(data, formula, is_classification = NULL,
   }
 
   # Create DMatrix object
-  dtrain <- xgboost::xgb.DMatrix(
-    data = as.matrix(x_mat), label = y_numeric,
-    weight = rows$weights, nthread = fixed_params$nthread
-  )
+  dtrain <- tl_xgb_dmatrix(x_mat, y_numeric, rows$weights,
+                           fixed_params$nthread)
 
   # Create parameter grid. A character value such as tree_method stays a
   # string rather than becoming a factor.
@@ -876,7 +950,8 @@ tl_tune_xgboost <- function(data, formula, is_classification = NULL,
   final_args <- c(
     list(data = data, formula = formula, method = "xgboost"),
     final_params,
-    list(nrounds = best_iteration)
+    list(nrounds = best_iteration),
+    eval_sets
   )
   if (!is.null(weights)) {
     final_args$weights <- weights
