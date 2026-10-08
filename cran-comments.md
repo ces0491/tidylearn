@@ -48,6 +48,11 @@ Each run below checked the 0.6.0 tarball submitted here.
   above. This is the configuration that reproduced the CPU-time NOTE
   behind 0.5.0's pre-test rejections; every timing step ran at a
   CPU-to-elapsed ratio of 1.3 or less.
+* win-builder: R-release (4.6.1, 2026-06-24 ucrt), 2026-10-08: Status OK.
+* win-builder: R-devel (2026-10-05 r90641 ucrt), 2026-10-08: Status OK.
+* GitHub Actions, `--as-cran`, 2026-10-08: ubuntu-latest (R-release and
+  R-devel), macos-latest and windows-latest (R-release): Status OK on
+  each.
 * Docker: rocker/r-ver:4.1.3, the minimum R version, with packages from a
   2022-12-01 snapshot (ggplot2 3.4.0, rlang 1.0.6), 2026-10-08: installs,
   and a script exercising fitting, prediction, splitting,
