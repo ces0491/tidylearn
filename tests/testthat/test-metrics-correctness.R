@@ -541,6 +541,17 @@ test_that("tl_cv refuses fitting arguments that hold one value per row", {
   expect_false(isTRUE(all.equal(fold_values(fine, "rmse"), expected)))
 })
 
+test_that("tl_cv accepts a per-row argument set to NULL", {
+  # weights = NULL was refused as holding one value per row, though it
+  # holds nothing and tl_model() fits with it
+  set.seed(2)
+  with_null <- tl_cv(mtcars, mpg ~ wt, method = "linear", folds = 3,
+                     weights = NULL)
+  set.seed(2)
+  without <- tl_cv(mtcars, mpg ~ wt, method = "linear", folds = 3)
+  expect_equal(with_null$summary, without$summary)
+})
+
 # ---- cross-validation on folds too small for a metric ----------------
 
 test_that("tl_cv explains a metric that no fold could compute", {

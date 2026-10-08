@@ -954,8 +954,11 @@ tl_cv <- function(data, formula, method, folds = 5, metrics = NULL,
 
   # An argument with one value per row of `data` reached every fold whole,
   # and the fit failed on "variable lengths differ". tl_compare_cv()
-  # refuses the same arguments.
-  per_row <- intersect(names2(list(...)), tl_per_row_args())
+  # refuses the same arguments. One set to NULL holds no values, and
+  # tl_model() fits with it.
+  per_row <- intersect(
+    names2(Filter(Negate(is.null), list(...))), tl_per_row_args()
+  )
   if (length(per_row) > 0) {
     several <- length(per_row) > 1L
     stop(
