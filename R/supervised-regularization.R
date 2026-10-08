@@ -100,7 +100,9 @@ tl_fit_elastic_net <- function(data, formula,
 #'   (default: 5)
 #' @param ... Additional arguments to pass to glmnet() or cv.glmnet(). A
 #'   name neither function takes is an error, as are \code{x}, \code{y},
-#'   \code{family} and \code{nfolds}, which tidylearn sets itself.
+#'   \code{family} and \code{nfolds}, which tidylearn sets itself, and
+#'   \code{relax = TRUE} and \code{gamma}: predictions and coefficients
+#'   come from the unrelaxed fit.
 #' @param weights Optional case weights, one per row of \code{data}
 #' @param foldid Optional fold for each row of \code{data}, for the
 #'   cross-validation that chooses lambda
@@ -124,7 +126,7 @@ tl_fit_regularized <- function(data, formula,
   # use.
   cross_validate <- is.null(lambda) || length(lambda) > 1L
 
-  tl_check_glmnet_args(names2(list(...)), cross_validate, !is.null(foldid))
+  tl_check_glmnet_args(list(...), cross_validate, !is.null(foldid))
 
   if (!is.null(offset)) {
     stop(
@@ -309,19 +311,42 @@ tl_fit_regularized <- function(data, formula,
 #' nothing while the model's \code{$spec$args} recorded it as used. A
 #' cross-validation argument at a single penalty reached \code{glmnet()}
 #' alone and went the same way. The arguments tidylearn sets itself are
-#' refused as well, with what sets them.
+#' refused as well, with what sets them, and so is a relaxed fit, which
+#' nothing downstream reads.
 #'
-#' @param arg_names Names of the arguments in \code{...}.
+#' @param args The arguments in \code{...}, as a list.
 #' @param cross_validate Whether \code{cv.glmnet()} will run.
 #' @param foldid_given Whether \code{foldid}, a formal of the caller, was
 #'   supplied.
 #' @return \code{TRUE}, invisibly, when every argument will be used.
 #' @keywords internal
 #' @noRd
-tl_check_glmnet_args <- function(arg_names, cross_validate, foldid_given) {
+tl_check_glmnet_args <- function(args, cross_validate, foldid_given) {
+  arg_names <- names2(args)
   arg_names <- arg_names[arg_names != ""]
   fit_args <- setdiff(names(formals(glmnet::glmnet)), "...")
   cv_args <- setdiff(names(formals(glmnet::cv.glmnet)), "...")
+
+  # glmnet would fit the relaxed lasso, but predict(), the coefficients,
+  # importance and the plots all read the unrelaxed path, at glmnet's
+  # default gamma = 1. relax = FALSE is glmnet's default and changes nothing.
+  if (isTRUE(args[["relax"]])) {
+    stop(
+      "relax = TRUE fits a relaxed lasso, but tidylearn predicts and ",
+      "reports coefficients\nfrom the unrelaxed fit, so it would change ",
+      "nothing. Call glmnet::cv.glmnet(relax = TRUE)\ndirectly for a ",
+      "relaxed model.",
+      call. = FALSE
+    )
+  }
+  if ("gamma" %in% arg_names) {
+    stop(
+      "'gamma' chooses among relaxed fits, which tidylearn does not use, so ",
+      "it would change\nnothing. Call glmnet::cv.glmnet(relax = TRUE) ",
+      "directly for a relaxed model.",
+      call. = FALSE
+    )
+  }
 
   # Passed again beside tidylearn's own value, these failed with R's
   # "formal argument matched by multiple actual arguments"

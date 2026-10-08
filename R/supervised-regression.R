@@ -54,9 +54,12 @@ tl_fit_polynomial <- function(data, formula, degree = 2, ...) {
 #' it on its integer codes -- and wrapped an existing \code{poly(wt, 3)} in
 #' a second one.
 #'
-#' Terms left as written: interactions, factors and other non-numeric
-#' terms, \code{I()} terms, and anything that is already a matrix such as
-#' \code{poly()} or a spline basis.
+#' A numeric term is a numeric vector or a one-column matrix such as
+#' \code{scale(wt)}. One that is also part of an interaction keeps its own
+#' term and gains \code{I(x^2)} up to \code{I(x^degree)}, so the
+#' interaction is coded as written. Terms left as written: interactions,
+#' factors and other non-numeric terms, \code{I()} terms, and bases such as
+#' \code{poly()} or a spline's.
 #'
 #' @param formula The model formula.
 #' @param data The training data, to expand a \code{.} and to tell which
@@ -71,33 +74,53 @@ tl_polynomial_formula <- function(formula, data, degree) {
   expanded <- stats::formula(model_terms)
   env <- environment(formula)
 
-  main_effects <- attr(model_terms, "term.labels")[
-    attr(model_terms, "order") == 1L
-  ]
-  to_poly <- Filter(function(label) {
+  order <- attr(model_terms, "order")
+  main_effects <- attr(model_terms, "term.labels")[order == 1L]
+  numeric_terms <- Filter(function(label) {
     term <- str2lang(label)
     if (is.call(term) && identical(term[[1]], as.name("I"))) {
       return(FALSE)
     }
     value <- tryCatch(eval(term, data, env), error = function(e) NULL)
-    is.numeric(value) && is.null(dim(value))
+    # A one-column matrix such as scale(wt) is a numeric term too. A
+    # basis -- poly(), or a spline's -- already is the expansion.
+    is.numeric(value) &&
+      (is.null(dim(value)) ||
+         (NCOL(value) == 1L && !inherits(value, c("poly", "basis"))))
   }, main_effects)
 
-  if (length(to_poly) == 0L) {
+  if (length(numeric_terms) == 0L) {
     return(expanded)
   }
+
+  # A term that is also part of an interaction keeps its own column, and
+  # gains the powers above it. Replaced by poly(wt), it left cyl_f:wt
+  # without its main effect, and model.matrix() then coded cyl_f in full:
+  # one coefficient was always NA. The raw polynomial spans the same
+  # columns, so the fit is the same model either way.
+  factors <- attr(model_terms, "factors")
+  in_interaction <- vapply(numeric_terms, function(label) {
+    any(factors[label, order > 1L] != 0)
+  }, logical(1))
 
   # One update() for every term: done one term at a time, update() put the
   # variables of an interaction such as wt:hp in a new order and renamed
   # its coefficient
   edit <- quote(.)
-  for (label in to_poly) {
+  for (label in numeric_terms[!in_interaction]) {
     edit <- call("-", edit, str2lang(label))
   }
-  for (label in to_poly) {
-    edit <- call("+", edit, call(
-      "poly", str2lang(label), degree = degree, raw = TRUE
-    ))
+  for (label in numeric_terms) {
+    term <- str2lang(label)
+    edit <- if (in_interaction[[label]]) {
+      Reduce(
+        function(lhs, power) call("+", lhs, call("I", call("^", term, power))),
+        # As doubles, so the term reads wt^2 rather than wt^2L
+        as.numeric(seq_len(degree)[-1]), edit
+      )
+    } else {
+      call("+", edit, call("poly", term, degree = degree, raw = TRUE))
+    }
   }
   edited <- stats::update(expanded, call("~", edit))
   environment(edited) <- env

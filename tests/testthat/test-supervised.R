@@ -84,6 +84,25 @@ test_that("logistic fits and scores a response the formula computes", {
   expect_error(tl_model(mtcars, cut(mpg, 3) ~ wt, method = "logistic"),
                "binary only, but 'cut\\(mpg, 3\\)' has 3 levels")
 
+  # Computed as text, or as numbers other than 0 and 1, it is fitted as the
+  # two classes it encodes. glm() stopped with "y values must be
+  # 0 <= y <= 1".
+  text <- tl_model(mtcars, ifelse(mpg > 20, "hi", "lo") ~ wt,
+                   method = "logistic")
+  expect_named(predict(text, mtcars, type = "prob"), c("hi", "lo"))
+  expect_equal(unname(predict(text, mtcars, type = "prob")$lo), 1 - prob)
+
+  coded <- withCallingHandlers(
+    tl_model(mtcars, I(am + 1) ~ wt, method = "logistic"),
+    tidylearn_response_conversion = function(w) invokeRestart("muffleWarning")
+  )
+  am_reference <- stats::glm(am ~ wt, data = mtcars,
+                             family = stats::binomial())
+  expect_named(predict(coded, mtcars, type = "prob"), c("1", "2"))
+  expect_equal(unname(predict(coded, mtcars, type = "prob")[["2"]]),
+               unname(stats::predict(am_reference, mtcars,
+                                     type = "response")))
+
   # A computed factor whose first level no row has would make glm() count
   # every row as the other class; without that level it fits as glm() does
   bands <- c(0, 5, 20, 50)
@@ -209,8 +228,7 @@ test_that("polynomial adds its terms to the formula as written", {
     list(mpg ~ poly(wt, 3) + hp, mpg ~ poly(wt, 3) +
            poly(hp, degree = 2, raw = TRUE)),
     list(mpg ~ wt * hp + I(qsec^2),
-         mpg ~ poly(wt, degree = 2, raw = TRUE) +
-           poly(hp, degree = 2, raw = TRUE) + wt:hp + I(qsec^2))
+         mpg ~ wt * hp + I(wt^2) + I(hp^2) + I(qsec^2))
   )
   for (case in cases) {
     model <- tl_model(mtcars, case[[1]], method = "polynomial")
@@ -232,6 +250,53 @@ test_that("polynomial adds its terms to the formula as written", {
       stats::lm(log(mpg) ~ poly(wt, degree = 3, raw = TRUE), data = mtcars),
       mtcars
     ))
+  )
+})
+
+test_that("polynomial expands a one-column matrix term such as scale()", {
+  # Only plain vectors were expanded, so mpg ~ scale(wt) + hp kept
+  # scale(wt) linear, and mpg ~ scale(wt) with degree = 3 fitted a straight
+  # line without a message
+  model <- tl_model(mtcars, mpg ~ scale(wt) + hp, method = "polynomial")
+  reference <- stats::lm(mpg ~ poly(scale(wt), degree = 2, raw = TRUE) +
+                           poly(hp, degree = 2, raw = TRUE), data = mtcars)
+  expect_equal(unname(stats::fitted(model$fit)),
+               unname(stats::fitted(reference)))
+
+  cubic <- tl_model(mtcars, mpg ~ scale(wt), method = "polynomial",
+                    degree = 3)
+  reference <- stats::lm(mpg ~ poly(scale(wt), degree = 3, raw = TRUE),
+                         data = mtcars)
+  expect_equal(unname(stats::fitted(cubic$fit)),
+               unname(stats::fitted(reference)))
+
+  # A basis is left as written, a one-column one included
+  basis <- tl_model(mtcars, mpg ~ poly(wt, 1) + hp, method = "polynomial")
+  reference <- stats::lm(mpg ~ poly(wt, 1) + poly(hp, degree = 2, raw = TRUE),
+                         data = mtcars)
+  expect_equal(stats::coef(basis$fit), stats::coef(reference))
+})
+
+test_that("polynomial keeps a numeric term that is part of an interaction", {
+  # wt was replaced by poly(wt), which left cyl_f:wt with no wt main
+  # effect. model.matrix() then coded it with every level of cyl_f, and one
+  # coefficient was NA.
+  mt <- transform(mtcars, cyl_f = factor(cyl))
+  model <- tl_model(mt, mpg ~ cyl_f * wt, method = "polynomial")
+  reference <- stats::lm(mpg ~ cyl_f * wt + I(wt^2), data = mt)
+  expect_false(anyNA(stats::coef(model$fit)))
+  expect_setequal(names(stats::coef(model$fit)),
+                  names(stats::coef(reference)))
+  expect_equal(stats::coef(model$fit)[names(stats::coef(reference))],
+               stats::coef(reference))
+  expect_equal(unname(predict(model, mt)$.pred),
+               unname(stats::predict(reference, mt)))
+
+  cubic <- tl_model(mt, mpg ~ cyl_f * wt, method = "polynomial", degree = 3)
+  expect_equal(
+    unname(stats::fitted(cubic$fit)),
+    unname(stats::fitted(stats::lm(mpg ~ cyl_f * wt + I(wt^2) + I(wt^3),
+                                   data = mt)))
   )
 })
 
@@ -656,6 +721,24 @@ test_that("arguments tidylearn sets for glmnet are refused by name", {
     tl_model(mtcars, mpg ~ wt + hp, method = "lasso", family = "poisson"),
     "tidylearn sets 'family' from the response"
   )
+  # A relaxed fit would be ignored: predict() and the coefficients read the
+  # unrelaxed one
+  expect_error(
+    tl_model(mtcars, mpg ~ wt + hp + disp, method = "lasso", relax = TRUE),
+    "relax = TRUE fits a relaxed lasso"
+  )
+  expect_error(
+    tl_model(mtcars, mpg ~ wt + hp + disp, method = "lasso", gamma = 0.5),
+    "'gamma' chooses among relaxed fits"
+  )
+  # relax = FALSE is glmnet's default, and changes nothing
+  set.seed(1)
+  plain <- tl_model(mtcars, mpg ~ wt + hp + disp, method = "lasso")
+  set.seed(1)
+  unrelaxed <- tl_model(mtcars, mpg ~ wt + hp + disp, method = "lasso",
+                        relax = FALSE)
+  expect_equal(predict(unrelaxed, mtcars), predict(plain, mtcars))
+
   # The number of folds is cv_folds
   set.seed(1)
   four <- tl_model(mtcars, mpg ~ wt + hp, method = "lasso", cv_folds = 4,

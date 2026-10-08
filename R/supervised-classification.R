@@ -53,6 +53,14 @@ tl_fit_logistic <- function(data, formula, ...) {
     )
   }
 
+  # glm() takes a factor, a logical or 0/1 numbers. A response computed as
+  # text, or as other numbers such as I(am + 1), stopped it with "y values
+  # must be 0 <= y <= 1", so it is fitted as the factor it encodes, whose
+  # second level -- the positive class -- is the one the spec reports.
+  if (!is.name(lhs) && !is.factor(computed) && !is.logical(computed)) {
+    formula[[2L]] <- call("factor", lhs)
+  }
+
   # Fit the logistic regression model
   # By value, so weights = <a vector> reaches glm() as a vector
   glm_model <- tl_fit_by_value(
