@@ -29,12 +29,12 @@ vignettes use the native `|>` pipe, and to ggplot2 3.4.0, for the
 
 ## R CMD check results
 
-0 errors | 0 warnings | 0 notes
+0 errors | 0 warnings | 0 notes from the package
 
-The local Windows check gives two further NOTEs that come from the
-machine: "unable to verify current time", when the time service cannot
-be reached, and a `lastMiKTeXException` file that the local MiKTeX
-installation leaves in the temp directory.
+The local checks give NOTEs that come from the machines: "unable to
+verify current time", when the time service cannot be reached, and on
+Windows a `lastMiKTeXException` file that the local MiKTeX installation
+leaves in the temp directory.
 
 ## Test environments
 
@@ -44,9 +44,10 @@ Each run below checked the 0.6.0 tarball submitted here.
   2026-10-08: 0 errors, 0 warnings, the 2 NOTEs above.
 * Docker: rocker/r-ver:4.5.2 on Ubuntu 24.04, 16 cores, OpenBLAS
   (pthread), `--as-cran` with the example, test and vignette CPU-to-elapsed
-  thresholds at 2.5, 2026-10-08: Status OK. This is the configuration
-  that reproduced the CPU-time NOTE behind 0.5.0's pre-test rejections;
-  every timing step ran at a CPU-to-elapsed ratio of 1.2 or less.
+  thresholds at 2.5, 2026-10-08: 0 errors, 0 warnings, the time NOTE
+  above. This is the configuration that reproduced the CPU-time NOTE
+  behind 0.5.0's pre-test rejections; every timing step ran at a
+  CPU-to-elapsed ratio of 1.3 or less.
 * Docker: rocker/r-ver:4.1.3, the minimum R version, with packages from a
   2022-12-01 snapshot (ggplot2 3.4.0, rlang 1.0.6), 2026-10-08: installs,
   and a script exercising fitting, prediction, splitting,
