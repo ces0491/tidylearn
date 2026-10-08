@@ -11,14 +11,15 @@ tl_dbscan_core_points <- function(data_matrix, eps, minPts) {
   neighbours <- dbscan::frNN(data_matrix, eps = eps)
 
   # frNN excludes the point itself, so a core point needs minPts - 1
-  # neighbours within eps
-  lengths(neighbours$id) >= (minPts - 1)
+  # neighbours within eps. lengths() carries the distances' labels, which
+  # would make is_core a named vector whenever the dist had labels.
+  unname(lengths(neighbours$id) >= (minPts - 1))
 }
 
 #' Read a coordinate matrix as a data frame
 #'
 #' The k-NN and DBSCAN helpers accept a matrix of coordinates, as
-#' \code{dbscan::dbscan()} does, but handed it straight to
+#' \code{dbscan::dbscan()} does, and pick their columns with
 #' \code{dplyr::select()}, which has no matrix method.
 #'
 #' @param data A matrix, data frame or dist object
@@ -81,17 +82,21 @@ tidy_dbscan <- function(data, eps, minPts = 5,
   } else {
     data <- tl_as_coordinates(data)
     data_selected <- tl_select_columns(
-      data, rlang::enquo(cols), all_columns = distance == "gower"
+      data, rlang::enquo(cols), all_columns = distance == "gower",
+      numeric_only = distance != "gower", what = "DBSCAN"
     )
     n_obs <- nrow(data_selected)
 
     # dbscan() searches Euclidean neighbourhoods on coordinates and takes
-    # any other metric as a dist object. Leaving `distance` unused gave the
-    # Euclidean clustering whatever metric was asked for.
-    data_matrix <- if (distance == "euclidean") {
-      as.matrix(data_selected)
+    # any other metric as a dist object, so the metric asked for has to
+    # arrive as distances. dbscan() refuses missing values in either form,
+    # in words that name neither the rows nor the columns.
+    if (distance == "euclidean") {
+      tl_check_complete_numeric(data_selected, "DBSCAN", tolerates = NULL)
+      data_matrix <- as.matrix(data_selected)
     } else {
-      tidy_dist(data_selected, method = distance)
+      data_matrix <- tidy_dist(data_selected, method = distance)
+      tl_check_complete_dist(data_matrix, "DBSCAN")
     }
   }
 
@@ -171,7 +176,10 @@ tidy_dbscan <- function(data, eps, minPts = 5,
 tidy_knn_dist <- function(data, k = 4, cols = NULL) {
 
   data <- tl_as_coordinates(data)
-  data_selected <- tl_select_columns(data, rlang::enquo(cols))
+  data_selected <- tl_select_columns(
+    data, rlang::enquo(cols), numeric_only = TRUE,
+    what = "The k-NN distance"
+  )
 
   data_matrix <- as.matrix(data_selected)
 
@@ -217,8 +225,9 @@ suggest_eps <- function(data, minPts = 5,
                         percentile = 0.95) {
 
   # frNN() and kNNdist() leave the point itself out, so a point with
-  # minPts - 1 neighbours within eps is core. Reading the distance at
-  # k = minPts suggested a radius for minPts + 1.
+  # minPts - 1 neighbours within eps is core, and the radius for minPts is
+  # the distance to the (minPts - 1)th neighbour. k = minPts would suggest
+  # the radius for minPts + 1.
   tl_check_whole_number(minPts, "minPts", min = 2)
   knn_data <- tidy_knn_dist(data, k = minPts - 1)
 

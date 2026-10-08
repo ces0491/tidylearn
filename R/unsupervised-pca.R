@@ -39,7 +39,9 @@ tidy_pca <- function(data, cols = NULL, scale = TRUE,
   # Convert to data frame if needed
   data <- as.data.frame(data)
 
-  data_selected <- tl_select_columns(data, rlang::enquo(cols))
+  data_selected <- tl_select_columns(
+    data, rlang::enquo(cols), numeric_only = TRUE, what = "PCA"
+  )
 
   tl_check_complete_numeric(data_selected, "PCA", tolerates = NULL)
 
@@ -57,8 +59,8 @@ tidy_pca <- function(data, cols = NULL, scale = TRUE,
     loadings_matrix <- pca_model$rotation
     sdev <- pca_model$sdev
   } else if (method == "princomp") {
-    # princomp() has no way to skip centring, so center = FALSE returned
-    # centred scores while the settings recorded FALSE
+    # princomp() has no way to skip centring, so center = FALSE is
+    # overridden, and the settings record what was done
     if (isFALSE(center)) {
       warning(
         "method = \"princomp\" always centres the data, so center = FALSE ",
@@ -186,7 +188,7 @@ get_pca_loadings <- function(pca_obj, n_components = NULL) {
 
   if (!is.null(n_components)) {
     components <- unique(loadings$component)
-    # 1:n_components with n_components = 0 is c(1, 0), which kept PC1
+    # 1:n_components with n_components = 0 is c(1, 0), which would keep PC1
     tl_check_whole_number(
       n_components, "n_components", min = 1, max = length(components)
     )

@@ -71,6 +71,28 @@ test_that("Hierarchical clustering works", {
   expect_s3_class(model$fit$model, "hclust")
 })
 
+test_that("tl_model(method = 'hclust') takes the linkage as hclust_method", {
+  # tl_model()'s own `method` holds "hclust", so tl_fit_hclust()'s linkage
+  # argument of the same name could never be reached: every fit was average
+  ward <- tl_model(USArrests, method = "hclust", hclust_method = "ward.D2")
+  expect_equal(
+    ward$fit$model$height,
+    stats::hclust(stats::dist(USArrests), method = "ward.D2")$height
+  )
+  expect_equal(ward$fit$method, "ward.D2")
+
+  # Average linkage stays the default
+  expect_equal(
+    tl_model(USArrests, method = "hclust")$fit$model$height,
+    stats::hclust(stats::dist(USArrests), method = "average")$height
+  )
+
+  expect_error(
+    tl_model(USArrests, method = "hclust", hclust_method = "ward"),
+    "'hclust_method' must be one of"
+  )
+})
+
 test_that("DBSCAN clustering works", {
   skip_if_not_installed("dbscan")
 
@@ -589,16 +611,10 @@ test_that("the gap statistic refuses a Gower tree built on factor columns", {
   # Silhouette works from the tree's own distances
   expect_equal(optimal_hclust_k(hc, max_k = 4)$k_range, 2:4)
 
-  # A Gower tree on numeric columns, and a Euclidean tree whose data holds a
-  # factor it never used, can still use the gap statistic
-  numeric_gower <- tidy_hclust(USArrests[1:25, ], distance = "gower")
+  # A Gower tree on numeric columns can still use the gap statistic
+  numeric_gower <- tidy_hclust(USArrests[1:12, ], distance = "gower")
   expect_equal(
     nrow(optimal_hclust_k(numeric_gower, method = "gap", max_k = 3)$gap_data),
-    3L
-  )
-  euclidean <- tidy_hclust(mixed, cols = c(num, fac))
-  expect_equal(
-    nrow(optimal_hclust_k(euclidean, method = "gap", max_k = 3)$gap_data),
     3L
   )
 })
@@ -876,6 +892,133 @@ test_that("cols takes tidy-select expressions, not only strings", {
   )
 })
 
+test_that("cols forwarded by a wrapper as NULL means the default columns", {
+  # A wrapper that passes its own cols = NULL on hands over the symbol, not
+  # the NULL, and tidyselect read that symbol as an empty selection: zero
+  # columns, then "needs at least one numeric column"
+  forward <- function(fun, ...) {
+    function(d, cc = NULL) fun(d, ..., cols = cc)
+  }
+  calls <- list(
+    tidy_kmeans = list(forward(tidy_kmeans, k = 3), list(k = 3)),
+    tidy_pam = list(forward(tidy_pam, k = 3), list(k = 3)),
+    tidy_hclust = list(forward(tidy_hclust), list()),
+    tidy_dbscan = list(forward(tidy_dbscan, eps = 0.5), list(eps = 0.5)),
+    tidy_knn_dist = list(forward(tidy_knn_dist), list()),
+    tidy_dist = list(forward(tidy_dist), list()),
+    tidy_pca = list(forward(tidy_pca), list())
+  )
+  funs <- list(
+    tidy_kmeans = tidy_kmeans, tidy_pam = tidy_pam, tidy_hclust = tidy_hclust,
+    tidy_dbscan = tidy_dbscan, tidy_knn_dist = tidy_knn_dist,
+    tidy_dist = tidy_dist, tidy_pca = tidy_pca
+  )
+  plain <- iris[, 1:4]
+
+  for (nm in names(calls)) {
+    set.seed(1)
+    expected <- do.call(funs[[nm]], c(list(plain), calls[[nm]][[2]]))
+    set.seed(1)
+    expect_no_warning(actual <- calls[[nm]][[1]](plain))
+    expect_equal(actual, expected, info = nm)
+  }
+
+  # A variable holding NULL reads the same way
+  cc <- NULL
+  expect_equal(tidy_pca(iris, cols = cc), tidy_pca(iris))
+
+  # A forwarded character vector still selects, without tidyselect's
+  # external-vector warning
+  two <- forward(tidy_kmeans, k = 2)
+  set.seed(1)
+  expect_no_warning(fwd <- two(iris, c("Petal.Length", "Petal.Width")))
+  set.seed(1)
+  direct <- tidy_kmeans(iris, k = 2, cols = c("Petal.Length", "Petal.Width"))
+  expect_equal(fwd$centers, direct$centers)
+
+  # A variable that shares a column's name is still the column
+  Sepal.Length <- NULL # nolint
+  expect_named(
+    tidy_pca(iris, cols = Sepal.Length)$model$center, "Sepal.Length"
+  )
+})
+
+test_that("a cols selection is held to the columns the method can use", {
+  # cols = Species left no numeric column, which surfaced as 11175 pairs of
+  # "undefined distances" for PAM and hclust, and as the backends' own
+  # errors elsewhere ("more cluster centers than distinct data points")
+  only_factor <- list(
+    tidy_dist = function() tidy_dist(iris, cols = Species),
+    tidy_hclust = function() tidy_hclust(iris, cols = Species),
+    tidy_pam = function() tidy_pam(iris, k = 2, cols = Species),
+    tidy_dbscan = function() {
+      tidy_dbscan(iris, eps = 0.5, cols = Species, distance = "manhattan")
+    },
+    tidy_kmeans = function() tidy_kmeans(iris, k = 2, cols = Species),
+    tidy_pca = function() tidy_pca(iris, cols = Species),
+    tidy_knn_dist = function() tidy_knn_dist(iris, cols = Species)
+  )
+  for (nm in names(only_factor)) {
+    expect_error(
+      only_factor[[nm]](),
+      "needs at least one numeric column, but 'cols' selected none",
+      info = nm
+    )
+  }
+  # Data with no numeric column at all, through tidy_dist()
+  expect_error(
+    tidy_mds(iris["Species"]),
+    "needs at least one numeric column, but none were found"
+  )
+
+  # A non-numeric column among numeric ones is reported and left out, as a
+  # formula naming one is
+  petals <- c("Petal.Length", "Petal.Width")
+  mixed_cols <- function(fun, ...) {
+    expect_warning(
+      out <- fun(iris, ..., cols = c(Petal.Length, Petal.Width, Species)),
+      "selected by 'cols': Species"
+    )
+    out
+  }
+  set.seed(1)
+  km <- mixed_cols(tidy_kmeans, k = 2)
+  set.seed(1)
+  expect_equal(
+    km$centers, tidy_kmeans(iris, k = 2, cols = dplyr::all_of(petals))$centers
+  )
+  expect_equal(
+    mixed_cols(tidy_pca)$variance, tidy_pca(iris[petals])$variance
+  )
+  expect_equal(
+    mixed_cols(tidy_knn_dist)$knn_dist, tidy_knn_dist(iris[petals])$knn_dist
+  )
+  expect_equal(
+    mixed_cols(tidy_dbscan, eps = 0.3)$clusters,
+    tidy_dbscan(iris[petals], eps = 0.3)$clusters
+  )
+  expect_equal(
+    as.vector(mixed_cols(tidy_dist)), as.vector(stats::dist(iris[petals]))
+  )
+  expect_equal(
+    mixed_cols(tidy_hclust)$model$height,
+    tidy_hclust(iris[petals])$model$height
+  )
+  expect_equal(
+    mixed_cols(tidy_pam, k = 2)$clusters,
+    tidy_pam(iris[petals], k = 2)$clusters
+  )
+
+  # Gower reads the factor, so it neither warns nor refuses
+  expect_no_warning(
+    hc <- tidy_hclust(iris[1:20, ], cols = c(Sepal.Length, Species),
+                      distance = "gower")
+  )
+  expect_named(hc$data, c("Sepal.Length", "Species"))
+  # Without cols, the numeric columns are taken as before, quietly
+  expect_no_warning(tidy_kmeans(iris, k = 2))
+})
+
 # ---- DBSCAN ----------------------------------------------------------
 
 test_that("tidy_dbscan clusters on the distance it is given", {
@@ -902,6 +1045,55 @@ test_that("tidy_dbscan clusters on the distance it is given", {
   expect_equal(
     tidy_dbscan(x, eps = 0.5, minPts = 5)$clusters$cluster,
     as.integer(dbscan::dbscan(x, eps = 0.5, minPts = 5)$cluster)
+  )
+})
+
+test_that("tidy_dbscan takes a Gower distance over every column", {
+  set.seed(9)
+  mixed <- data.frame(
+    num = stats::rnorm(20),
+    fac = factor(rep(c("a", "b"), each = 10))
+  )
+  gower <- cluster::daisy(mixed, metric = "gower")
+  theirs <- dbscan::dbscan(gower, eps = 0.1, minPts = 3)
+
+  ours <- tidy_dbscan(mixed, eps = 0.1, minPts = 3, distance = "gower")
+  expect_equal(ours$clusters$cluster, as.integer(theirs$cluster))
+  expect_equal(
+    ours$clusters$is_core, dbscan::is.corepoint(gower, eps = 0.1, minPts = 3)
+  )
+
+  # A factor named in the formula is used, not reported
+  expect_no_warning(
+    fit <- tl_model(mixed, ~ num + fac, method = "dbscan", eps = 0.1,
+                    minPts = 3, distance = "gower")
+  )
+  expect_equal(fit$fit$clusters$cluster, as.integer(theirs$cluster))
+})
+
+test_that("tidy_dbscan refuses undefined distances by naming the rows", {
+  # dbscan() stopped with "data/distances cannot contain NAs for frNN (with
+  # kd-tree)!", which names neither the rows nor the cause
+  na_pair <- data.frame(x = c(1, NA, 3, 4, 5), y = c(NA, 2, 5, 6, 7))
+  expect_error(
+    tidy_dbscan(na_pair, eps = 1, minPts = 2, distance = "manhattan"),
+    "DBSCAN cannot use undefined distances: 1 pair of rows has no variable"
+  )
+  # On coordinates the kd-tree refuses any missing value, so the columns
+  # holding them are named
+  expect_error(
+    tidy_dbscan(na_pair, eps = 1, minPts = 2),
+    "DBSCAN cannot use missing or infinite values. Affected columns"
+  )
+
+  # Missing values that leave every pair a shared variable still cluster
+  # on a distance that tolerates them
+  shared <- data.frame(x = c(1, NA, 3, 4, 5), y = c(1, 2, 5, 6, 7))
+  expect_equal(
+    tidy_dbscan(shared, eps = 3, minPts = 2,
+                distance = "manhattan")$clusters$cluster,
+    as.integer(dbscan::dbscan(stats::dist(shared, "manhattan"),
+                              eps = 3, minPts = 2)$cluster)
   )
 })
 
@@ -956,7 +1148,7 @@ test_that("plot_knn_dist labels a percentile that is not a whole percent", {
     is_text <- vapply(
       p$layers, function(l) inherits(l$geom, "GeomText"), logical(1)
     )
-    label <- ggplot2::layer_data(p, which(is_text))$label
+    label <- p$layers[[which(is_text)]]$aes_params$label
     expect_match(
       label, paste0("(", 100 * percentile, "% percentile)"),
       fixed = TRUE, info = percentile
@@ -994,6 +1186,37 @@ test_that("tidy_clara and tidy_pam pass further options to cluster", {
   pam <- tidy_pam(iris[, 1:4], k = 3, medoids = c(1, 51, 101),
                   do.swap = FALSE)
   expect_identical(pam$medoids$medoid_index, c(1L, 51L, 101L))
+})
+
+test_that("options that would break the result are refused by name", {
+  # cluster.only = TRUE makes pam() and clara() return a bare vector, and
+  # medoids.x = FALSE drops clara()'s medoids, so building the result
+  # failed with "$ operator is invalid for atomic vectors" or a tibble
+  # size error; diss is set by tidy_pam() itself
+  expect_error(
+    tidy_pam(iris[, 1:4], k = 3, cluster.only = TRUE),
+    "'cluster.only' cannot be passed to tidy_pam()"
+  )
+  expect_error(
+    tidy_pam(iris[, 1:4], k = 3, diss = FALSE),
+    "'diss' cannot be passed to tidy_pam()"
+  )
+  expect_error(
+    tidy_clara(iris[, 1:4], k = 3, cluster.only = TRUE),
+    "'cluster.only' cannot be passed to tidy_clara()"
+  )
+  expect_error(
+    tidy_clara(iris[, 1:4], k = 3, medoids.x = FALSE),
+    "'medoids.x' cannot be passed to tidy_clara()"
+  )
+
+  # Options that leave the result whole still pass
+  expect_s3_class(
+    tidy_pam(iris[, 1:4], k = 3, keep.diss = FALSE), "tidy_pam"
+  )
+  expect_s3_class(
+    tidy_clara(iris[, 1:4], k = 3, keep.data = FALSE), "tidy_clara"
+  )
 })
 
 test_that("tidy_clara refuses a distance matrix and points to PAM", {
@@ -1242,6 +1465,19 @@ groceries <- function() {
   env$Groceries
 }
 
+# The rule set most of these tests read. Mining Groceries at support 0.001
+# is the slowest step in this file, so it runs once.
+groceries_rules <- local({
+  mined <- NULL
+  function() {
+    trans <- groceries()
+    if (is.null(mined)) {
+      mined <<- tidy_apriori(trans, support = 0.001, confidence = 0.5)
+    }
+    mined
+  }
+})
+
 # Whether each rule holds `item` on the given side, read straight from arules
 rule_side_holds <- function(rules, side, item) {
   vapply(arules::LIST(side(rules)), function(items) item %in% items,
@@ -1252,14 +1488,15 @@ test_that("recommend_products suggests only what the basket lacks, once each", {
   # Rules whose right-hand side was already in the basket were returned:
   # {yogurt}, then {other vegetables} four times, for this basket. Every
   # rule that fires for it suggests something it holds, so none is left.
-  trans <- groceries()
-  rules <- tidy_apriori(trans, support = 0.001, confidence = 0.5)
+  rules <- groceries_rules()
   full_basket <- c("whole milk", "other vegetables", "yogurt",
                    "root vegetables", "tropical fruit")
   expect_equal(nrow(recommend_products(rules, basket = full_basket)), 0L)
 
-  # A broader rule set, against the rules read straight from arules
-  broad <- tidy_apriori(trans, support = 0.001, confidence = 0.15)
+  # A broader rule set, against the rules read straight from arules. It
+  # holds {butter} => {whole milk}, which fires for this basket and
+  # suggests what the basket already has.
+  broad <- tidy_apriori(groceries(), support = 0.005, confidence = 0.15)
   basket <- c("whole milk", "butter")
   lhs <- arules::LIST(arules::lhs(broad$rules))
   rhs <- arules::LIST(arules::rhs(broad$rules))
@@ -1305,8 +1542,7 @@ test_that("recommend_products matches item names that contain a comma", {
 test_that("filter_rules_by_item and find_related_items match whole items", {
   # grepl() matched "coffee" inside "instant coffee": 84 rules, of which 80
   # hold coffee. 19 Groceries items occur inside other item names.
-  trans <- groceries()
-  rules <- tidy_apriori(trans, support = 0.001, confidence = 0.5)
+  rules <- groceries_rules()
 
   # arules' own test of whether a rule's items include one
   expect_equal(
@@ -1348,8 +1584,7 @@ test_that("filter_rules_by_item and find_related_items match whole items", {
 })
 
 test_that("item matching reads the item lists tidy_rules() adds", {
-  trans <- groceries()
-  rules <- tidy_apriori(trans, support = 0.001, confidence = 0.5)
+  rules <- groceries_rules()
 
   # A filtered table keeps the lists, so it still matches
   strong <- dplyr::filter(rules$rules_tbl, .data$lift > 5)
@@ -1381,9 +1616,8 @@ test_that("an empty rule set gives empty results with the usual columns", {
   # tidy_rules() returned a zero-column tibble, so recommend_products()
   # failed with "object 'confidence' not found" and the item filters
   # reached arules::lhs() where they looked for a column
-  trans <- groceries()
-  rules <- tidy_apriori(trans, support = 0.001, confidence = 0.5)
-  empty <- tidy_apriori(trans, support = 0.5, confidence = 0.9)
+  rules <- groceries_rules()
+  empty <- tidy_apriori(groceries(), support = 0.5, confidence = 0.9)
   no_rules <- rules$rules_tbl[0, ]
 
   expect_equal(empty$n_rules, 0L)
@@ -1434,8 +1668,7 @@ test_that("a frequent-itemsets result prints and inspects as itemsets", {
 test_that("visualize_rules plots the top_n rules by lift", {
   # head() on an arules rule set kept the first N in mining order, so "Top
   # 50 rules" plotted lifts 2.04 to 16.7 where the highest 50 run 8.08 to 19.0
-  trans <- groceries()
-  rules <- tidy_apriori(trans, support = 0.001, confidence = 0.5)
+  rules <- groceries_rules()
   lifts <- arules::quality(rules$rules)$lift
 
   p <- visualize_rules(rules, top_n = 50)
@@ -1448,8 +1681,7 @@ test_that("visualize_rules plots the top_n rules by lift", {
 test_that("inspect_rules(decreasing = FALSE) returns the lowest-ranked rules", {
   # It took the n highest and only then reversed their order, returning
   # lifts 16.4, 16.7 and 19.0 where the three lowest are 1.96
-  trans <- groceries()
-  rules <- tidy_apriori(trans, support = 0.001, confidence = 0.5)
+  rules <- groceries_rules()
   quality <- arules::quality(rules$rules)
 
   low <- inspect_rules(rules, by = "lift", n = 3, decreasing = FALSE)

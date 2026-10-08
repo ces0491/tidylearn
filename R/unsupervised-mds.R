@@ -32,8 +32,7 @@ tidy_mds <- function(data, method = "classical",
 
   # Convert to distance matrix if needed. tidy_dist() sends "gower" to
   # tidy_gower(), over every column, and the other metrics to stats::dist()
-  # on the numeric ones; stats::dist() alone refused "gower" as an invalid
-  # distance method.
+  # on the numeric ones; stats::dist() alone has no "gower".
   if (inherits(data, "dist")) {
     dist_mat <- data
   } else {
@@ -132,8 +131,8 @@ tidy_mds_classical <- function(dist_mat, ndim = 2, add_rownames = TRUE) {
   config_matrix <- mds_result$points
 
   # cmdscale() keeps only dimensions with a positive eigenvalue, with a
-  # warning, so it can return fewer than ndim. Naming ndim columns failed
-  # on the mismatch.
+  # warning, so it can return fewer than ndim; the columns are named for
+  # what it returns
   colnames(config_matrix) <- paste0("Dim", seq_len(ncol(config_matrix)))
 
   if (add_rownames && !is.null(attr(dist_mat, "Labels"))) {
@@ -442,7 +441,7 @@ print.tidy_mds <- function(x, ...) {
   cat("=================\n\n")
   cat("Method:", x$method, "\n")
   # Count the Dim columns: .obs_id is there only when the distances
-  # carried labels, so ncol() - 1 undercounted a fit on a tibble
+  # carry labels, so ncol() - 1 would undercount a fit on a tibble
   cat("Dimensions:", sum(grepl("^Dim[0-9]+$", names(x$config))), "\n")
   cat("Observations:", nrow(x$config), "\n")
 
@@ -481,8 +480,8 @@ tl_check_mds_ndim <- function(ndim, dist_mat) {
 #'
 #' tl_model()'s own \code{method} argument holds "mds", so the variant is
 #' chosen with \code{mds_method}. The dimension count can be given as
-#' \code{ndim}, the name tidy_mds() uses, or as \code{k}; passing ndim used
-#' to reach tidy_mds() a second time.
+#' \code{ndim}, the name tidy_mds() uses, or as \code{k}; if both are
+#' given they must agree.
 #' @keywords internal
 #' @noRd
 tl_fit_mds <- function(data, formula = NULL, k = NULL, ndim = NULL,

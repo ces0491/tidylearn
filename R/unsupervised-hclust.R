@@ -38,10 +38,11 @@ tidy_hclust <- function(data, method = "average",
     dist_mat <- data
     data_orig <- NULL
   } else {
-    # Gower handles factors, so with no selection it takes every column.
-    # Taking only the numeric ones left the factors out of a Gower distance.
+    # Gower handles factors, so with no selection it takes every column;
+    # taking only the numeric ones would leave them out of the distance
     data_selected <- tl_select_columns(
-      data, rlang::enquo(cols), all_columns = distance == "gower"
+      data, rlang::enquo(cols), all_columns = distance == "gower",
+      numeric_only = distance != "gower", what = "Hierarchical clustering"
     )
 
     # Compute distance
@@ -100,7 +101,7 @@ tidy_cutree <- function(hclust_obj, k = NULL, h = NULL) {
   }
 
   # cutree() takes a vector of k or h and returns a matrix, one column per
-  # cut, which flattened into one row per observation per cut
+  # cut, which would flatten into one row per observation per cut
   if (!is.null(k)) {
     tl_check_whole_number(k, "k", min = 1)
     clusters <- stats::cutree(hc_model, k = k)
@@ -151,9 +152,9 @@ augment_hclust <- function(hclust_obj, data, k = NULL, h = NULL) {
 
   cluster_assignments <- tidy_cutree(hclust_obj, k = k, h = h)
 
-  # Attach by position. A join on row_number() numbered a grouped tibble's
-  # rows within each group, so it attached other rows' clusters, and data
-  # of another length was padded with NA or cut short without a word.
+  # Attach by position: row_number() counts within each group of a grouped
+  # tibble, so a join on it would attach other rows' clusters, and a join
+  # pads or cuts short data of another length without a word
   n_tree <- nrow(cluster_assignments)
   if (nrow(data) != n_tree) {
     stop(
@@ -260,7 +261,8 @@ optimal_hclust_k <- function(hclust_obj, method = "silhouette", max_k = 10) {
 
   if (method == "silhouette") {
     # silhouette() is defined for 2 to n - 1 clusters and returns NA
-    # outside them, which failed below as "incorrect number of dimensions"
+    # outside them, which would fail below as "incorrect number of
+    # dimensions"
     tl_check_whole_number(
       max_k, "max_k", min = 2, max = length(hc_model$order) - 1
     )
@@ -295,8 +297,8 @@ optimal_hclust_k <- function(hclust_obj, method = "silhouette", max_k = 10) {
     }
 
     # clusGap() draws its reference data uniformly over the range of each
-    # numeric column, so the refit kept only those: a Gower tree's factors
-    # were dropped, and the gap scored clusterings the tree never made
+    # numeric column, so the refit sees only those. For a Gower tree on
+    # factors it would score clusterings the tree never made.
     non_numeric <- names(hclust_obj$data)[
       !vapply(hclust_obj$data, is.numeric, logical(1))
     ]
@@ -376,11 +378,28 @@ print.tidy_hclust <- function(x, ...) {
 
 
 #' Fit hierarchical clustering for tidylearn models
+#'
+#' tl_model()'s own \code{method} argument holds "hclust", so the linkage
+#' has a name of its own, \code{hclust_method}, as the MDS variant has
+#' \code{mds_method}.
 #' @keywords internal
 #' @noRd
 tl_fit_hclust <- function(data, formula = NULL,
-                          method = "average",
+                          hclust_method = "average",
                           distance = "euclidean", ...) {
+  linkages <- c("ward.D", "ward.D2", "single", "complete", "average",
+                "mcquitty", "median", "centroid")
+  if (!is.character(hclust_method) || length(hclust_method) != 1 ||
+        !hclust_method %in% linkages) {
+    stop(
+      "'hclust_method' must be one of ",
+      paste0("\"", linkages, "\"", collapse = ", "), ". Got: ",
+      paste(utils::head(as.character(hclust_method), 5), collapse = ", "),
+      ".",
+      call. = FALSE
+    )
+  }
+
   # Without a formula, tidy_hclust() picks the columns its distance can use
   data <- tl_ungroup(data)
   if (!is.null(formula)) {
@@ -394,7 +413,7 @@ tl_fit_hclust <- function(data, formula = NULL,
 
   # Fit hierarchical clustering using tidy_hclust
   hc_result <- tidy_hclust(
-    data, method = method,
+    data, method = hclust_method,
     distance = distance, ...
   )
 

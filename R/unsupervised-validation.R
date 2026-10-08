@@ -1,9 +1,8 @@
 #' Cluster labels as the integer codes cluster::silhouette() needs
 #'
-#' \code{silhouette()} calls \code{round()} on the labels, so a factor
-#' failed with "'round' not meaningful for factors" -- among them
-#' \code{augment_kmeans()}'s own cluster column -- and character labels
-#' failed too. Labels that are already whole numbers, such as the
+#' \code{silhouette()} calls \code{round()} on the labels, which a factor
+#' or character vector cannot take -- \code{augment_kmeans()}'s own cluster
+#' column among them. Labels that are already whole numbers, such as the
 #' augment functions' factor of "1", "2", ..., keep their values, so 0
 #' still marks DBSCAN noise and a factor gives the result of the integer
 #' vector it came from. Other labels are numbered in level order for a
@@ -71,7 +70,7 @@ tidy_silhouette <- function(clusters, dist_mat) {
   sil <- cluster::silhouette(codes$codes, dist_mat)
 
   # silhouette() returns NA in place of a table outside 2 to n - 1
-  # clusters, which failed below as "incorrect number of dimensions"
+  # clusters, which would fail below as "incorrect number of dimensions"
   if (!is.matrix(sil)) {
     stop(
       "Silhouette widths need at least 2 clusters and fewer clusters than ",
@@ -331,8 +330,8 @@ tidy_gap_stat <- function(data, FUN_cluster = NULL,  # nolint
                                 gap_result$Tab[, "SE.sim"],
                                 method = "globalmax")
 
-  # which.max() is maxSE()'s "globalmax", so it made k_firstmax a copy of
-  # k_globalmax; the first local maximum is a rule of its own
+  # which.max() is maxSE()'s "globalmax"; the first local maximum is a rule
+  # of its own
   k_firstmax <- cluster::maxSE(gap_result$Tab[, "gap"],
                                gap_result$Tab[, "SE.sim"],
                                method = "firstmax")
@@ -467,9 +466,8 @@ calc_validation_metrics <- function(clusters, data = NULL, dist_mat = NULL) {
 
   metrics <- list()
 
-  # DBSCAN labels noise 0. k always left it out, but the sizes, silhouette
-  # and WSS counted it as one more cluster, so every measure is taken over
-  # the clustered points alone.
+  # DBSCAN labels noise 0, which is no cluster, so every measure is taken
+  # over the clustered points alone
   codes <- tl_cluster_codes(clusters)$codes
   noise <- !is.na(codes) & codes == 0
   kept <- codes[!noise]
@@ -552,8 +550,8 @@ compare_clusterings <- function(cluster_list, data, dist_mat = NULL) {
     )
   }
 
-  # Mapping over names(cluster_list) returned a 0 x 0 tibble for an unnamed
-  # list, and failed on an entry left unnamed in a named one
+  # Entries are read by position and named here: an unnamed list has no
+  # names to map over, and a partly named one has gaps
   method_names <- names(cluster_list) %||% rep("", length(cluster_list))
   unnamed <- is.na(method_names) | method_names == ""
   method_names[unnamed] <- paste0("clustering_", which(unnamed))

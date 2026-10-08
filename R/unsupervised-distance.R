@@ -25,16 +25,33 @@ tidy_dist <- function(data, method = "euclidean", cols = NULL, ...) {
   # Every column to begin with: Gower reads factors as they are, and the
   # other methods keep the numeric ones below
   data_selected <- tl_select_columns(
-    data, rlang::enquo(cols), all_columns = TRUE
+    data, rlang::enquo(cols), all_columns = TRUE,
+    numeric_only = method != "gower",
+    what = paste0("The ", method, " distance")
   )
+
+  usable <- if (method == "gower") {
+    data_selected
+  } else {
+    dplyr::select(data_selected, where(is.numeric))
+  }
+
+  # With no column to compare on, every distance is undefined, and the
+  # methods downstream would report that as missing values in every row
+  if (ncol(usable) == 0) {
+    stop(
+      "The ", method, " distance needs at least one ",
+      if (method == "gower") "column" else "numeric column",
+      ", but none were found.",
+      call. = FALSE
+    )
+  }
 
   # Compute distance based on method
   if (method == "gower") {
-    dist_mat <- tidy_gower(data_selected, ...)
+    dist_mat <- tidy_gower(usable, ...)
   } else {
-    # Convert to matrix for standard methods
-    data_matrix <- as.matrix(data_selected |> dplyr::select(where(is.numeric)))
-    dist_mat <- stats::dist(data_matrix, method = method)
+    dist_mat <- stats::dist(as.matrix(usable), method = method)
   }
 
   dist_mat
@@ -240,8 +257,8 @@ standardize_data <- function(data, center = TRUE, scale = TRUE) {
   }
 
   # mutate() on a rowwise tibble works one row at a time, and one value has
-  # no spread, so every standardised value came back NaN. Its columns are
-  # standardised whole, and the rowwise structure is put back.
+  # no spread, so standardising row by row gives NaN everywhere. Its
+  # columns are standardised whole, and the rowwise structure is put back.
   if (inherits(data, "rowwise_df")) {
     ids <- dplyr::group_vars(data)
     standardised <- dplyr::ungroup(data) |>
@@ -294,10 +311,9 @@ compare_distances <- function(
 #'
 #' dplyr adds a grouped tibble's grouping variables back to any column
 #' selection ("Adding missing grouping variables"), so selecting the
-#' numeric columns of \code{group_by(iris, Species)} returned Species as
-#' well: clara clustered on its factor codes, the distances coerced it to
-#' NA, and kmeans failed outright. None of these routines has a per-group
-#' meaning, so the grouping is ignored.
+#' numeric columns of \code{group_by(iris, Species)} returns Species too,
+#' and a clustering would run on its factor codes. None of these routines
+#' has a per-group meaning, so the grouping is dropped first.
 #'
 #' @param data Anything; only a data frame is changed
 #' @return \code{data}, ungrouped when it is a data frame
@@ -311,24 +327,125 @@ tl_ungroup <- function(data) {
 #'
 #' @param data A data frame
 #' @param cols The caller's \code{cols} argument, captured with
-#'   \code{rlang::enquo()}. Testing the argument itself with
-#'   \code{is.null()} evaluates it, and a bare column name is not an object
-#'   in the caller's environment: \code{cols = c(Sepal.Length)} failed with
-#'   "object 'Sepal.Length' not found".
+#'   \code{rlang::enquo()} rather than tested with \code{is.null()}, which
+#'   would evaluate it: a bare column name such as \code{Sepal.Length} is
+#'   not an object in the caller's environment.
 #' @param all_columns When \code{cols} is empty, TRUE keeps every column
 #'   (Gower distance reads factors) and FALSE the numeric ones
+#' @param numeric_only TRUE when the method can use numeric columns only.
+#'   A non-numeric column \code{cols} selects is then left out with a
+#'   warning, as one a formula names is, and a selection with no numeric
+#'   column is refused.
+#' @param what The method, as the messages should name it
 #' @return The selected columns of the ungrouped data
 #' @keywords internal
 #' @noRd
 tl_select_columns <- function(data, cols = rlang::quo(NULL),
-                              all_columns = FALSE) {
+                              all_columns = FALSE, numeric_only = FALSE,
+                              what = NULL) {
   data <- tl_ungroup(data)
+  cols <- tl_resolve_cols(cols, data)
 
-  if (!rlang::quo_is_null(cols)) {
-    return(dplyr::select(data, !!cols))
+  if (rlang::quo_is_null(cols)) {
+    return(if (all_columns) data else dplyr::select(data, where(is.numeric)))
   }
 
-  if (all_columns) data else dplyr::select(data, where(is.numeric))
+  selected <- dplyr::select(data, !!cols)
+  if (!numeric_only) {
+    return(selected)
+  }
+
+  is_number <- vapply(selected, is.numeric, logical(1))
+  if (!any(is_number)) {
+    stop(
+      what, " needs at least one numeric column, but 'cols' selected none",
+      if (ncol(selected) > 0) {
+        paste0("; it selected ", paste(names(selected), collapse = ", "))
+      },
+      ".",
+      call. = FALSE
+    )
+  }
+  if (!all(is_number)) {
+    left_out <- names(selected)[!is_number]
+    warning(
+      what, " uses only numeric columns, so it left out the non-numeric ",
+      "column", if (length(left_out) > 1) "s", " selected by 'cols': ",
+      paste(left_out, collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
+  selected[is_number]
+}
+
+#' Read a cols argument that a wrapper forwarded
+#'
+#' A function that takes \code{cols = NULL} and passes it on hands over the
+#' symbol \code{cols}, not the NULL it holds. tidyselect reads such a
+#' symbol by its value -- a NULL as an empty selection, which left zero
+#' columns, and a character vector with a deprecation warning -- so the
+#' value is read here instead. A symbol that names a column of the data is
+#' that column, as tidyselect reads it; an expression that cannot be
+#' evaluated outside a selection, such as \code{starts_with("x")}, is left
+#' for tidyselect.
+#'
+#' @param cols A quosure of the caller's cols argument
+#' @param data The data the selection is made from
+#' @return A quosure: NULL for an empty selection, \code{all_of()} for a
+#'   forwarded vector of names or positions, or \code{cols} as it was
+#' @keywords internal
+#' @noRd
+tl_resolve_cols <- function(cols, data) {
+  if (rlang::quo_is_null(cols)) {
+    return(cols)
+  }
+
+  expr <- rlang::quo_get_expr(cols)
+  if (is.symbol(expr) && as.character(expr) %in% names(data)) {
+    return(cols)
+  }
+
+  value <- tryCatch(
+    list(suppressWarnings(rlang::eval_tidy(cols, data = data))),
+    error = function(e) NULL
+  )
+  if (is.null(value)) {
+    return(cols)
+  }
+
+  value <- value[[1]]
+  if (is.null(value)) {
+    return(rlang::quo(NULL))
+  }
+  if (is.symbol(expr) && (is.character(value) || is.numeric(value))) {
+    return(rlang::quo(dplyr::all_of(!!value)))
+  }
+
+  cols
+}
+
+#' Refuse pass-through options that break the result
+#'
+#' The tidy wrappers forward \code{...} to the routine they wrap, then read
+#' its full result. An option that changes that result's shape, or one the
+#' wrapper sets itself, is refused by name before the call.
+#'
+#' @param passed Names of the arguments in \code{...}
+#' @param refused A named character vector: the reason for each option
+#' @param fun The wrapper's name, for the message
+#' @keywords internal
+#' @noRd
+tl_refuse_options <- function(passed, refused, fun) {
+  bad <- intersect(passed, names(refused))
+  if (length(bad) > 0) {
+    stop(
+      "'", bad[1], "' cannot be passed to ", fun, "(): ", refused[[bad[1]]],
+      ".",
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
 }
 
 #' Columns a one-sided formula selects for an unsupervised method
@@ -338,10 +455,10 @@ tl_select_columns <- function(data, cols = rlang::quo(NULL),
 #' distance is defined for factors too, so there a dot stands for every
 #' column, less any the formula subtracts.
 #'
-#' A column the formula names but the method cannot use is reported, since
-#' it was asked for by name; it used to be dropped without a message.
-#' Columns a dot expanded to are not reported, since for these methods the
-#' dot means the numeric columns.
+#' A column the formula names but the method cannot use is reported with a
+#' warning, since it was asked for by name and the fit goes ahead without
+#' it. Columns a dot expanded to are not reported, since for these methods
+#' the dot means the numeric columns.
 #'
 #' @param formula A one-sided formula
 #' @param data The ungrouped training data
@@ -391,8 +508,8 @@ tl_formula_columns <- function(formula, data, what, mixed_types = FALSE,
 #'
 #' Ranges such as \code{2:max_k} run backwards when the bound is too small
 #' -- \code{2:1} is \code{c(2, 1)} -- and a vector \code{k} makes
-#' \code{cutree()} return a matrix, so a bad count surfaced far from the
-#' argument that caused it.
+#' \code{cutree()} return a matrix, so a bad count would surface far from
+#' the argument that caused it.
 #'
 #' @param x The value passed
 #' @param arg The argument's name, for the message

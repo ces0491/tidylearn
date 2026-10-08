@@ -28,7 +28,9 @@
 tidy_kmeans <- function(data, k, cols = NULL, nstart = 25, iter_max = 100,
                         algorithm = "Hartigan-Wong") {
 
-  data_selected <- tl_select_columns(data, rlang::enquo(cols))
+  data_selected <- tl_select_columns(
+    data, rlang::enquo(cols), numeric_only = TRUE, what = "k-means"
+  )
 
   tl_check_complete_numeric(data_selected, "k-means")
 
@@ -116,6 +118,8 @@ augment_kmeans <- function(kmeans_obj, data) {
 #' @param cols Columns to include (tidy select). If NULL, uses all columns.
 #' @param ... Further arguments passed to \code{\link[cluster]{pam}}, such
 #'   as \code{nstart}, \code{variant} or starting \code{medoids}.
+#'   \code{cluster.only} and \code{diss} are refused: the first leaves no
+#'   fit to build the result from, and tidy_pam() sets the second itself.
 #'
 #' @return A list of class "tidy_pam" containing:
 #' \itemize{
@@ -139,13 +143,25 @@ augment_kmeans <- function(kmeans_obj, data) {
 #' @export
 tidy_pam <- function(data, k, metric = "euclidean", cols = NULL, ...) {
 
+  tl_refuse_options(names(list(...)), c(
+    cluster.only = paste0(
+      "it makes pam() return the cluster vector alone, where the result is ",
+      "built from the whole fit. Read $clusters$cluster instead"
+    ),
+    diss = paste0(
+      "tidy_pam() always hands pam() a distance matrix. Pass a dist object ",
+      "as data to cluster on distances of your own"
+    )
+  ), "tidy_pam")
+
   # Handle dist object
   if (inherits(data, "dist")) {
     dist_mat <- data
     data_orig <- NULL
   } else {
     data_selected <- tl_select_columns(
-      data, rlang::enquo(cols), all_columns = TRUE
+      data, rlang::enquo(cols), all_columns = TRUE,
+      numeric_only = metric != "gower", what = "PAM"
     )
 
     # Compute distance
@@ -170,8 +186,8 @@ tidy_pam <- function(data, k, metric = "euclidean", cols = NULL, ...) {
   )
 
   # pam() reports the medoids by label when the distances carry labels, so
-  # a data frame with row names gave "Toyota Corona" where the same data as
-  # a tibble gave 21. id.med is the row position either way.
+  # its medoids are "Toyota Corona" for mtcars but 21 for the same data as
+  # a tibble. id.med is the row position either way.
   medoid_rows <- pam_model$id.med
 
   # Create medoids tibble
@@ -244,6 +260,8 @@ augment_pam <- function(pam_obj, data) {
 #' @param sampsize Sample size (default: min(n, 40 + 2*k))
 #' @param ... Further arguments passed to \code{\link[cluster]{clara}}, such
 #'   as \code{correct.d}, \code{pamLike} or \code{rngR}.
+#'   \code{cluster.only} and \code{medoids.x} are refused, since the result
+#'   needs the fit and its medoids.
 #'
 #' @return A list of class \code{"tidy_clara"} containing:
 #' \itemize{
@@ -265,9 +283,19 @@ augment_pam <- function(pam_obj, data) {
 tidy_clara <- function(data, k, metric = "euclidean",
                        samples = 50, sampsize = NULL, ...) {
 
+  tl_refuse_options(names(list(...)), c(
+    cluster.only = paste0(
+      "it makes clara() return the cluster vector alone, where the result ",
+      "is built from the whole fit. Read $clusters$cluster instead"
+    ),
+    medoids.x = paste0(
+      "medoids.x = FALSE leaves out the medoids, which the result reports. ",
+      "keep.data = FALSE saves a copy of the data instead"
+    )
+  ), "tidy_clara")
+
   # clara() draws samples of observations and computes distances within
-  # each, so it takes no distance matrix. Handing one over failed inside
-  # cluster, after nrow() of the dist had already come back NULL.
+  # each, so it takes no distance matrix
   if (inherits(data, "dist")) {
     stop(
       "tidy_clara() needs the observations: CLARA draws samples of rows and ",

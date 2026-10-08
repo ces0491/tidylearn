@@ -133,9 +133,8 @@ tidy_rules <- function(rules) {
   n_rules <- length(rules)
 
   # labels() of an empty rule set is "{}", one label for no rules, so the
-  # sides are read only when there are rules. An empty set used to return
-  # a tibble with no columns at all, which every helper downstream failed
-  # on.
+  # sides are read only when there are rules. An empty set still gets every
+  # column, typed, so the helpers downstream filter it like any other.
   if (n_rules == 0) {
     lhs <- character(0)
     rhs <- character(0)
@@ -218,8 +217,8 @@ inspect_rules <- function(rules_obj, by = "lift", n = 10, decreasing = TRUE) {
   }
 
   # Sort in the requested direction before taking n, as arules' head(by = )
-  # does. Sorting descending first and reversing afterwards returned the n
-  # highest rules in ascending order.
+  # does, so decreasing = FALSE gives the n lowest rules rather than the n
+  # highest in reverse
   if (by %in% names(rules_tbl)) {
     rules_tbl <- if (decreasing) {
       dplyr::arrange(rules_tbl, dplyr::desc(.data[[by]]))
@@ -423,9 +422,9 @@ visualize_rules <- function(rules_obj, method = "scatter", top_n = 50, ...) {
     stop("rules_obj must be a tidy_apriori or rules object")
   }
 
-  # Keep the top_n rules by lift. utils::head() falls through to its
-  # default method on an S4 rule set, which kept the first top_n in mining
-  # order while the subtitle called them the top ones.
+  # Keep the top_n rules by lift, ordered here: utils::head() falls through
+  # to its default method on an S4 rule set, which ignores `by` and keeps
+  # the first top_n in mining order
   by_lift <- order(arules::quality(rules)$lift, decreasing = TRUE)
   rules <- rules[utils::head(by_lift, top_n)]
 
@@ -510,8 +509,8 @@ recommend_products <- function(rules_obj, basket,
   basket <- as.character(basket)
 
   # A rule fires when the basket holds its whole left-hand side, and is
-  # worth suggesting only for what the basket lacks: rules recommending an
-  # item already in it used to be returned, one of them four times over
+  # worth suggesting only when its right-hand side is something the basket
+  # lacks
   fires <- vapply(
     tl_rule_items(rules_tbl, "lhs"),
     function(items) all(items %in% basket),
@@ -557,9 +556,8 @@ recommend_products <- function(rules_obj, basket,
 #'
 #' @export
 print.tidy_apriori <- function(x, ...) {
-  # An itemset result has no rules table, confidence or lift. Printing it
-  # as rules gave nine min/max warnings, "Support: Inf - -Inf", and then
-  # failed on the missing table.
+  # An itemset result has no rules table, confidence or lift, so it is
+  # printed from its itemsets table
   is_rules <- inherits(x$rules, "rules")
 
   cat("Tidy Apriori Results\n")
@@ -670,8 +668,9 @@ tl_tidy_itemsets <- function(itemsets) {
 #' The rules table a market-basket helper works on
 #'
 #' The helpers take a tidy_apriori() result, an arules rules object, or a
-#' table of rules. A result saved before tidy_rules() added the item lists
-#' has them rebuilt from the rules it carries.
+#' table of rules. A result whose rules table lacks the item lists, such as
+#' one saved by an earlier version, has them rebuilt from the rules it
+#' carries.
 #'
 #' @param rules_obj What the caller passed
 #' @return A tibble of rules
@@ -707,8 +706,8 @@ tl_rules_table <- function(rules_obj) {
 
 #' Refuse an itemset result where rules are needed
 #'
-#' An itemset result's rules table is NULL, which the rule helpers used to
-#' fail on with messages that named neither the table nor the cause.
+#' An itemset result's rules table is NULL, so the rule helpers say what
+#' they were given rather than fail on the NULL.
 #'
 #' @param rules_obj A tidy_apriori result mined for itemsets
 #' @keywords internal
@@ -724,9 +723,9 @@ tl_stop_itemsets <- function(rules_obj) {
 
 #' One side's item lists, for matching
 #'
-#' Matching reads the item lists tidy_rules() adds. grepl() on the labels
-#' matched "coffee" inside "instant coffee", and splitting a label on ","
-#' cut an item such as "salt, iodised" in two.
+#' Matching reads the item lists tidy_rules() adds, not the labels: a
+#' substring search of a label finds "coffee" inside "instant coffee", and
+#' splitting a label on "," cuts an item such as "salt, iodised" in two.
 #'
 #' @param rules_tbl A rules table
 #' @param side "lhs" or "rhs"
@@ -765,8 +764,8 @@ tl_rules_holding <- function(rules_tbl, item, side) {
 
 #' Refuse anything but a single item name
 #'
-#' grepl() used only the first element of a vector, with a warning; item
-#' matching on a vector would quietly mean "any of these" instead.
+#' Matching on a vector of items would quietly mean "any of these", so the
+#' helpers take one item at a time.
 #'
 #' @param item The caller's item
 #' @return The item, as a character string
