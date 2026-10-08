@@ -321,6 +321,31 @@ test_that("polynomial predicts a scale() term with the training centre", {
                    paste0("poly(scale(wt), degree = 2, raw = TRUE)", 1:2))
 })
 
+test_that("polynomial warns about a dot formula only as lm() does", {
+  # terms() warns "'varlist' has changed ... EncodeVars()" when a dot
+  # formula names a variable the data lacks. The edited formula has no dot
+  # and lm() fits it without a warning, but expanding the dot gave one.
+  z <- sin(seq_len(32))
+  d <- mtcars[, c("mpg", "wt", "hp")]
+  collect <- function(expr) {
+    messages <- character()
+    withCallingHandlers(expr, warning = function(w) {
+      messages <<- c(messages, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    })
+    messages
+  }
+  from_tl <- collect(model <- tl_model(d, mpg ~ . + z, method = "polynomial"))
+  from_lm <- collect(reference <- stats::lm(
+    mpg ~ poly(wt, degree = 2, raw = TRUE) + poly(hp, degree = 2, raw = TRUE) +
+      poly(z, degree = 2, raw = TRUE),
+    data = d
+  ))
+  expect_identical(from_tl, from_lm)
+  expect_length(from_tl, 0)
+  expect_equal(stats::coef(model$fit), stats::coef(reference))
+})
+
 test_that("polynomial keeps a numeric term that is part of an interaction", {
   # wt was replaced by poly(wt), which left cyl_f:wt with no wt main
   # effect. model.matrix() then coded it with every level of cyl_f, and one

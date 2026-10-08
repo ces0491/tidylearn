@@ -74,7 +74,7 @@ tl_fit_polynomial <- function(data, formula, degree = 2, ...) {
 #' @keywords internal
 #' @noRd
 tl_polynomial_formula <- function(formula, data, degree) {
-  model_terms <- stats::terms(formula, data = data)
+  model_terms <- tl_terms(formula, data = data)
   # Expanded against the data, so a term inside `.` can be replaced
   expanded <- stats::formula(model_terms)
   env <- environment(formula)

@@ -150,7 +150,9 @@ table(clusters$cluster, iris$Species)
 ## Data Preprocessing
 
 `tl_prepare_data()` handles imputation, scaling and encoding in one call, and
-records what it did so the same transformation can be replayed on new data:
+records the parameters it learned, such as each column's training mean and
+standard deviation. Applying them to new data is a step you take yourself;
+`tl_pipeline()` takes it for you:
 
 ```{r}
 # Prepare data with multiple preprocessing steps
