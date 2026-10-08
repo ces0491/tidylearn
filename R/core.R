@@ -402,7 +402,7 @@ tl_model_supervised <- function(data, formula, method, ..., compute = "cpu") {
   attr(xlev, "terms") <- tryCatch(
     {
       predictor_terms <- stats::delete.response(
-        stats::terms(fit_formula, data = data)
+        tl_terms(fit_formula, data = data)
       )
       attr(
         stats::model.frame(predictor_terms, data, na.action = stats::na.pass),
@@ -806,7 +806,7 @@ tl_fitted_classes <- function(y, data, formula, method, response_label) {
     return(levels(y))
   }
   columns <- intersect(
-    all.vars(stats::terms(formula, data = data)), names(data)
+    all.vars(tl_terms(formula, data = data)), names(data)
   )
   if (length(columns) == 0L) {
     return(levels(y))
@@ -979,7 +979,7 @@ tl_predictor_columns <- function(object) {
   predictor_terms <- attr(object$spec$xlev, "terms")
   if (!inherits(predictor_terms, "terms")) {
     predictor_terms <- tryCatch(
-      stats::delete.response(stats::terms(
+      stats::delete.response(tl_terms(
         tl_fit_formula(object$spec$formula, object$data, predicting = TRUE),
         data = object$data
       )),

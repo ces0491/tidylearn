@@ -121,6 +121,30 @@ test_that("tl_align_classes() reads observed classes against the model's", {
   expect_identical(aligned$keep, c(TRUE, FALSE, FALSE))
 })
 
+test_that("a missing file's message keeps a password out", {
+  # A libpq connection string read with a file format reached the file
+  # check, and "File not found" printed it, password and all
+  err <- expect_error(
+    tl_read("host=db user=u password=secret dbname=x", format = "csv",
+            .quiet = TRUE),
+    "File not found: 'host=db user=u password=*** dbname=x'", fixed = TRUE
+  )
+  expect_false(grepl("secret", conditionMessage(err), fixed = TRUE))
+
+  # An ordinary path prints as given
+  paths <- c(
+    "nonexistent.csv", "data/train set.csv", "C:/Users/me/data.csv",
+    "C:\\Users\\me\\data.csv", "~/data/x.parquet",
+    file.path(tempdir(), "missing.csv")
+  )
+  for (path in paths) {
+    expect_error(
+      tidylearn:::tl_validate_file_path(path),
+      paste0("File not found: '", path, "'"), fixed = TRUE
+    )
+  }
+})
+
 # ---- Categorical predictors ----
 
 # What tl_read() hands back for a CSV: the category is a character column.
@@ -380,6 +404,59 @@ test_that("a formula may subtract a variable it finds in its environment", {
     rownames(pca$fit$model$rotation),
     c("Sepal.Length", "Petal.Length", "Petal.Width")
   )
+})
+
+test_that("a dot formula naming an outside variable warns as lm() does", {
+  # terms() warns "'varlist' has changed ... should no longer happen!" for a
+  # dot formula that names a variable the data lacks. lm() gives it once;
+  # tidylearn's own terms() calls passed it on three or four more times
+  varlist_warnings <- function(expr) {
+    n <- 0L
+    withCallingHandlers(expr, warning = function(w) {
+      if (grepl("'varlist' has changed", conditionMessage(w), fixed = TRUE)) {
+        n <<- n + 1L
+        invokeRestart("muffleWarning")
+      }
+    })
+    n
+  }
+  z <- mtcars$wt * 2
+  expect_identical(varlist_warnings(lm(mpg ~ . + z, data = mtcars)), 1L)
+  expect_identical(
+    varlist_warnings(model <- tl_model(mtcars, mpg ~ . + z, method = "linear")),
+    1L
+  )
+  expect_equal(coef(model$fit),
+               suppressWarnings(coef(lm(mpg ~ . + z, data = mtcars))))
+
+  # A classification fit reads its classes through one more terms() call
+  d <- mtcars[c("am", "wt", "hp")]
+  d$am <- factor(d$am)
+  expect_identical(
+    varlist_warnings(glm(am ~ . + z, family = binomial, data = d)), 1L
+  )
+  expect_identical(
+    varlist_warnings(tl_model(d, am ~ . + z, method = "logistic")), 1L
+  )
+
+  # lm() has nothing to warn about once the dot is written out, and
+  # neither has tl_model()
+  expect_identical(
+    varlist_warnings(tl_model(mtcars, mpg ~ wt * z - z, method = "linear")),
+    0L
+  )
+
+  # Only that warning is muffled
+  muffle <- tidylearn:::tl_muffle_varlist
+  expect_warning(
+    withCallingHandlers(warning("something else"), warning = muffle),
+    "something else"
+  )
+  real <- tryCatch(
+    stats::terms(mpg ~ . + z, data = mtcars),
+    warning = function(w) w
+  )
+  expect_no_warning(withCallingHandlers(warning(real), warning = muffle))
 })
 
 test_that("a data-dependent term is computed with the training values", {

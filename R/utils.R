@@ -46,6 +46,45 @@ utils::globalVariables(c(
   if (is.null(x)) y else x
 }
 
+#' terms() without R's varlist warning
+#'
+#' \code{terms()} warns "'varlist' has changed (from nvar=11) to new 12
+#' after EncodeVars() -- should no longer happen!" for a dot formula that
+#' names a variable the data lacks, such as \code{mpg ~ . + z} with
+#' \code{z} in the caller's session. The terms it returns are right. The
+#' fit's own model frame gives the warning once, as \code{lm()} does;
+#' tidylearn's other reads of the formula passed it on three or four more
+#' times per \code{tl_model()} call.
+#'
+#' @param x A formula, as for \code{stats::terms()}
+#' @param ... Passed to \code{stats::terms()}
+#' @return The terms object
+#' @keywords internal
+#' @noRd
+tl_terms <- function(x, ...) {
+  withCallingHandlers(stats::terms(x, ...), warning = tl_muffle_varlist)
+}
+
+#' Muffle R's varlist warning and no other
+#'
+#' Recognised by the parts a translation keeps -- the C routine's name and
+#' the \code{nvar=} count -- so it is muffled in any language. The error
+#' "invalid model formula in EncodeVars" names the routine too, without
+#' the parentheses or the count.
+#'
+#' @param w A warning condition
+#' @return Called for its effect: the warning is muffled, or left to
+#'   reach the caller
+#' @keywords internal
+#' @noRd
+tl_muffle_varlist <- function(w) {
+  text <- conditionMessage(w)
+  if (grepl("EncodeVars()", text, fixed = TRUE) &&
+        grepl("nvar=", text, fixed = TRUE)) {
+    invokeRestart("muffleWarning")
+  }
+}
+
 #' Safe extraction of formula variables
 #'
 #' For a one-sided formula, the columns an unsupervised method fits on. A
@@ -67,7 +106,7 @@ get_formula_vars <- function(formula, data) {
   if (length(formula) == 2) {
     # terms() expands the dot and applies `- x`; all.vars() on the formula
     # returned "." itself for ~ . - x
-    labels <- attr(stats::terms(formula, data = data), "term.labels")
+    labels <- attr(tl_terms(formula, data = data), "term.labels")
     terms <- lapply(labels, str2lang)
     bare <- vapply(terms, is.name, logical(1))
     if (!all(bare)) {
@@ -97,7 +136,7 @@ get_formula_vars <- function(formula, data) {
     # Two-sided: the variables the expanded terms use. all.vars() on the
     # formula itself returns "." for `y ~ .` and returns `id` for
     # `y ~ . - id`, which is exactly the column the caller excluded.
-    labels <- attr(stats::terms(formula, data = data), "term.labels")
+    labels <- attr(tl_terms(formula, data = data), "term.labels")
     unique(unlist(lapply(labels, function(label) all.vars(str2lang(label)))))
   }
 }
@@ -110,8 +149,10 @@ tl_validate_file_path <- function(path) {
     stop("'path' must be a single character string",
          call. = FALSE)
   }
+  # A connection string read with a file format arrives here as a path,
+  # and its password would otherwise be printed with it
   if (!file.exists(path)) {
-    stop("File not found: '", path, "'",
+    stop("File not found: '", tl_redact_db_url(path), "'",
          call. = FALSE)
   }
   invisible(TRUE)
@@ -379,7 +420,7 @@ tl_complete_predictor_rows <- function(formula, new_data) {
   # column the formula subtracts is not a predictor, so a missing value in
   # it leaves the row usable.
   predictors <- tryCatch(
-    all.vars(stats::delete.response(stats::terms(
+    all.vars(stats::delete.response(tl_terms(
       tl_fit_formula(formula, new_data, predicting = TRUE),
       data = new_data
     ))),
@@ -467,7 +508,7 @@ tl_predictor_matrix <- function(formula, new_data, xlev = NULL) {
   # column it subtracts, which the matrix never uses.
   rhs_terms <- attr(xlev, "terms")
   if (!inherits(rhs_terms, "terms")) {
-    rhs_terms <- stats::delete.response(stats::terms(
+    rhs_terms <- stats::delete.response(tl_terms(
       tl_fit_formula(formula, new_data, predicting = TRUE),
       data = new_data
     ))
@@ -512,7 +553,7 @@ tl_model_columns <- function(formula, data) {
     return(NULL)
   }
   model_terms <- tryCatch(
-    stats::terms(formula, data = data),
+    tl_terms(formula, data = data),
     error = function(e) NULL
   )
   if (is.null(model_terms)) {
@@ -566,7 +607,7 @@ tl_fit_formula <- function(formula, data, predicting = FALSE) {
   }
 
   model_terms <- tryCatch(
-    stats::terms(formula, data = columns),
+    tl_terms(formula, data = columns),
     error = function(e) NULL
   )
   if (is.null(model_terms)) {
@@ -586,7 +627,7 @@ tl_fit_formula <- function(formula, data, predicting = FALSE) {
   if (all(all.vars(model_terms) %in% used)) {
     return(formula)
   }
-  stats::formula(stats::terms(formula, data = columns, simplify = TRUE))
+  stats::formula(tl_terms(formula, data = columns, simplify = TRUE))
 }
 
 #' The variables a formula's right-hand side subtracts
@@ -688,7 +729,7 @@ tl_check_subtracted <- function(formula, data) {
 #' @keywords internal
 #' @noRd
 tl_bare_term_vars <- function(formula, data) {
-  labels <- attr(stats::terms(formula, data = data), "term.labels")
+  labels <- attr(tl_terms(formula, data = data), "term.labels")
 
   interaction_parts <- function(expr) {
     if (is.call(expr) && identical(expr[[1L]], as.name(":"))) {
@@ -920,7 +961,7 @@ tl_as_formula <- function(formula, arg = "formula") {
 tl_check_predictor_variance <- function(data, formula, method) {
   predictors <- tryCatch(
     {
-      labels <- attr(stats::terms(formula, data = data), "term.labels")
+      labels <- attr(tl_terms(formula, data = data), "term.labels")
       unique(unlist(lapply(labels, function(l) all.vars(str2lang(l)))))
     },
     error = function(e) setdiff(all.vars(formula), all.vars(formula)[1])
