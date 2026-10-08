@@ -1269,11 +1269,22 @@ tl_parse_kaggle_url <- function(url) {
 #'   \code{user:password@@} userinfo, and the value of any secret-bearing
 #'   query parameter or libpq keyword (\code{password=},
 #'   \code{sslpassword=} and others), replaced by \code{***}; input with
-#'   no secret is returned unchanged
+#'   no secret, and a path starting with a drive letter, a slash or a
+#'   backslash, is returned unchanged
 #' @keywords internal
 #' @noRd
 tl_redact_db_url <- function(url) {
   if (!is.character(url) || length(url) != 1 || is.na(url)) {
+    return(url)
+  }
+
+  # A path that starts with a drive letter, a slash or a backslash (a
+  # Windows, UNC or Unix path) is no connection string, though
+  # C:\Users\ana@corp\data.csv has the shape of user:password@host, and a
+  # folder called "my password=1" that of a libpq keyword. A relative
+  # path is left to the patterns below; the user:password@host one needs
+  # a ':' before the '@', which a Windows file name cannot hold.
+  if (grepl("^([A-Za-z]:[\\\\/]|[\\\\/])", url)) {
     return(url)
   }
 

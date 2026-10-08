@@ -1678,6 +1678,63 @@ test_that("connection strings are redacted whatever form the password takes", {
   }
 })
 
+test_that("local paths pass through the redactor unchanged", {
+  # A Windows path with '@' after a backslash read as user:password@host,
+  # so C:\Users\ana@corp\data.csv was printed as C:***@corp\data.csv
+  expect_identical(
+    tl_redact_db_url("C:\\Users\\ana@corp\\data.csv"),
+    "C:\\Users\\ana@corp\\data.csv"
+  )
+  expect_identical(
+    tl_redact_db_url("C:/Users/ana@corp/data.csv"),
+    "C:/Users/ana@corp/data.csv"
+  )
+  paths <- c(
+    "D:\\exports\\a@b.csv",
+    "D:/exports/a@b.csv",
+    "C:\\Users\\ana\\my password=1\\data.csv",
+    "\\\\fileserver\\share\\ana@corp\\data.csv",
+    "//fileserver/share/ana@corp/data.csv",
+    "exports\\ana@corp\\data.csv",
+    "exports/ana@corp/data.csv",
+    "ana@corp.csv",
+    "/home/ana@corp/data.csv",
+    "/home/ana/my password=1/data.csv"
+  )
+  for (path in paths) {
+    expect_identical(tl_redact_db_url(path), path, info = path)
+  }
+
+  # Connection strings without a scheme are still redacted, a Windows
+  # domain user's included
+  expect_identical(tl_redact_db_url("ana:secret@host"), "ana:***@host")
+  expect_identical(
+    tl_redact_db_url("CORP\\ana:secret@host/db"), "CORP\\ana:***@host/db"
+  )
+})
+
+test_that("tl_read() prints a path with '@' in it as it is", {
+  dir <- withr::local_tempdir(pattern = "ana@corp")
+  path <- file.path(dir, "data.csv")
+  write.csv(mtcars[1:2, ], path, row.names = FALSE)
+
+  printed <- character(0)
+  withCallingHandlers(
+    tl_read(path),
+    message = function(m) {
+      printed <<- c(printed, conditionMessage(m))
+      invokeRestart("muffleMessage")
+    }
+  )
+  expect_identical(printed[1], paste0("Reading csv data from: ", path, "\n"))
+
+  missing_file <- file.path(dir, "absent.csv")
+  expect_error(
+    tl_read(missing_file, .quiet = TRUE),
+    paste0("File not found: '", missing_file, "'"), fixed = TRUE
+  )
+})
+
 test_that("tl_parse_kaggle_url extracts dataset slug", {
   parsed <- tl_parse_kaggle_url(
     "https://www.kaggle.com/datasets/zillow/zecon"
