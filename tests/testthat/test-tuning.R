@@ -942,6 +942,89 @@ test_that("tuning logistic on a numeric 0/1 response scores accuracy", {
   expect_identical(attr(tree, "tuning_results")$metric, "rmse")
 })
 
+test_that("the tuners read the task from the response the formula computes", {
+  # tl_model() fits factor(am) ~ wt + hp as a classification, but the
+  # tuners read the raw 0/1 column: they defaulted to rmse, which the
+  # classifier does not produce, and refused metric = "accuracy"
+  set.seed(1)
+  tuned <- tl_tune_grid(mtcars, factor(am) ~ wt + hp, method = "tree",
+                        param_grid = list(cp = c(0.01, 0.1)), folds = 3,
+                        verbose = FALSE)
+  tuning <- attr(tuned, "tuning_results")
+  expect_identical(tuning$metric, "accuracy")
+  expect_true(tuning$maximize)
+  expect_true(tuned$spec$is_classification)
+
+  # The score is rpart's accuracy on the left-out rows, fold by fold
+  set.seed(1)
+  splits <- rsample::vfold_cv(mtcars, v = 3)$splits
+  accuracy <- vapply(splits, function(split) {
+    fit <- rpart::rpart(factor(am) ~ wt + hp, data = rsample::analysis(split),
+                        method = "class")
+    test <- rsample::assessment(split)
+    mean(as.character(predict(fit, test, type = "class")) ==
+           as.character(test$am))
+  }, numeric(1))
+  expect_equal(tuning$results$mean_metric[tuning$results$cp == 0.01],
+               mean(accuracy))
+
+  # An explicit classification metric is accepted, a regression one refused
+  tuned <- tl_tune_random(mtcars, factor(am) ~ wt + hp, method = "tree",
+                          param_space = list(cp = c(0.01, 0.1)), n_iter = 2,
+                          folds = 3, metric = "f1", verbose = FALSE, seed = 1)
+  expect_identical(attr(tuned, "tuning_results")$metric, "f1")
+  expect_error(
+    tl_tune_grid(mtcars, factor(am) ~ wt + hp, method = "tree",
+                 param_grid = list(cp = 0.01), folds = 3, metric = "rmse",
+                 verbose = FALSE),
+    "Metric \"rmse\" was not produced for this task"
+  )
+
+  # A transformed numeric response is still regression
+  set.seed(1)
+  tuned <- tl_tune_grid(mtcars, log(mpg) ~ wt + hp, method = "tree",
+                        param_grid = list(cp = 0.01), folds = 3,
+                        verbose = FALSE)
+  expect_identical(attr(tuned, "tuning_results")$metric, "rmse")
+})
+
+test_that("folds = nrow(data) is leave-one-out", {
+  # The fold check allows nrow(data), as tl_cv() does, and rsample's
+  # vfold_cv() then refused it with "Leave-one-out cross-validation is not
+  # supported by this function"
+  d <- mtcars[1:10, c("mpg", "wt")]
+
+  # minsplit = 20 leaves a 9-row tree unsplit, so each left-out row is
+  # predicted by the mean of the other nine
+  loo_error <- vapply(seq_len(nrow(d)), function(i) {
+    abs(d$mpg[i] - mean(d$mpg[-i]))
+  }, numeric(1))
+  tuned <- suppressMessages(tl_tune_grid(
+    d, mpg ~ wt, method = "tree", param_grid = list(cp = 0.01),
+    folds = nrow(d), verbose = FALSE
+  ))
+  results <- attr(tuned, "tuning_results")$results
+  expect_identical(results$n_folds_ok, 10L)
+  expect_equal(results$mean_metric, mean(loo_error))
+  tuned <- suppressMessages(tl_tune_random(
+    d, mpg ~ wt, method = "tree", param_space = list(cp = 0.01),
+    n_iter = 1, folds = nrow(d), verbose = FALSE, seed = 1
+  ))
+  expect_identical(attr(tuned, "tuning_results")$results$n_folds_ok, 10L)
+
+  # tl_compare_cv() leaves each row out in turn as well
+  linear <- suppressMessages(tl_model(d, mpg ~ wt, method = "linear"))
+  cv <- suppressMessages(
+    tl_compare_cv(d, list(linear = linear), folds = nrow(d), metrics = "rmse")
+  )
+  loo_lm <- vapply(seq_len(nrow(d)), function(i) {
+    fit <- lm(mpg ~ wt, d[-i, ])
+    abs(d$mpg[i] - predict(fit, d[i, ]))
+  }, numeric(1))
+  expect_identical(nrow(cv$fold_metrics), 10L)
+  expect_equal(cv$summary$mean_value, mean(loo_lm))
+})
+
 test_that("the response note is given once per search, not once per fold", {
   # tl_model() notes a numeric response with few values once per fit, and
   # every fold refit repeated it: a 2-set, 3-fold search printed it 7 times
@@ -1458,6 +1541,23 @@ test_that("a search where every fit fails says so", {
   expect_identical(best, 2L)
 })
 
+test_that("stepwise selection refuses a categorical response by name", {
+  # The task was read from the raw column, and lm() fitted a factor
+  # response's codes until step() stopped with "AIC is -infinity for this
+  # model, so 'step' cannot proceed"
+  expect_error(
+    tl_step_selection(mtcars, factor(am) ~ wt + hp),
+    "needs a numeric response, but 'factor\\(am\\)' is a factor"
+  )
+  expect_error(
+    tl_step_selection(iris, Species ~ ., direction = "forward"),
+    "needs a numeric response, but 'Species' is a factor"
+  )
+  # A numeric response the formula computes is still selected on
+  model <- tl_step_selection(mtcars, log(mpg) ~ wt + hp + qsec)
+  expect_false(model$spec$is_classification)
+})
+
 test_that("forward selection keeps a transformed response", {
   model <- tl_step_selection(mtcars, log(mpg) ~ wt + hp + qsec,
                              direction = "forward")
@@ -1851,6 +1951,8 @@ test_that("tl_default_param_grid gives xgboost a grid tl_model() can fit", {
     }
   }
 
+  # The search itself fits 17 xgboost models, a third of this file's time
+  skip_on_cran()
   skip_if_not_installed("xgboost")
   set.seed(1)
   tuned <- tl_tune_grid(mtcars, mpg ~ ., method = "xgboost",

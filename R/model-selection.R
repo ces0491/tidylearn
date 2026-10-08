@@ -50,6 +50,23 @@ tl_step_selection <- function(data, formula, direction = "backward",
   formula <- stats::formula(stats::terms(tl_as_formula(formula), data = data,
                                          simplify = TRUE))
 
+  # Selection is over linear models. A categorical response -- a factor
+  # column, or one the formula makes, as factor(am) does -- had its integer
+  # codes fitted until step() stopped with "AIC is -infinity for this
+  # model". The response is the one the formula computes, as tl_model()
+  # reads it.
+  response <- tl_formula_response(formula, data)
+  if (is.factor(response) || is.character(response)) {
+    stop(
+      "tl_step_selection() selects the terms of a linear model, so it needs ",
+      "a numeric response, but '", deparse1(formula[[2L]]), "' is a ",
+      if (is.factor(response)) "factor" else "character vector",
+      ". For a classification, compare candidate models with ",
+      "tl_compare_cv().",
+      call. = FALSE
+    )
+  }
+
   # The model is returned with the data as passed. Every fit below sees a
   # copy whose response is blanked on the rows the full model cannot use.
   original_data <- data
@@ -103,18 +120,15 @@ tl_step_selection <- function(data, formula, direction = "backward",
     ...
   )
 
-  # Create tidylearn model wrapper
-  response <- original_data[[all.vars(formula)[1]]]
-  is_classification <- is.factor(response) || is.character(response)
-
-  # Return selected model as a tidylearn model
+  # Return selected model as a tidylearn model. A categorical response was
+  # refused above, so this is a regression.
   model <- structure(
     list(
       spec = list(
         paradigm = "supervised",
         formula = formula(selected_model),
         method = "linear",
-        is_classification = is_classification,
+        is_classification = FALSE,
         response_var = all.vars(formula)[1],
         selection = list(
           criterion = criterion,
@@ -225,7 +239,7 @@ tl_step_null_formula <- function(formula) {
 #'   classification or all regression. An unnamed model is named
 #'   \code{Model_<position>}.
 #' @param folds Number of cross-validation folds, a whole number between 2
-#'   and \code{nrow(data)}
+#'   and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn.
 #' @param metrics Character vector of metrics to compute, from those
 #'   \code{\link{tl_evaluate}} computes for the task. Defaults to
 #'   \code{c("accuracy", "precision", "recall", "f1", "auc")} for
@@ -400,7 +414,7 @@ tl_compare_cv <- function(data, models, folds = 5, metrics = NULL, ...) {
   }
 
   # Create cross-validation splits
-  cv_splits <- rsample::vfold_cv(data, v = folds)
+  cv_splits <- tl_resample_folds(data, folds)
 
   # For each model, perform cross-validation
   cv_results <- lapply(seq_along(models), function(i) {

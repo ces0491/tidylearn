@@ -44,7 +44,7 @@ tl_metric_maximize <- function(metric) {
 #' @param param_grid A named list of candidate values, one element for each
 #'   \code{\link{tl_model}} argument to tune, named after it
 #' @param folds Number of cross-validation folds, a whole number between 2
-#'   and \code{nrow(data)}
+#'   and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn.
 #' @param metric Metric to optimize: one of the names
 #'   \code{\link{tl_evaluate}} computes for the task. Defaults to
 #'   \code{"accuracy"} for classification and \code{"rmse"} for regression.
@@ -115,13 +115,12 @@ tl_tune_grid <- function(data, formula, method,
   dots <- list(...)
   tl_check_per_row_args(c(names2(dots), names(param_grid)), "tl_tune_grid()")
 
-  # Determine if classification or regression. tl_model() fits logistic
+  # Determine if classification or regression, as tl_model() does: from the
+  # response the formula computes, so factor(am) ~ . is a classification
+  # although the am column is numeric. tl_model() also fits logistic
   # regression as classification whatever the response is stored as, so a
   # 0/1 numeric response has to default to a classification metric too.
-  response_var <- all.vars(formula)[1]
-  y <- data[[response_var]]
-  is_classification <- is.factor(y) || is.character(y) ||
-    method == "logistic"
+  is_classification <- tl_tuning_task(formula, data, method)
 
   # Default metric based on problem type
   if (is.null(metric)) {
@@ -166,7 +165,7 @@ tl_tune_grid <- function(data, formula, method,
   }
 
   # Create cross-validation splits
-  cv_splits <- rsample::vfold_cv(data, v = folds)
+  cv_splits <- tl_resample_folds(data, folds)
 
   # Initialize results storage
   tuning_results <- list()
@@ -408,6 +407,46 @@ tl_check_tuning_inputs <- function(data, method, folds) {
   }
 
   tl_check_folds(folds, data)
+}
+
+#' Whether a search is a classification
+#'
+#' Decided as \code{tl_model()} decides it, so the default metric and the
+#' metric check agree with the model each fold fits. The response is the
+#' one the formula computes: reading the raw column took
+#' \code{factor(am) ~ wt + hp} for a regression, defaulted to rmse, which
+#' the classifier does not produce, and refused \code{"accuracy"}. Logistic
+#' regression is a classification whatever the response is stored as.
+#'
+#' @param formula The model formula
+#' @param data The training data
+#' @param method The method searched
+#' @return \code{TRUE} for classification
+#' @keywords internal
+#' @noRd
+tl_tuning_task <- function(formula, data, method) {
+  y <- tl_formula_response(formula, data)
+  is.factor(y) || is.character(y) || method == "logistic"
+}
+
+#' The folds a resampling search runs over
+#'
+#' \code{rsample::vfold_cv()} refuses \code{v = nrow(data)} and points to
+#' \code{loo_cv()}, so a fold count that \code{tl_check_folds()} and
+#' \code{tl_cv()} both accept failed there. It is leave-one-out, and is
+#' run as such.
+#'
+#' @param data The data to split
+#' @param folds The number of folds, already checked
+#' @return An rsample rset whose \code{splits} are the folds
+#' @keywords internal
+#' @noRd
+tl_resample_folds <- function(data, folds) {
+  if (folds == nrow(data)) {
+    rsample::loo_cv(data)
+  } else {
+    rsample::vfold_cv(data, v = folds)
+  }
 }
 
 #' Refuse a fold count that cannot split the data
@@ -1087,7 +1126,7 @@ tl_tune_cap_mtry <- function(param_combinations, method, formula, data) {
 #' @param n_iter Number of random parameter
 #'   combinations to try, a whole number of at least 1
 #' @param folds Number of cross-validation folds, a whole number between 2
-#'   and \code{nrow(data)}
+#'   and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn.
 #' @param metric Metric to optimize, as for \code{\link{tl_tune_grid}}
 #' @param maximize Logical; whether to maximize (TRUE)
 #'   or minimize (FALSE) the metric. \code{NULL}, the default, follows the
@@ -1153,12 +1192,9 @@ tl_tune_random <- function(data, formula, method,
     c(names2(dots), names(param_space)), "tl_tune_random()"
   )
 
-  # Determine if classification or regression. Logistic regression is
-  # classification whatever the response type -- see tl_tune_grid()
-  response_var <- all.vars(formula)[1]
-  y <- data[[response_var]]
-  is_classification <- is.factor(y) || is.character(y) ||
-    method == "logistic"
+  # Determine if classification or regression as tl_model() does, for the
+  # reasons given in tl_tune_grid()
+  is_classification <- tl_tuning_task(formula, data, method)
 
   # Default metric based on problem type
   if (is.null(metric)) {
@@ -1188,7 +1224,7 @@ tl_tune_random <- function(data, formula, method,
   }
 
   # Create cross-validation splits
-  cv_splits <- rsample::vfold_cv(data, v = folds)
+  cv_splits <- tl_resample_folds(data, folds)
 
   # Initialize results storage
   tuning_results <- list()
