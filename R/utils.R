@@ -530,8 +530,9 @@ tl_model_columns <- function(formula, data) {
 #' model uses. Any other formula is returned as it is: written out, a dot
 #' would list every column in the fit's printed call.
 #'
-#' At fit time a subtracted name that is not a column is refused: it is
-#' almost always a misspelling, and written out, the column the caller
+#' At fit time a subtracted name that is neither a column nor a variable in
+#' the formula's environment is refused (\code{tl_check_subtracted()}): it
+#' is almost always a misspelling, and written out, the column the caller
 #' meant to drop would be fitted. At prediction new data may lack a
 #' subtracted column, since the model never uses it.
 #'
@@ -554,10 +555,11 @@ tl_fit_formula <- function(formula, data, predicting = FALSE) {
   }
 
   # The dot is expanded against the data's own columns. Only a subtracted
-  # column the new data lacks is added, empty: terms() warns "'varlist' has
-  # changed ... should no longer happen!" without it. Anything else the
-  # formula names but the data lacks -- a vector or scalar in the formula's
-  # environment -- stays out, or it would join the dot as a column.
+  # name the data lacks -- a column new data does not have, or a variable
+  # in the formula's environment -- is added, empty, and the subtraction
+  # takes it out again: terms() warns "'varlist' has changed ... should no
+  # longer happen!" without it. Anything else the formula names but the
+  # data lacks stays out, or it would join the dot as a column.
   columns <- data[0, , drop = FALSE]
   for (variable in absent) {
     columns[[variable]] <- logical(0)
@@ -619,27 +621,53 @@ tl_subtracted_vars <- function(formula) {
   setdiff(unique(subtracted), ".")
 }
 
-#' Refuse a subtracted name the data does not have
+#' Refuse a subtracted name the formula cannot find
 #'
 #' \code{terms()} subtracts a name that is not a column without complaint,
 #' so \code{mpg ~ . - qsce} kept qsec in a fit written out from it, where
 #' \code{lm()} on the formula itself stopped with "object 'qsce' not
 #' found".
 #'
+#' A two-sided formula is fitted through \code{model.frame()}, which takes
+#' a variable the data lacks from the formula's environment, so a name
+#' found there is accepted as \code{lm()} accepts it: \code{mpg ~ wt * z - z}
+#' fits \code{wt:z} without \code{z}. A function found there is no variable
+#' \code{model.frame()} can use, and a short misspelling such as \code{df}
+#' can match one. A one-sided formula names columns only, so there the name
+#' has to be a column.
+#'
 #' @param formula A model formula
 #' @param data The training data
 #' @return \code{TRUE}, invisibly, when every subtracted name is a column
+#'   or, for a two-sided formula, a variable in the formula's environment
 #' @keywords internal
 #' @noRd
 tl_check_subtracted <- function(formula, data) {
   absent <- setdiff(tl_subtracted_vars(formula), names(data))
+  two_sided <- length(formula) == 3L
+  if (two_sided && length(absent) > 0L) {
+    env <- environment(formula) %||% baseenv()
+    found <- vapply(absent, function(name) {
+      value <- get0(name, envir = env, inherits = TRUE)
+      !is.null(value) && !is.function(value)
+    }, logical(1))
+    absent <- absent[!found]
+  }
   if (length(absent) > 0L) {
     one <- length(absent) == 1L
     stop(
       "The formula subtracts ", paste0("'", absent, "'", collapse = ", "),
       if (one) ", which is not a column" else ", which are not columns",
-      " of the data. Check the spelling: subtracting a name the data does ",
-      "not have drops nothing.",
+      " of the data",
+      if (two_sided) {
+        if (one) {
+          " or a variable in the formula's environment"
+        } else {
+          " or variables in the formula's environment"
+        }
+      },
+      ". Check the spelling: subtracting a name the data does not have ",
+      "drops nothing.",
       call. = FALSE
     )
   }

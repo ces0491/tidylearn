@@ -223,7 +223,8 @@ for (method in regression_methods) {
 # model.frame() looks a variable up in the data and then in the formula's
 # environment, so new data without hp took a same-named object from the
 # caller instead: predictions built from someone else's hp, or "object
-# 'hp' not found" when there was none. Only svm refused it.
+# 'hp' not found" when there was none. Every method did so, svm included,
+# except xgboost on a `.` formula, which refused the missing column.
 
 for (method in regression_methods) {
   label <- paste0("regression '", method, "'")

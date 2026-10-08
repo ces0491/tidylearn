@@ -344,6 +344,44 @@ test_that("writing out a subtracted formula keeps what the formula means", {
   )
 })
 
+test_that("a formula may subtract a variable it finds in its environment", {
+  # The check for a misspelt subtracted column refused every name the data
+  # lacked, so mpg ~ wt * z - z, which lm() fits with z from the formula's
+  # environment, failed with "The formula subtracts 'z', which is not a
+  # column of the data"
+  z <- mtcars$wt * 2
+  model <- tl_model(mtcars, mpg ~ wt * z - z, method = "linear")
+  reference <- lm(mpg ~ wt * z - z, data = mtcars)
+  expect_equal(coef(model$fit), coef(reference))
+  expect_named(coef(model$fit), c("(Intercept)", "wt", "wt:z"))
+  expect_equal(unname(predict(model)$.pred), unname(fitted(reference)))
+
+  # A misspelling is still refused; without a dot it would keep the term it
+  # meant to remove. A function is no variable model.frame() can use, so a
+  # misspelling that happens to name one, such as df, is refused too
+  expect_error(
+    tl_model(mtcars, mpg ~ wt * hp - wt:hpp, method = "linear"),
+    "The formula subtracts 'hpp', which is not a column of the data"
+  )
+  expect_error(
+    tl_model(mtcars, mpg ~ . - df, method = "linear"),
+    "The formula subtracts 'df', which is not a column of the data"
+  )
+
+  # A one-sided formula names columns only, so an unsupervised method
+  # refuses a subtracted name the data lacks whatever the environment holds
+  Sepal.Widht <- iris$Sepal.Width # nolint: object_name_linter.
+  expect_error(
+    tl_model(iris, ~ . - Sepal.Widht, method = "kmeans", k = 3),
+    "The formula subtracts 'Sepal.Widht', which is not a column of the data"
+  )
+  pca <- tl_model(iris, ~ . - Sepal.Width, method = "pca")
+  expect_identical(
+    rownames(pca$fit$model$rotation),
+    c("Sepal.Length", "Petal.Length", "Petal.Width")
+  )
+})
+
 test_that("a data-dependent term is computed with the training values", {
   skip_if_not_installed("xgboost")
   # The design was rebuilt from the formula on the rows predicted, so
@@ -357,6 +395,38 @@ test_that("a data-dependent term is computed with the training values", {
   expect_false(is.na(alone))
   expect_equal(alone, within[5])
   expect_equal(predict(model, new_data = mtcars[1:3, ])$.pred, within[1:3])
+})
+
+test_that("deep computes a data-dependent term with the training values", {
+  skip_on_cran()
+  skip_if_not_installed("keras")
+  skip_if_not_installed("tensorflow")
+  has_backend <- tryCatch(
+    !is.null(tensorflow::tf_version()),
+    error = function(e) FALSE
+  )
+  if (!isTRUE(has_backend)) {
+    skip("No TensorFlow backend available")
+  }
+
+  # The design was rebuilt from the formula on the rows predicted, as for
+  # xgboost: scale(hp) of a single row is NaN, so the row predicted NA
+  tensorflow::set_random_seed(1)
+  model <- tl_model(mtcars, mpg ~ scale(hp) + wt, method = "deep",
+                    epochs = 2, hidden_layers = 4, verbose = 0)
+  within <- predict(model, new_data = mtcars)$.pred
+  alone <- predict(model, new_data = mtcars[5, ])$.pred
+  expect_false(is.na(alone))
+
+  # keras on the design the training rows give, scaled as tl_fit_deep() does
+  x <- cbind(`scale(hp)` = scale(mtcars$hp)[, 1], wt = mtcars$wt)
+  x <- scale(x, center = model$fit$x_means, scale = model$fit$x_sds)
+  direct <- stats::predict(model$fit$model, x[5, , drop = FALSE], verbose = 0)
+  # keras rounds batches of different sizes slightly differently
+  expect_equal(alone, as.numeric(direct), tolerance = 1e-6)
+  expect_equal(alone, within[5], tolerance = 1e-6)
+  expect_equal(predict(model, new_data = mtcars[1:3, ])$.pred, within[1:3],
+               tolerance = 1e-6)
 })
 
 test_that("an extra column does not reach xgboost's design matrix", {
