@@ -682,6 +682,38 @@ test_that("a transformation in a one-sided formula is refused by name", {
   )
 })
 
+test_that("a one-sided formula naming a non-column is refused by name", {
+  # The name was kept as a column to select, and every method failed with
+  # "undefined columns selected", with a dot or without one, whether or not
+  # the caller's session had an object of that name
+  z <- mtcars$wt * 2
+  expect_error(
+    tl_model(mtcars, ~ . + z, method = "kmeans", k = 2),
+    "name columns only, but 'z' is not a column of the data"
+  )
+  expect_error(
+    tl_model(mtcars, ~ wt + zz, method = "pca"),
+    "name columns only, but 'zz' is not a column of the data"
+  )
+  expect_error(
+    tl_model(mtcars, ~ zz + wt + yy, method = "hclust"),
+    "name columns only, but 'zz', 'yy' are not columns of the data"
+  )
+
+  # Columns still fit, named or under a dot
+  set.seed(1)
+  named <- tl_model(mtcars, ~ wt + hp, method = "kmeans", k = 2)
+  fit <- named$fit$model
+  expect_identical(colnames(fit$centers), c("wt", "hp"))
+  # Each centre is the mean of its cluster's rows over those two columns
+  expect_equal(
+    unname(fit$centers[1, ]),
+    unname(colMeans(mtcars[fit$cluster == 1, c("wt", "hp")]))
+  )
+  dotted <- tl_model(mtcars, ~ ., method = "pca")
+  expect_identical(rownames(dotted$fit$model$rotation), names(mtcars))
+})
+
 # ---- Unsupervised predict() output ----
 
 test_that("predict() on a reduction keeps .obs_id and the kept components", {

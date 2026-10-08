@@ -92,7 +92,8 @@ tl_muffle_varlist <- function(w) {
 #' a column named explicitly is returned whatever its type, for the caller
 #' to judge. The unsupervised fitters select these columns by name, so a
 #' term that is not a column name -- \code{log(x)}, \code{x:z} -- is
-#' refused here: selecting its variable instead fitted the raw column.
+#' refused here: selecting its variable instead fitted the raw column. So
+#' is a name the data has no column for.
 #'
 #' @keywords internal
 #' @noRd
@@ -121,6 +122,23 @@ get_formula_vars <- function(formula, data) {
       )
     }
     vars <- vapply(terms, as.character, character(1))
+
+    # A name that is not a column was kept for the fitter to select, which
+    # failed with "undefined columns selected". The fitters select columns
+    # by name, so an object of that name in the caller's session does not
+    # stand in for one.
+    absent <- setdiff(vars, names(data))
+    if (length(absent) > 0L) {
+      one <- length(absent) == 1L
+      stop(
+        "Formulas for unsupervised methods name columns only, but ",
+        paste0("'", absent, "'", collapse = ", "),
+        if (one) " is not a column" else " are not columns",
+        " of the data. Check the spelling, or add ",
+        if (one) "it" else "them", " to the data, e.g. with dplyr::mutate().",
+        call. = FALSE
+      )
+    }
 
     if ("." %in% all.vars(formula)) {
       named <- setdiff(all.vars(formula), ".")
