@@ -85,6 +85,74 @@ test_that("columns the formula transforms are left on their own scale", {
   )
 })
 
+test_that("standardising leaves every formula shape's model unchanged", {
+  # Centring a plain column changes the model when nothing absorbs the
+  # shift: a formula without an intercept, or an interaction whose
+  # lower-order terms are missing. These predicted differently from lm().
+  shapes <- list(
+    mpg ~ log(hp) + wt - 1,
+    mpg ~ log(hp) + wt:qsec,
+    mpg ~ wt - 1,
+    mpg ~ wt * qsec
+  )
+  for (shape in shapes) {
+    set.seed(217)
+    run <- tl_run_pipeline(
+      tl_pipeline(
+        mtcars, shape,
+        models = list(lin = list(method = "linear")),
+        evaluation = list(metrics = "rmse", best_metric = "rmse",
+                          cv_folds = 3)
+      ),
+      verbose = FALSE
+    )
+    expect_equal(tl_predict_pipeline(run, mtcars)$.pred,
+                 fitted(lm(shape, data = mtcars)), info = deparse(shape))
+  }
+
+  # A full interaction keeps every lower-order term, so its columns are
+  # still standardised
+  expect_equal(run$results$preprocessing_stats$center$wt, mean(mtcars$wt))
+  expect_equal(run$results$preprocessing_stats$center$qsec,
+               mean(mtcars$qsec))
+
+  binary_iris <- droplevels(iris[iris$Species != "setosa", ])
+  no_intercept <- Species ~ Sepal.Length + Sepal.Width - 1
+  set.seed(218)
+  logit <- tl_run_pipeline(
+    tl_pipeline(
+      binary_iris, no_intercept,
+      models = list(logit = list(method = "logistic")),
+      evaluation = list(cv_folds = 3)
+    ),
+    verbose = FALSE
+  )
+  expect_equal(
+    tl_predict_pipeline(logit, binary_iris, type = "response")$.pred,
+    fitted(glm(no_intercept, data = binary_iris, family = binomial)),
+    tolerance = 1e-6
+  )
+})
+
+test_that("a computed factor response makes a classification pipeline", {
+  # factor(am) ~ wt + hp is a classification for tl_model(), but the
+  # pipeline read the task off the numeric column am and set up the
+  # regression models and metrics, which the run then refused
+  pipe <- tl_pipeline(mtcars, factor(am) ~ wt + hp)
+  expect_true(all(c("accuracy", "f1") %in% pipe$evaluation$metrics))
+  expect_true("logistic" %in% names(pipe$models))
+
+  set.seed(219)
+  run <- tl_run_pipeline(
+    tl_pipeline(mtcars, factor(am) ~ wt + hp,
+                models = list(tree = list(method = "tree")),
+                evaluation = list(cv_folds = 3)),
+    verbose = FALSE
+  )
+  expect_false(anyNA(run$results$metric_values))
+  expect_true(run$results$best_model$spec$is_classification)
+})
+
 test_that("a transformed term in a logistic pipeline matches glm()", {
   # The standardised Sepal.Length gave NaN under log(), so the final glm
   # kept 51 of the 100 rows
@@ -174,6 +242,24 @@ test_that("every metric a pipeline can score has a direction", {
     c(TRUE, TRUE, TRUE, TRUE, FALSE, FALSE)
   )
   expect_true(is.na(tl_metric_higher_better("mystery")))
+
+  # A multiclass auc is reported per class as well, as auc_<class>
+  expect_true(tl_metric_higher_better("auc_setosa"))
+})
+
+test_that("the comparison plot knows the direction of per-class auc", {
+  # auc_setosa and the other per-class rows came back with an NA direction
+  set.seed(220)
+  run <- tl_run_pipeline(
+    tl_pipeline(iris, Species ~ .,
+                models = list(tree = list(method = "tree")),
+                evaluation = list(metrics = c("accuracy", "auc"),
+                                  best_metric = "accuracy", cv_folds = 3)),
+    verbose = FALSE
+  )
+  plotted <- tl_compare_pipeline_models(run)$data
+  expect_true(any(grepl("^auc_", plotted$metric)))
+  expect_true(all(plotted$higher_better))
 })
 
 test_that("sensitivity, specificity and pr_auc select the highest score", {

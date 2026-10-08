@@ -22,8 +22,9 @@ tl_cluster_levels <- function(cluster_model) {
 #' Settle tl_auto_ml()'s task against its response
 #'
 #' @param task The \code{task} argument
-#' @param y The response column
-#' @param response_var Its name, for the message
+#' @param y The response the formula computes
+#' @param response_var The response as written in the formula, for the
+#'   message
 #' @return \code{"classification"} or \code{"regression"}
 #' @keywords internal
 #' @noRd
@@ -265,10 +266,14 @@ tl_automl_cluster_variant <- function(data, formula, response_var,
 #' @param data A data frame
 #' @param formula Model formula (for supervised learning)
 #' @param task Task type: "classification", "regression", or "auto"
-#'   (default), which reads it off the response. An explicit task has to
-#'   agree with the response, since \code{tl_model()} fits a factor or
-#'   character response as a classification and a numeric one as a
-#'   regression.
+#'   (default), which takes it from the response the formula computes, so
+#'   \code{factor(am) ~ .} is a classification although \code{am} is
+#'   numeric. A factor or character response is a classification and any
+#'   other a regression. An explicit task has to agree: every candidate but
+#'   logistic regression takes its task from the response, so a
+#'   contradicting task would be scored on metrics the candidates cannot
+#'   produce. A 0/1 numeric response is therefore a regression; convert it
+#'   with \code{factor()} to treat its values as classes.
 #' @param use_reduction Whether to try dimensionality reduction (default: TRUE)
 #' @param use_clustering Whether to add cluster features (default: TRUE)
 #' @param time_budget Time budget in seconds (default: 300). The budget is
@@ -347,15 +352,22 @@ tl_auto_ml <- function(data, formula, task = "auto",
       call. = FALSE
     )
   }
-  y <- data[[response_var]]
-  task <- tl_automl_task(task, y, response_var)
+  # The response the formula computes, as tl_model() reads it: for
+  # factor(am) ~ wt + hp the raw column is numeric and the task is not
+  y <- tl_formula_response(formula, data)
+  response_label <- if (is.name(formula[[2L]])) {
+    response_var
+  } else {
+    deparse1(formula[[2L]])
+  }
+  task <- tl_automl_task(task, y, response_label)
 
   n_classes <- length(unique(stats::na.omit(y)))
 
   if (task == "classification" && n_classes < 2) {
     stop(
       "Classification requires at least two observed classes in '",
-      response_var, "'; found ", n_classes, ".",
+      response_label, "'; found ", n_classes, ".",
       call. = FALSE
     )
   }

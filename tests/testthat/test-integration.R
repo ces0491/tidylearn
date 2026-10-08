@@ -372,6 +372,32 @@ test_that("supervised and clustering settings reach their own stage", {
   )
 })
 
+test_that("a clustering setting left in ... points to cluster_args", {
+  # `...` reaches the supervised model alone, so nstart = 5 failed in the
+  # tree with a message that never mentioned cluster_args
+  labelled <- c(1:5, 51:55, 101:105)
+  expect_error(
+    tl_semisupervised(iris, Species ~ ., labeled_indices = labelled,
+                      nstart = 5),
+    paste0("'nstart' is a setting for the clustering step, but `...` goes ",
+           "to the supervised model. Pass it as cluster_args = ",
+           "list\\(nstart = 5\\)")
+  )
+  expect_error(
+    tl_stratified_models(mtcars, mpg ~ wt + hp, k = 2, iter.max = 50,
+                         algorithm = "Lloyd"),
+    "Pass them as cluster_args = list\\(iter.max = 50, algorithm = \"Lloyd\"\\)"
+  )
+
+  # randomForest's own sampsize is a supervised setting, and still reaches
+  # the forest
+  set.seed(216)
+  forests <- tl_stratified_models(mtcars, mpg ~ wt + hp, k = 2,
+                                  supervised_method = "forest",
+                                  sampsize = 10, ntree = 50)
+  expect_s3_class(forests, "tidylearn_stratified")
+})
+
 test_that("downweight reaches the fit, or is refused", {
   skip_if_not_installed("dbscan")
 

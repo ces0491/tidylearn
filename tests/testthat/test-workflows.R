@@ -132,6 +132,34 @@ test_that("tl_auto_ml checks task and metric before fitting anything", {
   )
 })
 
+test_that("tl_auto_ml reads the task off the response the formula computes", {
+  # factor(am) is a classification for tl_model(), but AutoML read the task
+  # off the numeric column: "auto" chose regression and trained nothing
+  # it could score, and an explicit "regression" was let through
+  expect_error(
+    tl_auto_ml(mtcars, factor(am) ~ wt + hp, task = "regression"),
+    paste0("'factor\\(am\\)' is categorical, which tl_model\\(\\) fits as ",
+           "a classification")
+  )
+  expect_error(
+    tl_auto_ml(mtcars, factor(am) ~ wt + hp, metric = "rmse"),
+    "'metric' must be one of the classification metrics"
+  )
+})
+
+test_that("tl_auto_ml fits a computed factor response as a classification", {
+  skip_on_cran()
+
+  set.seed(304)
+  result <- suppressWarnings(suppressMessages(
+    tl_auto_ml(mtcars, factor(am) ~ wt + hp, use_reduction = FALSE,
+               use_clustering = FALSE, time_budget = 10, cv_folds = 3)
+  ))
+  expect_equal(result$task, "classification")
+  expect_equal(result$metric, "accuracy")
+  expect_gt(sum(!is.na(result$leaderboard$score)), 0)
+})
+
 test_that("the leaderboard ranks every computable metric its own way", {
   # sensitivity and specificity were missing from the leaderboard's lists,
   # so ranking by them was refused after every model was fitted

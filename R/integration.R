@@ -302,6 +302,41 @@ tl_check_cluster_args <- function(cluster_args, k_owner) {
   invisible(TRUE)
 }
 
+#' Point a clustering setting passed through `...` to cluster_args
+#'
+#' `...` goes to the supervised model alone, so \code{nstart = 5} reached
+#' the tree, which refused it with a message about rpart that never
+#' mentioned \code{cluster_args}. Only names no supervised backend takes are
+#' caught: randomForest's \code{sampsize} is a forest setting.
+#'
+#' @param dots The \code{...} arguments, as a list
+#' @return \code{TRUE}, invisibly
+#' @keywords internal
+#' @noRd
+tl_check_cluster_dots <- function(dots) {
+  clustering_only <- c("nstart", "iter_max", "iter.max", "algorithm",
+                       "metric", "samples", "distance")
+  found <- intersect(names2(dots), clustering_only)
+  if (length(found) == 0) {
+    return(invisible(TRUE))
+  }
+
+  one <- length(found) == 1L
+  settings <- paste0(
+    found, " = ",
+    vapply(dots[found], deparse1, character(1)),
+    collapse = ", "
+  )
+  stop(
+    paste0("'", found, "'", collapse = " and "),
+    if (one) " is a setting" else " are settings",
+    " for the clustering step, but `...` goes to the supervised model. ",
+    "Pass ", if (one) "it" else "them", " as cluster_args = list(",
+    settings, ").",
+    call. = FALSE
+  )
+}
+
 #' Cluster the rows into k groups
 #'
 #' hclust builds the whole tree and takes no k, so it is cut at k
@@ -387,6 +422,7 @@ tl_semisupervised <- function(data, formula, labeled_indices,
     cluster_args,
     "tl_semisupervised() sets k to the number of labelled classes."
   )
+  tl_check_cluster_dots(list(...))
 
   # A logical selector would otherwise be matched as the positions 0 and 1
   if (is.logical(labeled_indices)) {
@@ -722,6 +758,7 @@ tl_stratified_models <- function(data, formula, cluster_method = "kmeans",
   formula <- tl_as_formula(formula)
   tl_check_cluster_method(cluster_method)
   tl_check_cluster_args(cluster_args, "Pass k as the k argument.")
+  tl_check_cluster_dots(list(...))
 
   # Extract response variable
   response_var <- all.vars(formula)[1]

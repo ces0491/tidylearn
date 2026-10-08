@@ -13,6 +13,9 @@ NULL
 #' out sensitivity, specificity and pr_auc, so a stump scoring 0.40 beat a
 #' tree scoring 0.90.
 #'
+#' A multiclass \code{auc} is also reported per class, as
+#' \code{auc_<class>}, and is higher-is-better like the average.
+#'
 #' @param metrics Character vector of metric names
 #' @return A logical vector: \code{TRUE} where higher is better,
 #'   \code{FALSE} where lower is, \code{NA} for a name tidylearn does not
@@ -23,7 +26,10 @@ tl_metric_higher_better <- function(metrics) {
   higher <- c("accuracy", "precision", "recall", "sensitivity",
               "specificity", "f1", "auc", "pr_auc", "rsq")
   lower <- c("rmse", "mse", "mae", "mape")
-  ifelse(metrics %in% higher, TRUE, ifelse(metrics %in% lower, FALSE, NA))
+  ifelse(
+    metrics %in% higher | grepl("^auc_", metrics), TRUE,
+    ifelse(metrics %in% lower, FALSE, NA)
+  )
 }
 
 #' Fill in and validate a pipeline evaluation specification
@@ -237,10 +243,12 @@ merge_preprocessing_spec <- function(preprocessing) {
 #'   \code{TRUE} or \code{FALSE}: \code{impute_missing} (default
 #'   \code{TRUE}) replaces missing predictor values with the training
 #'   median or mode; \code{standardize} (default \code{TRUE}) centres and
-#'   scales numeric predictors, leaving alone any column the formula uses
+#'   scales numeric predictors where that leaves the model the formula
+#'   describes unchanged. It leaves alone any column the formula uses
 #'   inside a function call such as \code{log()}, \code{poly()} or
-#'   \code{offset()}, so those terms are computed on the column's own
-#'   scale; \code{dummy_encode} (default \code{TRUE}) only records that
+#'   \code{offset()}, every column when the formula has no intercept, and
+#'   the columns of an interaction whose lower-order terms are not all in
+#'   the formula; \code{dummy_encode} (default \code{TRUE}) only records that
 #'   categorical predictors are encoded by each model's fitting function,
 #'   and cannot be set to \code{FALSE}.
 #' @param models A list of models to train
@@ -295,7 +303,10 @@ tl_pipeline <- function(data, formula,
       call. = FALSE
     )
   }
-  y <- data[[response_var]]
+  # The task comes from the response the formula computes, as tl_model()
+  # takes it. Read off the raw column, factor(am) ~ wt + hp was set up as a
+  # regression whose default metrics its classification models refused.
+  y <- tl_formula_response(formula, data)
   is_classification <- is.factor(y) || is.character(y)
 
   # Create default models if not provided
@@ -377,25 +388,57 @@ tl_pipeline <- function(data, formula,
   pipeline
 }
 
-#' Columns a formula uses inside a function call
+#' Columns that standardising would change the model for
 #'
-#' Standardising happens before the formula is evaluated, so a column the
-#' formula transforms would be transformed on the standardised scale:
-#' \code{log(hp)} of a below-average car is \code{log()} of a negative
-#' number, and \code{offset(0.05 * hp)} adds 0.05 per standard deviation
-#' rather than per horsepower. Those columns are left on their own scale.
+#' Standardising happens before the formula is evaluated, so it has to
+#' leave alone any column whose centre and scale the model cannot absorb:
+#' \itemize{
+#'   \item one used inside a function call: \code{log(hp)} of a
+#'     below-average car is \code{log()} of a negative number, and
+#'     \code{offset(0.05 * hp)} adds 0.05 per standard deviation;
+#'   \item every column when the formula has no intercept: a centred
+#'     \code{wt} in \code{mpg ~ wt - 1} is a line through a different
+#'     origin;
+#'   \item a column in an interaction whose lower-order terms are not all
+#'     in the formula: centring \code{wt} in \code{wt:qsec} adds a multiple
+#'     of \code{qsec}, which \code{mpg ~ wt:qsec} has no term for.
+#' }
+#' A plain term, and an interaction with all its lower-order terms, only
+#' moves the coefficients, so those columns are standardised.
 #'
 #' @param formula The model formula
 #' @param data The data it is evaluated against, to expand \code{.}
 #' @return A character vector of column names, possibly empty
 #' @keywords internal
 #' @noRd
-tl_formula_call_columns <- function(formula, data) {
-  variables <- as.list(
-    attr(stats::terms(formula, data = data), "variables")
-  )[-1]
-  in_calls <- variables[!vapply(variables, is.name, logical(1))]
-  unique(unlist(lapply(in_calls, all.vars)))
+tl_formula_raw_columns <- function(formula, data) {
+  model_terms <- stats::terms(formula, data = data)
+  variables <- as.list(attr(model_terms, "variables"))[-1]
+  is_plain <- vapply(variables, is.name, logical(1))
+  raw <- unlist(lapply(variables[!is_plain], all.vars))
+
+  if (attr(model_terms, "intercept") == 0L) {
+    return(unique(c(raw, unlist(lapply(variables[is_plain], all.vars)))))
+  }
+
+  factors <- attr(model_terms, "factors")
+  if (length(factors) > 0) {
+    term_vars <- lapply(seq_len(ncol(factors)), function(j) {
+      rownames(factors)[factors[, j] > 0]
+    })
+    key <- function(vars) paste(sort(vars), collapse = ":")
+    present <- vapply(term_vars, key, character(1))
+    for (vars in term_vars[lengths(term_vars) > 1]) {
+      lower <- unlist(lapply(seq_len(length(vars) - 1), function(size) {
+        utils::combn(vars, size, FUN = key)
+      }))
+      if (!all(lower %in% present)) {
+        raw <- c(raw, unlist(lapply(vars, function(v) all.vars(str2lang(v)))))
+      }
+    }
+  }
+
+  unique(raw)
 }
 
 #' Learn preprocessing statistics from a training set
@@ -449,9 +492,8 @@ tl_learn_preprocessing <- function(data, formula, preprocessing) {
   if (isTRUE(preprocessing$standardize)) {
     numeric_cols <- vapply(data, is.numeric, logical(1))
     numeric_cols[response_var] <- FALSE  # Don't standardize response
-    transformed <- intersect(tl_formula_call_columns(formula, data),
-                             names(data))
-    numeric_cols[transformed] <- FALSE
+    keep_raw <- intersect(tl_formula_raw_columns(formula, data), names(data))
+    numeric_cols[keep_raw] <- FALSE
 
     for (col in names(data)[numeric_cols]) {
       col_mean <- mean(data[[col]], na.rm = TRUE)
