@@ -101,7 +101,8 @@ test_that("a dot formula naming an outside variable warns as lm() does", {
   z <- sin(seq_len(nrow(cars)))
   expect_identical(varlist_warnings(lm(mpg ~ . + z, data = cars)), 1L)
 
-  settings <- list(tree = list(), forest = list(ntree = 10), svm = list(),
+  settings <- list(tree = list(), forest = list(ntree = 10),
+                   boost = list(n.trees = 10), svm = list(),
                    nn = list(size = 2, trace = FALSE),
                    xgboost = list(nrounds = 2))
   for (method in names(settings)) {
@@ -119,18 +120,6 @@ test_that("a dot formula naming an outside variable warns as lm() does", {
   expect_identical(
     varlist_warnings(tl_model(cars, mpg ~ . + z + log(hp), method = "forest",
                               ntree = 10)),
-    1L
-  )
-
-  # gbm rebuilds its predictors from their labels in an environment that
-  # reaches the global one and not this test's, so boost is handed a
-  # variable it can find there
-  assign(".tl_outside", z, envir = globalenv())
-  withr::defer(rm(".tl_outside", envir = globalenv()))
-  set.seed(1)
-  expect_identical(
-    varlist_warnings(tl_model(cars, mpg ~ . + .tl_outside, method = "boost",
-                              n.trees = 10)),
     1L
   )
 })
@@ -685,6 +674,47 @@ test_that("boost computes a data-dependent term as training computed it", {
   expect_equal(predict(logged, b[5, ])$.pred,
                gbm::predict.gbm(direct, newdata = b[5, ], n.trees = 50))
   expect_identical(logged$fit$var.names, c("log(hp)", "wt"))
+})
+
+test_that("boost reads a variable outside the data from the formula's scope", {
+  skip_if_not_installed("gbm")
+
+  # gbm rebuilds its predictors from their labels in its own environment,
+  # which reaches the global environment and not the formula's. A variable
+  # defined in a function failed with "object '.tl_outside' not found", and
+  # a global of the same name was taken in its place, while the response
+  # came from the data.
+  cars <- rbind(mtcars, mtcars)
+  outside <- sin(seq_len(nrow(cars)))
+  fit_in_function <- function() {
+    .tl_outside <- outside
+    set.seed(1)
+    tl_model(cars, mpg ~ wt + .tl_outside, method = "boost", n.trees = 50)
+  }
+
+  # The model gbm fits with the variable as a column
+  x <- data.frame(wt = cars$wt, .tl_outside = outside)
+  set.seed(1)
+  direct <- gbm::gbm(mpg ~ ., data = cbind(x, mpg = cars$mpg),
+                     distribution = "gaussian", n.trees = 50,
+                     interaction.depth = 3, shrinkage = 0.1,
+                     n.minobsinnode = 10, cv.folds = 0, verbose = FALSE)
+  expected <- gbm::predict.gbm(direct, newdata = x, n.trees = 50)
+
+  model <- fit_in_function()
+  expect_equal(predict(model)$.pred, expected)
+
+  # New data that holds the variable supplies it, as for lm()
+  rows <- cars[1:5, ]
+  rows$.tl_outside <- -outside[1:5]
+  expect_equal(predict(model, rows)$.pred,
+               gbm::predict.gbm(direct, newdata = rows, n.trees = 50))
+
+  # A global of the same name is not the one read, at fit or predict
+  assign(".tl_outside", rev(outside), envir = globalenv())
+  withr::defer(rm(".tl_outside", envir = globalenv()))
+  conflicting <- fit_in_function()
+  expect_equal(predict(conflicting)$.pred, expected)
 })
 
 # ---- svm -------------------------------------------------------------

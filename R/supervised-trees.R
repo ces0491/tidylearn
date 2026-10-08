@@ -760,40 +760,49 @@ tl_fit_boost <- function(
   # colliding with them as duplicate arguments.
   args <- tl_override_args(args, dots)
 
-  # gbm rebuilds each term from its label on the rows it predicts, so a
-  # term computed from the training rows was computed afresh: scale(hp)
-  # took the centre and scale of whichever rows arrived, and a row
-  # predicted alone differed from the same row in a larger frame. A
-  # matrix-valued term such as poly(wt, 2) failed at predict(). Such a
-  # formula is fitted, as the forest's is, from a predictor frame of the
-  # training values. The rest keep gbm's formula interface, whose own
-  # model frame gives R's varlist warning for a dot formula once, as lm()
-  # does; this read of the formula does not repeat it.
-  frame <- withCallingHandlers(
-    stats::model.frame(formula, data = data, na.action = stats::na.pass),
-    warning = tl_muffle_varlist
-  )
-  if (tl_has_trained_term(frame)) {
+  # gbm rebuilds each term from its label, in its own environment, on the
+  # rows it is handed: see tl_boost_needs_frame() for what that broke. A
+  # formula it cannot rebuild is fitted, as the forest's is, from a
+  # predictor frame built here. The rest keep gbm's formula interface.
+  #
+  # R's varlist warning comes from a dot formula naming a variable the data
+  # lacks, which always takes the frame path, so this frame, the fit's own,
+  # gives it once, as lm() does: gbm is then handed the columns by name.
+  frame <- stats::model.frame(formula, data = data, na.action = stats::na.pass)
+  if (tl_boost_needs_frame(frame, data)) {
     return(tl_fit_boost_frame(args, tl_predictor_frame(frame)))
   }
 
   tl_fit_by_value(gbm::gbm, "gbm", args)
 }
 
-#' Whether a model frame holds a predictor computed from training values
+#' Whether gbm cannot rebuild a formula's predictors from their labels
 #'
-#' \code{makepredictcall()} records in a frame's predvars what a term such
-#' as \code{scale(hp)}, \code{poly()}, \code{ns()} or \code{bs()} computed
-#' from the training rows -- the centre and scale, the coefficients, the
-#' knots -- so a predict method that rebuilds the variable from its label
-#' computes it afresh. A matrix-valued variable is one column holding a
-#' matrix. A transform such as \code{log(hp)} is neither.
+#' gbm fits, and predicts, on a frame it rebuilds from the term labels in
+#' its own environment. That loses three things:
+#' \itemize{
+#'   \item what a term such as \code{scale(hp)}, \code{poly()}, \code{ns()}
+#'     or \code{bs()} computed from the training rows -- the centre and
+#'     scale, the coefficients, the knots, which \code{makepredictcall()}
+#'     records in the frame's predvars -- so a row predicted alone
+#'     differed from the same row in a larger frame;
+#'   \item a matrix-valued variable, which gbm cannot read: poly(wt, 2)
+#'     failed with "number of items to replace is not a multiple of
+#'     replacement length";
+#'   \item a variable that is not a column of the data, which the formula
+#'     takes from its environment, as \code{lm()} does. gbm's environment
+#'     reaches the global one and not the formula's, so one defined in a
+#'     function failed with "object 'z' not found", and a global of the
+#'     same name was used in its place.
+#' }
+#' A transform of a column, such as \code{log(hp)}, loses none of them.
 #'
 #' @param frame A model frame without weights or offset columns
+#' @param data The data it was built from
 #' @return A single logical
 #' @keywords internal
 #' @noRd
-tl_has_trained_term <- function(frame) {
+tl_boost_needs_frame <- function(frame, data) {
   model_terms <- attr(frame, "terms")
   variables <- as.list(attr(model_terms, "variables"))[-1L]
   predvars <- as.list(attr(model_terms, "predvars"))[-1L]
@@ -802,7 +811,8 @@ tl_has_trained_term <- function(frame) {
   }
   predictors <- setdiff(seq_along(variables), attr(model_terms, "response"))
   any(vapply(predictors, function(i) {
-    !identical(predvars[[i]], variables[[i]]) || is.matrix(frame[[i]])
+    !identical(predvars[[i]], variables[[i]]) || is.matrix(frame[[i]]) ||
+      !all(all.vars(variables[[i]]) %in% names(data))
   }, logical(1)))
 }
 
