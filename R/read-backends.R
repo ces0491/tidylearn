@@ -387,9 +387,12 @@ tl_read_bigquery <- function(project, query, dataset = NULL, ...) {
     stop("'query' is required. Provide a SQL string.", call. = FALSE)
   }
 
-  # Handle bigquery:// URI format from dispatcher
-  if (grepl("^bigquery://", project)) {
-    parts <- strsplit(sub("^bigquery://", "", project), "/")[[1]]
+  # Handle bigquery:// URI format from dispatcher, whose schemes match in
+  # any case
+  if (grepl("^bigquery://", project, ignore.case = TRUE)) {
+    parts <- strsplit(
+      sub("^bigquery://", "", project, ignore.case = TRUE), "/"
+    )[[1]]
     project <- parts[1]
     if (length(parts) > 1 && is.null(dataset)) {
       dataset <- parts[2]
@@ -1221,9 +1224,10 @@ tl_parse_kaggle_url <- function(url) {
 #'
 #' @param url A connection string, or any other source description
 #' @return The same string with the password in any
-#'   \code{user:password@@} userinfo, \code{password=} query parameter or
-#'   libpq keyword replaced by \code{***}; input with no password is
-#'   returned unchanged
+#'   \code{user:password@@} userinfo, and the value of any secret-bearing
+#'   query parameter or libpq keyword (\code{password=},
+#'   \code{sslpassword=} and others), replaced by \code{***}; input with
+#'   no secret is returned unchanged
 #' @keywords internal
 #' @noRd
 tl_redact_db_url <- function(url) {
@@ -1246,11 +1250,26 @@ tl_redact_db_url <- function(url) {
   # backends below, so cover that shape too
   redacted <- sub("^([^:@/]+):([^@/]*)@", "\\1:***@", redacted, perl = TRUE)
 
-  # A password given as a query parameter, or as a keyword in a libpq
-  # connection string made of space-separated key=value pairs
+  # A secret given as a query parameter, which tl_read_postgres() hands to
+  # libpq as a keyword, or as a keyword in a libpq connection string of
+  # space-separated key=value pairs. libpq takes secrets in password and
+  # sslpassword (the SSL client key's passphrase); libpq 18 adds
+  # oauth_client_secret and the SCRAM pass-through keys. passwd and pwd
+  # are other drivers' names for a password.
+  secret_keys <- c(
+    "password", "passwd", "pwd", "sslpassword", "oauth_client_secret",
+    "scram_client_key", "scram_server_key"
+  )
+  # A libpq value may be quoted, with backslash escapes, and '=' may have
+  # spaces around it, so the value is matched as libpq reads it. Stopping
+  # at the first space would leave the rest of a quoted password in place.
+  value <- "(?:'(?:[^'\\\\]|\\\\.)*'?|(?:\\\\.|[^&;#\\s\\\\])*)"
   gsub(
-    "(^|[?&;[:space:]])(password|passwd|pwd)=[^&;#[:space:]]*",
-    "\\1\\2=***",
+    paste0(
+      "(^|[?&;\\s])(", paste(secret_keys, collapse = "|"), ")(\\s*=\\s*)",
+      value
+    ),
+    "\\1\\2\\3***",
     redacted,
     ignore.case = TRUE,
     perl = TRUE

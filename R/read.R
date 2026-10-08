@@ -33,7 +33,8 @@
 #'   \item \strong{SQLite}: \code{.sqlite}, \code{.db} files via \pkg{RSQLite}
 #'   \item \strong{PostgreSQL}: via \pkg{RPostgres}
 #'   \item \strong{MySQL/MariaDB}: via \pkg{RMariaDB}
-#'   \item \strong{BigQuery}: via \pkg{bigrquery}
+#'   \item \strong{BigQuery}: \code{bigquery://project/dataset} URIs via
+#'     \pkg{bigrquery}
 #' }
 #'
 #' Supported cloud/API sources:
@@ -42,7 +43,9 @@
 #'   \item \strong{GitHub}: raw file download from repositories
 #'   \item \strong{Kaggle}: dataset download via Kaggle CLI
 #' }
-#' Other web URLs are not read; download the file first.
+#' A \code{file://} URL is read as the local path it names. Other web
+#' URLs, and URLs with any other scheme such as \code{ftp://}, are not
+#' read; download the file first.
 #'
 #' Multi-file reading:
 #' \itemize{
@@ -141,26 +144,133 @@ print.tidylearn_data <- function(x, ...) {
   "github.com", "www.github.com", "raw.githubusercontent.com"
 )
 
+# The schemes other than http(s) that tl_read() routes by, and the format
+# that reads each. A web URL is routed by its host instead, and a file://
+# URL is turned into the path it names before any routing.
+.tl_scheme_formats <- list(
+  s3         = "s3",
+  postgres   = "postgres",
+  postgresql = "postgres",
+  mysql      = "mysql",
+  bigquery   = "bigquery"
+)
+
 #' Does a source carry a URL scheme such as https:// or s3://?
 #'
 #' A source with a scheme is never a local file, so it is routed by its
-#' protocol before any extension is looked at.
+#' protocol before any extension is looked at. A single letter before
+#' \code{://} is taken for a Windows drive written with a doubled slash,
+#' as in \code{C://data}, which is a local path.
 #'
-#' @param source A single string.
-#' @return A single logical.
+#' @param source A character vector.
+#' @return A logical vector.
 #' @keywords internal
 #' @noRd
 tl_has_scheme <- function(source) {
-  grepl("^[A-Za-z][A-Za-z0-9+.-]*://", source)
+  grepl("^[A-Za-z][A-Za-z0-9+.-]+://", source)
 }
 
-#' Is a source an http(s) URL?
-#' @param source A single string.
-#' @return A single logical.
+#' The scheme of a source that has one, lower case
+#' @param source A single string for which \code{tl_has_scheme()} is true.
+#' @return The scheme without \code{://}, such as \code{"s3"}.
 #' @keywords internal
 #' @noRd
-tl_is_web_url <- function(source) {
-  grepl("^https?://", source, ignore.case = TRUE)
+tl_url_scheme <- function(source) {
+  tolower(sub("^([A-Za-z][A-Za-z0-9+.-]+)://.*$", "\\1", source))
+}
+
+#' The error for a URL scheme tl_read() has no reader for
+#'
+#' Only the scheme is named: the rest of the URL can carry credentials.
+#'
+#' @param scheme The scheme, lower case.
+#' @keywords internal
+#' @noRd
+tl_stop_scheme <- function(scheme) {
+  stop(
+    "tl_read() has no reader for '", scheme, "://' sources. It reads ",
+    "local paths and file:// URLs, s3:// and bigquery:// URIs, postgres:// ",
+    "and mysql:// connection strings, and GitHub and Kaggle URLs. ",
+    "Download the file first and read the local copy.",
+    call. = FALSE
+  )
+}
+
+#' Refuse a format that would send a source with a scheme to the wrong
+#' reader
+#'
+#' A source with a scheme is read by the reader for its scheme, or for a
+#' web URL its host. Named a file format, it would reach a local-file
+#' reader and be reported as a file that does not exist, in an error that
+#' prints the URL with any password in it.
+#'
+#' @param source A single string for which \code{tl_has_scheme()} is true.
+#' @param format The format the caller named.
+#' @return \code{TRUE}, invisibly, when \code{format} reads \code{source}.
+#' @keywords internal
+#' @noRd
+tl_check_scheme_format <- function(source, format) {
+  # Stops for a scheme or a web host that no reader takes
+  expected <- tl_detect_format(source)
+  if (identical(format, expected)) {
+    return(invisible(TRUE))
+  }
+
+  file_formats <- c("csv", "tsv", "excel", "parquet", "json", "rds", "rdata")
+  stop(
+    "tl_read() reads this ", tl_url_scheme(source), ":// source with ",
+    "format = \"", expected, "\", not \"", format, "\". Leave 'format' unset",
+    if (identical(expected, "s3") && format %in% file_formats) {
+      paste0(", or call tl_read_s3(source, format = \"", format, "\") to ",
+             "read the object as ", format)
+    },
+    ".",
+    call. = FALSE
+  )
+}
+
+#' The local path a file:// URL names
+#'
+#' R's own connections open \code{file://} URLs, so \code{tl_read()} reads
+#' one as the path it names: the part after an empty or \code{localhost}
+#' host, percent-decoded, without the slash a URL puts before a Windows
+#' drive letter. The form R's \code{file()} also takes on Windows,
+#' \code{file://C:/data.csv}, is read the same way. A URL naming another
+#' host is refused, since it is no file on this machine; a Windows share
+#' can be given as its UNC path instead.
+#'
+#' @param source A character vector of sources, without \code{NA}.
+#' @return \code{source} with each \code{file://} URL replaced by its path.
+#' @keywords internal
+#' @noRd
+tl_file_url_path <- function(source) {
+  is_file_url <- grepl("^file://", source, ignore.case = TRUE)
+  source[is_file_url] <- vapply(source[is_file_url], function(url) {
+    rest <- sub("^file://", "", url, ignore.case = TRUE)
+    authority <- sub("/.*$", "", rest)
+    path <- substring(rest, nchar(authority) + 1L)
+
+    if (grepl("^[A-Za-z]:$", authority)) {
+      path <- rest
+    } else if (nzchar(authority) && tolower(authority) != "localhost") {
+      stop(
+        "tl_read() reads file:// URLs only for files on this machine, and ",
+        "this one names the host '", tl_url_host(url), "'. Pass the ",
+        "file's path instead, such as a UNC path for a Windows share.",
+        call. = FALSE
+      )
+    }
+
+    path <- utils::URLdecode(path)
+    if (.Platform$OS.type == "windows" && grepl("^/[A-Za-z]:", path)) {
+      path <- substring(path, 2L)
+    }
+    if (!nzchar(path)) {
+      stop("'", url, "' names no file.", call. = FALSE)
+    }
+    path
+  }, character(1), USE.NAMES = FALSE)
+  source
 }
 
 #' The host a URL points at
@@ -249,17 +359,21 @@ tl_scan_pattern <- function(formats = c("csv", "tsv", "excel", "parquet",
 tl_detect_format <- function(source) {
   # Protocols take priority over extensions. Schemes are case-insensitive,
   # and a web URL is matched on its host.
-  if (tl_is_web_url(source)) {
-    host <- tl_url_host(source)
-    if (host %in% .tl_github_hosts) return("github")
-    if (tl_is_kaggle_host(host)) return("kaggle")
-    tl_stop_web_url(source)
+  if (tl_has_scheme(source)) {
+    scheme <- tl_url_scheme(source)
+    if (scheme %in% c("http", "https")) {
+      host <- tl_url_host(source)
+      if (host %in% .tl_github_hosts) return("github")
+      if (tl_is_kaggle_host(host)) return("kaggle")
+      tl_stop_web_url(source)
+    }
+    # Any other scheme names no file on this disk, and looked up as one
+    # it would be reported as a file that does not exist
+    if (!scheme %in% names(.tl_scheme_formats)) {
+      tl_stop_scheme(scheme)
+    }
+    return(.tl_scheme_formats[[scheme]])
   }
-  if (grepl("^s3://", source, ignore.case = TRUE)) return("s3")
-  if (grepl("^postgres(ql)?://", source, ignore.case = TRUE)) {
-    return("postgres")
-  }
-  if (grepl("^mysql://", source, ignore.case = TRUE)) return("mysql")
 
   ext <- tolower(tools::file_ext(source))
   if (ext %in% .tl_compression_extensions) {
@@ -294,10 +408,11 @@ tl_detect_format <- function(source) {
 #' \code{tl_read_dir()}. When \code{source} is a local \code{.zip} file, it
 #' is equivalent to calling \code{tl_read_zip()}.
 #'
-#' @param source A file path, a GitHub or Kaggle URL, an \code{s3://} URI,
-#'   a database connection string, a directory path, or a character vector
-#'   of multiple file paths. Other web URLs are refused: download the file
-#'   and read the local copy.
+#' @param source A file path or \code{file://} URL, a GitHub or Kaggle URL,
+#'   an \code{s3://} or \code{bigquery://} URI, a database connection
+#'   string, a directory path, or a character vector of multiple file
+#'   paths. Other web URLs, and URLs with any other scheme such as
+#'   \code{ftp://}, are refused: download the file and read the local copy.
 #' @param ... Additional arguments passed to the format-specific reader.
 #' @param format Optional explicit format override.
 #'   One of \code{"csv"}, \code{"tsv"},
@@ -307,7 +422,10 @@ tl_detect_format <- function(source) {
 #'   \code{"s3"}, \code{"github"}, \code{"kaggle"}. When \code{NULL} (default),
 #'   the format is auto-detected from the file extension
 #'   or source pattern. Note: \code{.txt} files default
-#'   to CSV; use \code{format = "tsv"} to override.
+#'   to CSV; use \code{format = "tsv"} to override. A source with a URL
+#'   scheme other than \code{file://} is read only with the format its
+#'   scheme or host implies; to read an S3 object as a given file format,
+#'   call \code{tl_read_s3()} with that format.
 #' @param .quiet Logical. If \code{TRUE}, suppresses
 #'   informational messages. Default is \code{FALSE}.
 #'
@@ -346,6 +464,11 @@ tl_read <- function(source, ..., format = NULL, .quiet = FALSE) {
     stop("'source' must not contain NA or empty strings.", call. = FALSE)
   }
 
+  # R's connections open file:// URLs, so one is read as the path it
+  # names. Done before the multi-path split, so files given as URLs are
+  # labelled by their paths like any others.
+  source <- tl_file_url_path(source)
+
   # Multi-path: read each and row-bind
   if (length(source) > 1) {
     return(tl_read_multi(source, ..., format = format, .quiet = .quiet))
@@ -367,12 +490,8 @@ tl_read <- function(source, ..., format = NULL, .quiet = FALSE) {
 
   if (is.null(format)) {
     format <- tl_detect_format(source)
-  }
-
-  # With a file format named, a web URL would reach a local-file reader
-  # and be reported as a file that does not exist
-  if (tl_is_web_url(source) && !format %in% c("github", "kaggle")) {
-    tl_stop_web_url(source)
+  } else if (!local) {
+    tl_check_scheme_format(source, format)
   }
 
   supported_formats <- c(

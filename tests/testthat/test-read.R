@@ -281,6 +281,148 @@ test_that("tl_read names the cause for a URL it cannot read", {
   expect_equal(tl_detect_format("S3://bucket/data.csv"), "s3")
 })
 
+test_that("tl_read names a URL scheme it has no reader for", {
+  # Any scheme but http(s), s3, postgres and mysql reached the local file
+  # readers and was reported as a file that does not exist
+  expect_error(
+    tl_read("ftp://example.com/data.csv", .quiet = TRUE),
+    "tl_read() has no reader for 'ftp://' sources", fixed = TRUE
+  )
+  expect_error(
+    tl_read("SFTP://example.com/data.csv", format = "csv", .quiet = TRUE),
+    "tl_read() has no reader for 'sftp://' sources", fixed = TRUE
+  )
+  # The message names the scheme, not the URL and its credentials
+  err <- expect_error(
+    tl_read("ftp://ana:hunter2@example.com/data.csv", .quiet = TRUE),
+    "tl_read() has no reader for 'ftp://' sources", fixed = TRUE
+  )
+  expect_false(grepl("hunter2", conditionMessage(err), fixed = TRUE))
+})
+
+test_that("format cannot send a source with a scheme to a file reader", {
+  # A postgres:// string read with format = "csv" was looked for on disk,
+  # and the "File not found" error printed it, password and all
+  err <- expect_error(
+    tl_read("postgres://ana:hunter2@db.example.com/sales", format = "csv",
+            .quiet = TRUE),
+    paste0("tl_read() reads this postgres:// source with ",
+           "format = \"postgres\", not \"csv\""),
+    fixed = TRUE
+  )
+  expect_false(grepl("hunter2", conditionMessage(err), fixed = TRUE))
+
+  expect_error(
+    tl_read("s3://bucket/data.txt", format = "tsv", .quiet = TRUE),
+    "call tl_read_s3(source, format = \"tsv\")", fixed = TRUE
+  )
+  # A GitHub URL was refused as a host that is neither GitHub nor Kaggle
+  expect_error(
+    tl_read("https://github.com/o/r/blob/main/a.txt", format = "tsv",
+            .quiet = TRUE),
+    "reads this https:// source with format = \"github\", not \"tsv\"",
+    fixed = TRUE
+  )
+})
+
+test_that("tl_read reads bigquery:// URIs, with or without format", {
+  skip_if_not_installed("bigrquery")
+  # tl_read_bigquery() takes a bigquery://project/dataset URI, but
+  # tl_read() could not detect one and stopped
+  seen <- new.env()
+  local_mocked_bindings(
+    bq_project_query = function(x, query, ...) {
+      seen$args <- list(x = x, query = query, ...)
+      "job-table"
+    },
+    bq_table_download = function(x, ...) data.frame(n = 1L),
+    .package = "bigrquery"
+  )
+
+  expect_equal(tl_detect_format("BigQuery://my-project/ds"), "bigquery")
+  result <- tl_read("bigquery://my-project/ds", query = "SELECT 1",
+                    .quiet = TRUE)
+  expect_equal(seen$args$x, "my-project")
+  expect_equal(
+    seen$args$default_dataset, bigrquery::bq_dataset("my-project", "ds")
+  )
+  expect_equal(attr(result, "tl_source"), "bigquery://my-project/ds")
+
+  # The scheme is case-insensitive here as everywhere else
+  tl_read("BIGQUERY://other-project", query = "SELECT 1", format = "bigquery",
+          .quiet = TRUE)
+  expect_equal(seen$args$x, "other-project")
+})
+
+test_that("tl_read reads a file:// URL as the local path it names", {
+  # R's own connections open file:// URLs, and tl_read() reported them
+  # as files that do not exist
+  dir <- withr::local_tempdir(pattern = "tl file url ")
+  write.csv(mtcars[1:10, ], file.path(dir, "a.csv"), row.names = FALSE)
+  write.csv(mtcars[11:32, ], file.path(dir, "b.csv"), row.names = FALSE)
+
+  local_dir <- normalizePath(dir, winslash = "/")
+  # A URL's path starts with '/', before a Windows drive letter too, and
+  # a space in it is percent-encoded
+  url_path <- paste0(if (!startsWith(local_dir, "/")) "/",
+                     gsub(" ", "%20", local_dir, fixed = TRUE))
+  url_of <- function(name, host = "") {
+    paste0("file://", host, url_path, "/", name)
+  }
+
+  result <- tl_read(url_of("a.csv"), .quiet = TRUE)
+  expect_equal(result$mpg, mtcars$mpg[1:10])
+  expect_equal(attr(result, "tl_source"), file.path(local_dir, "a.csv"))
+
+  expect_equal(
+    tl_read(url_of("a.csv", host = "localhost"), format = "csv",
+            .quiet = TRUE)$mpg,
+    mtcars$mpg[1:10]
+  )
+
+  # Several URLs are labelled like the paths they name
+  both <- tl_read(c(url_of("a.csv"), url_of("b.csv")), .quiet = TRUE)
+  expect_equal(both$mpg, mtcars$mpg)
+  expect_equal(unique(both$source_file), c("a.csv", "b.csv"))
+
+  # A URL naming a folder reads the folder
+  folder <- tl_read(paste0("file://", url_path), .quiet = TRUE)
+  expect_equal(nrow(folder), 32L)
+
+  if (.Platform$OS.type == "windows") {
+    # file://C:/... without the third slash, which R's file() accepts
+    expect_equal(
+      nrow(tl_read(paste0("file:/", url_path, "/a.csv"), .quiet = TRUE)),
+      10L
+    )
+  }
+})
+
+test_that("tl_read refuses a file:// URL that names another machine", {
+  expect_error(
+    tl_read("file://fileserver/share/data.csv", .quiet = TRUE),
+    "tl_read() reads file:// URLs only for files on this machine",
+    fixed = TRUE
+  )
+  expect_error(
+    tl_read("file://", .quiet = TRUE),
+    "'file://' names no file", fixed = TRUE
+  )
+})
+
+test_that("a Windows path with a doubled slash is not taken for a URL", {
+  # A drive letter followed by :// looked like a one-letter scheme, so
+  # C://data was not looked for on this disk
+  expect_false(tl_has_scheme("C://data/x.csv"))
+  expect_true(tl_has_scheme("s3://bucket/x.csv"))
+
+  skip_on_os(c("mac", "linux", "solaris"))
+  path <- withr::local_tempfile(fileext = ".csv")
+  write.csv(mtcars, path, row.names = FALSE)
+  doubled <- sub("^([A-Za-z]:)/", "\\1//", normalizePath(path, winslash = "/"))
+  expect_equal(tl_read(doubled, .quiet = TRUE)$mpg, mtcars$mpg)
+})
+
 test_that("tl_read refuses a missing or empty source by name", {
   # NA reached an if() and failed with "missing value where TRUE/FALSE
   # needed", alone or inside a vector of paths
@@ -775,6 +917,40 @@ test_that("tl_read() never prints the password in a connection string", {
   )
   expect_match(printed[1], "password=***", fixed = TRUE)
   expect_false(any(grepl("hunter2", printed, fixed = TRUE)))
+})
+
+test_that("tl_read() never prints or stores an SSL key passphrase", {
+  skip_if_not_installed("DBI")
+  skip_if_not_installed("RPostgres")
+  # sslpassword goes to libpq as a connection keyword, and was shown in
+  # the progress message and stored in the tl_source attribute
+  seen <- new.env()
+  testthat::local_mocked_bindings(
+    dbConnect = function(drv, ...) {
+      seen$args <- list(...)
+      structure(list(), class = "fake_connection")
+    },
+    dbGetQuery = function(conn, statement, ...) data.frame(n = 1L),
+    dbDisconnect = function(conn, ...) invisible(TRUE),
+    .package = "DBI"
+  )
+
+  dsn <- "postgres://ana@db.example.com/sales?sslmode=verify-full"
+  printed <- character(0)
+  result <- withCallingHandlers(
+    tl_read(paste0(dsn, "&sslpassword=hunter2"), query = "SELECT 1"),
+    message = function(m) {
+      printed <<- c(printed, conditionMessage(m))
+      invokeRestart("muffleMessage")
+    }
+  )
+  # libpq still receives it
+  expect_equal(seen$args$sslpassword, "hunter2")
+  expect_match(printed[1], "sslpassword=***", fixed = TRUE)
+  expect_false(any(grepl("hunter2", printed, fixed = TRUE)))
+  expect_equal(
+    attr(result, "tl_source"), paste0(dsn, "&sslpassword=***")
+  )
 })
 
 # ---- tl_read_mysql (error path only) ----
@@ -1360,7 +1536,25 @@ test_that("connection strings are redacted whatever form the password takes", {
       "postgres://host/db?sslmode=require&password=***&x=1",
     "host=localhost password=secret dbname=x" =
       "host=localhost password=*** dbname=x",
-    "user:secret@host"                     = "user:***@host"
+    "user:secret@host"                     = "user:***@host",
+    # libpq's other secret: the passphrase of the SSL client key, which a
+    # URL query hands to libpq as a keyword. It was shown in the clear.
+    "postgres://host/db?sslpassword=secret" =
+      "postgres://host/db?sslpassword=***",
+    "postgres://host/db?sslmode=verify-full&SSLPASSWORD=secret&sslcert=c.crt" =
+      "postgres://host/db?sslmode=verify-full&SSLPASSWORD=***&sslcert=c.crt",
+    "postgres://host/db?oauth_client_secret=secret" =
+      "postgres://host/db?oauth_client_secret=***",
+    "host=localhost sslpassword=secret dbname=x" =
+      "host=localhost sslpassword=*** dbname=x",
+    # A libpq keyword value may be quoted, with backslash escapes, and
+    # '=' may have spaces around it. Only the first word was redacted.
+    "host=localhost password='se cret' dbname=x" =
+      "host=localhost password=*** dbname=x",
+    "host=localhost password='it\\'s secret' dbname=x" =
+      "host=localhost password=*** dbname=x",
+    "host=localhost password = secret dbname=x" =
+      "host=localhost password = *** dbname=x"
   )
   for (url in names(redacted)) {
     expect_equal(tl_redact_db_url(url), redacted[[url]], info = url)
@@ -1369,6 +1563,7 @@ test_that("connection strings are redacted whatever form the password takes", {
   # Nothing that carries no password changes, file paths included
   unchanged <- c(
     "postgres://user@host/db",
+    "postgres://host/db?sslmode=require&passfile=/home/ana/.pgpass",
     "C:/Users/ana@corp/data.csv",
     "/home/ana/pass=1/data.csv"
   )
