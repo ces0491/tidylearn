@@ -38,7 +38,7 @@ leaves in the temp directory.
 
 ## Test environments
 
-Each run below checked the 0.6.0 tarball submitted here.
+Each run below used the source of the 0.6.0 tarball submitted here.
 
 * Local: Windows 11 x64, R 4.5.2 (2025-10-31 ucrt), `--as-cran`,
   2026-10-08: 0 errors, 0 warnings, the 2 NOTEs above.
