@@ -1118,6 +1118,43 @@ test_that("the k-NN and DBSCAN helpers accept a numeric matrix", {
   )
 })
 
+test_that("the k-NN distance refuses data it cannot measure, naming why", {
+  # kNNdist() was handed whatever was selected: "the provided data has 0
+  # columns!" for data with no numeric column, and "data/distances cannot
+  # contain NAs for kNN (with kd-tree)!" for a missing value
+  na_x <- iris[, 1:4]
+  na_x$Sepal.Width[3] <- NA
+
+  for (knn in list(
+    tidy_knn_dist = function(d) tidy_knn_dist(d),
+    suggest_eps = function(d) suggest_eps(d, minPts = 5),
+    plot_knn_dist = function(d) plot_knn_dist(d, k = 4)
+  )) {
+    expect_error(
+      knn(iris["Species"]),
+      paste0(
+        "The k-NN distance needs at least one numeric column, but none ",
+        "were found."
+      ),
+      fixed = TRUE
+    )
+    expect_error(
+      knn(na_x),
+      paste0(
+        "The k-NN distance cannot use missing or infinite values. Affected ",
+        "columns, with counts: 'Sepal.Width' (1). Impute or drop them first."
+      ),
+      fixed = TRUE
+    )
+  }
+
+  # Complete numeric data is measured as before
+  expect_equal(
+    tidy_knn_dist(iris, k = 4)$knn_dist,
+    as.numeric(dbscan::kNNdist(iris[, 1:4], k = 4))
+  )
+})
+
 test_that("suggest_eps reads the k-NN distance at k = minPts - 1", {
   # It used k = minPts, one neighbour more than dbscan's own convention
   # (kNNdistplot(minPts = ) sets k = minPts - 1), and more than the k = 4
@@ -1195,19 +1232,28 @@ test_that("options that would break the result are refused by name", {
   # size error; diss is set by tidy_pam() itself
   expect_error(
     tidy_pam(iris[, 1:4], k = 3, cluster.only = TRUE),
-    "'cluster.only' cannot be passed to tidy_pam()"
+    "'cluster.only' must be FALSE in tidy_pam(), its default: TRUE makes",
+    fixed = TRUE
   )
   expect_error(
     tidy_pam(iris[, 1:4], k = 3, diss = FALSE),
-    "'diss' cannot be passed to tidy_pam()"
+    "'diss' cannot be passed to tidy_pam(): tidy_pam() reads it from data",
+    fixed = TRUE
+  )
+  expect_error(
+    tidy_pam(iris[, 1:4], k = 3, diss = TRUE),
+    "'diss' cannot be passed to tidy_pam()",
+    fixed = TRUE
   )
   expect_error(
     tidy_clara(iris[, 1:4], k = 3, cluster.only = TRUE),
-    "'cluster.only' cannot be passed to tidy_clara()"
+    "'cluster.only' must be FALSE in tidy_clara(), its default: TRUE makes",
+    fixed = TRUE
   )
   expect_error(
     tidy_clara(iris[, 1:4], k = 3, medoids.x = FALSE),
-    "'medoids.x' cannot be passed to tidy_clara()"
+    "'medoids.x' must be TRUE in tidy_clara(), its default: FALSE leaves",
+    fixed = TRUE
   )
 
   # Options that leave the result whole still pass
@@ -1219,6 +1265,69 @@ test_that("options that would break the result are refused by name", {
   )
 })
 
+test_that("refused pam and clara options are caught under abbreviations", {
+  # R matches cluster.o to cluster.only and medoids to medoids.x, so an
+  # abbreviation got past a check on the full name and failed with "$
+  # operator is invalid for atomic vectors" or "`cluster` must be size 0 or
+  # 1, not 3"; dis reached pam() as an unused argument
+  x <- iris[, 1:4]
+  expect_error(
+    tidy_pam(x, k = 3, cluster.o = TRUE),
+    "'cluster.o', short for 'cluster.only', must be FALSE in tidy_pam()",
+    fixed = TRUE
+  )
+  expect_error(
+    tidy_pam(x, k = 3, dis = FALSE),
+    "'dis', short for 'diss', cannot be passed to tidy_pam()",
+    fixed = TRUE
+  )
+  expect_error(
+    tidy_clara(x, k = 3, medoids = FALSE),
+    "'medoids', short for 'medoids.x', must be TRUE in tidy_clara()",
+    fixed = TRUE
+  )
+  expect_error(
+    tidy_clara(x, k = 3, cluster = TRUE),
+    "'cluster', short for 'cluster.only', must be FALSE in tidy_clara()",
+    fixed = TRUE
+  )
+  # A value that works as TRUE breaks the result as TRUE does
+  expect_error(
+    tidy_clara(x, k = 3, cluster.only = 1),
+    "'cluster.only' must be FALSE in tidy_clara()",
+    fixed = TRUE
+  )
+})
+
+test_that("the defaults of refused pam and clara options are accepted", {
+  # The check refused an option whatever its value, so passing the default
+  # medoids.x = TRUE was refused with a message about FALSE
+  x <- iris[, 1:4]
+  reference_pam <- cluster::pam(stats::dist(x), k = 3, diss = TRUE)
+  for (pam_fit in list(
+    tidy_pam(x, k = 3, cluster.only = FALSE),
+    tidy_pam(x, k = 3, cluster.o = FALSE)
+  )) {
+    expect_equal(unname(pam_fit$model$clustering),
+                 unname(reference_pam$clustering))
+    expect_identical(pam_fit$medoids$medoid_index, reference_pam$id.med)
+  }
+
+  reference_clara <- cluster::clara(x, k = 3, samples = 50, sampsize = 46)
+  for (clara_fit in list(
+    tidy_clara(x, k = 3, medoids.x = TRUE),
+    tidy_clara(x, k = 3, medoids = TRUE, keep.data = FALSE),
+    tidy_clara(x, k = 3, cluster.only = FALSE)
+  )) {
+    expect_equal(clara_fit$model$clustering, reference_clara$clustering)
+    expect_equal(
+      as.matrix(clara_fit$medoids[names(x)]),
+      reference_clara$medoids,
+      ignore_attr = TRUE
+    )
+  }
+})
+
 test_that("tidy_clara refuses a distance matrix and points to PAM", {
   # A branch passed dist objects straight to clara(), which samples
   # observations and takes no distances, so it failed inside cluster
@@ -1227,6 +1336,26 @@ test_that("tidy_clara refuses a distance matrix and points to PAM", {
     "Use tidy_pam\\(\\), which takes a dist object"
   )
   expect_s3_class(tidy_clara(iris[, 1:4], k = 3), "tidy_clara")
+})
+
+test_that("tidy_clara refuses data with no numeric column", {
+  # clara() was handed a frame with no columns and reported "Each of the
+  # random samples contains objects between which no distance can be
+  # computed", which points at missing values rather than the selection
+  expect_error(
+    tidy_clara(iris["Species"], k = 2),
+    "CLARA needs at least one numeric column, but none were found.",
+    fixed = TRUE
+  )
+  # Missing values are still clara()'s to handle
+  na_x <- iris[, 1:4]
+  na_x[1, 1] <- NA
+  expect_equal(
+    suppressWarnings(tidy_clara(na_x, k = 3))$model$clustering,
+    suppressWarnings(
+      cluster::clara(na_x, k = 3, samples = 50, sampsize = 46)
+    )$clustering
+  )
 })
 
 # ---- validation ------------------------------------------------------
@@ -1326,6 +1455,26 @@ test_that("compare_clusterings names the entries it is not given names for", {
   expect_error(
     compare_clusterings(k2, iris[, 1:4]),
     "'cluster_list' must be a list of cluster assignment vectors"
+  )
+})
+
+test_that("compare_clusterings refuses data with no numeric column", {
+  # The distances it computes for the silhouette came from no columns, and
+  # silhouette() failed with "NA/NaN/Inf in foreign function call (arg 1)"
+  by_row <- list(by_row = rep(1:3, each = 50))
+  expect_error(
+    compare_clusterings(by_row, iris["Species"]),
+    paste0(
+      "The euclidean distance needs at least one numeric column, but none ",
+      "were found."
+    ),
+    fixed = TRUE
+  )
+
+  # Its silhouette is still the one on the numeric columns' distances
+  sil <- cluster::silhouette(by_row$by_row, stats::dist(iris[, 1:4]))
+  expect_equal(
+    compare_clusterings(by_row, iris)$avg_silhouette, mean(sil[, 3])
   )
 })
 

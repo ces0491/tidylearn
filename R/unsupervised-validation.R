@@ -556,9 +556,10 @@ compare_clusterings <- function(cluster_list, data, dist_mat = NULL) {
   unnamed <- is.na(method_names) | method_names == ""
   method_names[unnamed] <- paste0("clustering_", which(unnamed))
 
+  # tidy_dist() refuses data with no numeric column, for which
+  # stats::dist() returns nothing but NA
   if (is.null(dist_mat)) {
-    data_numeric <- tl_select_columns(data)
-    dist_mat <- stats::dist(data_numeric)
+    dist_mat <- tidy_dist(data)
   }
 
   comparison <- purrr::map_dfr(seq_along(cluster_list), function(i) {

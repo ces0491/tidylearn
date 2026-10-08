@@ -180,6 +180,11 @@ tidy_knn_dist <- function(data, k = 4, cols = NULL) {
     data, rlang::enquo(cols), numeric_only = TRUE,
     what = "The k-NN distance"
   )
+  # kNNdist() searches a kd-tree, which takes neither an empty frame nor a
+  # missing value, and refuses both in words that name no column
+  tl_check_complete_numeric(
+    data_selected, "The k-NN distance", tolerates = NULL
+  )
 
   data_matrix <- as.matrix(data_selected)
 

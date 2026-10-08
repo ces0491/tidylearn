@@ -429,22 +429,52 @@ tl_resolve_cols <- function(cols, data) {
 #'
 #' The tidy wrappers forward \code{...} to the routine they wrap, then read
 #' its full result. An option that changes that result's shape, or one the
-#' wrapper sets itself, is refused by name before the call.
+#' wrapper sets itself, is refused before the call.
 #'
-#' @param passed Names of the arguments in \code{...}
-#' @param refused A named character vector: the reason for each option
+#' R matches an abbreviated argument name to the argument it starts, so
+#' \code{cluster.o = TRUE} reaches \code{pam()} as \code{cluster.only =
+#' TRUE}. The names in \code{...} are expanded the same way, with
+#' \code{pmatch()} against the routine's arguments, before they are
+#' checked. \code{pmatch()} leaves a prefix that two arguments share
+#' unmatched, where R would pick the one the wrapper has not set itself;
+#' for \code{pam()} and \code{clara()} those prefixes (\code{d}, \code{m},
+#' \code{me}) match the wrapper's own \code{data} or \code{metric} first,
+#' so they never reach \code{...}.
+#'
+#' @param dots The wrapper's \code{list(...)}
+#' @param target The routine \code{...} is forwarded to
+#' @param refused A named list with one element per option, itself a list
+#'   of \code{reason}, why the option is refused, and \code{allowed}, the
+#'   one value that leaves the result whole (the routine's default), or
+#'   NULL to refuse every value
 #' @param fun The wrapper's name, for the message
+#' @return \code{TRUE}, invisibly, when no option is refused
 #' @keywords internal
 #' @noRd
-tl_refuse_options <- function(passed, refused, fun) {
-  bad <- intersect(passed, names(refused))
-  if (length(bad) > 0) {
-    stop(
-      "'", bad[1], "' cannot be passed to ", fun, "(): ", refused[[bad[1]]],
-      ".",
-      call. = FALSE
-    )
+tl_refuse_options <- function(dots, target, refused, fun) {
+  given <- names(dots) %||% character(length(dots))
+  options <- names(formals(target))
+  full <- options[pmatch(given, options, duplicates.ok = TRUE)]
+
+  for (i in which(full %in% names(refused))) {
+    rule <- refused[[full[i]]]
+    if (!is.null(rule$allowed) && identical(unname(dots[[i]]), rule$allowed)) {
+      next
+    }
+
+    named <- if (given[i] == full[i]) {
+      paste0("'", full[i], "'")
+    } else {
+      paste0("'", given[i], "', short for '", full[i], "',")
+    }
+    verdict <- if (is.null(rule$allowed)) {
+      paste0(" cannot be passed to ", fun, "()")
+    } else {
+      paste0(" must be ", deparse(rule$allowed), " in ", fun, "(), its default")
+    }
+    stop(named, verdict, ": ", rule$reason, ".", call. = FALSE)
   }
+
   invisible(TRUE)
 }
 

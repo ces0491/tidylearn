@@ -118,8 +118,9 @@ augment_kmeans <- function(kmeans_obj, data) {
 #' @param cols Columns to include (tidy select). If NULL, uses all columns.
 #' @param ... Further arguments passed to \code{\link[cluster]{pam}}, such
 #'   as \code{nstart}, \code{variant} or starting \code{medoids}.
-#'   \code{cluster.only} and \code{diss} are refused: the first leaves no
-#'   fit to build the result from, and tidy_pam() sets the second itself.
+#'   \code{cluster.only = TRUE} and \code{diss} are refused, under any
+#'   abbreviation R would accept: the first leaves no fit to build the
+#'   result from, and tidy_pam() sets the second itself from \code{data}.
 #'
 #' @return A list of class "tidy_pam" containing:
 #' \itemize{
@@ -143,14 +144,24 @@ augment_kmeans <- function(kmeans_obj, data) {
 #' @export
 tidy_pam <- function(data, k, metric = "euclidean", cols = NULL, ...) {
 
-  tl_refuse_options(names(list(...)), c(
-    cluster.only = paste0(
-      "it makes pam() return the cluster vector alone, where the result is ",
-      "built from the whole fit. Read $clusters$cluster instead"
+  # diss is refused at either value: tidy_pam() passes diss = TRUE itself,
+  # so a second one would be "matched by multiple actual arguments"
+  tl_refuse_options(list(...), cluster::pam, list(
+    cluster.only = list(
+      allowed = FALSE,
+      reason = paste0(
+        "TRUE makes pam() return the cluster vector alone, where the result ",
+        "is built from the whole fit. Read $clusters$cluster instead"
+      )
     ),
-    diss = paste0(
-      "tidy_pam() always hands pam() a distance matrix. Pass a dist object ",
-      "as data to cluster on distances of your own"
+    diss = list(
+      allowed = NULL,
+      reason = paste0(
+        "tidy_pam() reads it from data, clustering a dist object on the ",
+        "distances it holds and anything else on distances computed with ",
+        "'metric'. Pass a dist object as data to cluster on distances of ",
+        "your own"
+      )
     )
   ), "tidy_pam")
 
@@ -260,8 +271,9 @@ augment_pam <- function(pam_obj, data) {
 #' @param sampsize Sample size (default: min(n, 40 + 2*k))
 #' @param ... Further arguments passed to \code{\link[cluster]{clara}}, such
 #'   as \code{correct.d}, \code{pamLike} or \code{rngR}.
-#'   \code{cluster.only} and \code{medoids.x} are refused, since the result
-#'   needs the fit and its medoids.
+#'   \code{cluster.only = TRUE} and \code{medoids.x = FALSE} are refused,
+#'   under any abbreviation R would accept, since the result needs the fit
+#'   and its medoids.
 #'
 #' @return A list of class \code{"tidy_clara"} containing:
 #' \itemize{
@@ -283,14 +295,20 @@ augment_pam <- function(pam_obj, data) {
 tidy_clara <- function(data, k, metric = "euclidean",
                        samples = 50, sampsize = NULL, ...) {
 
-  tl_refuse_options(names(list(...)), c(
-    cluster.only = paste0(
-      "it makes clara() return the cluster vector alone, where the result ",
-      "is built from the whole fit. Read $clusters$cluster instead"
+  tl_refuse_options(list(...), cluster::clara, list(
+    cluster.only = list(
+      allowed = FALSE,
+      reason = paste0(
+        "TRUE makes clara() return the cluster vector alone, where the ",
+        "result is built from the whole fit. Read $clusters$cluster instead"
+      )
     ),
-    medoids.x = paste0(
-      "medoids.x = FALSE leaves out the medoids, which the result reports. ",
-      "keep.data = FALSE saves a copy of the data instead"
+    medoids.x = list(
+      allowed = TRUE,
+      reason = paste0(
+        "FALSE leaves out the medoids, which the result reports. To save ",
+        "memory, pass keep.data = FALSE, which leaves the data out of the fit"
+      )
     )
   ), "tidy_clara")
 
@@ -307,6 +325,17 @@ tidy_clara <- function(data, k, metric = "euclidean",
 
   # Select numeric columns
   data_numeric <- tl_select_columns(data)
+
+  # clara() takes a frame with no columns as one whose rows cannot be
+  # compared, and says "Each of the random samples contains objects between
+  # which no distance can be computed", as if values were missing. Missing
+  # values themselves are clara()'s to handle.
+  if (ncol(data_numeric) == 0) {
+    stop(
+      "CLARA needs at least one numeric column, but none were found.",
+      call. = FALSE
+    )
+  }
 
   # Set default sampsize if not provided
   if (is.null(sampsize)) {
