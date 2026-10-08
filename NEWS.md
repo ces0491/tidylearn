@@ -13,6 +13,29 @@
   floor rises from 0.4.0 to 1.0.0, the version ggplot2 3.4.0 imports, so
   it changes nothing for an install that meets the ggplot2 one.
 
+* Some calls that ran in 0.5.0 are now errors, with a message naming
+  the problem: each passed an argument tidylearn ignored or returned a
+  meaningless result. Bug Fixes describes all of them. Among them are:
+  * an argument a method cannot use, such as `maxdeth = 1` or
+    `offset =` with `method = "tree"`, a name glmnet does not take with
+    `"ridge"`, `"lasso"` or `"elastic_net"`, and a misspelt argument to
+    `tl_pipeline()`;
+  * an `offset()` term with a method that cannot apply it at
+    `predict()`, which is every method but `"linear"`, `"polynomial"`
+    and `"logistic"`;
+  * a metric name `tl_evaluate()` or `tl_cv()` does not compute, such
+    as `"RMSE"`;
+  * `predict(type = "prob")` or `type = "class"` on a regression
+    model, and a misspelt `type`;
+  * `tl_prepare_data(impute_method = "knn")`, and `tl_split()` with a
+    `prop` outside (0, 1);
+  * repeated model names in `tl_compare_cv()` and
+    `tl_plot_importance_comparison()`;
+  * `type` in `tl_plot_interaction()`, and an `exclude_vars` in
+    `tl_auto_interactions()` that is not a predictor;
+  * a numeric response in `tl_semisupervised()`, and
+    `tl_anomaly_aware(action = "downweight")` with `"svm"` or `"deep"`.
+
 * `tl_model()` makes a text predictor a factor before fitting, and
   stores it as one in `$data`. `method = "forest"` coded a character
   column as numbers by the values present in whichever frame it was
@@ -65,6 +88,14 @@
   `set.seed(3)`). Both now stop with the message that the penalty
   dropped every predictor, as for any penalty that keeps none.
 
+* `method = "polynomial"` keeps a numeric term that is also part of an
+  interaction as it is and adds its powers as `I(x^2)` up to the
+  degree. For `mpg ~ wt * hp` the fit and its predictions are those of
+  0.5.0, but the terms are now `wt`, `hp`, `I(wt^2)`, `I(hp^2)` and
+  `wt:hp`, where 0.5.0 named them `poly(wt, degree = 2, raw = TRUE)1`,
+  `poly(wt, degree = 2, raw = TRUE)2` and so on, so `tl_coefficients()`
+  and `tl_table_coefficients()` list other names in another order.
+
 * `predict()` on an unsupervised model returns `.obs_id`, the row names
   of the data predicted on, and as many components as the model keeps,
   on both the training and the new-data path. A two-dimensional MDS fit
@@ -115,14 +146,14 @@
   the formula computes such as `factor(am)`, as classification. With the
   old default of `FALSE`, `tl_tune_xgboost(iris, Species ~ .)` was tuned
   as a regression on the class codes without a message, and
-  `tl_tune_nn()` and `tl_tune_deep()` failed. `is_classification = FALSE` with a factor
-  response is an error, and so is `is_classification = TRUE` with a
-  computed response that is not a factor, such as `I(mpg > 20)`, which
-  `tl_tune_nn()` ran; the message points to `factor()` on the left-hand
-  side. The response is reduced to the classes it holds, so a two-class
-  subset of `iris` that still declares setosa is tuned as two classes;
-  `tl_tune_xgboost()` had tuned it with `multi:softprob` and a setosa
-  probability column.
+  `tl_tune_nn()` and `tl_tune_deep()` failed.
+  `is_classification = FALSE` with a factor response is an error, and so
+  is `is_classification = TRUE` with a computed response that is not a
+  factor, such as `I(mpg > 20)`, which `tl_tune_nn()` ran; the message
+  points to `factor()` on the left-hand side. The response is reduced to
+  the classes it holds, so a two-class subset of `iris` that still
+  declares setosa is tuned as two classes; `tl_tune_xgboost()` had tuned
+  it with `multi:softprob` and a setosa probability column.
 
 * `tl_tune_deep()` returns the best configuration as a `tidylearn_model`
   in `$model`, so `predict()` and the deep plots take it; the keras
@@ -162,8 +193,16 @@
   failed in k-means with "unused argument", and `nstart = 5` reached
   k-means and then broke `glm()`. A clustering setting now goes in
   `cluster_args`, e.g. `cluster_args = list(nstart = 5)`; one left in
-  `...`, such as `nstart`, `iter.max` or `algorithm`, is refused with a
-  message saying so.
+  `...`, such as `nstart`, `iter.max`, `algorithm`, `hclust_method` or
+  pam's `variant`, is refused with a message saying so. `sampsize`,
+  `keep.data` and `trace`, which randomForest, gbm and nnet take, still
+  reach the supervised model.
+
+* `tl_semisupervised()` with a response the formula computes, such as
+  `factor(am) ~ wt + hp + qsec`, writes each propagated label to the
+  column the response is computed from, as that column's own value in a
+  labelled row of the same class. The returned `$data$am` therefore
+  holds 0 and 1, where it held a factor.
 
 * `tl_interaction_effects()` holds a variable it does not vary at its
   most frequent value, as `tl_plot_interaction()` does. It held a factor
@@ -226,6 +265,12 @@
   `tidy_pam(mtcars, k = 3)` gave `"Toyota Corona"`, `"Merc 450SE"` and
   `"Duster 360"` where the same data as a tibble gave 21, 12 and 7. Both
   now give 21, 12 and 7.
+
+* `calc_validation_metrics()` and `compare_clusterings()` gain an
+  `n_noise` column, after `avg_size`, counting the points labelled 0,
+  DBSCAN's label for noise. The other clustering methods number their
+  clusters from 1, so it is 0 for them. The columns after it move one
+  place along.
 
 * Counts that ran a range backwards or reached `cutree()` as a vector
   are refused with a message naming the argument. `get_pca_loadings()`
@@ -359,8 +404,9 @@
 
 * `tl_tune_grid()`, `tl_tune_random()` and `tl_compare_cv()` accept
   `folds = nrow(data)` and leave each row out in turn, as `tl_cv()`
-  does. rsample's `vfold_cv()` refused it with "Leave-one-out
-  cross-validation is not supported by this function".
+  does, and so does `tl_run_pipeline()` with `evaluation$cv_folds`
+  equal to the number of rows. rsample's `vfold_cv()` refused it with
+  "Leave-one-out cross-validation is not supported by this function".
 
 * `tl_read()` and `tl_read_json()` read newline-delimited `.ndjson`
   files, through `jsonlite::stream_in()`, and `tl_read_json()` reads a
@@ -403,9 +449,10 @@
   `tidy_pam()` gain `...` for the arguments of `cluster::clara()` and
   `cluster::pam()`: `tidy_clara(x, k = 3, correct.d = TRUE)` was
   `unused argument`, and `tidy_pam()` can now take `nstart`, `variant`
-  or starting `medoids`. `cluster.only` for both, `diss` for
-  `tidy_pam()` and `medoids.x` for `tidy_clara()` are refused by name,
-  since the result is built from the full fit and its medoids.
+  or starting `medoids`. `cluster.only = TRUE` for both, `diss` for
+  `tidy_pam()` and `medoids.x = FALSE` for `tidy_clara()` are refused,
+  under any abbreviation R accepts, since the result is built from the
+  full fit and its medoids.
 
 ## Bug Fixes
 
@@ -418,9 +465,19 @@
   with `"ridge"` it was treated as regression and failed with "invalid
   to change the storage mode of a factor", and with `"forest"` it
   returned a classification forest described as a regression. A
+  response the formula computes as text, such as
+  `ifelse(mpg > 20, "hi", "lo") ~ wt + hp`, is classified as the factor
+  it encodes by `"nn"`, `"forest"` and `"svm"`, and by `tl_tune_nn()`:
+  nnet stopped with `NA/NaN/Inf in foreign function call (arg 2)`,
+  randomForest with `non-numeric argument to binary operator`, and e1071
+  with `Need numeric dependent variable for regression.` A
   supervised method given a one-sided formula, or none, says it needs a
-  two-sided formula naming the response, where it failed with
-  "incompatible dimensions" or "argument is not a valid model".
+  two-sided formula naming the response. Given `~ wt + hp`, `"forest"`
+  fitted an unsupervised forest, `"xgboost"` a booster with no
+  objective, and `"polynomial"` a model of `wt` on itself and `hp`;
+  `"logistic"` took `wt` as the response and refused it, and the other
+  methods failed inside their backends, `"linear"` with "incompatible
+  dimensions".
 
 * `predict()` passes a method only the columns its formula uses. A
   column the model never saw counted as a predictor wherever a method
@@ -429,16 +486,20 @@
   column gave `"xgboost"` a warning about columns not in the training
   data.
 
-* `predict()` on a supervised model refuses new data that lacks a
-  column the model's predictors were fitted on: "New data is missing
-  predictors used at fit time: hp". `model.frame()` looks a variable up
-  in the data and then in the formula's environment, so every method but
-  `"svm"` took a missing column from a same-named object in the caller's
-  session, or failed with "object 'hp' not found" when there was none:
+* `predict()` on a supervised model refuses new data that lacks a column
+  the model's predictors were fitted on: "New data is missing predictors
+  used at fit time: hp". `model.frame()` looks a variable up in the data
+  and then in the formula's environment, so every method took a missing
+  column from a same-named object in the caller's session, or failed
+  with "object 'hp' not found" when there was none:
   `predict(tl_model(mtcars, mpg ~ wt + hp, method = "linear"), nd)` on
   data without `hp` returned predictions built from a global `hp`. A
   variable the formula takes from its environment, such as `k` in
-  `offset(k * disp)`, is not required.
+  `offset(k * disp)`, is not required. `tl_xgboost_shap()`,
+  `tl_plot_xgboost_shap_summary()` and
+  `tl_plot_xgboost_shap_dependence()` check `data` the same way, where
+  they computed SHAP values from a global `hp` or failed with
+  `object 'hp' not found`.
 
 * `predict(type = "prob")` and `type = "class"` on a regression model
   are errors. Both returned the numeric predictions, and a regression
@@ -459,17 +520,19 @@
   written out without the column; `$spec$formula`, `print()` and every
   refit keep the formula as written, and a missing value in the
   subtracted column no longer leaves an `"svm"` prediction `NA`. A
-  subtracted name that is not a column of the data, usually a
-  misspelling, is an error that names it.
+  subtracted name that is neither a column of the data nor, for a
+  supervised model, a variable in the formula's environment -- usually
+  a misspelling, as in `mpg ~ . - qsce` -- is an error that names it.
 
 * **`tl_model(subset = )` fits the selected rows, with every method, and
   stores only those in `$data`.** `"linear"`, `"logistic"` and `"nn"`
   failed on `subset` with "..1 used in an incorrect context", `"boost"`
-  with "unused argument", and `"tree"`, `"ridge"`, `"lasso"` and
-  `"xgboost"` fitted every row, `"xgboost"` warning "Passed unrecognized
-  parameters: subset"; a regularised fit with `subset = 1:16` used all
-  32 rows. `"forest"` and `"svm"` fitted the selected rows but kept
-  every row in `$data`, so `predict(model)` and `tl_evaluate(model)`
+  with "unused argument", and `"tree"`, `"ridge"`, `"lasso"`,
+  `"elastic_net"` and `"xgboost"` fitted every row, `"xgboost"` warning
+  "Passed unrecognized parameters: subset"; a regularised fit with
+  `subset = 1:16` used all 32 rows. `"forest"`, `"svm"` and
+  `"polynomial"` fitted the selected rows but kept every row in
+  `$data`, so `predict(model)` and `tl_evaluate(model)`
   scored rows the fit never saw. The other per-row arguments, such as
   `weights`, are taken to the same rows.
 
@@ -509,10 +572,10 @@
   fit. Held at the same predictors, each method's prediction moved by 0
   when the offset moved by 100. As an argument, an offset was ignored
   without a message by `"tree"`, `"forest"`, `"svm"`, `"nn"` and
-  `"deep"`;
-  `"xgboost"` warned that xgboost did not recognise it, and `"boost"`
-  stopped with gbm's `unused argument`. `"linear"` and `"logistic"`
-  still take an `offset()` term. An `offset` argument is refused with a
+  `"deep"`; `"xgboost"` warned that xgboost did not recognise it, and
+  `"boost"` stopped with gbm's `unused argument`. `"linear"` and
+  `"logistic"` still take an `offset()` term, and `"polynomial"`, which
+  dropped one, now applies it. An `offset` argument is refused with a
   pointer to `offset()` in the formula, which is the form `predict()`
   can apply to new data.
 
@@ -543,13 +606,20 @@
   gbm. A saved model holds the training data a second time: a tree
   fitted on 20,000 rows saves at 1.1 MB, against 0.6 MB in 0.5.0.
 
-* **`predict()` on an `"xgboost"` or `"deep"` model computes a
-  data-dependent term of the formula, such as `scale(hp)` or
+* **`predict()` on an `"xgboost"`, `"deep"` or `"boost"` model computes
+  a data-dependent term of the formula, such as `scale(hp)` or
   `poly(wt, 2)`, with the values the training data gave it, as
   `predict.lm()` does.** The term was recomputed on the rows being
   predicted, so a row's prediction depended on the rows scored with it:
   for `mpg ~ scale(hp) + wt` with `nrounds = 20`, the fifth row of
-  `mtcars` predicted 15.0 alone and 18.6 inside the full frame.
+  `mtcars` predicted 15.0 alone and 18.6 inside the full frame. With
+  `"boost"` on `mtcars` stacked twice, `n.trees = 50` and `set.seed(1)`,
+  row 5 predicted 14.72 alone and 17.28 inside the frame. A
+  matrix-valued term such as `poly(wt, 2)` failed to fit with boost
+  (`number of items to replace is not a multiple of replacement
+  length`); it now enters as one predictor per column, as with
+  `"forest"`. A transform that needs nothing from training, such as
+  `log(hp)`, is fitted through gbm's formula interface as before.
 
 * **`"xgboost"`, `"deep"`, `tl_tune_xgboost()` and `tl_tune_nn()` fit
   and score the response the formula computes.** The first three fitted
@@ -587,6 +657,17 @@
   coefficient for `cyl_f8:wt`, and now fits
   `mpg ~ cyl_f * wt + I(wt^2)`. Factors, `I()` terms and bases such as
   `poly()` or a spline's are left as written.
+
+* **`predict()` on a `method = "polynomial"` model computes a
+  data-dependent term such as `scale(wt)` with the training data's
+  centre and scale, so its predictions on new rows change.** Inside the
+  `poly()` or `I()` the expansion wraps it in, the term was recomputed
+  on the rows being predicted, so for `mpg ~ scale(wt) + hp` on
+  `mtcars` a single row predicted `NaN`, and `mtcars[1:5, ]` predicted
+  20.48 for its second row against a fitted value of 21.71.
+  Cross-validation scored each held-out fold on its own centre and
+  scale: `tl_cv()` on `mpg ~ scale(wt) + hp` at `folds = 4` after
+  `set.seed(1)` reported a mean rmse of 2.43, and now reports 2.34.
 
 * **`"ridge"`, `"lasso"` and `"elastic_net"` keep every predictor of a
   formula without an intercept.** The design matrix's first column was
@@ -897,9 +978,11 @@
   randomForest reads as a number of rows and the grid gave as fractions
   from 0.5 to 1. For `method = "forest"` the tuners cap `mtry` at the
   number of predictors, counted the way randomForest counts them, with a
-  warning: randomForest reset an oversized `mtry` in every fold while
-  the results credited the value asked for. `y ~ . - id` does not count
-  `id`: on `mtcars[, c("mpg", "wt", "hp", "qsec")]` plus an id column,
+  warning; a matrix-valued term such as `poly(hp, 2)` counts once per
+  column, since the forest is fitted on its columns. randomForest reset
+  an oversized `mtry` in every fold while the results credited the value
+  asked for. `y ~ . - id` does not count `id`: on
+  `mtcars[, c("mpg", "wt", "hp", "qsec")]` plus an id column,
   `mpg ~ . - id` with `mtry = c(3, 4)` left 4 uncapped, randomForest
   reset it to 3 in every fold, and `best_params$mtry` reported 4 for a
   fit that used 3 (`folds = 3`, `set.seed(1)`). It is now capped at 3,
@@ -944,6 +1027,27 @@
   factor for `method = "logistic"` is likewise given once per search,
   and not by `tl_compare_cv()`'s refits, which repeated it on every
   fold. Other warnings from the fits still come through.
+  `tl_run_pipeline()`, `tl_auto_ml()` and `tl_stratified_models()` give
+  the note about the response once per call as well: on the first ten
+  rows of `mtcars`, a linear model and a tree of `mpg ~ wt` over 3 folds
+  printed it 8 times, `tl_auto_ml(mtcars, cyl ~ wt + hp,
+  time_budget = 10, cv_folds = 2)` 6 times, and
+  `tl_stratified_models(mtcars, mpg ~ wt + hp, k = 3,
+  supervised_method = "linear")` twice (`set.seed(1)`).
+
+* `tl_cv()`, `tl_compare_cv()`, `tl_tune_grid()`, `tl_tune_random()`
+  and `tl_run_pipeline()` warn once, before scoring, when every fold
+  holds one row (`folds = nrow(data)`) and a metric being scored does
+  not average to its leave-one-out value. rmse on one row is the
+  absolute error, so the averaged rmse is the mean absolute error under
+  rmse's name: 2.52 for a linear `mpg ~ wt` on `mtcars` with
+  `folds = 32`, the same as mae, where the leave-one-out rmse is 3.20.
+  The warning says so, and that precision, recall, sensitivity,
+  specificity and f1 are undefined on folds whose one row leaves nothing
+  to divide by, and rsq, auc and pr_auc on every fold. The per-fold
+  warnings from yardstick that it explains are no longer repeated. The
+  scores are unchanged, and a run scoring only accuracy, mae, mse or
+  mape gets no warning.
 
 * **`tl_tune_nn()` scores each two-class candidate by its own
   predictions.** Every candidate was scored as if it predicted the first
@@ -985,11 +1089,12 @@
   metric name it does not compute for the task is refused with the
   message `tl_evaluate()` gives: a misspelt `"acuracy"` was dropped from
   the summary without a message, and `metrics = "rmse"` on a
-  classification model returned an empty summary. `tl_compare_cv(mtcars, list())`
-  failed with "argument is not interpretable as logical", a single model
-  passed without `list()` was read as three models that were not
-  tidylearn models, and an unsupervised model failed the task check;
-  each now gets a message saying what to pass.
+  classification model returned an empty summary.
+  `tl_compare_cv(mtcars, list())` failed with "argument is not
+  interpretable as logical", a single model passed without `list()` was
+  read as three models that were not tidylearn models, and an
+  unsupervised model failed the task check; each now gets a message
+  saying what to pass.
 
 * `tl_compare_cv()` refuses repeated model names and names an unnamed
   entry `Model_<i>`, numbered on (`Model_1.1`) if the caller already
@@ -1002,8 +1107,11 @@
   missing, has `NA` for each metric in `fold_metrics`, with a warning
   naming the fold and the model; in 0.5.0 it scored `NaN` and was left
   out of the summary without a message. A metric with no value on any
-  fold summarises as `NA`: its `mean_value` was `NaN`, and its `min_value`
-  and `max_value` were `Inf` and `-Inf` with a warning each.
+  fold summarises as `NA`: its `mean_value` was `NaN`, and its
+  `min_value` and `max_value` were `Inf` and `-Inf` with a warning each.
+  `tl_cv()` reports such a metric's mean as `NA` too, as its note said
+  it did: rsq on `data.frame(x = 1:10, y = 3)` with `folds = 5`
+  summarised as mean `NaN`.
 
 * `tl_step_selection()` with `direction = "forward"` or `"both"` works
   with a formula using `.`, and keeps a transformed response, the
@@ -1184,7 +1292,13 @@
 * `tl_semisupervised()` refuses a numeric response. Labels are
   propagated by majority vote within a cluster, and the response was
   passed through `factor()`, so `mpg ~ .` was fitted as a classification
-  with one class per distinct value.
+  with one class per distinct value. The response is the one the
+  formula computes, so `factor(am) ~ wt + hp + qsec` is accepted and
+  `log(mpg) ~ wt + hp` refused as numeric. A computed logical such as
+  `I(mpg > 20)`, which `tl_model()` fits as a regression, is refused
+  with a pointer to `factor()`, and so is a response that does not
+  compute the propagated labels back from the column's values, such as
+  `cut(mpg, 2)`, whose breaks follow the column's range.
 
 * `tl_semisupervised()` warns about rows whose cluster holds no labelled
   observation, and leaves them out of training. They were given `NA`
@@ -1241,7 +1355,8 @@
   own. That cluster now gets no model and is listed in
   `$single_class_clusters`, `predict()` returns its class for its rows
   (probability 1 under `type = "prob"`), and the other clusters' models
-  are built as before.
+  are built as before. This holds for a response the formula computes,
+  such as `factor(am)`, whose single-class clusters were not found.
 
 * `predict()` on a `tl_stratified_models()` result returns what each
   cluster's model returns for the requested `type`. With
@@ -1346,6 +1461,12 @@
   doesn't exist`. Its documentation says the statistics come from the
   data passed in, so preparing before splitting lets test rows shape
   them.
+
+* `tl_prepare_data()` reports encoding, and records an encoding step,
+  only for the variables it splits into dummy columns. A two-level
+  factor is left as it is, yet one alone gave "Encoding 1 categorical
+  variables". Imputing and scaling are likewise reported and recorded
+  only when a column is filled or scaled.
 
 * `tl_auto_interactions()` honours `exclude_vars`. It computed the
   reduced predictor set and never used it, so with a strong `a:z` effect
@@ -1497,7 +1618,10 @@
   term such as `log(Sepal.Length)` is an error naming it; PCA used to
   run on the raw column instead, centred at 5.84, the mean of
   `Sepal.Length` itself. `~ . - x` now means every numeric column but
-  `x`, where it failed with "undefined columns selected".
+  `x`, where it failed with "undefined columns selected". A name that is
+  not a column of the data, as in `~ wt + zz`, or `~ . + z` with `z` in
+  the caller's session, is an error that names it; it failed with
+  "undefined columns selected" too.
 
 * `tl_model()` warns, naming the column, when an unsupervised formula
   names a non-numeric column the method cannot use: any such column for
@@ -1515,8 +1639,11 @@
   column is refused by name. `tidy_kmeans()`, `tidy_pca()`,
   `tidy_knn_dist()` and `tidy_dbscan()` failed on such a column inside
   their backends (`NA/NaN/Inf in foreign function call`, `'x' must be
-  numeric or complex`, `x has to be a numeric matrix`), `tidy_hclust()`,
-  `tidy_pam()` and `tidy_dist()` dropped it without a message, and
+  numeric or complex`, `x has to be a numeric matrix`, `all data in x
+  has to be numeric`), `tidy_hclust()`, `tidy_pam()` and `tidy_dist()`
+  dropped it from the distance without a message while `tidy_pam()`'s
+  `$medoids` and `tidy_hclust()`'s `$data` kept it (both now leave it
+  out), and
   `tidy_dist(iris, cols = "Species")` returned a distance matrix of
   `NA`, which `tidy_hclust()` and `tidy_pam()` then refused as missing
   values. `tidy_dist()`, and so `tidy_mds()`, refuse data with no
@@ -1589,6 +1716,15 @@
   keep their values, so `augment_dbscan()`'s `"0"` is still noise;
   `tidy_silhouette()` reports other labels as given.
 
+* `calc_validation_metrics()` refuses `data` with no numeric column,
+  where it summed squares over no columns and reported `total_wss = 0`,
+  a perfect score: `calc_validation_metrics(rep(1:3, each = 50),
+  iris["Species"])` gave 0 where `iris[, 1:4]` gives 89.30.
+  `compare_clusterings()` refuses the same data, where it also reported
+  0 with a `dist_mat`, or failed inside `silhouette()` with
+  `NA/NaN/Inf in foreign function call` without one. Given a `dist_mat`
+  and no `data`, the silhouette is still scored on its own.
+
 * **`tidy_gap_stat()`'s `k_firstmax` is the first local maximum of the
   gap, `cluster::maxSE(method = "firstmax")`.** It was computed with
   `which.max()`, maxSE's `"globalmax"`, so it always equalled
@@ -1612,10 +1748,10 @@
   minPts = 5)$eps` was 0.758 and is now 0.718, the 95th percentile of
   `dbscan::kNNdist(k = 4)`. `minPts` below 2 is an error.
 
-* `tidy_pca(method = "princomp", center = FALSE)` warns that
+* **`tidy_pca(method = "princomp", center = FALSE)` warns that
   `princomp()` always centres and records `center = TRUE` in
-  `$settings`. It returned centred scores while `$settings$center` said
-  `FALSE`.
+  `$settings`.** It returned centred scores while `$settings$center`
+  said `FALSE`.
 
 * `tidy_mds()` returns the dimensions classical MDS supports when `ndim`
   asks for more: `cmdscale()` keeps only dimensions with a positive
@@ -1640,9 +1776,18 @@
   `explore_dbscan_params()` and `tidy_dbscan()` accept a numeric matrix
   of coordinates. They failed with `no applicable method for 'select'`.
 
-* `standardize_data()` standardises a rowwise tibble over its whole
-  columns. `mutate()` works on a rowwise tibble one row at a time, and a
-  single value has no spread, so every standardised value came back
+* `tidy_knn_dist()`, and through it `suggest_eps()` and
+  `plot_knn_dist()`, refuse data with no numeric column, or with a
+  missing value, in words that say so, as `tidy_dbscan()` does; dbscan
+  stopped with `the provided data has 0 columns!` or `data/distances
+  cannot contain NAs for kNN (with kd-tree)!`. `tidy_clara()` refuses
+  data with no numeric column the same way, where `cluster::clara()`
+  reported `Each of the random samples contains objects between which
+  no distance can be computed`.
+
+* **`standardize_data()` standardises a rowwise tibble over its whole
+  columns.** `mutate()` works on a rowwise tibble one row at a time, and
+  a single value has no spread, so every standardised value came back
   `NaN` (with `scale = FALSE`, every centred value was 0). The rowwise
   structure and its identifier columns are kept. A grouped tibble is
   still standardised within each group, which the documentation now
@@ -1670,25 +1815,25 @@
   0.57, since `0.57 * 100` is 56.99999999999999. It now reads "(97.5%
   percentile)".
 
-* `recommend_products()` suggests only items the basket lacks, each
-  once. Rules whose right-hand side was already in the basket were
-  returned: for the basket `whole milk`, `other vegetables`, `yogurt`,
-  `root vegetables`, `tropical fruit` on the `Groceries` rules at
-  `support = 0.001`, `confidence = 0.5` it returned `{yogurt}` and then
-  `{other vegetables}` four times, and now returns no rows, since every
-  rule that fires suggests an item the basket holds. A product suggested
-  by several rules is listed once, with its highest-lift rule. Rules are
-  matched on their item lists, so an item name containing a comma, such
-  as `"salt, iodised"`, can fire a rule; splitting the label on `","`
-  cut it in two.
+* **`recommend_products()` suggests only items the basket lacks, each
+  once, so its recommendations change.** Rules whose right-hand side was
+  already in the basket were returned: for the basket `whole milk`,
+  `other vegetables`, `yogurt`, `root vegetables`, `tropical fruit` on
+  the `Groceries` rules at `support = 0.001`, `confidence = 0.5` it
+  returned `{yogurt}` and then `{other vegetables}` four times, and now
+  returns no rows, since every rule that fires suggests an item the
+  basket holds. A product suggested by several rules is listed once,
+  with its highest-lift rule. Rules are matched on their item lists, so
+  an item name containing a comma, such as `"salt, iodised"`, can fire a
+  rule; splitting the label on `","` cut it in two.
 
-* `filter_rules_by_item()` and `find_related_items()` match whole items.
-  `grepl()` on the labels matched `"coffee"` inside `"instant coffee"`,
-  returning 84 of the `Groceries` rules where 80 contain coffee, and
-  `"ham"` inside `"hamburger meat"`, 207 rules where 102 contain ham; 19
-  `Groceries` items occur inside other item names. `item` must be a
-  single name: a vector was matched on its first element, with a
-  warning.
+* **`filter_rules_by_item()` and `find_related_items()` match whole
+  items, so they return fewer rules.** `grepl()` on the labels matched
+  `"coffee"` inside `"instant coffee"`, returning 84 of the `Groceries`
+  rules where 80 contain coffee, and `"ham"` inside `"hamburger meat"`,
+  207 rules where 102 contain ham; 19 `Groceries` items occur inside
+  other item names. `item` must be a single name: a vector was matched
+  on its first element, with a warning.
 
 * A frequent-itemsets result from `tidy_apriori()` prints and inspects
   as itemsets. `print()` read the rules table, which itemsets do not
@@ -1708,16 +1853,16 @@
   applied to an object of class "NULL"` or, for `visualize_rules()`, an
   arules method-dispatch error.
 
-* `visualize_rules()` plots the `top_n` rules with the highest lift. It
-  took the first `top_n` in mining order under the subtitle "Top 50
-  rules (colored by lift)": on the `Groceries` rules at
-  `support = 0.001`, `confidence = 0.5` it plotted lifts 2.04 to 16.7,
-  where the 50 highest run from 8.08 to 19.0. The subtitle now reads
-  "Top 50 rules by lift". The other methods draw the same top-lift
-  rules.
+* **`visualize_rules()` plots the `top_n` rules with the highest lift,
+  so it draws other rules.** It took the first `top_n` in mining order
+  under the subtitle "Top 50 rules (colored by lift)": on the
+  `Groceries` rules at `support = 0.001`, `confidence = 0.5` it plotted
+  lifts 2.04 to 16.7, where the 50 highest run from 8.08 to 19.0. The
+  subtitle now reads "Top 50 rules by lift". The other methods draw the
+  same top-lift rules.
 
-* `inspect_rules(decreasing = FALSE)` returns the `n` lowest-ranked
-  rules, lowest first, as arules' `head(by = )` does. It took the `n`
+* **`inspect_rules(decreasing = FALSE)` returns the `n` lowest-ranked
+  rules, lowest first, as arules' `head(by = )` does.** It took the `n`
   highest and only reversed their order: lifts 16.4, 16.7 and 19.0 for
   `by = "lift", n = 3` on the `Groceries` rules, where the three lowest
   are 1.96.
@@ -1791,8 +1936,9 @@
   `importance = FALSE` failed with `subscript out of bounds`; it now
   uses the impurity measure the forest does have.
   `tl_table_importance()`, which documented xgboost support, refused
-  xgboost models; they now report gain. `tl_plot_importance()` shares
-  the table's extraction, and the dashboard's importance panel, which
+  xgboost models; they now report gain. `plot(model, type =
+  "importance")` shares the table's extraction, and the dashboard's
+  importance panel, which
   showed an error for `"ridge"`, `"lasso"` and `"elastic_net"`, now
   plots them. `tl_plot_importance_comparison()` with no supported model
   failed inside dplyr; it now says so.
@@ -1808,7 +1954,19 @@
 * `tl_plot_importance_comparison()` counts as zero a feature a model was
   given but did not use. The ranking averaged each feature over only the
   models that kept it, so a feature a lasso dropped could outrank one
-  both models used.
+  both models used. A tree, forest or boost model is given the variables
+  of an interaction, never the interaction itself, so `wt:hp` gets no
+  bar from it.
+
+* **Importance for `method = "boost"` names the columns gbm fitted on,
+  so the rows it reports change.** gbm names its relative influence
+  after the formula's terms but computes it over the variables they use,
+  so for `mpg ~ wt * hp + qsec` `tl_table_importance()`,
+  `plot(model, type = "importance")` and the importance comparison
+  listed a `wt:hp` at zero, a column gbm never had, and for
+  `mpg ~ wt:hp + qsec` they failed with gbm's "row names contain missing
+  values". Both now report `wt`, `hp` and `qsec`, each with its own
+  influence.
 
 * `tl_plot_importance_comparison()` names a factor predictor once for
   every model. randomForest, rpart and gbm report the factor (`Species`)
@@ -1878,38 +2036,37 @@
   fitted on PCA scores alone store no raw rows, and still need
   `new_data`.
 
-* `tl_plot_lift()` and `tl_plot_gain()` no longer depend on row order.
-  Rows with tied probabilities kept the order they arrived in, and a
-  tree scores many rows alike: for a tree of `Species ~ Sepal.Width` on
-  two iris classes, reversing the rows moved the gain at 10% of the
-  population from 0% to 20% of responders. Each row now counts the
-  response rate of its tie group, the value any tie-breaking gives on
-  average. A row missing its response turned every point to `NA` and
-  left the chart empty; those rows are now left out, with a warning. The
-  bins also match `bins`: sizing them by rounding up gave 32 rows in 10
-  bins as 8, and a `bins` that is not a whole number of at least 1 is
-  refused.
+* **`tl_plot_lift()` and `tl_plot_gain()` no longer depend on row order,
+  so their curves change.** Rows with tied probabilities kept the order
+  they arrived in, and a tree scores many rows alike: for a tree of
+  `Species ~ Sepal.Width` on two iris classes, reversing the rows moved
+  the gain at 10% of the population from 0% to 20% of responders. Each
+  row now counts the response rate of its tie group, the value any
+  tie-breaking gives on average. A row missing its response turned every
+  point to `NA` and left the chart empty; those rows are now left out,
+  with a warning. The bins also match `bins`: sizing them by rounding up
+  gave 32 rows in 10 bins as 8, and a `bins` that is not a whole number
+  of at least 1 is refused.
 
-* `tl_plot_lift()`, `tl_plot_gain()` and `tl_table_confusion()` read the
-  observed classes against the model's. The positive class came from the
-  scored data's level order, so reordering `am`'s levels to
-  `c("1", "0")` made the gain chart of `am ~ wt` rank mtcars by
-  P(am = 0) and count the 19 automatic cars as responders, where the
-  model's positive class is the 13 manual ones. Lift and gain decide
-  binary from the model: a test split of
-  `iris[iris$Species != "setosa", ]` still declares setosa, so both
-  charts called a binary model multiclass and refused it; they now draw
-  it. The confusion matrix of a two-class model gained a row of zeros
-  for a class the scored data declared but did not hold, and a row for
-  each class the model was never trained on. It now has one row and one
-  column per class the model was trained on. Rows of any other class are
-  left out with a warning, where lift and gain failed. Lift and gain on
-  scored rows with no row of the positive class are an error naming the
-  class, where every cumulative value was 0 / 0. A `new_data` without
-  the response column is reported by name ("Response variable 'am' not
-  found in the evaluation data") where the charts said the model was not
-  binary and the confusion table failed with "all arguments must have
-  the same length".
+* **`tl_plot_lift()`, `tl_plot_gain()` and `tl_table_confusion()` read
+  the observed classes against the model's.** The positive class came
+  from the scored data's level order, so reordering `am`'s levels to
+  `c("1", "0")` made the gain chart of `am ~ wt` rank mtcars by P(am =
+  0) and count the 19 automatic cars as responders, where the model's
+  positive class is the 13 manual ones. Lift and gain decide binary from
+  the model: a test split of `iris[iris$Species != "setosa", ]` still
+  declares setosa, so both charts called a binary model multiclass and
+  refused it; they now draw it. The confusion matrix of a two-class
+  model gained a row of zeros for a class the scored data declared but
+  did not hold, and a row for each class the model was never trained on.
+  It now has one row and one column per class the model was trained on.
+  Rows of any other class are left out with a warning, where lift and
+  gain failed. Lift and gain on scored rows with no row of the positive
+  class are an error naming the class, where every cumulative value was
+  0 / 0. A `new_data` without the response column is reported by name
+  ("Response variable 'am' not found in the evaluation data") where the
+  charts said the model was not binary and the confusion table failed
+  with "all arguments must have the same length".
 
 * `tl_table_confusion()` warns when rows are missing a response or a
   prediction. `table()` dropped them, and the counts summed to fewer
@@ -1943,7 +2100,8 @@
   n = 22, the training rows. Coefficient and importance tables now count
   the rows the fit used, and metrics, confusion and comparison tables
   the rows scored; a comparison whose models scored different rows gives
-  each model's count.
+  each model's count. An xgboost fit with `weights` counts only the rows
+  with a weight, which are the rows xgboost trains on.
 
 * `tl_table_clusters()` summarises only the columns an hclust or dbscan
   fit used. A dbscan model of `~ Sepal.Length + Sepal.Width` on
@@ -2038,7 +2196,7 @@
   such as `old.csv`, was read as a directory and its rows were added to
   the result.
 
-* `tl_read_zip(file = )` reads the member it was asked for.
+* **`tl_read_zip(file = )` reads the member it was asked for.**
   `file = "train.csv"` read `full_train.csv` when the archive held both,
   because the name was matched as part of each member's base name and
   the first match in file order won, with no message under
@@ -2106,7 +2264,34 @@
   `...` instead. The progress message from `tl_read()` and the
   `tl_source` attribute redact a password given as `?password=`, as a
   libpq keyword, after an empty user name (`postgres://:secret@host`) or
-  under an upper-case scheme, all of which were shown in the clear.
+  under an upper-case scheme, all of which were shown in the clear. The
+  same goes for the SSL key passphrase (`?sslpassword=`), for the other
+  secret-bearing keywords newer libpq versions take
+  (`oauth_client_secret`, `scram_client_key`, `scram_server_key`), and
+  for a password written in quotes (`password='two words'`) or with
+  spaces around `=`. A local path is left alone: the redaction took
+  `C:\Users\ana@corp\data.csv` for `user:password@host` and printed
+  `C:***@corp\data.csv`. The "File not found" error redacts the path it
+  names, which printed a connection string's password in full.
+
+* `tl_read()` refuses a URL whose scheme it has no reader for, such as
+  `ftp://`, with a message naming the scheme and listing the sources it
+  reads; it reported `File not found`. A `file://` URL is read as the
+  local path it names, percent-decoded, where it was reported as not
+  found, and a `file://` URL naming another machine is refused. A source
+  with a scheme can no longer be sent to a file reader with `format`:
+  `tl_read("postgres://ana:secret@host/db", format = "csv")` failed with
+  "File not found" and printed the password.
+  `bigquery://project/dataset` sources are detected and read with
+  `tl_read_bigquery()`, where they stopped with "Cannot detect format".
+
+* `tl_read_bigquery()`, `tl_read_postgres()` and `tl_read_mysql()` check
+  `project`, `dsn` and `query` before contacting a server, and the
+  message names the argument. A `NULL` `project` or `dsn` failed with
+  "argument is of length zero", and an `NA` `dsn` or `query` was handed
+  to the database driver. `tl_read_bigquery()` also refuses a
+  `bigquery://` URI with an empty project or dataset, such as
+  `bigquery:///my_dataset`.
 
 * `tl_read_bigquery(dataset = )` reaches the query as its default
   dataset, so unqualified table names resolve against it, as documented.
@@ -2120,23 +2305,24 @@
   both failed with "missing value where TRUE/FALSE needed", on the
   inputs the advisor exists to size.
 
-* `tl_compute_advisor()` counts predictors from the terms the formula
-  expands to against the data. It counted the variable names on the
-  right-hand side, so on a frame of 200 predictors plus `id` and `y`,
-  `y ~ . - id` was sized as 2 predictors and `y ~ 1` as 201. A fitted
-  model is sized from its own formula the same way.
+* **`tl_compute_advisor()` counts predictors from the terms the formula
+  expands to against the data, so its estimates change.** It counted the
+  variable names on the right-hand side, so on a frame of 200 predictors
+  plus `id` and `y`, `y ~ . - id` was sized as 2 predictors and `y ~ 1`
+  as 201. A fitted model is sized from its own formula the same way.
 
-* `tl_compute_advisor()` sizes the fit tidylearn would run: a runtime
-  hyperparameter left out takes the default of the method's fit
-  function. It assumed 10 epochs of 128 units for `"deep"`, where
-  `tl_fit_deep()` trains 30 epochs through layers of 32 and 16, and a
-  hidden layer of 10 for `"nn"` against `tl_fit_nn()`'s 5, which halves
-  the `"nn"` estimate. On iris's four predictors the `"deep"` estimate
-  is 3.8 times the old one. `"deep"` reads `hidden_layers`; `units`,
-  which the help page listed, is no tidylearn argument and is ignored. A
-  hyperparameter the estimate reads must be a positive number:
-  `nrounds = NA` failed with "attempt to select less than one element",
-  and a negative value gave a negative runtime.
+* **`tl_compute_advisor()` sizes the fit tidylearn would run, so its
+  estimates change.** A runtime hyperparameter left out takes the
+  default of the method's fit function. It assumed 10 epochs of 128
+  units for `"deep"`, where `tl_fit_deep()` trains 30 epochs through
+  layers of 32 and 16, and a hidden layer of 10 for `"nn"` against
+  `tl_fit_nn()`'s 5, which halves the `"nn"` estimate. On iris's four
+  predictors the `"deep"` estimate is 3.8 times the old one. `"deep"`
+  reads `hidden_layers`; `units`, which the help page listed, is no
+  tidylearn argument and is ignored. A hyperparameter the estimate reads
+  must be a positive number: `nrounds = NA` failed with "attempt to
+  select less than one element", and a negative value gave a negative
+  runtime.
 
 * `print()` on a `tl_compute_advisor()` result, and its reasoning and
   notes, write large numbers out in full with thousands separators. A
