@@ -928,17 +928,63 @@ tl_check_predict_type <- function(object, type) {
 #' are cut down to those the formula reads, and the categorical ones put on
 #' their training levels, before any method's predict sees them.
 #'
+#' A predictor missing from new_data is refused first. model.frame() looks
+#' a variable up in the data and then in the formula's environment, so a
+#' missing column was taken from a same-named object in the caller's
+#' session, and the predictions were built from it.
+#'
 #' @param object A supervised tidylearn model
 #' @param new_data Data to predict on
 #' @return `new_data`, prepared
 #' @keywords internal
 #' @noRd
 tl_prepare_new_data <- function(object, new_data) {
+  missing_cols <- setdiff(tl_predictor_columns(object), names(new_data))
+  if (length(missing_cols) > 0) {
+    stop(
+      "New data is missing predictors used at fit time: ",
+      paste(missing_cols, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
   columns <- tl_model_columns(object$spec$formula, object$data)
   if (!is.null(columns)) {
     new_data <- new_data[, intersect(names(new_data), columns), drop = FALSE]
   }
   tl_align_predictor_levels(new_data, object$spec$xlev, object$data)
+}
+
+#' The training columns a model's predictor terms read
+#'
+#' The variables of the predictor terms, an offset's included, that were
+#' columns of the training data. A variable the formula takes from its
+#' environment instead -- a scalar in \code{offset(k * disp)} -- is not a
+#' column new data has to carry, and a column the formula subtracts is not
+#' in the terms at all.
+#'
+#' @param object A supervised tidylearn model
+#' @return Column names; none when the model has no training data
+#' @keywords internal
+#' @noRd
+tl_predictor_columns <- function(object) {
+  if (is.null(object$data)) {
+    return(character(0))
+  }
+  predictor_terms <- attr(object$spec$xlev, "terms")
+  if (!inherits(predictor_terms, "terms")) {
+    predictor_terms <- tryCatch(
+      stats::delete.response(stats::terms(
+        tl_fit_formula(object$spec$formula, object$data, predicting = TRUE),
+        data = object$data
+      )),
+      error = function(e) NULL
+    )
+  }
+  if (is.null(predictor_terms)) {
+    return(character(0))
+  }
+  intersect(all.vars(predictor_terms), names(object$data))
 }
 
 #' One training row to take a prediction's shape from

@@ -218,6 +218,43 @@ for (method in regression_methods) {
   })
 }
 
+# ---- a predictor missing from new data -------------------------------
+
+# model.frame() looks a variable up in the data and then in the formula's
+# environment, so new data without hp took a same-named object from the
+# caller instead: predictions built from someone else's hp, or "object
+# 'hp' not found" when there was none. Only svm refused it.
+
+for (method in regression_methods) {
+  label <- paste0("regression '", method, "'")
+
+  test_that(paste(label, "refuses new data without a predictor"), {
+    model <- fit_model(method, regression_data, mpg ~ wt + hp)
+    hp <- regression_data$hp[1:5]
+
+    expect_error(
+      predict(model, new_data = regression_data[1:5, "wt", drop = FALSE]),
+      "New data is missing predictors used at fit time: hp"
+    )
+  })
+}
+
+for (method in classification_methods) {
+  label <- paste0("binary '", method, "'")
+
+  test_that(paste(label, "refuses new data without a predictor"), {
+    model <- fit_model(method, binary_data, Species ~ .)
+    # Named after the column, as the object model.frame() would pick up
+    Petal.Width <- binary_data$Petal.Width[1:5] # nolint: object_name_linter.
+    lacking <- binary_data[1:5, setdiff(names(binary_data), "Petal.Width")]
+
+    expect_error(
+      predict(model, new_data = lacking, type = "class"),
+      "New data is missing predictors used at fit time: Petal.Width"
+    )
+  })
+}
+
 # ---- a formula that subtracts a column -------------------------------
 
 # terms() keeps a subtracted column among its variables, and predict.lm()

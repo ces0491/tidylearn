@@ -285,6 +285,37 @@ test_that("a column the formula subtracts is not needed to predict", {
   expect_false(anyNA(predict(svm, new_data = noted)$.pred))
 })
 
+test_that("a training column missing from new data is refused, not looked up", {
+  # model.frame() took a same-named object from the caller when new data
+  # lacked the column, so predictions came from a global hp
+  model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+  hp <- c(110, 110, 93, 110, 175)
+  expect_error(
+    predict(model, new_data = mtcars[1:5, "wt", drop = FALSE]),
+    "New data is missing predictors used at fit time: hp"
+  )
+  poly <- tl_model(mtcars, mpg ~ wt + hp, method = "polynomial")
+  expect_error(
+    predict(poly, new_data = mtcars[1:5, "wt", drop = FALSE]),
+    "New data is missing predictors used at fit time: hp"
+  )
+
+  # Every column present still predicts
+  expect_equal(
+    unname(predict(model, new_data = mtcars[1:5, c("wt", "hp")])$.pred),
+    unname(stats::predict(model$fit, newdata = mtcars[1:5, ]))
+  )
+
+  # A variable the formula takes from its environment is not a column to
+  # require
+  k <- 0.01
+  offset <- tl_model(mtcars, mpg ~ wt + offset(k * disp), method = "linear")
+  expect_equal(
+    unname(predict(offset, new_data = mtcars[1:5, c("wt", "disp")])$.pred),
+    unname(stats::predict(offset$fit, newdata = mtcars[1:5, ]))
+  )
+})
+
 test_that("writing out a subtracted formula keeps what the formula means", {
   # Writing y ~ . - x out added an empty column for every variable the
   # data lacked: a global vector became an extra main effect, a local
