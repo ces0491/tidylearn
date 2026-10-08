@@ -392,13 +392,18 @@ tl_auto_ml <- function(data, formula, task = "auto",
   # Helper: train a model with error handling.
   # Note: R cannot safely interrupt C-level code (randomForest, xgboost),
   # so we control budget by skipping models rather than killing them.
+  # Every candidate is fitted to the same response, and tl_model()'s note
+  # about a numeric one with few values came once per candidate; the
+  # candidates share one handler, so the run gives it once. tl_cv()'s fold
+  # refits are quiet already.
+  response_note <- tl_response_note_once()
   safe_train <- function(expr_fn, label) {
     if (budget_left() <= 0) {
       message("    ", label, ": skipped (time budget exhausted)")
       return(NULL)
     }
     tryCatch(
-      expr_fn(),
+      withCallingHandlers(expr_fn(), message = response_note),
       error = function(e) {
         message("    ", label, ": failed - ", e$message)
         NULL

@@ -868,6 +868,25 @@ test_that("stratified logistic fits warn about the conversion once", {
   expect_equal(seen, 1)
 })
 
+test_that("stratified fits give tl_model()'s response note once", {
+  # A cluster's few rows hold few distinct mpg values, so tl_model() noted
+  # it was treating the response as regression, once per cluster
+  notes <- character()
+  set.seed(1)
+  models <- withCallingHandlers(
+    tl_stratified_models(mtcars, mpg ~ wt + hp, k = 3,
+                         supervised_method = "linear"),
+    message = function(m) {
+      if (grepl("unique numeric values", conditionMessage(m), fixed = TRUE)) {
+        notes <<- c(notes, conditionMessage(m))
+      }
+      invokeRestart("muffleMessage")
+    }
+  )
+  expect_length(models$supervised_models, 3)
+  expect_length(notes, 1)
+})
+
 test_that("tl_stratified_models cuts hclust at k and predicts training rows", {
   # hclust failed with "unused argument (k = 2)", and pam and clara fits
   # could not predict even the rows they were fitted on

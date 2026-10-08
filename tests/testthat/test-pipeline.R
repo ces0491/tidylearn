@@ -478,6 +478,73 @@ test_that("a run warns about the logistic response conversion once", {
   )
 })
 
+test_that("a run gives tl_model()'s response note once", {
+  # mpg in the first ten cars has 8 distinct values, so tl_model() notes
+  # it is treating the response as regression, and every fold refit and
+  # every model's final fit said it again: 8 notes for 2 models over 3
+  # folds
+  response_notes <- function(expr) {
+    notes <- character()
+    withCallingHandlers(
+      expr,
+      message = function(m) {
+        if (grepl("unique numeric values", conditionMessage(m),
+                  fixed = TRUE)) {
+          notes <<- c(notes, conditionMessage(m))
+        }
+        invokeRestart("muffleMessage")
+      }
+    )
+    notes
+  }
+  pipe <- tl_pipeline(
+    mtcars[1:10, ], mpg ~ wt,
+    models = list(lin = list(method = "linear"),
+                  tree = list(method = "tree")),
+    evaluation = list(cv_folds = 3, metrics = "rmse", best_metric = "rmse")
+  )
+  set.seed(1)
+  notes <- response_notes(tl_run_pipeline(pipe, verbose = FALSE))
+  # and it is the note about the rows the final models are fitted on
+  expect_length(notes, 1)
+  expect_match(notes, "Response 'mpg' has 8 unique numeric values",
+               fixed = TRUE)
+
+  split_pipe <- pipe
+  split_pipe$evaluation$validation <- "split"
+  set.seed(1)
+  expect_length(response_notes(tl_run_pipeline(split_pipe, verbose = FALSE)),
+                1)
+})
+
+test_that("the response-note handler lets other messages through", {
+  # The handler is shared by every fit of a run. It muffles the second
+  # note tl_model() gives about the response, and nothing else.
+  fit <- function(n) {
+    message("Note: Response 'y' has ", n, " unique numeric values. ",
+            "Treating as regression. Convert to factor for classification.")
+    message("a message from the backend")
+  }
+  once <- tl_response_note_once()
+  seen <- character()
+  withCallingHandlers(
+    {
+      withCallingHandlers(fit(3), message = once)
+      withCallingHandlers(fit(4), message = once)
+    },
+    message = function(m) {
+      seen <<- c(seen, trimws(conditionMessage(m)))
+      invokeRestart("muffleMessage")
+    }
+  )
+  expect_identical(seen, c(
+    paste0("Note: Response 'y' has 3 unique numeric values. Treating as ",
+           "regression. Convert to factor for classification."),
+    "a message from the backend",
+    "a message from the backend"
+  ))
+})
+
 test_that("tl_pipeline refuses arguments and settings it would ignore", {
   # A misspelt argument was swallowed by `...`, leaving cv_folds at 5
   expect_error(

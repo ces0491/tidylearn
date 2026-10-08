@@ -855,7 +855,9 @@ tl_stratified_models <- function(data, formula, cluster_method = "kmeans",
   single_class <- character()
 
   # Logistic on a 0/1 numeric response warns that it converts the response
-  # to a factor, once per cluster fitted. The first is let through.
+  # to a factor, once per cluster fitted. The first is let through, and so
+  # is the first of tl_model()'s notes about a numeric response with few
+  # values, which a cluster's few rows set off in every cluster.
   conversion_warned <- FALSE
   muffle_repeat <- function(w) {
     if (conversion_warned) {
@@ -863,6 +865,7 @@ tl_stratified_models <- function(data, formula, cluster_method = "kmeans",
     }
     conversion_warned <<- TRUE
   }
+  response_note <- tl_response_note_once()
 
   for (i in seq_len(k)) {
     cluster_data <- data[clusters == i, , drop = FALSE]
@@ -881,7 +884,8 @@ tl_stratified_models <- function(data, formula, cluster_method = "kmeans",
     }
     cluster_models[[name]] <- withCallingHandlers(
       tl_model(cluster_data, formula, method = supervised_method, ...),
-      tidylearn_response_conversion = muffle_repeat
+      tidylearn_response_conversion = muffle_repeat,
+      message = response_note
     )
   }
 

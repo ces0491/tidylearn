@@ -160,6 +160,28 @@ test_that("tl_auto_ml fits a computed factor response as a classification", {
   expect_gt(sum(!is.na(result$leaderboard$score)), 0)
 })
 
+test_that("tl_auto_ml gives tl_model()'s response note once", {
+  skip_on_cran()
+
+  # cyl has 3 distinct values, so tl_model() notes it is treating it as
+  # regression, and each of the six candidates said it again
+  notes <- character()
+  set.seed(1)
+  result <- withCallingHandlers(
+    tl_auto_ml(mtcars, cyl ~ wt + hp, time_budget = 10, cv_folds = 2),
+    message = function(m) {
+      if (grepl("unique numeric values", conditionMessage(m), fixed = TRUE)) {
+        notes <<- c(notes, conditionMessage(m))
+      }
+      invokeRestart("muffleMessage")
+    }
+  )
+  expect_gt(length(result$models), 1)
+  expect_length(notes, 1)
+  expect_match(notes, "Response 'cyl' has 3 unique numeric values",
+               fixed = TRUE)
+})
+
 test_that("the leaderboard ranks every computable metric its own way", {
   # sensitivity and specificity were missing from the leaderboard's lists,
   # so ranking by them was refused after every model was fitted

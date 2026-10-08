@@ -32,6 +32,35 @@ tl_metric_higher_better <- function(metrics) {
   )
 }
 
+#' A message handler that gives tl_model()'s response note once
+#'
+#' \code{tl_model()} notes that a numeric response with few distinct values
+#' is being treated as regression. A pipeline, AutoML and the stratified
+#' models fit the same response many times, and every fit said it again: 8
+#' times for a two-model pipeline over 3 folds. One handler is shared by a
+#' run's fits, so the first note comes through and the rest are muffled.
+#' The note has no condition class, so it is recognised by its wording,
+#' and every other message still comes through.
+#'
+#' @return A function for \code{withCallingHandlers(message = )}
+#' @keywords internal
+#' @noRd
+tl_response_note_once <- function() {
+  noted <- FALSE
+  function(m) {
+    text <- conditionMessage(m)
+    if (!startsWith(text, "Note: Response '") ||
+          !grepl("unique numeric values. Treating as regression", text,
+                 fixed = TRUE)) {
+      return(invisible(NULL))
+    }
+    if (noted) {
+      invokeRestart("muffleMessage")
+    }
+    noted <<- TRUE
+  }
+}
+
 #' Fill in and validate a pipeline evaluation specification
 #'
 #' @param evaluation A named list of evaluation settings, or NULL.
@@ -792,10 +821,20 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
   # to a factor, and the loop below refits once per fold, per model, and
   # again on every row: two specs over three folds gave eight copies. The
   # first is let through and the rest muffled.
+  #
+  # tl_model()'s note about a numeric response with few values repeated in
+  # the same way. A fold refit runs quietly, as the tuners' and tl_cv()'s
+  # do, and the models kept share one handler, so the run gives the note
+  # once, about the rows the first of them is fitted on.
   conversion_warned <- FALSE
-  fit_model <- function(args) {
+  response_note <- tl_response_note_once()
+  fit_model <- function(args, fold = FALSE) {
     withCallingHandlers(
-      do.call(tl_model, args),
+      if (fold) {
+        suppressMessages(do.call(tl_model, args))
+      } else {
+        withCallingHandlers(do.call(tl_model, args), message = response_note)
+      },
       tidylearn_response_conversion = function(w) {
         if (conversion_warned) {
           invokeRestart("muffleWarning")
@@ -852,7 +891,7 @@ tl_run_pipeline <- function(pipeline, verbose = TRUE) {
           model_params
         )
 
-        fold_model <- fit_model(model_args)
+        fold_model <- fit_model(model_args, fold = TRUE)
 
         # Evaluate on test fold. tl_evaluate() refuses a fold with no row
         # it can score -- every response in it missing, say -- and one such
