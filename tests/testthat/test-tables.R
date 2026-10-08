@@ -265,6 +265,48 @@ test_that("the importance note counts the rows xgboost, svm and nn fitted", {
   expect_match(tl_table_importance(xgb)[["_source_notes"]][[1]], "n = 116$")
 })
 
+test_that("the row count sees missing weights and svm with no fitted values", {
+  # An svm fitted with fitted = FALSE keeps no fitted values, and the count
+  # fell back to all 153 stored rows, where svm used the 111 complete ones
+  vars <- c("Ozone", "Temp", "Wind", "Solar.R")
+  svm <- tl_model(airquality, Ozone ~ Temp + Wind + Solar.R, method = "svm",
+                  fitted = FALSE)
+  expect_length(svm$fit$fitted, 0L)
+  expect_identical(tl_fit_rows(svm),
+                   sum(stats::complete.cases(airquality[, vars])))
+  expect_identical(tl_fit_rows(svm),
+                   nrow(airquality) - length(svm$fit$na.action))
+
+  # A column the formula subtracts is not one svm needed complete
+  minus <- tl_model(airquality, Ozone ~ . - Solar.R, method = "svm",
+                    fitted = FALSE)
+  used <- setdiff(names(airquality), "Solar.R")
+  expect_identical(tl_fit_rows(minus),
+                   sum(stats::complete.cases(airquality[, used])))
+
+  # xgboost leaves out a row missing its weight, which the count did not
+  # see: 116 rows with an Ozone value, where 108 also have a weight
+  skip_if_not_installed("xgboost")
+  w <- rep(1, nrow(airquality))
+  w[1:10] <- NA
+  xgb <- tl_model(airquality, Ozone ~ Temp + Wind, method = "xgboost",
+                  weights = w, nrounds = 5)
+  expect_identical(tl_fit_rows(xgb), sum(!is.na(airquality$Ozone) & !is.na(w)))
+  expect_identical(
+    tl_fit_rows(xgb),
+    length(tl_xgb_training_rows(Ozone ~ Temp + Wind, airquality, w)$y)
+  )
+
+  # A model read back from disk holds a training DMatrix that no longer
+  # exists, and counts the rows with a response instead of failing
+  unweighted <- tl_model(airquality, Ozone ~ Temp + Wind, method = "xgboost",
+                         nrounds = 5)
+  path <- tempfile(fileext = ".rds")
+  on.exit(unlink(path), add = TRUE)
+  saveRDS(unweighted, path)
+  expect_identical(tl_fit_rows(readRDS(path)), sum(!is.na(airquality$Ozone)))
+})
+
 test_that("models fitted on one frame still share it as the default", {
   skip_if_not_installed("gt")
   # tl_model() makes a text column a factor only where its formula uses

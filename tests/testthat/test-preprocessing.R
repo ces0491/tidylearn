@@ -438,6 +438,55 @@ test_that("an entirely missing factor is left as it is", {
   expect_equal(out$data$x, (d$x - mean(d$x)) / stats::sd(d$x))
 })
 
+test_that("tl_prepare_data reports imputing only when it imputes", {
+  # The only missing column was entirely missing, so nothing was filled,
+  # yet the call said "Imputing missing values using method: mean" and
+  # recorded an imputation step with no values
+  d <- data.frame(
+    y = c(1, 4, 2, 8, 5, 7), x = c(3, 1, 4, 1, 5, 9),
+    f = factor(rep(NA, 6), levels = c("a", "b", "c"))
+  )
+  expect_no_message(
+    out <- tl_prepare_data(d, y ~ ., scale_method = "none"),
+    message = "Imputing missing values"
+  )
+  expect_null(out$preprocessing_steps$imputation)
+  expect_identical(out$data$f, d$f)
+
+  # A column with a value to impute from is still filled, and said so
+  d$x[2] <- NA
+  expect_message(
+    out <- tl_prepare_data(d, y ~ ., scale_method = "none"),
+    "Imputing missing values using method: mean",
+    fixed = TRUE
+  )
+  expect_identical(out$preprocessing_steps$imputation$imputation_values,
+                   list(x = mean(d$x, na.rm = TRUE)))
+  expect_equal(out$data$x[2], mean(d$x, na.rm = TRUE))
+})
+
+test_that("tl_prepare_data reports scaling only when it scales", {
+  # A numeric column whose spread is not finite is left unscaled, yet with
+  # no other numeric predictor the call still said "Scaling numeric
+  # features" and recorded a scaling step with no parameters
+  d <- data.frame(y = 1:5, x = c(1, 2, Inf, 4, 5))
+  expect_no_message(
+    out <- tl_prepare_data(d, y ~ .),
+    message = "Scaling numeric features"
+  )
+  expect_null(out$preprocessing_steps$scaling)
+  expect_identical(out$data$x, d$x)
+
+  d$z <- c(2, 7, 1, 8, 2)
+  expect_message(
+    out <- tl_prepare_data(d, y ~ .),
+    "Scaling numeric features using method: standardize",
+    fixed = TRUE
+  )
+  expect_named(out$preprocessing_steps$scaling$scaling_params, "z")
+  expect_equal(out$data$z, (d$z - mean(d$z)) / stats::sd(d$z))
+})
+
 test_that("a single row is returned without scaling", {
   # One value has an NA variance, and NA in the zero-variance selection
   # failed with "Selections can't have missing values"

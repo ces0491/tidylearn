@@ -92,17 +92,47 @@ tl_fit_rows <- function(model) {
     tree = fit$frame$n[1],
     forest = length(fit$predicted),
     boost = fit$nTrain,
-    # The rows the fit trained on: those with a response, as xgboost
-    # routes a missing predictor itself
-    xgboost = length(
-      tl_xgb_training_rows(model$spec$formula, model$data)$y
-    ),
-    # Fitted values, one per row fitted; e1071 keeps none with fitted = FALSE
-    svm = if (length(fit$fitted) > 0L) length(fit$fitted),
+    xgboost = tl_xgb_fit_rows(model),
+    # Fitted values, one per row fitted. e1071 keeps none with
+    # fitted = FALSE, but records the rows its model frame left out; a
+    # count of complete cases would also have counted a column the
+    # formula subtracts.
+    svm = if (length(fit$fitted) > 0L) {
+      length(fit$fitted)
+    } else {
+      nrow(model$data) - length(fit$na.action)
+    },
     nn = if (!is.null(fit$fitted.values)) NROW(fit$fitted.values),
     tryCatch(stats::nobs(fit), error = function(e) NULL)
   )
   if (is.numeric(n) && length(n) == 1L && !is.na(n)) n else nrow(model$data)
+}
+
+#' Rows an xgboost model trained on
+#'
+#' xgboost trains on the rows with a response, as it routes a missing
+#' predictor itself, and with a weight when weights are given. The model
+#' keeps the weights' name but not their values, so counting the rows with
+#' a response alone gave 116 for airquality where ten missing weights left
+#' 108. The count is read off the training \code{xgb.DMatrix}, which the
+#' booster's call holds. A model read back from disk holds a DMatrix that
+#' no longer exists, and falls back to the rows with a response.
+#'
+#' @param model A tidylearn xgboost model.
+#' @return The number of training rows, as an integer.
+#' @keywords internal
+#' @noRd
+tl_xgb_fit_rows <- function(model) {
+  fit <- model$fit
+  # The call is an attribute from xgboost 3.0, an element before it
+  dtrain <- (attr(fit, "call") %||% fit$call)$data
+  n <- if (inherits(dtrain, "xgb.DMatrix")) {
+    tryCatch(nrow(dtrain), error = function(e) NULL)
+  }
+  if (is.null(n)) {
+    n <- length(tl_xgb_training_rows(model$spec$formula, model$data)$y)
+  }
+  as.integer(n)
 }
 
 #' Rows a table scored

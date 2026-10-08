@@ -141,12 +141,16 @@ tl_prepare_data <- function(data, formula = NULL,
     predictor_data <- processed_data
   }
 
-  # 1. Handle missing values
+  # 1. Handle missing values. An entirely missing column is not imputed, and
+  # when it was the only one missing, the call still said it was imputing
+  # and recorded a step with no values.
   if (any(is.na(predictor_data))) {
-    message("Imputing missing values using method: ", impute_method)
     imputation_info <- impute_missing(predictor_data, method = impute_method)
-    predictor_data <- imputation_info$data
-    preprocessing_steps$imputation <- imputation_info
+    if (length(imputation_info$imputation_values) > 0L) {
+      message("Imputing missing values using method: ", impute_method)
+      predictor_data <- imputation_info$data
+      preprocessing_steps$imputation <- imputation_info
+    }
   }
 
   # 2. Encode categorical variables. vapply() keeps an empty predictor set
@@ -204,14 +208,18 @@ tl_prepare_data <- function(data, formula = NULL,
       vapply(predictor_data, is.numeric, logical(1))
     ]
 
+    # A column with no finite spread is left unscaled, so the message and
+    # the step wait until a column has been scaled
     if (length(numeric_cols) > 0) {
-      message("Scaling numeric features using method: ", scale_method)
       scaling_info <- scale_features(
         predictor_data, numeric_cols,
         method = scale_method
       )
-      predictor_data <- scaling_info$data
-      preprocessing_steps$scaling <- scaling_info
+      if (length(scaling_info$scaling_params) > 0L) {
+        message("Scaling numeric features using method: ", scale_method)
+        predictor_data <- scaling_info$data
+        preprocessing_steps$scaling <- scaling_info
+      }
     }
   }
 

@@ -617,6 +617,81 @@ test_that("importance comparison zero-fills only a model's own predictors", {
                   names(sort(average, decreasing = TRUE))[1:2])
 })
 
+test_that("importance comparison gives an interaction no bar from a forest", {
+  # randomForest and gbm are handed wt and hp for wt * hp, never a wt:hp
+  # column, yet the term label counted as given to them: wt:hp drew a zero
+  # bar for the forest and the boost, and its average fell to a third of
+  # the lasso's 77.5
+  set.seed(1)
+  lasso <- tl_model(mtcars, mpg ~ wt * hp + qsec, method = "lasso")
+  forest <- tl_model(mtcars, mpg ~ wt * hp + qsec, method = "forest",
+                     ntree = 100)
+  boost <- tl_model(mtcars, mpg ~ wt * hp + qsec, method = "boost",
+                    n.minobsinnode = 3)
+  p <- tl_plot_importance_comparison(lasso, forest, boost,
+                                     names = c("lasso", "forest", "boost"))
+  d <- as.data.frame(p$data)
+  expect_setequal(d$feature[d$model == "lasso"], c("wt", "hp", "qsec", "wt:hp"))
+  expect_setequal(d$feature[d$model == "forest"], c("wt", "hp", "qsec"))
+  expect_setequal(d$feature[d$model == "boost"], c("wt", "hp", "qsec"))
+
+  # wt:hp ranks on the lasso's value alone
+  lasso_imp <- tl_get_importance_regularized(lasso)
+  top <- tl_plot_importance_comparison(lasso, forest, boost, top_n = 2)$data
+  ranked <- c(
+    wt = mean(d$importance[d$feature == "wt"]),
+    hp = mean(d$importance[d$feature == "hp"]),
+    qsec = mean(d$importance[d$feature == "qsec"]),
+    "wt:hp" = lasso_imp$importance[lasso_imp$feature == "wt:hp"]
+  )
+  expect_setequal(unique(as.character(top$feature)),
+                  names(sort(ranked, decreasing = TRUE))[1:2])
+
+  # The forest keeps its own values: randomForest's directly
+  forest_raw <- randomForest::importance(forest$fit)[, "%IncMSE"]
+  expect_equal(
+    d$importance[d$model == "forest"][match(names(forest_raw),
+                                            d$feature[d$model == "forest"])],
+    unname(100 * forest_raw / max(forest_raw))
+  )
+
+  # A variable that only an interaction names is still one the forest was
+  # given, under its own name
+  forest_parts <- tl_model(mtcars, mpg ~ wt:hp + qsec, method = "forest",
+                           ntree = 100)
+  lasso_parts <- tl_model(mtcars, mpg ~ wt:hp + qsec, method = "lasso")
+  parts <- tl_plot_importance_comparison(lasso_parts, forest_parts,
+                                         names = c("lasso", "forest"))$data
+  expect_setequal(parts$feature[parts$model == "forest"],
+                  c("wt", "hp", "qsec"))
+  expect_setequal(parts$feature[parts$model == "lasso"], c("wt:hp", "qsec"))
+})
+
+test_that("boost importance names the columns gbm was given", {
+  # gbm names its influence after the formula's term labels but computes
+  # it over the variables they use. For wt * hp it reported a wt:hp it had
+  # no column for, at zero; for wt:hp + qsec it put wt's influence under
+  # wt:hp, left hp's unnamed and summary() failed with "row names contain
+  # missing values"
+  set.seed(1)
+  boost <- tl_model(mtcars, mpg ~ wt * hp + qsec, method = "boost",
+                    n.minobsinnode = 3)
+  imp <- tl_extract_importance(boost)
+  expect_setequal(imp$feature, c("wt", "hp", "qsec"))
+  raw <- gbm::relative.influence(boost$fit, n.trees = boost$fit$n.trees)
+  expect_equal(imp$importance[match(c("wt", "hp", "qsec"), imp$feature)],
+               unname(100 * raw[1:3] / max(raw)))
+
+  set.seed(1)
+  parts <- tl_model(mtcars, mpg ~ wt:hp + qsec, method = "boost",
+                    n.minobsinnode = 3)
+  imp <- tl_extract_importance(parts)
+  # gbm's columns are qsec, wt and hp, in that order, whatever it names them
+  raw <- gbm::relative.influence(parts$fit, n.trees = parts$fit$n.trees)
+  expect_equal(imp$importance[match(c("qsec", "wt", "hp"), imp$feature)],
+               unname(100 * raw[1:3] / max(raw)))
+})
+
 test_that("a model with no importance stays in the comparison", {
   # A lasso that penalised every predictor away has no importance rows,
   # so it dropped out of the comparison without a word

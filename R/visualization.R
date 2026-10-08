@@ -19,8 +19,10 @@ NULL
 #' design columns stands for it where a method ranks those columns
 #' separately (ridge, lasso, elastic net and xgboost). A predictor a model
 #' was given but did not use scores zero for that model; one it was never
-#' given has no bar for it. Features are ranked on their mean importance
-#' over the models that were given them.
+#' given has no bar for it. Tree, forest and boost models are given the
+#' variables of an interaction such as \code{wt:hp} rather than the
+#' interaction itself, so it has no bar for them. Features are ranked on
+#' their mean importance over the models that were given them.
 #'
 #' @param ... tidylearn model objects to compare
 #' @param top_n Number of top features to display (default: 10)
@@ -123,7 +125,10 @@ tl_comparison_importance <- function(model, name) {
   method <- model$spec$method
   if (method %in% c("tree", "forest", "boost", "xgboost")) {
     imp <- tl_extract_importance(model)
-    mapped <- tl_importance_terms(model, imp$feature)
+    # xgboost is fitted on the design matrix, which has a wt:hp column for
+    # wt * hp; rpart, randomForest and gbm are handed the variables alone
+    given <- if (method == "xgboost") "terms" else "variables"
+    mapped <- tl_importance_terms(model, imp$feature, given = given)
   } else if (method %in% c("ridge", "lasso", "elastic_net")) {
     # Two design columns can share a name -- a factor a with level b beside
     # a numeric column ab -- so a column's term comes from its position
@@ -177,15 +182,41 @@ tl_comparison_importance <- function(model, name) {
 #'
 #' @param model A tidylearn supervised model.
 #' @param features Feature names an importance extractor returned.
-#' @return A list: \code{terms}, the model's term labels (the predictors it
-#'   was given), and \code{feature_terms}, the term each of
-#'   \code{features} belongs to. A name that matches no term is kept as it
-#'   is.
+#' @param given What the backend was given: \code{"terms"}, the formula's
+#'   terms, for a fit on the design matrix; or \code{"variables"}, the
+#'   variables those terms use, for rpart, randomForest and gbm, which take
+#'   wt and hp for wt * hp and never a wt:hp column.
+#' @return A list: \code{terms}, the predictors the model was given (term
+#'   labels, or variables named as term labels name them), and
+#'   \code{feature_terms}, the one each of \code{features} belongs to. A
+#'   name that matches none is kept as it is.
 #' @keywords internal
 #' @noRd
-tl_importance_terms <- function(model, features) {
+tl_importance_terms <- function(model, features,
+                                given = c("terms", "variables")) {
+  given <- match.arg(given)
   formula <- model$spec$formula
-  labels <- attr(stats::terms(formula, data = model$data), "term.labels")
+  model_terms <- stats::terms(formula, data = model$data)
+  labels <- attr(model_terms, "term.labels")
+  if (given == "variables") {
+    # Taking every term label as given drew a zero bar for wt:hp, a term
+    # the backend never had a column for. A variable that only a
+    # subtracted term names is in no term, and was not given either.
+    factors <- attr(model_terms, "factors")
+    labels <- if (length(factors) > 0L) {
+      rownames(factors)[rowSums(factors) > 0]
+    } else {
+      character(0)
+    }
+    if (length(labels) > 0L) {
+      # The design-column lookup below then maps the columns of a matrix
+      # variable, poly(hp, 2)1 and poly(hp, 2)2, to that variable even when
+      # only an interaction uses it
+      variables_only <- stats::reformulate(labels)
+      environment(variables_only) <- environment(formula)
+      formula <- variables_only
+    }
+  }
   # A term label backquotes a non-syntactic name, `car weight`, as glmnet
   # and xgboost columns do; rpart names the variable without them, and
   # randomForest rebuilds its frame with data.frame(), which makes the name
@@ -321,15 +352,9 @@ tl_extract_importance <- function(model) {
       importance = imp$Gain
     )
   } else if (method == "boost") {
-    # Gradient boosting importance
-    # Get relative influence from gbm
-    imp <- summary(fit, plotit = FALSE)
-
-    # Create a data frame for plotting
-    importance_df <- tibble::tibble(
-      feature = imp$var,
-      importance = imp$rel.inf
-    )
+    # gbm's relative influence, named after the columns gbm fitted on
+    # rather than as summary() names it
+    importance_df <- tl_gbm_influence(fit)
   } else {
     stop(
       "Variable importance extraction not implemented for method: ",
@@ -341,6 +366,48 @@ tl_extract_importance <- function(model) {
   importance_df$importance <- tl_rescale_importance(importance_df$importance)
 
   importance_df
+}
+
+#' Relative influence of each column a gbm fit was given
+#'
+#' gbm names its influence after the formula's term labels, but it fits on
+#' a frame of the variables those terms use, and an influence belongs to a
+#' position in that frame. For wt * hp + qsec the frame is wt, hp and qsec,
+#' and summary() added a wt:hp it had no column for, at zero. For
+#' wt:hp + qsec the frame is qsec, wt and hp: wt's influence was reported
+#' as wt:hp's, hp's had no name, and summary() failed with "row names
+#' contain missing values". Each position is named here after the column
+#' gbm built, as \code{gbm()} builds it from \code{fit$var.names}. A fit
+#' from \code{gbm.fit()}, which has no terms, was handed its columns and
+#' names each one.
+#'
+#' @param fit A \code{gbm} object.
+#' @return A tibble of \code{feature} and \code{importance}, the relative
+#'   influence over all the fitted trees, one row per column, largest
+#'   first as \code{summary()} orders it.
+#' @keywords internal
+#' @noRd
+tl_gbm_influence <- function(fit) {
+  features <- if (is.null(fit$Terms)) {
+    fit$var.names
+  } else {
+    rownames(
+      attr(stats::terms(stats::reformulate(fit$var.names)), "factors")
+    )
+  }
+
+  # A column past the last term label that no tree split on is beyond the
+  # end of gbm's vector, and has no influence
+  influence <- unname(gbm::relative.influence(fit, n.trees = fit$n.trees))
+  influence <- c(influence, numeric(max(0L, length(features) -
+                                          length(influence))))
+  influence <- influence[seq_along(features)]
+
+  ordered <- order(influence, decreasing = TRUE)
+  tibble::tibble(
+    feature = features[ordered],
+    importance = influence[ordered]
+  )
 }
 
 #' Extract importance from a regularized regression model
