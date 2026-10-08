@@ -1459,7 +1459,7 @@ test_that("component counts are checked by name", {
 # ---- market basket ---------------------------------------------------
 
 groceries <- function() {
-  skip_if_not_installed("arules")
+  testthat::skip_if_not_installed("arules")
   env <- new.env()
   utils::data("Groceries", package = "arules", envir = env)
   env$Groceries

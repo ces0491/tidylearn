@@ -170,13 +170,13 @@ for (method in regression_methods) {
 # or code binding the two together breaks.
 
 expect_same_shape <- function(none, one, info) {
-  expect_equal(nrow(none), 0L, info = info)
-  expect_identical(class(none), class(one), info = info)
-  expect_identical(names(none), names(one), info = info)
-  expect_identical(
+  testthat::expect_equal(nrow(none), 0L, info = info)
+  testthat::expect_identical(class(none), class(one), info = info)
+  testthat::expect_identical(names(none), names(one), info = info)
+  testthat::expect_identical(
     lapply(none, class), lapply(one, class), info = info
   )
-  expect_identical(
+  testthat::expect_identical(
     lapply(none, levels), lapply(one, levels), info = info
   )
 }
