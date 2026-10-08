@@ -28,7 +28,15 @@ tl_tune_grid(
 \code{\link{tl_model}} argument to tune, named after it}
 
 \item{folds}{Number of cross-validation folds, a whole number between 2
-and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn.}
+and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn,
+and each fold then scores a single prediction. \code{"accuracy"},
+\code{"mae"}, \code{"mse"} and \code{"mape"} average to their values
+over the left-out predictions. The average \code{"rmse"} is the mean
+absolute error; \code{"precision"}, \code{"recall"},
+\code{"sensitivity"}, \code{"specificity"} and \code{"f1"} are
+undefined on the folds whose one row gives them nothing to divide by;
+and \code{"rsq"}, \code{"auc"} and \code{"pr_auc"} are undefined on
+every fold. A run scoring any of these warns once.}
 
 \item{metric}{Metric to optimize: one of the names
 \code{\link{tl_evaluate}} computes for the task. Defaults to
@@ -74,8 +82,9 @@ function stops.
 For \code{method = "forest"}, an \code{mtry} above the number of
 predictors is capped at that number, with a warning, and duplicate
 combinations that result are evaluated once. Predictors are counted as
-randomForest counts them, so a column removed with \code{- id} is not
-one.
+the forest is fitted on them, so a column removed with \code{- id} is
+not one, and a matrix-valued term such as \code{poly(hp, 2)} is one per
+column.
 }
 \description{
 Tune hyperparameters for a model using grid search

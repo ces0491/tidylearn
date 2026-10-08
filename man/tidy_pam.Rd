@@ -18,8 +18,9 @@ Use "gower" for mixed data types.}
 
 \item{...}{Further arguments passed to \code{\link[cluster]{pam}}, such
 as \code{nstart}, \code{variant} or starting \code{medoids}.
-\code{cluster.only} and \code{diss} are refused: the first leaves no
-fit to build the result from, and tidy_pam() sets the second itself.}
+\code{cluster.only = TRUE} and \code{diss} are refused, under any
+abbreviation R would accept: the first leaves no fit to build the
+result from, and tidy_pam() sets the second itself from \code{data}.}
 }
 \value{
 A list of class "tidy_pam" containing:

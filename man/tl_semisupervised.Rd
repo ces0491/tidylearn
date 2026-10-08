@@ -17,8 +17,13 @@ tl_semisupervised(
 \arguments{
 \item{data}{A data frame}
 
-\item{formula}{Model formula. The response must be a factor, character
-or logical column.}
+\item{formula}{Model formula. The response must be categorical: a
+factor, character or logical column, or an expression that computes a
+factor or character vector from a column, such as \code{factor(am)} or
+\code{factor(mpg > 20)}. For an expression, each row's propagated label
+is written to that column as its value in a labelled row of the same
+class. An expression that then computes other labels, such as
+\code{cut(mpg, 2)}, whose breaks follow the column's range, is refused.}
 
 \item{labeled_indices}{Indices of labeled observations}
 

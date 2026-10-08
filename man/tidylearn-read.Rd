@@ -37,7 +37,8 @@ Supported databases (via \pkg{DBI}):
 \item \strong{SQLite}: \code{.sqlite}, \code{.db} files via \pkg{RSQLite}
 \item \strong{PostgreSQL}: via \pkg{RPostgres}
 \item \strong{MySQL/MariaDB}: via \pkg{RMariaDB}
-\item \strong{BigQuery}: via \pkg{bigrquery}
+\item \strong{BigQuery}: \code{bigquery://project/dataset} URIs via
+\pkg{bigrquery}
 }
 
 Supported cloud/API sources:
@@ -46,7 +47,9 @@ Supported cloud/API sources:
 \item \strong{GitHub}: raw file download from repositories
 \item \strong{Kaggle}: dataset download via Kaggle CLI
 }
-Other web URLs are not read; download the file first.
+A \code{file://} URL is read as the local path it names. Other web
+URLs, and URLs with any other scheme such as \code{ftp://}, are not
+read; download the file first.
 
 Multi-file reading:
 \itemize{

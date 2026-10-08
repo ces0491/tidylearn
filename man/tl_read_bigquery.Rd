@@ -7,7 +7,9 @@
 tl_read_bigquery(project, query, dataset = NULL, ...)
 }
 \arguments{
-\item{project}{Google Cloud project ID.}
+\item{project}{Google Cloud project ID, or a
+\code{bigquery://project/dataset} URI, whose dataset is used when
+\code{dataset} is not given.}
 
 \item{query}{A SQL query string (Standard SQL).}
 

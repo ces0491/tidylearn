@@ -26,8 +26,10 @@ appears once, under its own name, for every model: the largest of its
 design columns stands for it where a method ranks those columns
 separately (ridge, lasso, elastic net and xgboost). A predictor a model
 was given but did not use scores zero for that model; one it was never
-given has no bar for it. Features are ranked on their mean importance
-over the models that were given them.
+given has no bar for it. Tree, forest and boost models are given the
+variables of an interaction such as \code{wt:hp} rather than the
+interaction itself, so it has no bar for them. Features are ranked on
+their mean importance over the models that were given them.
 }
 \examples{
 \donttest{

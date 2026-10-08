@@ -14,7 +14,15 @@ tl_cv(data, formula, method, folds = 5, metrics = NULL, transform = NULL, ...)
 \item{method}{Modeling method}
 
 \item{folds}{Number of cross-validation folds, a whole number between 2
-and \code{nrow(data)}}
+and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn,
+and each fold then scores a single prediction. \code{"accuracy"},
+\code{"mae"}, \code{"mse"} and \code{"mape"} average to their values
+over the left-out predictions. The average \code{"rmse"} is the mean
+absolute error; \code{"precision"}, \code{"recall"},
+\code{"sensitivity"}, \code{"specificity"} and \code{"f1"} are
+undefined on the folds whose one row gives them nothing to divide by;
+and \code{"rsq"}, \code{"auc"} and \code{"pr_auc"} are undefined on
+every fold. A run scoring any of these warns once.}
 
 \item{metrics}{Character vector of metrics to compute on each fold,
 passed to \code{\link{tl_evaluate}}. If \code{NULL} (the default),
@@ -46,7 +54,8 @@ A list with two elements:
 performance across folds. A metric undefined on a fold -- auc
 on a fold holding one class -- is \code{NA} there and left out
 of the mean and sd. So is every metric of a fold none of whose
-rows can be scored, with a warning giving the reason.}
+rows can be scored, with a warning giving the reason. A metric
+with no value on any fold has \code{NA} mean and sd.}
 }
 }
 \description{

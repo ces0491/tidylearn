@@ -7,10 +7,11 @@
 tl_read(source, ..., format = NULL, .quiet = FALSE)
 }
 \arguments{
-\item{source}{A file path, a GitHub or Kaggle URL, an \code{s3://} URI,
-a database connection string, a directory path, or a character vector
-of multiple file paths. Other web URLs are refused: download the file
-and read the local copy.}
+\item{source}{A file path or \code{file://} URL, a GitHub or Kaggle URL,
+an \code{s3://} or \code{bigquery://} URI, a database connection
+string, a directory path, or a character vector of multiple file
+paths. Other web URLs, and URLs with any other scheme such as
+\code{ftp://}, are refused: download the file and read the local copy.}
 
 \item{...}{Additional arguments passed to the format-specific reader.}
 
@@ -22,7 +23,10 @@ One of \code{"csv"}, \code{"tsv"},
 \code{"s3"}, \code{"github"}, \code{"kaggle"}. When \code{NULL} (default),
 the format is auto-detected from the file extension
 or source pattern. Note: \code{.txt} files default
-to CSV; use \code{format = "tsv"} to override.}
+to CSV; use \code{format = "tsv"} to override. A source with a URL
+scheme other than \code{file://} is read only with the format its
+scheme or host implies; to read an S3 object as a given file format,
+call \code{tl_read_s3()} with that format.}
 
 \item{.quiet}{Logical. If \code{TRUE}, suppresses
 informational messages. Default is \code{FALSE}.}

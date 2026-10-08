@@ -96,9 +96,14 @@ except for these, which tidylearn takes itself:
 \describe{
 \item{\code{"polynomial"}}{\code{degree} (default 2). Each numeric main
 effect is replaced by \code{poly(term, degree, raw = TRUE)} and the
-result fitted with \code{lm()}. Factor terms, interactions,
-\code{I()} terms, the response as written, an \code{offset()} and
-a removed intercept are kept as they are.}
+result fitted with \code{lm()}. A numeric term is one that computes a
+numeric vector, such as \code{wt} or \code{log(wt)}, or a one-column
+matrix, such as \code{scale(wt)}. One that is also part of an
+interaction keeps its own term and gains \code{I(x^2)} up to
+\code{I(x^degree)}, so the interaction is coded as written. Factor
+and other non-numeric terms, interactions, \code{I()} terms, bases
+such as \code{poly()} or a spline's, the response as written, an
+\code{offset()} and a removed intercept are kept as they are.}
 \item{\code{"ridge"}, \code{"lasso"}, \code{"elastic_net"}}{
 \code{alpha}, glmnet's mixing parameter (by default 0, 1 and 0.5);
 \code{lambda}, a single penalty to fit at, a sequence of penalties for

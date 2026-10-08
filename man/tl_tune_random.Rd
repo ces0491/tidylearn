@@ -51,7 +51,15 @@ given, whether or not they are whole}
 combinations to try, a whole number of at least 1}
 
 \item{folds}{Number of cross-validation folds, a whole number between 2
-and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn.}
+and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn,
+and each fold then scores a single prediction. \code{"accuracy"},
+\code{"mae"}, \code{"mse"} and \code{"mape"} average to their values
+over the left-out predictions. The average \code{"rmse"} is the mean
+absolute error; \code{"precision"}, \code{"recall"},
+\code{"sensitivity"}, \code{"specificity"} and \code{"f1"} are
+undefined on the folds whose one row gives them nothing to divide by;
+and \code{"rsq"}, \code{"auc"} and \code{"pr_auc"} are undefined on
+every fold. A run scoring any of these warns once.}
 
 \item{metric}{Metric to optimize, as for \code{\link{tl_tune_grid}}}
 

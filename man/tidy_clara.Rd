@@ -20,8 +20,9 @@ takes no distance matrix; use \code{\link{tidy_pam}} for a dist object.}
 
 \item{...}{Further arguments passed to \code{\link[cluster]{clara}}, such
 as \code{correct.d}, \code{pamLike} or \code{rngR}.
-\code{cluster.only} and \code{medoids.x} are refused, since the result
-needs the fit and its medoids.}
+\code{cluster.only = TRUE} and \code{medoids.x = FALSE} are refused,
+under any abbreviation R would accept, since the result needs the fit
+and its medoids.}
 }
 \value{
 A list of class \code{"tidy_clara"} containing:
