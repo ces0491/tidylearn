@@ -7,26 +7,31 @@
 tidy_dbscan(data, eps, minPts = 5, cols = NULL, distance = "euclidean")
 }
 \arguments{
-\item{data}{A data frame, tibble, or distance matrix}
+\item{data}{A data frame, tibble, numeric matrix, or dist object}
 
 \item{eps}{Neighborhood radius (epsilon)}
 
 \item{minPts}{Minimum number of points to form a dense region (default: 5)}
 
 \item{cols}{Columns to include (tidy select).
-If NULL, uses all numeric columns.}
+If NULL, uses all numeric columns, or every column for
+\code{distance = "gower"}.}
 
-\item{distance}{Distance metric if data is not a
-dist object (default: "euclidean")}
+\item{distance}{Distance metric if data is not a dist object (default:
+"euclidean"): any method \code{\link[stats]{dist}} accepts, or "gower"
+for mixed data types}
 }
 \value{
 A list of class "tidy_dbscan" containing:
 \itemize{
-\item clusters: tibble with observation IDs and
-cluster assignments (0 = noise)
-\item core_points: logical vector indicating core points
+\item clusters: tibble with observation IDs, cluster assignments
+(0 = noise), and the logical flags \code{is_noise} and
+\code{is_core}
+\item summary: tibble with each cluster's size and number of core
+points
 \item n_clusters: number of clusters (excluding noise)
 \item n_noise: number of noise points
+\item eps, minPts: the parameters used
 \item model: original dbscan object
 }
 }

@@ -16,18 +16,22 @@ If NULL, uses training data.}
 \code{"response"} (default), \code{"prob"} or \code{"class"}. Note
 that \code{"response"} is method-dependent -- logistic regression
 returns probabilities, trees and forests return class labels -- so
-pass \code{"class"} explicitly when you want labels. Ignored by
-unsupervised models, whose output is determined by the method.}
+pass \code{"class"} explicitly when you want labels. \code{"prob"}
+and \code{"class"} need a classification model, and any other value
+is an error. Ignored by unsupervised models, whose output is
+determined by the method.}
 
 \item{...}{Additional arguments}
 }
 \value{
 For supervised models, a \link[tibble]{tibble} with a
 \code{.pred} column; with \code{type = "prob"}, one column per class
-instead. For unsupervised models, the method's natural output: an
-\code{.obs_id} column plus component scores for \code{"pca"} and
-\code{"mds"}, or plus a \code{cluster} column for the clustering
-methods.
+instead. It has one row per row of \code{new_data}, in order, and
+zero rows for zero-row \code{new_data}. For unsupervised models, the
+method's natural output: an \code{.obs_id} column, the row names of
+the data predicted on, plus component scores for \code{"pca"} and
+\code{"mds"} (as many as the model keeps), or plus a \code{cluster}
+column for the clustering methods.
 
 Unsupervised models differ in whether they can handle new data.
 \code{"pca"} projects it and \code{"kmeans"} assigns it to the

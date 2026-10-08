@@ -15,20 +15,24 @@
 #' \code{\link{tl_pipeline}}, which learns its preprocessing inside each
 #' resampling fold.
 #'
-#' @param data A data frame
-#' @param formula Optional formula (for supervised learning). Only its
-#'   predictors are processed; a column it excludes, such as \code{- id},
-#'   is returned unchanged.
+#' @param data A data frame. A grouped tibble is prepared as a whole and
+#'   returned ungrouped.
+#' @param formula Optional two-sided formula (for supervised learning),
+#'   whose response must be a column of \code{data}. Only its predictors are
+#'   processed; a column it excludes, such as \code{- id}, is returned
+#'   unchanged. Leave it \code{NULL} to process every column.
 #' @param impute_method Method for imputing a missing numeric value:
 #'   "mean", "median" or "mode". A missing categorical value is always
 #'   filled with the column's most frequent value.
 #' @param scale_method Scaling method: "standardize",
-#'   "normalize", "robust", "none"
+#'   "normalize", "robust", "none". A column whose spread is zero or not
+#'   finite, such as one holding an \code{Inf}, is left unscaled.
 #' @param encode_categorical Whether to encode categorical
 #'   variables (default: TRUE)
 #' @param remove_zero_variance Remove zero-variance features (default: TRUE)
 #' @param remove_correlated Remove highly correlated features (default: FALSE)
-#' @param correlation_cutoff Correlation threshold for removal (default: 0.95)
+#' @param correlation_cutoff Correlation threshold for removal, greater than
+#'   0 and at most 1 (default: 0.95)
 #' @return A list with components:
 #'   \describe{
 #'     \item{\code{data}}{The processed data frame.}
@@ -54,6 +58,15 @@ tl_prepare_data <- function(data, formula = NULL,
 
   if (!is.null(formula)) {
     formula <- tl_as_formula(formula)
+    # all.vars(~ x1 + x2)[1] is x1, which was then passed through
+    # unprocessed as if it were the response
+    if (length(formula) != 3L) {
+      stop(
+        "'formula' has no response: write it as y ~ predictors, or leave ",
+        "formula = NULL to process every column.",
+        call. = FALSE
+      )
+    }
   }
 
   imputers <- c("mean", "median", "mode")
@@ -66,13 +79,50 @@ tl_prepare_data <- function(data, formula = NULL,
     )
   }
 
-  processed_data <- data
+  # An unrecognised method fell through every branch of scale_features()
+  # and returned the data unscaled, under a message saying it had scaled
+  scalers <- c("standardize", "normalize", "robust", "none")
+  if (!is.character(scale_method) || length(scale_method) != 1L ||
+        !scale_method %in% scalers) {
+    stop(
+      "'scale_method' must be one of ",
+      paste0("\"", scalers, "\"", collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
+  # No correlation exceeds 1, so a cutoff of 95, meant as a percentage,
+  # removed nothing without a word
+  if (!is.numeric(correlation_cutoff) || length(correlation_cutoff) != 1L ||
+        is.na(correlation_cutoff) || correlation_cutoff <= 0 ||
+        correlation_cutoff > 1) {
+    stop(
+      "'correlation_cutoff' must be a single number greater than 0 and at ",
+      "most 1, such as 0.95; got ", tl_describe_value(correlation_cutoff),
+      ".",
+      call. = FALSE
+    )
+  }
+
+  # A grouped tibble kept its groups through the column selections below,
+  # so the response was added back once per group and failed on its length
+  processed_data <- dplyr::ungroup(data)
   preprocessing_steps <- list()
 
   # Extract response if formula provided
   response_var <- NULL
   if (!is.null(formula)) {
     response_var <- all.vars(formula)[1]
+    # A misspelt response matched no column, so the real one was scaled as
+    # a predictor and the typo was dropped without a word
+    if (!response_var %in% names(data)) {
+      stop(
+        "The formula's response, '", response_var,
+        "', is not a column of `data`. Available: ",
+        paste(names(data), collapse = ", "), ".",
+        call. = FALSE
+      )
+    }
   }
 
   # Separate predictors and response. Only the formula's predictors are
@@ -91,28 +141,45 @@ tl_prepare_data <- function(data, formula = NULL,
     predictor_data <- processed_data
   }
 
-  # 1. Handle missing values
+  # 1. Handle missing values. An entirely missing column is not imputed, and
+  # when it was the only one missing, the call still said it was imputing
+  # and recorded a step with no values.
   if (any(is.na(predictor_data))) {
-    message("Imputing missing values using method: ", impute_method)
     imputation_info <- impute_missing(predictor_data, method = impute_method)
-    predictor_data <- imputation_info$data
-    preprocessing_steps$imputation <- imputation_info
+    if (length(imputation_info$imputation_values) > 0L) {
+      message("Imputing missing values using method: ", impute_method)
+      predictor_data <- imputation_info$data
+      preprocessing_steps$imputation <- imputation_info
+    }
   }
 
-  # 2. Encode categorical variables
+  # 2. Encode categorical variables. vapply() keeps an empty predictor set
+  # a logical index, where sapply() returned list() and the subset failed
+  # with "invalid subscript type 'list'". An entirely missing column has
+  # no value to encode -- model.matrix() dropped every one of its rows --
+  # and is left as it is, as imputation leaves it.
   if (encode_categorical) {
     cat_vars <- names(predictor_data)[
-      sapply(
+      vapply(
         predictor_data,
-        function(x) is.factor(x) || is.character(x)
+        function(x) (is.factor(x) || is.character(x)) && !all(is.na(x)),
+        logical(1)
       )
     ]
 
+    # A factor of one or two levels is left as it is, and a text one only
+    # becomes a factor, so the count is of the one-hot encoded variables
+    # alone. Counting every categorical one, a lone two-level factor said
+    # "Encoding 1 categorical variables" and recorded an empty map.
     if (length(cat_vars) > 0) {
-      message("Encoding ", length(cat_vars), " categorical variables")
       encoding_info <- encode_categoricals(predictor_data, cat_vars)
       predictor_data <- encoding_info$data
-      preprocessing_steps$encoding <- encoding_info
+      encoded <- length(encoding_info$encoding_map)
+      if (encoded > 0L) {
+        message("Encoding ", encoded, " categorical ",
+                ngettext(encoded, "variable", "variables"))
+        preprocessing_steps$encoding <- encoding_info
+      }
     }
   }
 
@@ -120,7 +187,8 @@ tl_prepare_data <- function(data, formula = NULL,
   if (remove_zero_variance) {
     zero_var_cols <- find_zero_variance(predictor_data)
     if (length(zero_var_cols) > 0) {
-      message("Removing ", length(zero_var_cols), " zero-variance features")
+      message("Removing ", length(zero_var_cols), " zero-variance ",
+              ngettext(length(zero_var_cols), "feature", "features"))
       predictor_data <- predictor_data |>
         dplyr::select(-dplyr::all_of(zero_var_cols))
       preprocessing_steps$zero_variance <- zero_var_cols
@@ -135,7 +203,8 @@ tl_prepare_data <- function(data, formula = NULL,
       high_cor <- find_high_correlation(cor_matrix, cutoff = correlation_cutoff)
 
       if (length(high_cor) > 0) {
-        message("Removing ", length(high_cor), " highly correlated features")
+        message("Removing ", length(high_cor), " highly correlated ",
+                ngettext(length(high_cor), "feature", "features"))
         predictor_data <- predictor_data |>
           dplyr::select(-dplyr::all_of(high_cor))
         preprocessing_steps$high_correlation <- high_cor
@@ -145,16 +214,22 @@ tl_prepare_data <- function(data, formula = NULL,
 
   # 5. Scale numeric features
   if (scale_method != "none") {
-    numeric_cols <- names(predictor_data)[sapply(predictor_data, is.numeric)]
+    numeric_cols <- names(predictor_data)[
+      vapply(predictor_data, is.numeric, logical(1))
+    ]
 
+    # A column with no finite spread is left unscaled, so the message and
+    # the step wait until a column has been scaled
     if (length(numeric_cols) > 0) {
-      message("Scaling numeric features using method: ", scale_method)
       scaling_info <- scale_features(
         predictor_data, numeric_cols,
         method = scale_method
       )
-      predictor_data <- scaling_info$data
-      preprocessing_steps$scaling <- scaling_info
+      if (length(scaling_info$scaling_params) > 0L) {
+        message("Scaling numeric features using method: ", scale_method)
+        predictor_data <- scaling_info$data
+        preprocessing_steps$scaling <- scaling_info
+      }
     }
   }
 
@@ -271,9 +346,13 @@ encode_categoricals <- function(data, cat_vars) {
 find_zero_variance <- function(data) {
   numeric_data <- data |> dplyr::select(where(is.numeric))
 
-  zero_var <- sapply(numeric_data, function(x) {
-    stats::var(x, na.rm = TRUE) == 0 || all(is.na(x))
-  })
+  # vapply(), because sapply() over a frame with no numeric column returns
+  # list(). isTRUE(), because the variance of a single row, or of a column
+  # holding an Inf, is NA, and an NA in the selection stopped the call with
+  # "Selections can't have missing values".
+  zero_var <- vapply(numeric_data, function(x) {
+    all(is.na(x)) || isTRUE(stats::var(x, na.rm = TRUE) == 0)
+  }, logical(1))
 
   names(zero_var)[zero_var]
 }
@@ -319,7 +398,9 @@ scale_features <- function(data, numeric_cols, method = "standardize") {
 
   for (col in numeric_cols) {
     # A column with fewer than two observed values has no spread to scale
-    # by; its sd is NA, and `if (NA > 0)` stopped the whole call
+    # by; its sd is NA, and `if (NA > 0)` stopped the whole call. An Inf
+    # leaves sd() NaN and the range infinite, so each spread below must be
+    # finite as well as positive.
     if (sum(!is.na(data[[col]])) < 2) {
       next
     }
@@ -329,7 +410,7 @@ scale_features <- function(data, numeric_cols, method = "standardize") {
       mean_val <- mean(data[[col]], na.rm = TRUE)
       sd_val <- stats::sd(data[[col]], na.rm = TRUE)
 
-      if (sd_val > 0) {
+      if (is.finite(sd_val) && sd_val > 0) {
         scaled_data[[col]] <- (data[[col]] - mean_val) / sd_val
         scaling_params[[col]] <- list(mean = mean_val, sd = sd_val)
       }
@@ -339,7 +420,7 @@ scale_features <- function(data, numeric_cols, method = "standardize") {
       min_val <- min(data[[col]], na.rm = TRUE)
       max_val <- max(data[[col]], na.rm = TRUE)
 
-      if (max_val > min_val) {
+      if (is.finite(max_val - min_val) && max_val > min_val) {
         scaled_data[[col]] <- (data[[col]] - min_val) / (max_val - min_val)
         scaling_params[[col]] <- list(min = min_val, max = max_val)
       }
@@ -351,7 +432,7 @@ scale_features <- function(data, numeric_cols, method = "standardize") {
       q3 <- stats::quantile(data[[col]], 0.75, na.rm = TRUE)
       iqr_val <- q3 - q1
 
-      if (iqr_val > 0) {
+      if (is.finite(iqr_val) && iqr_val > 0) {
         scaled_data[[col]] <- (data[[col]] - median_val) / iqr_val
         scaling_params[[col]] <- list(median = median_val, iqr = iqr_val)
       }
@@ -369,13 +450,20 @@ scale_features <- function(data, numeric_cols, method = "standardize") {
 #'
 #' @param data A data frame
 #' @param prop Proportion for training set (default: 0.8)
-#' @param stratify Column name for stratified splitting
+#' @param stratify Column name for stratified splitting. Each stratum is
+#'   split at \code{prop}. A numeric column with more than five distinct
+#'   values is stratified by its quartiles, and rows missing the value form
+#'   a stratum of their own. A stratum of a single row goes to the training
+#'   set, unless such strata together hold more than a tenth of the rows, as
+#'   in an ID column; then they are pooled into one stratum and split
+#'   together.
 #' @param seed Random seed for reproducibility
 #' @return A list with two elements:
 #'   \describe{
 #'     \item{\code{$train}}{A data frame containing the training subset.}
 #'     \item{\code{$test}}{A data frame containing the test subset.}
 #'   }
+#'   A split that leaves the test set empty, as a single row does, warns.
 #' @export
 #' @examples
 #' \donttest{
@@ -392,25 +480,34 @@ tl_split <- function(data, prop = 0.8, stratify = NULL, seed = NULL) {
          "such as 0.8", call. = FALSE)
   }
 
+  # A vector of two names failed the column lookup with "the condition has
+  # length > 1"
+  if (!is.null(stratify)) {
+    if (!is.character(stratify) || length(stratify) != 1L ||
+          is.na(stratify)) {
+      stop("'stratify' must be the name of one column of 'data'; got ",
+           tl_describe_value(stratify), ".", call. = FALSE)
+    }
+    if (!stratify %in% names(data)) {
+      stop("Stratify variable not found in data: '", stratify, "'.",
+           call. = FALSE)
+    }
+  }
+
   # Seed this call without rewriting the caller's random stream
   tl_local_seed(seed)
 
   n <- nrow(data)
 
   if (!is.null(stratify)) {
-    if (!stratify %in% names(data)) {
-      stop("Stratify variable not found in data", call. = FALSE)
-    }
-
     # Stratified sampling. Each stratum keeps at least one training row
-    # and one test row where it has the rows to spare, so a small group
-    # cannot vanish from the training set entirely.
+    # and one test row where it has the rows to spare, and a stratum of
+    # one row goes to training, unless tl_split_strata() pooled the
+    # one-row strata because together they are over a tenth of the rows.
     # Index into idx rather than sampling it: sample() on a single number
     # draws from 1:idx, so a one-row stratum took a row from some other
     # stratum -- sometimes one already drawn -- and left its own in test.
-    # split() drops an NA group, so rows missing the stratify value were in
-    # no stratum, never drawn, and all landed in test. They form their own.
-    groups <- split(seq_len(n), addNA(factor(data[[stratify]]), ifany = TRUE))
+    groups <- split(seq_len(n), tl_split_strata(data[[stratify]]))
     train_indices <- unlist(lapply(groups, function(idx) {
       idx[sample.int(length(idx), size = tl_train_size(length(idx), prop))]
     }))
@@ -430,11 +527,63 @@ tl_split <- function(data, prop = 0.8, stratify = NULL, seed = NULL) {
     )
   }
 
+  # A single row cannot sit on both sides, and an empty test set scores
+  # as NaN rather than failing
+  if (length(train_indices) == n) {
+    warning(
+      "Splitting ", n, " row(s) at prop = ", prop, " leaves no test data, ",
+      "so the test set is empty. Use a larger sample.",
+      call. = FALSE
+    )
+  }
+
   # drop = FALSE, or a one-column frame comes back as a bare vector
   list(
     train = data[train_indices, , drop = FALSE],
     test = data[-train_indices, , drop = FALSE]
   )
+}
+
+#' Strata for a stratified split
+#'
+#' Each distinct value used to be a stratum of its own. A continuous or ID
+#' column then made every row a stratum of one, and a stratum of one goes
+#' wholly to training, so the test set came back empty. A numeric column
+#' with more than five distinct values is cut at its quartiles instead,
+#' which is the default of rsample's \code{make_strata()}.
+#'
+#' A stratum of one row still goes to training, so a level seen once is one
+#' the model was trained on; in test, \code{predict()} would refuse it as
+#' new. When such strata together hold more than a tenth of the rows -- the
+#' threshold of \code{make_strata()}'s \code{pool = 0.1} -- the column is
+#' ID-like, and they are pooled into one stratum that is split like any
+#' other.
+#'
+#' \code{make_strata()} goes further: it uses fewer bins when a bin would
+#' hold under 20 rows, pools any stratum under a tenth of the data, and
+#' assigns missing values to strata at random. A single split needs only
+#' two rows in a stratum, and missing values keep a stratum of their own.
+#'
+#' @param x The stratify column
+#' @return An integer stratum code per row
+#' @keywords internal
+#' @noRd
+tl_split_strata <- function(x) {
+  if (is.numeric(x) && length(unique(x[!is.na(x)])) > 5) {
+    breaks <- unique(stats::quantile(x, probs = seq(0, 1, 0.25),
+                                     na.rm = TRUE, names = FALSE))
+    x <- cut(x, breaks = breaks, include.lowest = TRUE)
+  }
+
+  # split() drops an NA group, so rows missing the stratify value were in
+  # no stratum, never drawn, and all landed in test. They form their own.
+  strata <- as.integer(addNA(factor(x), ifany = TRUE))
+  single <- tabulate(strata)[strata] == 1L
+  # One-row strata holding more than a tenth of the rows
+  if (10 * sum(single) > length(strata)) {
+    strata[single] <- 0L
+  }
+  strata
 }
 
 #' Number of training rows to draw from a group

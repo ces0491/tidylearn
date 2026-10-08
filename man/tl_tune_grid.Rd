@@ -21,21 +21,39 @@ tl_tune_grid(
 
 \item{formula}{A formula specifying the model}
 
-\item{method}{The modeling method to tune}
+\item{method}{The modeling method to tune, one of the supervised methods
+\code{\link{tl_model}} fits}
 
-\item{param_grid}{A named list of parameter values
-to tune}
+\item{param_grid}{A named list of candidate values, one element for each
+\code{\link{tl_model}} argument to tune, named after it}
 
-\item{folds}{Number of cross-validation folds}
+\item{folds}{Number of cross-validation folds, a whole number between 2
+and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn,
+and each fold then scores a single prediction. \code{"accuracy"},
+\code{"mae"}, \code{"mse"} and \code{"mape"} average to their values
+over the left-out predictions. The average \code{"rmse"} is the mean
+absolute error; \code{"precision"}, \code{"recall"},
+\code{"sensitivity"}, \code{"specificity"} and \code{"f1"} are
+undefined on the folds whose one row gives them nothing to divide by;
+and \code{"rsq"}, \code{"auc"} and \code{"pr_auc"} are undefined on
+every fold. A run scoring any of these warns once.}
 
-\item{metric}{Metric to optimize}
+\item{metric}{Metric to optimize: one of the names
+\code{\link{tl_evaluate}} computes for the task. Defaults to
+\code{"accuracy"} for classification and \code{"rmse"} for regression.}
 
 \item{maximize}{Logical; whether to maximize (TRUE)
-or minimize (FALSE) the metric}
+or minimize (FALSE) the metric. \code{NULL}, the default, maximizes
+every metric but the error metrics \code{"rmse"}, \code{"mse"},
+\code{"mae"} and \code{"mape"}.}
 
 \item{verbose}{Logical; whether to print progress}
 
-\item{...}{Additional arguments passed to tl_model}
+\item{...}{Additional arguments passed to \code{\link{tl_model}} for
+every fold and for the final fit. Arguments holding one value per row
+of \code{data} -- \code{weights}, \code{subset}, \code{offset},
+\code{foldid} and \code{strata} -- are refused, since they cannot
+follow the rows into a fold.}
 }
 \value{
 A tidylearn model object fitted with the best hyperparameters.
@@ -47,18 +65,26 @@ a list containing \code{param_grid}, \code{results}, \code{best_params},
 (the mean over the folds that produced a score), \code{n_folds_ok} (how
 many of the \code{folds} did), and a column per parameter. A parameter
 with a vector-valued candidate, such as \code{hidden_layers}, is a list
-column.
+column. A fold produces no score when its fit fails, when the metric
+is undefined on it -- \code{"auc"} on a fold holding one class, or
+\code{"precision"} on one where nothing is predicted positive -- or
+when none of its rows can be scored, as when every predictor is
+missing there, which is warned about.
 
 Only combinations with \code{n_folds_ok} equal to \code{folds} are
 eligible to be best, since a mean over the folds that happened to
 succeed is not comparable with a mean over all of them. If no
-combination completed every fold, the best of those scored on the most
-folds is used, with a warning. If every combination failed in every
-fold, the function stops.
+combination was scored on every fold, the best of those scored on the
+most folds is used, with a warning saying whether fits failed or the
+metric was undefined. If no combination was scored on any fold, the
+function stops.
 
 For \code{method = "forest"}, an \code{mtry} above the number of
 predictors is capped at that number, with a warning, and duplicate
-combinations that result are evaluated once.
+combinations that result are evaluated once. Predictors are counted as
+the forest is fitted on them, so a column removed with \code{- id} is
+not one, and a matrix-valued term such as \code{poly(hp, 2)} is one per
+column.
 }
 \description{
 Tune hyperparameters for a model using grid search

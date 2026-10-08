@@ -14,7 +14,9 @@ weights (default: equal weights)}
 }
 \value{
 A \code{\link[stats]{dist}} object containing Gower distances, with
-the \code{method} attribute set to \code{"gower"}.
+the \code{method} attribute set to \code{"gower"}. A pair of rows with
+no variable observed in both has no defined distance and is \code{NA},
+as in \code{\link[cluster]{daisy}}.
 }
 \description{
 Computes Gower distance for mixed data types (numeric, factor, ordered)

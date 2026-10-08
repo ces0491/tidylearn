@@ -40,16 +40,19 @@ classification problem}
 
 \item{batch_size}{Batch size for training (default: 32)}
 
-\item{validation_split}{Proportion of data for validation}
+\item{validation_split}{Proportion of the rows held out to validate on,
+drawn at random (default: 0.2). Their row numbers are kept as
+\code{$validation_rows}. Pass \code{validation_data} through \code{...}
+to validate on data of your own instead.}
 
 \item{learning_rate}{Optimizer learning rate. NULL (default) leaves
-keras's own adam default in place.
-(default: 0.2)}
+keras's own adam default in place.}
 
 \item{verbose}{Verbosity mode (0 = silent, 1 = progress bar,
 2 = one line per epoch) (default: 0)}
 
-\item{...}{Additional arguments}
+\item{...}{Additional arguments to pass to keras's fit(). Case
+\code{weights} and an offset are refused: neither is passed on.}
 
 \item{compute}{Compute tier. Either \code{"cpu"} (default) or
 \code{"gpu"}. GPU usage is handled automatically by the underlying

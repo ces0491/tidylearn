@@ -12,7 +12,8 @@ tl_read_json(path, flatten = TRUE, ...)
 \item{flatten}{Logical. Automatically flatten nested data frames? Default is
 \code{TRUE}.}
 
-\item{...}{Additional arguments passed to \code{jsonlite::fromJSON()}.}
+\item{...}{Additional arguments passed to \code{jsonlite::fromJSON()}, or
+to \code{jsonlite::stream_in()} for an \code{.ndjson} file.}
 }
 \value{
 A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
@@ -21,12 +22,23 @@ with attributes \code{tl_source}, \code{tl_format}, and
 }
 \description{
 Reads a JSON file into a \code{tidylearn_data} object. Expects the JSON to
-represent tabular data (array of objects or similar). Requires the
-\pkg{jsonlite} package.
+represent tabular data (array of objects or similar). A file with the
+\code{.ndjson} extension is read as newline-delimited JSON, one record
+per line, and so is a \code{.json} file that does not parse as a single
+document but does as one record per line. Requires the \pkg{jsonlite}
+package.
 }
 \examples{
-\donttest{
-# data <- tl_read_json("path/to/data.json")
-}
+\dontshow{if (requireNamespace("jsonlite", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+path <- tempfile(fileext = ".json")
+jsonlite::write_json(mtcars, path)
+tl_read_json(path)
 
+# Newline-delimited JSON: one record per line
+lines <- tempfile(fileext = ".ndjson")
+jsonlite::stream_out(mtcars, file(lines), verbose = FALSE)
+tl_read_json(lines)
+
+unlink(c(path, lines))
+\dontshow{\}) # examplesIf}
 }

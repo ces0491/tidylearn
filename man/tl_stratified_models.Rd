@@ -10,7 +10,8 @@ tl_stratified_models(
   cluster_method = "kmeans",
   k = 3,
   supervised_method = "tree",
-  ...
+  ...,
+  cluster_args = list()
 )
 }
 \arguments{
@@ -18,29 +19,43 @@ tl_stratified_models(
 
 \item{formula}{Model formula}
 
-\item{cluster_method}{Clustering method}
+\item{cluster_method}{Clustering method: \code{"kmeans"} (default),
+\code{"pam"}, \code{"clara"} or \code{"hclust"}, whose tree is cut at
+\code{k}. Only k-means can assign new rows, so the others predict
+their training data alone.}
 
 \item{k}{Number of clusters}
 
 \item{supervised_method}{Supervised learning method (default:
 \code{"tree"}, which handles both regression and classification).
-\code{"linear"} silently fits \code{lm()} to a factor response
-rather than refusing it, so it is not a safe default here.}
+\code{"linear"} needs a numeric response and refuses a factor.}
 
-\item{...}{Additional arguments}
+\item{...}{Additional arguments for the supervised models}
+
+\item{cluster_args}{A named list of arguments for the clustering step,
+such as \code{list(nstart = 5)} for k-means. Pass k as \code{k}.}
 }
 \value{
 A list with class \code{"tidylearn_stratified"} containing:
 \describe{
 \item{cluster_model}{The fitted clustering model.}
+\item{clusters}{The training rows' cluster assignments.}
 \item{supervised_models}{Named list of tidylearn models, one per
-cluster.}
+cluster that holds more than one class.}
+\item{single_class_clusters}{Named character vector giving, for each
+cluster whose rows all hold one class, that class.}
 \item{formula}{The model formula.}
 \item{data}{The original training data.}
 }
 }
 \description{
 Create cluster-specific supervised models for heterogeneous data
+}
+\details{
+The rows are clustered on the predictors the formula names, and a
+model is fitted to each cluster. A cluster whose rows all hold one class
+has nothing for a classifier to separate, so it gets no model and its
+rows are predicted as that class.
 }
 \examples{
 \donttest{

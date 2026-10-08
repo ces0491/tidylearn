@@ -170,8 +170,10 @@ transfer_model <- tl_transfer_learning(
   n_components = 3
 )
 
-cat("Transfer learning model built on",
-    transfer_model$spec$method, "over 3 principal components\n")
+n_transfer_pcs <- sum(grepl("^PC",
+                            names(transfer_model$supervised_model$data)))
+cat("Transfer learning model:", transfer_model$method, "fitted on",
+    n_transfer_pcs, "principal components\n")
 
 
 # ====================================================
@@ -190,8 +192,8 @@ messy_data$redundant_col <-
   messy_data$Sepal.Length +
   rnorm(nrow(messy_data), 0, 0.01)
 
-cat("Original data:", ncol(messy_data) - 1,
-    "features with missing values\n")
+cat("Original data:", ncol(messy_data) - 1, "features,",
+    sum(colSums(is.na(messy_data)) > 0), "with missing values\n")
 
 processed <- tl_prepare_data(
   messy_data, Species ~ .,
@@ -202,8 +204,8 @@ processed <- tl_prepare_data(
 )
 
 cat(
-  "Processed data:", ncol(processed$data) - 1,
-  "features, no missing values\n"
+  "Processed data:", ncol(processed$data) - 1, "features,",
+  sum(colSums(is.na(processed$data)) > 0), "with missing values\n"
 )
 
 

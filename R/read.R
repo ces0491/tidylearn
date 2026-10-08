@@ -12,24 +12,29 @@
 #' Supported file formats:
 #' \itemize{
 #'   \item \strong{CSV}: \code{.csv} files via \pkg{readr}
-#'     (with base R fallback)
+#'     (with base R fallback), and \code{.txt} files named directly
 #'   \item \strong{TSV}: \code{.tsv} files via \pkg{readr}
 #'     (with base R fallback)
 #'   \item \strong{Excel}: \code{.xls}, \code{.xlsx},
 #'     \code{.xlsm} files via \pkg{readxl}
 #'   \item \strong{Parquet}: \code{.parquet} files via \pkg{nanoparquet}
-#'   \item \strong{JSON}: \code{.json} files via \pkg{jsonlite}
+#'   \item \strong{JSON}: \code{.json} files, and newline-delimited
+#'     \code{.ndjson} files, via \pkg{jsonlite}
 #'   \item \strong{RDS}: \code{.rds} files via base \code{readRDS()}
 #'   \item \strong{RData}: \code{.rdata}, \code{.rda}
 #'     files via base \code{load()}
 #' }
+#' CSV and TSV files compressed with gzip, bzip2 or xz
+#' (\code{data.csv.gz}) are recognised by the extension under the
+#' compression one.
 #'
 #' Supported databases (via \pkg{DBI}):
 #' \itemize{
 #'   \item \strong{SQLite}: \code{.sqlite}, \code{.db} files via \pkg{RSQLite}
 #'   \item \strong{PostgreSQL}: via \pkg{RPostgres}
 #'   \item \strong{MySQL/MariaDB}: via \pkg{RMariaDB}
-#'   \item \strong{BigQuery}: via \pkg{bigrquery}
+#'   \item \strong{BigQuery}: \code{bigquery://project/dataset} URIs via
+#'     \pkg{bigrquery}
 #' }
 #'
 #' Supported cloud/API sources:
@@ -38,6 +43,9 @@
 #'   \item \strong{GitHub}: raw file download from repositories
 #'   \item \strong{Kaggle}: dataset download via Kaggle CLI
 #' }
+#' A \code{file://} URL is read as the local path it names. Other web
+#' URLs, and URLs with any other scheme such as \code{ftp://}, are not
+#' read; download the file first.
 #'
 #' Multi-file reading:
 #' \itemize{
@@ -48,7 +56,15 @@
 #'     \code{.zip} files
 #' }
 #' When combining multiple files, a \code{source_file} column is added to
-#' identify the origin of each row.
+#' identify the origin of each row: the file's path below the directory
+#' or archive it came from, or, for paths given directly, below the
+#' deepest folder they share. Files in one folder are labelled by their
+#' bare names.
+#'
+#' Directory and archive scans read the extensions listed above except
+#' \code{.txt}, which in a folder is as likely to hold notes as data.
+#' Name a \code{.txt} file directly, or select it with \code{pattern},
+#' to read it.
 NULL
 
 # ---- tidylearn_data class ----
@@ -91,6 +107,7 @@ new_tidylearn_data <- function(data, source, format, timestamp = Sys.time()) {
 #' write.csv(iris, f, row.names = FALSE)
 #' d <- tl_read(f)
 #' print(d)
+#' unlink(f)
 #' }
 #' @export
 print.tidylearn_data <- function(x, ...) {
@@ -102,6 +119,231 @@ print.tidylearn_data <- function(x, ...) {
 }
 
 # ---- Format detection ----
+
+# The extensions each file format is recognised by: in tl_detect_format(),
+# and in the scans of tl_read_dir() and tl_read_zip(), so the two cannot
+# disagree. .txt defaults to CSV; use format = "tsv" to override.
+.tl_format_extensions <- list(
+  csv     = c("csv", "txt"),
+  tsv     = "tsv",
+  excel   = c("xls", "xlsx", "xlsm"),
+  rds     = "rds",
+  rdata   = c("rdata", "rda"),
+  parquet = "parquet",
+  json    = c("json", "ndjson"),
+  sqlite  = c("sqlite", "db")
+)
+
+# readr and base R both read compressed delimited files transparently, so
+# data.csv.gz is detected by the extension under the compression one
+.tl_compressible_formats <- c("csv", "tsv")
+.tl_compression_extensions <- c("gz", "bz2", "xz")
+
+# Hosts tl_read_github() rewrites to raw file downloads
+.tl_github_hosts <- c(
+  "github.com", "www.github.com", "raw.githubusercontent.com"
+)
+
+# The schemes other than http(s) that tl_read() routes by, and the format
+# that reads each. A web URL is routed by its host instead, and a file://
+# URL is turned into the path it names before any routing.
+.tl_scheme_formats <- list(
+  s3         = "s3",
+  postgres   = "postgres",
+  postgresql = "postgres",
+  mysql      = "mysql",
+  bigquery   = "bigquery"
+)
+
+#' Does a source carry a URL scheme such as https:// or s3://?
+#'
+#' A source with a scheme is never a local file, so it is routed by its
+#' protocol before any extension is looked at. A single letter before
+#' \code{://} is taken for a Windows drive written with a doubled slash,
+#' as in \code{C://data}, which is a local path.
+#'
+#' @param source A character vector.
+#' @return A logical vector.
+#' @keywords internal
+#' @noRd
+tl_has_scheme <- function(source) {
+  grepl("^[A-Za-z][A-Za-z0-9+.-]+://", source)
+}
+
+#' The scheme of a source that has one, lower case
+#' @param source A single string for which \code{tl_has_scheme()} is true.
+#' @return The scheme without \code{://}, such as \code{"s3"}.
+#' @keywords internal
+#' @noRd
+tl_url_scheme <- function(source) {
+  tolower(sub("^([A-Za-z][A-Za-z0-9+.-]+)://.*$", "\\1", source))
+}
+
+#' The error for a URL scheme tl_read() has no reader for
+#'
+#' Only the scheme is named: the rest of the URL can carry credentials.
+#'
+#' @param scheme The scheme, lower case.
+#' @keywords internal
+#' @noRd
+tl_stop_scheme <- function(scheme) {
+  stop(
+    "tl_read() has no reader for '", scheme, "://' sources. It reads ",
+    "local paths and file:// URLs, s3:// and bigquery:// URIs, postgres:// ",
+    "and mysql:// connection strings, and GitHub and Kaggle URLs. ",
+    "Download the file first and read the local copy.",
+    call. = FALSE
+  )
+}
+
+#' Refuse a format that would send a source with a scheme to the wrong
+#' reader
+#'
+#' A source with a scheme is read by the reader for its scheme, or for a
+#' web URL its host. Named a file format, it would reach a local-file
+#' reader and be reported as a file that does not exist, in an error that
+#' prints the URL with any password in it.
+#'
+#' @param source A single string for which \code{tl_has_scheme()} is true.
+#' @param format The format the caller named.
+#' @return \code{TRUE}, invisibly, when \code{format} reads \code{source}.
+#' @keywords internal
+#' @noRd
+tl_check_scheme_format <- function(source, format) {
+  # Stops for a scheme or a web host that no reader takes
+  expected <- tl_detect_format(source)
+  if (identical(format, expected)) {
+    return(invisible(TRUE))
+  }
+
+  file_formats <- c("csv", "tsv", "excel", "parquet", "json", "rds", "rdata")
+  stop(
+    "tl_read() reads this ", tl_url_scheme(source), ":// source with ",
+    "format = \"", expected, "\", not \"", format, "\". Leave 'format' unset",
+    if (identical(expected, "s3") && format %in% file_formats) {
+      paste0(", or call tl_read_s3(source, format = \"", format, "\") to ",
+             "read the object as ", format)
+    },
+    ".",
+    call. = FALSE
+  )
+}
+
+#' The local path a file:// URL names
+#'
+#' R's own connections open \code{file://} URLs, so \code{tl_read()} reads
+#' one as the path it names: the part after an empty or \code{localhost}
+#' host, percent-decoded, without the slash a URL puts before a Windows
+#' drive letter. The form R's \code{file()} also takes on Windows,
+#' \code{file://C:/data.csv}, is read the same way. A URL naming another
+#' host is refused, since it is no file on this machine; a Windows share
+#' can be given as its UNC path instead.
+#'
+#' @param source A character vector of sources, without \code{NA}.
+#' @return \code{source} with each \code{file://} URL replaced by its path.
+#' @keywords internal
+#' @noRd
+tl_file_url_path <- function(source) {
+  is_file_url <- grepl("^file://", source, ignore.case = TRUE)
+  source[is_file_url] <- vapply(source[is_file_url], function(url) {
+    rest <- sub("^file://", "", url, ignore.case = TRUE)
+    authority <- sub("/.*$", "", rest)
+    path <- substring(rest, nchar(authority) + 1L)
+
+    if (grepl("^[A-Za-z]:$", authority)) {
+      path <- rest
+    } else if (nzchar(authority) && tolower(authority) != "localhost") {
+      stop(
+        "tl_read() reads file:// URLs only for files on this machine, and ",
+        "this one names the host '", tl_url_host(url), "'. Pass the ",
+        "file's path instead, such as a UNC path for a Windows share.",
+        call. = FALSE
+      )
+    }
+
+    path <- utils::URLdecode(path)
+    if (.Platform$OS.type == "windows" && grepl("^/[A-Za-z]:", path)) {
+      path <- substring(path, 2L)
+    }
+    if (!nzchar(path)) {
+      stop("'", url, "' names no file.", call. = FALSE)
+    }
+    path
+  }, character(1), USE.NAMES = FALSE)
+  source
+}
+
+#' The host a URL points at
+#'
+#' The host is parsed out of the URL rather than searched for in the
+#' string, where "https://mirror.example.org/github.com/data.csv" would
+#' pass for GitHub.
+#'
+#' @param url A single URL string.
+#' @return The host, lower case, without user info or port; \code{""} when
+#'   \code{url} has no scheme.
+#' @keywords internal
+#' @noRd
+tl_url_host <- function(url) {
+  m <- regmatches(url, regexec("^[A-Za-z][A-Za-z0-9+.-]*://([^/?#]*)", url))
+  authority <- m[[1]][2]
+  if (is.na(authority)) {
+    return("")
+  }
+  authority <- sub("^.*@", "", authority)
+  tolower(sub(":[0-9]*$", "", authority))
+}
+
+#' Is a host Kaggle's?
+#' @param host A host name, lower case.
+#' @return A single logical.
+#' @keywords internal
+#' @noRd
+tl_is_kaggle_host <- function(host) {
+  identical(host, "kaggle.com") || endsWith(host, ".kaggle.com")
+}
+
+#' The error for a web URL tl_read() has no reader for
+#' @param source The URL.
+#' @keywords internal
+#' @noRd
+tl_stop_web_url <- function(source) {
+  stop(
+    "tl_read() reads web URLs only from GitHub and Kaggle, and '",
+    tl_url_host(source), "' is neither. Download the file first, for ",
+    "example with utils::download.file(), and read the local copy.",
+    call. = FALSE
+  )
+}
+
+#' Regular expression matching the files a directory or archive scan reads
+#'
+#' Scans leave out \code{.txt}: a folder's \code{.txt} is as likely to
+#' hold notes as data, and reading notes as CSV either fails the row-bind
+#' or adds junk rows. A database needs a query, so no scan reads one.
+#'
+#' @param formats The formats to match.
+#' @return A single regular expression, to be used with
+#'   \code{ignore.case = TRUE}.
+#' @keywords internal
+#' @noRd
+tl_scan_pattern <- function(formats = c("csv", "tsv", "excel", "parquet",
+                                        "json", "rds", "rdata")) {
+  plain <- setdiff(unlist(.tl_format_extensions[formats]), "txt")
+  compressible <- setdiff(
+    unlist(.tl_format_extensions[intersect(formats, .tl_compressible_formats)]),
+    "txt"
+  )
+
+  alternatives <- paste0("\\.(", paste(plain, collapse = "|"), ")$")
+  if (length(compressible) > 0L) {
+    alternatives <- c(alternatives, paste0(
+      "\\.(", paste(compressible, collapse = "|"), ")\\.(",
+      paste(.tl_compression_extensions, collapse = "|"), ")$"
+    ))
+  }
+  paste(alternatives, collapse = "|")
+}
 
 #' Detect data format from source string
 #'
@@ -115,33 +357,36 @@ print.tidylearn_data <- function(x, ...) {
 #' @keywords internal
 #' @noRd
 tl_detect_format <- function(source) {
-  # Check URL/protocol patterns first (these take priority over extensions)
-  if (grepl("^https?://", source)) {
-    github_pat <- "github\\.com|raw\\.githubusercontent\\.com"
-    if (grepl(github_pat, source)) return("github")
-    if (grepl("kaggle\\.com", source)) return("kaggle")
+  # Protocols take priority over extensions. Schemes are case-insensitive,
+  # and a web URL is matched on its host.
+  if (tl_has_scheme(source)) {
+    scheme <- tl_url_scheme(source)
+    if (scheme %in% c("http", "https")) {
+      host <- tl_url_host(source)
+      if (host %in% .tl_github_hosts) return("github")
+      if (tl_is_kaggle_host(host)) return("kaggle")
+      tl_stop_web_url(source)
+    }
+    # Any other scheme names no file on this disk, and looked up as one
+    # it would be reported as a file that does not exist
+    if (!scheme %in% names(.tl_scheme_formats)) {
+      tl_stop_scheme(scheme)
+    }
+    return(.tl_scheme_formats[[scheme]])
   }
-  if (grepl("^s3://", source)) return("s3")
-  if (grepl("^postgres(ql)?://", source)) return("postgres")
-  if (grepl("^mysql://", source)) return("mysql")
 
-
-  # Fall back to file extension matching
-  # Note: .txt defaults to CSV; use format = "tsv" to override
   ext <- tolower(tools::file_ext(source))
+  if (ext %in% .tl_compression_extensions) {
+    inner <- tolower(tools::file_ext(tools::file_path_sans_ext(source)))
+    compressible <- unlist(.tl_format_extensions[.tl_compressible_formats])
+    if (inner %in% compressible) ext <- inner
+  }
 
-  ext_map <- c(
-    csv = "csv", tsv = "tsv", txt = "csv",
-    xls = "excel", xlsx = "excel", xlsm = "excel",
-    rds = "rds", rdata = "rdata", rda = "rdata",
-    parquet = "parquet",
-    json = "json", ndjson = "json",
-    sqlite = "sqlite", db = "sqlite"
-  )
+  for (format in names(.tl_format_extensions)) {
+    if (ext %in% .tl_format_extensions[[format]]) return(format)
+  }
 
-  if (ext %in% names(ext_map)) return(ext_map[[ext]])
-
-  stop("Cannot detect format from: '", source,
+  stop("Cannot detect format from: '", tl_redact_db_url(source),
        "'. Please specify the 'format' argument.",
        call. = FALSE)
 }
@@ -157,13 +402,17 @@ tl_detect_format <- function(source) {
 #' source.
 #'
 #' When \code{source} is a character vector of multiple paths, each file is read
-#' and row-bound into a single result with a \code{source_file} column. When
+#' and row-bound into a single result with a \code{source_file} column
+#' giving each file's path below the deepest folder they share. When
 #' \code{source} is a directory path, it is equivalent to calling
-#' \code{tl_read_dir()}. When \code{source} is a \code{.zip} file, it is
-#' equivalent to calling \code{tl_read_zip()}.
+#' \code{tl_read_dir()}. When \code{source} is a local \code{.zip} file, it
+#' is equivalent to calling \code{tl_read_zip()}.
 #'
-#' @param source A file path, URL, connection string, directory path, or a
-#'   character vector of multiple file paths.
+#' @param source A file path or \code{file://} URL, a GitHub or Kaggle URL,
+#'   an \code{s3://} or \code{bigquery://} URI, a database connection
+#'   string, a directory path, or a character vector of multiple file
+#'   paths. Other web URLs, and URLs with any other scheme such as
+#'   \code{ftp://}, are refused: download the file and read the local copy.
 #' @param ... Additional arguments passed to the format-specific reader.
 #' @param format Optional explicit format override.
 #'   One of \code{"csv"}, \code{"tsv"},
@@ -173,7 +422,10 @@ tl_detect_format <- function(source) {
 #'   \code{"s3"}, \code{"github"}, \code{"kaggle"}. When \code{NULL} (default),
 #'   the format is auto-detected from the file extension
 #'   or source pattern. Note: \code{.txt} files default
-#'   to CSV; use \code{format = "tsv"} to override.
+#'   to CSV; use \code{format = "tsv"} to override. A source with a URL
+#'   scheme other than \code{file://} is read only with the format its
+#'   scheme or host implies; to read an S3 object as a given file format,
+#'   call \code{tl_read_s3()} with that format.
 #' @param .quiet Logical. If \code{TRUE}, suppresses
 #'   informational messages. Default is \code{FALSE}.
 #'
@@ -182,22 +434,25 @@ tl_detect_format <- function(source) {
 #'   \code{tl_timestamp}.
 #'
 #' @examples
-#' \donttest{
-#' # Read a single CSV file
-#' # data <- tl_read("path/to/data.csv")
+#' # The format is detected from the extension
+#' csv <- tempfile(fileext = ".csv")
+#' write.csv(mtcars, csv, row.names = FALSE)
+#' tl_read(csv)
 #'
-#' # Read multiple files and row-bind
-#' # data <- tl_read(c("jan.csv", "feb.csv", "mar.csv"))
+#' # Several files are row-bound, with a source_file column naming each
+#' jan <- tempfile(fileext = ".csv")
+#' feb <- tempfile(fileext = ".csv")
+#' write.csv(mtcars[1:16, ], jan, row.names = FALSE)
+#' write.csv(mtcars[17:32, ], feb, row.names = FALSE)
+#' both <- tl_read(c(jan, feb), .quiet = TRUE)
+#' table(both$source_file)
 #'
-#' # Read all CSVs from a directory
-#' # data <- tl_read("data/")
+#' # A .txt file is read as CSV unless told otherwise
+#' txt <- tempfile(fileext = ".txt")
+#' write.table(mtcars, txt, sep = "\t", row.names = FALSE)
+#' tl_read(txt, format = "tsv", .quiet = TRUE)
 #'
-#' # Read from a zip archive
-#' # data <- tl_read("data.zip")
-#'
-#' # Explicit format override
-#' # data <- tl_read("path/to/data.txt", format = "tsv")
-#' }
+#' unlink(c(csv, jan, feb, txt))
 #'
 #' @export
 tl_read <- function(source, ..., format = NULL, .quiet = FALSE) {
@@ -205,24 +460,38 @@ tl_read <- function(source, ..., format = NULL, .quiet = FALSE) {
     stop("'source' must be a character string or vector of paths",
          call. = FALSE)
   }
+  if (anyNA(source) || !all(nzchar(source))) {
+    stop("'source' must not contain NA or empty strings.", call. = FALSE)
+  }
+
+  # R's connections open file:// URLs, so one is read as the path it
+  # names. Done before the multi-path split, so files given as URLs are
+  # labelled by their paths like any others.
+  source <- tl_file_url_path(source)
 
   # Multi-path: read each and row-bind
   if (length(source) > 1) {
     return(tl_read_multi(source, ..., format = format, .quiet = .quiet))
   }
 
+  # A source with a scheme is routed by its protocol: s3://bucket/a.zip
+  # is an S3 object, not a zip file on this disk
+  local <- !tl_has_scheme(source)
+
   # Directory: delegate to tl_read_dir
-  if (dir.exists(source)) {
+  if (local && dir.exists(source)) {
     return(tl_read_dir(source, ..., format = format, .quiet = .quiet))
   }
 
   # Zip file: delegate to tl_read_zip
-  if (tolower(tools::file_ext(source)) == "zip") {
+  if (local && tolower(tools::file_ext(source)) == "zip") {
     return(tl_read_zip(source, ..., format = format, .quiet = .quiet))
   }
 
   if (is.null(format)) {
     format <- tl_detect_format(source)
+  } else if (!local) {
+    tl_check_scheme_format(source, format)
   }
 
   supported_formats <- c(
@@ -279,29 +548,41 @@ tl_read <- function(source, ..., format = NULL, .quiet = FALSE) {
 #' @param ... Additional arguments passed to each reader.
 #' @param format Optional format override applied to all files.
 #' @param .quiet Suppress messages.
+#' @param labels The label for each path. \code{NULL} labels each path
+#'   relative to the deepest folder they all share.
 #'
 #' @return A \code{tidylearn_data} object with a \code{source_file} column.
 #' @keywords internal
 #' @noRd
-tl_read_multi <- function(paths, ..., format = NULL, .quiet = FALSE) {
+tl_read_multi <- function(paths, ..., format = NULL, .quiet = FALSE,
+                          labels = NULL) {
   if (!.quiet) {
     message("Reading ", length(paths), " files...")
   }
 
+  if (is.null(labels)) {
+    labels <- tl_relative_labels(paths)
+  }
+
   results <- lapply(paths, function(p) {
-    df <- tl_read(p, ..., format = format, .quiet = TRUE)
-    col <- "source_file"
-    if (col %in% names(df)) {
-      col <- "tl_source_file"
-      warning(
-        "Column 'source_file' already exists in data. ",
-        "Using 'tl_source_file' instead.",
-        call. = FALSE
-      )
-    }
-    df[[col]] <- basename(p)
-    df
+    tl_read(p, ..., format = format, .quiet = TRUE)
   })
+
+  # One column for every file's label, chosen once. Chosen per file, the
+  # labels of a file holding its own source_file column would go to
+  # tl_source_file and the rest into that file's column, among its data.
+  col <- "source_file"
+  if (any(vapply(results, function(df) col %in% names(df), logical(1)))) {
+    col <- "tl_source_file"
+    warning(
+      "Column 'source_file' already exists in the data. ",
+      "Using 'tl_source_file' for the origin of each row instead.",
+      call. = FALSE
+    )
+  }
+  for (i in seq_along(results)) {
+    results[[i]][[col]] <- rep(labels[[i]], nrow(results[[i]]))
+  }
 
   combined <- dplyr::bind_rows(results)
 
@@ -317,6 +598,37 @@ tl_read_multi <- function(paths, ..., format = NULL, .quiet = FALSE) {
   )
 }
 
+#' Label paths read together by their part below a shared folder
+#'
+#' Base names alone would label 2023/sales.csv and 2024/sales.csv alike.
+#' Each path is shown relative to the deepest folder all of them share, so
+#' files in one folder keep their bare names.
+#'
+#' @param paths Character vector of paths or URIs.
+#' @return A character vector the length of \code{paths}.
+#' @keywords internal
+#' @noRd
+tl_relative_labels <- function(paths) {
+  local <- !tl_has_scheme(paths)
+  full <- paths
+  full[local] <- normalizePath(paths[local], winslash = "/", mustWork = FALSE)
+
+  parts <- strsplit(full, "/", fixed = TRUE)
+  folders <- lapply(parts, function(p) p[-length(p)])
+
+  shared <- 0L
+  repeat {
+    k <- shared + 1L
+    if (any(lengths(folders) < k)) break
+    if (length(unique(vapply(folders, `[`, character(1), k))) != 1L) break
+    shared <- k
+  }
+
+  vapply(parts, function(p) {
+    paste(p[-seq_len(shared)], collapse = "/")
+  }, character(1))
+}
+
 #' Read all matching files from a directory
 #'
 #' Scans a directory for files matching a pattern or format, reads each one,
@@ -329,26 +641,35 @@ tl_read_multi <- function(paths, ..., format = NULL, .quiet = FALSE) {
 #'   \code{format} instead.
 #' @param format File format to read. If \code{NULL} and \code{pattern} is
 #'   \code{NULL}, all recognized data files are read. If specified, only files
-#'   with matching extensions are read.
+#'   with matching extensions are read. \code{.txt} files are read only
+#'   when selected with \code{pattern}.
 #' @param recursive Logical. Should subdirectories be scanned? Default is
 #'   \code{FALSE}.
 #' @param .quiet Suppress messages. Default is \code{FALSE}.
 #' @param ... Additional arguments passed to the format-specific reader.
 #'
 #' @return A \code{tidylearn_data} object with an additional
-#'   \code{source_file} column identifying the origin of each row.
+#'   \code{source_file} column giving each row's file as a path below
+#'   \code{path}, such as \code{"2024/sales.csv"}.
 #'
 #' @examples
-#' \donttest{
-#' # Read all CSVs from a directory
-#' # data <- tl_read_dir("data/", format = "csv")
+#' dir <- tempfile("sales_")
+#' dir.create(file.path(dir, "2024"), recursive = TRUE)
+#' write.csv(mtcars[1:16, ], file.path(dir, "jan.csv"), row.names = FALSE)
+#' write.csv(mtcars[17:32, ], file.path(dir, "2024", "feb.csv"),
+#'           row.names = FALSE)
 #'
-#' # Read with pattern matching
-#' # data <- tl_read_dir("data/", pattern = "^sales_.*\\.csv$")
+#' # Only the top level unless asked to recurse
+#' tl_read_dir(dir, format = "csv")
 #'
-#' # Read all recognized data files recursively
-#' # data <- tl_read_dir("data/", recursive = TRUE)
-#' }
+#' # Files in subfolders are labelled by their path below dir
+#' all_months <- tl_read_dir(dir, recursive = TRUE, .quiet = TRUE)
+#' table(all_months$source_file)
+#'
+#' # Or select files by a regular expression
+#' tl_read_dir(dir, pattern = "^jan", .quiet = TRUE)
+#'
+#' unlink(dir, recursive = TRUE)
 #'
 #' @export
 tl_read_dir <- function(path, pattern = NULL, format = NULL,
@@ -357,31 +678,28 @@ tl_read_dir <- function(path, pattern = NULL, format = NULL,
     stop("Directory not found: '", path, "'", call. = FALSE)
   }
 
-  # Build file list
+  # Build file list, relative to path: the relative path is each row's
+  # source_file label
   if (!is.null(pattern)) {
-    files <- list.files(path, pattern = pattern, full.names = TRUE,
-                        recursive = recursive)
+    found <- list.files(path, pattern = pattern, recursive = recursive)
   } else if (!is.null(format)) {
-    ext_patterns <- list(
-      csv = "\\.csv$", tsv = "\\.tsv$",
-      excel = "\\.(xlsx?|xlsm)$",
-      parquet = "\\.parquet$", json = "\\.json$",
-      rds = "\\.rds$", rdata = "\\.(rdata|rda)$"
-    )
-    pat <- ext_patterns[[format]]
-    if (is.null(pat)) {
+    scannable <- c("csv", "tsv", "excel", "parquet", "json", "rds", "rdata")
+    if (!format %in% scannable) {
       stop("Cannot scan directory for format '", format, "'. ",
            "Use 'pattern' argument instead.",
            call. = FALSE)
     }
-    files <- list.files(path, pattern = pat, full.names = TRUE,
+    found <- list.files(path, pattern = tl_scan_pattern(format),
                         recursive = recursive, ignore.case = TRUE)
   } else {
     # All recognized data file extensions
-    pat <- "\\.(csv|tsv|xlsx?|xlsm|parquet|json|rds|rdata|rda)$"
-    files <- list.files(path, pattern = pat, full.names = TRUE,
+    found <- list.files(path, pattern = tl_scan_pattern(),
                         recursive = recursive, ignore.case = TRUE)
   }
+  # Without recursion list.files() returns folders too, and a folder named
+  # like a data file (old.csv) would be read as a directory into the result
+  found <- found[!dir.exists(file.path(path, found))]
+  files <- file.path(path, found)
 
   if (length(files) == 0) {
     stop("No data files found in '", path, "'.",
@@ -394,7 +712,7 @@ tl_read_dir <- function(path, pattern = NULL, format = NULL,
     message("Found ", length(files), " file(s) in ", path)
   }
 
-  tl_read_multi(files, ..., format = format, .quiet = .quiet)
+  tl_read_multi(files, ..., format = format, .quiet = .quiet, labels = found)
 }
 
 #' Read data from a zip archive
@@ -405,13 +723,21 @@ tl_read_dir <- function(path, pattern = NULL, format = NULL,
 #' column. Use the \code{file} argument to select a specific file from
 #' the archive.
 #'
+#' An archive with a member whose name could reach outside the extraction
+#' directory -- an absolute path, a drive letter on Windows, or any
+#' \code{..} component -- is refused before anything is extracted.
+#'
 #' @param path Path to a zip file.
-#' @param file Optional name of a specific file within the archive to read.
-#'   Supports partial matching.
+#' @param file Optional name of a specific file within the archive to read:
+#'   its path within the archive (\code{"2024/sales.csv"}), its file name,
+#'   or part of its path. An exact path wins, then an exact file name, then
+#'   a partial match; a name that matches more than one member at the
+#'   first of those steps that matches anything is an error listing them.
 #' @param format Optional format override for the file(s) inside the
-#'   archive. When the archive holds more than one kind of data file,
-#'   this selects the members of that format rather than forcing it
-#'   onto all of them.
+#'   archive. Without \code{file}, this selects the members of that
+#'   format rather than forcing it onto them, whether the archive holds
+#'   one data file or several. With \code{file}, the named member is read
+#'   as \code{format} whatever its extension.
 #' @param .quiet Suppress messages. Default is \code{FALSE}.
 #' @param ... Additional arguments passed to the format-specific reader.
 #'
@@ -419,16 +745,16 @@ tl_read_dir <- function(path, pattern = NULL, format = NULL,
 #'   with attributes \code{tl_source}, \code{tl_format}, and
 #'   \code{tl_timestamp}. The archive is extracted to a temporary directory
 #'   that is cleaned up automatically. If multiple data files are found,
-#'   a \code{source_file} column identifies the origin of each row.
+#'   a \code{source_file} column gives each row's member as its path within
+#'   the archive.
 #'
-#' @examples
-#' \donttest{
-#' # Read from a zip archive
-#' # data <- tl_read_zip("data.zip")
+#' @examplesIf requireNamespace("readr", quietly = TRUE)
+#' # readr ships a zip archive holding one CSV
+#' archive <- readr::readr_example("mtcars.csv.zip")
+#' tl_read_zip(archive)
 #'
-#' # Read a specific file from the archive
-#' # data <- tl_read_zip("data.zip", file = "train.csv")
-#' }
+#' # Name a member to read just that one
+#' tl_read_zip(archive, file = "mtcars.csv", .quiet = TRUE)
 #'
 #' @export
 tl_read_zip <- function(path, file = NULL, format = NULL,
@@ -440,56 +766,42 @@ tl_read_zip <- function(path, file = NULL, format = NULL,
   dir.create(dest)
   on.exit(unlink(dest, recursive = TRUE), add = TRUE)
 
-  utils::unzip(path, exdir = dest)
+  tl_unzip_checked(path, dest)
+  members <- list.files(dest, recursive = TRUE)
 
   if (!is.null(file)) {
-    # Find the specific file (supports partial matching)
-    all_files <- list.files(dest, recursive = TRUE, full.names = TRUE)
-    matches <- all_files[grepl(file, basename(all_files), fixed = TRUE)]
-
-    if (length(matches) == 0) {
-      available <- basename(all_files)
-      stop("File '", file, "' not found in archive.",
-           "\nAvailable files: ", paste(available, collapse = ", "),
-           call. = FALSE)
-    }
-
-    target <- matches[1]
-    if (length(matches) > 1 && !.quiet) {
-      message("Multiple matches for '", file, "'. Reading: ",
-              basename(target))
-    }
-
-    result <- tl_read(target, ..., format = format, .quiet = .quiet)
-    attr(result, "tl_source") <- paste0(path, "//", basename(target))
+    target <- tl_match_zip_member(file, members)
+    result <- tl_read(file.path(dest, target), ..., format = format,
+                      .quiet = .quiet)
+    attr(result, "tl_source") <- paste0(path, "//", target)
     attr(result, "tl_format") <- paste0("zip+", attr(result, "tl_format"))
     return(result)
   }
 
   # No specific file — read all data files
-  data_pattern <- "\\.(csv|tsv|xlsx?|xlsm|parquet|json|rds|rdata|rda)$"
-  data_files <- list.files(dest, pattern = data_pattern,
-                           full.names = TRUE, recursive = TRUE,
-                           ignore.case = TRUE)
+  data_files <- members[grepl(tl_scan_pattern(), members, ignore.case = TRUE)]
 
   if (length(data_files) == 0) {
-    all_files <- list.files(dest, recursive = TRUE)
     stop("No recognized data files found in archive.",
-         "\nFiles in archive: ", paste(all_files, collapse = ", "),
+         "\nFiles in archive: ", paste(members, collapse = ", "),
          call. = FALSE)
   }
 
   # An archive can hold more than one kind of file. Forcing `format` onto
   # every member read a JSON as a CSV and row-bound the result, producing
   # a column named after the JSON's first line and no error at all. When
-  # the caller names a format, take it to mean the members of that format.
-  if (!is.null(format) && length(data_files) > 1) {
-    detected <- vapply(data_files, tl_detect_format, character(1))
+  # the caller names a format, take it to mean the members of that format
+  # -- one member or many, so a single JSON is not read as a CSV either.
+  if (!is.null(format)) {
+    detected <- vapply(data_files, tl_detect_format, character(1),
+                       USE.NAMES = FALSE)
     wanted <- detected == format
 
     if (!any(wanted)) {
       stop("No ", format, " files in archive.",
            "\nFound: ", paste(unique(detected), collapse = ", "),
+           "\nTo read a member as ", format, " whatever its extension, ",
+           "name it with 'file'.",
            call. = FALSE)
     }
 
@@ -503,8 +815,9 @@ tl_read_zip <- function(path, file = NULL, format = NULL,
   }
 
   if (length(data_files) == 1) {
-    result <- tl_read(data_files[1], ..., format = format, .quiet = .quiet)
-    attr(result, "tl_source") <- paste0(path, "//", basename(data_files[1]))
+    result <- tl_read(file.path(dest, data_files), ..., format = format,
+                      .quiet = .quiet)
+    attr(result, "tl_source") <- paste0(path, "//", data_files)
     attr(result, "tl_format") <- paste0("zip+", attr(result, "tl_format"))
     return(result)
   }
@@ -514,10 +827,114 @@ tl_read_zip <- function(path, file = NULL, format = NULL,
     message("Found ", length(data_files), " data file(s) in ", basename(path))
   }
 
-  result <- tl_read_multi(data_files, ..., format = format, .quiet = .quiet)
+  result <- tl_read_multi(file.path(dest, data_files), ..., format = format,
+                          .quiet = .quiet, labels = data_files)
   attr(result, "tl_source") <- path
   attr(result, "tl_format") <- "zip+multi"
   result
+}
+
+#' Pick the archive member a caller named
+#'
+#' An exact path wins, then an exact file name, then a part of the path.
+#' Several matches at the step that decides are an error. Settled by file
+#' order, "train" would read "full_train.csv" where the archive also holds
+#' "train.csv", without a word under \code{.quiet = TRUE}.
+#'
+#' @param file The name the caller gave.
+#' @param members Member paths, relative to the extraction directory.
+#' @return The chosen member path.
+#' @keywords internal
+#' @noRd
+tl_match_zip_member <- function(file, members) {
+  wanted <- sub("^\\./", "", gsub("\\\\", "/", file))
+  steps <- list(
+    members == wanted,
+    basename(members) == wanted,
+    grepl(wanted, members, fixed = TRUE)
+  )
+
+  for (hit in steps) {
+    if (sum(hit) == 1L) {
+      return(members[hit])
+    }
+    if (sum(hit) > 1L) {
+      stop("'", file, "' matches ", sum(hit), " files in the archive: ",
+           paste(members[hit], collapse = ", "),
+           ". Give the path of one of them within the archive.",
+           call. = FALSE)
+    }
+  }
+
+  stop("File '", file, "' not found in archive.",
+       "\nAvailable files: ", paste(members, collapse = ", "),
+       call. = FALSE)
+}
+
+#' Refuse a zip archive with members that would land outside the
+#' directory it is unpacked into
+#'
+#' \code{unzip()} before R 4.5.1 extracts a member named \code{"../x"} or
+#' \code{"/x"} as written, so a crafted archive could plant a file
+#' anywhere the user can write -- an \code{.Rprofile}, say, which runs at
+#' the next R start. Any \code{..} component is refused, including one
+#' that resolves inside, so the check needs no path arithmetic. Names are
+#' split on both separators, since archives made on Windows use either and
+#' some extractors treat a backslash as one. A drive letter
+#' (\code{"C:x"}) is refused only on Windows: elsewhere a colon is an
+#' ordinary character in a file name.
+#'
+#' @param path The archive, named in the message.
+#' @param members Member names, as listed by \code{unzip(list = TRUE)}.
+#' @return \code{TRUE}, invisibly, when every member is safe.
+#' @keywords internal
+#' @noRd
+tl_refuse_unsafe_zip <- function(path, members) {
+  reason <- rep(NA_character_, length(members))
+
+  climbing <- vapply(
+    strsplit(members, "[/\\\\]"),
+    function(parts) any(parts == ".."),
+    logical(1)
+  )
+  reason[climbing] <- "has a '..' component"
+  reason[grepl("^[/\\\\]", members)] <- "is an absolute path"
+  if (.Platform$OS.type == "windows") {
+    reason[grepl("^[A-Za-z]:", members)] <- "names a drive"
+  }
+
+  unsafe <- !is.na(reason)
+  if (any(unsafe)) {
+    stop(
+      "Refusing to unpack '", basename(path), "': ",
+      paste0("'", members[unsafe], "' ", reason[unsafe], collapse = "; "),
+      ". tidylearn does not extract a member that is an absolute path, ",
+      "names a drive or has a '..' component, since such a name can reach ",
+      "outside the folder an archive is unpacked into. Extract it by hand ",
+      "only if you trust where it came from.",
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
+}
+
+#' Unzip an archive once its member names are known to be safe
+#'
+#' @param path The archive.
+#' @param exdir The directory to extract into.
+#' @return The extracted paths, invisibly.
+#' @keywords internal
+#' @noRd
+tl_unzip_checked <- function(path, exdir) {
+  members <- tryCatch(
+    utils::unzip(path, list = TRUE)$Name,
+    error = function(e) {
+      stop("Cannot read zip archive '", path, "': ", conditionMessage(e),
+           call. = FALSE)
+    }
+  )
+  tl_refuse_unsafe_zip(path, members)
+  invisible(utils::unzip(path, exdir = exdir))
 }
 
 # ---- File format readers ----
@@ -536,9 +953,10 @@ tl_read_zip <- function(path, file = NULL, format = NULL,
 #'   \code{tl_timestamp}.
 #'
 #' @examples
-#' \donttest{
-#' # data <- tl_read_csv("path/to/data.csv")
-#' }
+#' path <- tempfile(fileext = ".csv")
+#' write.csv(mtcars, path, row.names = FALSE)
+#' tl_read_csv(path)
+#' unlink(path)
 #'
 #' @export
 tl_read_csv <- function(path, ...) {
@@ -570,9 +988,10 @@ tl_read_csv <- function(path, ...) {
 #'   \code{tl_timestamp}.
 #'
 #' @examples
-#' \donttest{
-#' # data <- tl_read_tsv("path/to/data.tsv")
-#' }
+#' path <- tempfile(fileext = ".tsv")
+#' write.table(mtcars, path, sep = "\t", row.names = FALSE)
+#' tl_read_tsv(path)
+#' unlink(path)
 #'
 #' @export
 tl_read_tsv <- function(path, ...) {
@@ -603,11 +1022,11 @@ tl_read_tsv <- function(path, ...) {
 #'   with attributes \code{tl_source}, \code{tl_format}, and
 #'   \code{tl_timestamp}.
 #'
-#' @examples
-#' \donttest{
-#' # data <- tl_read_excel("path/to/data.xlsx")
-#' # data <- tl_read_excel("path/to/data.xlsx", sheet = "Sheet2")
-#' }
+#' @examplesIf requireNamespace("readxl", quietly = TRUE)
+#' # readxl ships a workbook with one data set per sheet
+#' path <- readxl::readxl_example("datasets.xlsx")
+#' tl_read_excel(path)
+#' tl_read_excel(path, sheet = "mtcars")
 #'
 #' @export
 tl_read_excel <- function(path, sheet = 1, ...) {
@@ -624,6 +1043,14 @@ tl_read_excel <- function(path, sheet = 1, ...) {
 #' Reads an RDS file into a \code{tidylearn_data} object. Uses base R
 #' \code{readRDS()} — no additional packages required.
 #'
+#' @section Reading files you did not create:
+#' \code{readRDS()} rebuilds whatever R objects the file describes, so
+#' read only files from a source you trust. On R before 4.4.0 a crafted
+#' file can run code as it is read (CVE-2024-27322). The remote readers
+#' \code{tl_read_github()} and \code{tl_read_s3()} refuse \code{.rds}
+#' and \code{.rdata} files on those versions unless
+#' \code{trust_rds = TRUE}.
+#'
 #' @param path Path to an RDS file.
 #'
 #' @return A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
@@ -631,9 +1058,10 @@ tl_read_excel <- function(path, sheet = 1, ...) {
 #'   \code{tl_timestamp}.
 #'
 #' @examples
-#' \donttest{
-#' # data <- tl_read_rds("path/to/data.rds")
-#' }
+#' path <- tempfile(fileext = ".rds")
+#' saveRDS(mtcars, path)
+#' tl_read_rds(path)
+#' unlink(path)
 #'
 #' @export
 tl_read_rds <- function(path) {
@@ -659,6 +1087,14 @@ tl_read_rds <- function(path) {
 #' If \code{name} is \code{NULL} and
 #' the file contains exactly one data frame, it is returned automatically.
 #'
+#' @section Reading files you did not create:
+#' \code{load()} rebuilds whatever R objects the file describes, so read
+#' only files from a source you trust. On R before 4.4.0 a crafted file
+#' can run code as it is read (CVE-2024-27322). The remote readers
+#' \code{tl_read_github()} and \code{tl_read_s3()} refuse \code{.rds}
+#' and \code{.rdata} files on those versions unless
+#' \code{trust_rds = TRUE}.
+#'
 #' @param path Path to an RData file.
 #' @param name Optional name of the object to extract from the RData file. If
 #'   \code{NULL} (default), the function returns the first data frame found, or
@@ -670,10 +1106,14 @@ tl_read_rds <- function(path) {
 #'   \code{tl_timestamp}.
 #'
 #' @examples
-#' \donttest{
-#' # data <- tl_read_rdata("path/to/data.rdata")
-#' # data <- tl_read_rdata("path/to/data.rdata", name = "my_data")
-#' }
+#' path <- tempfile(fileext = ".rdata")
+#' cars <- mtcars
+#' flowers <- iris
+#' save(cars, flowers, file = path)
+#'
+#' # With more than one data frame in the file, name the one to read
+#' tl_read_rdata(path, name = "flowers")
+#' unlink(path)
 #'
 #' @export
 tl_read_rdata <- function(path, name = NULL, ...) {
@@ -738,10 +1178,11 @@ tl_read_rdata <- function(path, name = NULL, ...) {
 #'   with attributes \code{tl_source}, \code{tl_format}, and
 #'   \code{tl_timestamp}.
 #'
-#' @examples
-#' \donttest{
-#' # data <- tl_read_parquet("path/to/data.parquet")
-#' }
+#' @examplesIf requireNamespace("nanoparquet", quietly = TRUE)
+#' path <- tempfile(fileext = ".parquet")
+#' nanoparquet::write_parquet(mtcars, path)
+#' tl_read_parquet(path)
+#' unlink(path)
 #'
 #' @export
 tl_read_parquet <- function(path, ...) {
@@ -756,29 +1197,61 @@ tl_read_parquet <- function(path, ...) {
 #' Read a JSON file
 #'
 #' Reads a JSON file into a \code{tidylearn_data} object. Expects the JSON to
-#' represent tabular data (array of objects or similar). Requires the
-#' \pkg{jsonlite} package.
+#' represent tabular data (array of objects or similar). A file with the
+#' \code{.ndjson} extension is read as newline-delimited JSON, one record
+#' per line, and so is a \code{.json} file that does not parse as a single
+#' document but does as one record per line. Requires the \pkg{jsonlite}
+#' package.
 #'
 #' @param path Path to a JSON file.
 #' @param flatten Logical. Automatically flatten nested data frames? Default is
 #'   \code{TRUE}.
-#' @param ... Additional arguments passed to \code{jsonlite::fromJSON()}.
+#' @param ... Additional arguments passed to \code{jsonlite::fromJSON()}, or
+#'   to \code{jsonlite::stream_in()} for an \code{.ndjson} file.
 #'
 #' @return A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
 #'   with attributes \code{tl_source}, \code{tl_format}, and
 #'   \code{tl_timestamp}.
 #'
-#' @examples
-#' \donttest{
-#' # data <- tl_read_json("path/to/data.json")
-#' }
+#' @examplesIf requireNamespace("jsonlite", quietly = TRUE)
+#' path <- tempfile(fileext = ".json")
+#' jsonlite::write_json(mtcars, path)
+#' tl_read_json(path)
+#'
+#' # Newline-delimited JSON: one record per line
+#' lines <- tempfile(fileext = ".ndjson")
+#' jsonlite::stream_out(mtcars, file(lines), verbose = FALSE)
+#' tl_read_json(lines)
+#'
+#' unlink(c(path, lines))
 #'
 #' @export
 tl_read_json <- function(path, flatten = TRUE, ...) {
   tl_validate_file_path(path)
   tl_check_packages("jsonlite")
 
-  data <- jsonlite::fromJSON(path, flatten = flatten, ...)
+  # fromJSON() reads a file as one document, and stops newline-delimited
+  # JSON at the end of its first record ("trailing garbage")
+  read_lines <- function() {
+    lines <- jsonlite::stream_in(file(path), verbose = FALSE, ...)
+    if (isTRUE(flatten)) jsonlite::flatten(lines) else lines
+  }
+
+  if (tolower(tools::file_ext(path)) == "ndjson") {
+    data <- read_lines()
+  } else {
+    # The same records are often saved under a .json name, so a file that
+    # fails as one document is tried line by line before giving up
+    data <- tryCatch(
+      jsonlite::fromJSON(path, flatten = flatten, ...),
+      error = function(e) {
+        tryCatch(read_lines(), error = function(e_lines) {
+          stop("Cannot read '", path, "' as JSON or as newline-delimited ",
+               "JSON: ", conditionMessage(e), call. = FALSE)
+        })
+      }
+    )
+  }
 
   if (!is.data.frame(data)) {
     stop("The JSON file does not contain tabular data. ",

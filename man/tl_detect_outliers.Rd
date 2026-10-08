@@ -31,9 +31,13 @@ A list with outlier detection results:
 \item{method_name}{Human-readable method name (character).}
 \item{threshold}{The threshold value used (numeric).}
 \item{threshold_label}{Formatted threshold description (character).}
-\item{outlier_flags}{A logical matrix (observations x variables).}
+\item{outlier_flags}{A logical matrix (observations x variables),
+\code{NA} where a value is missing. For \code{"cook"} and
+\code{"mahalanobis"} a row's flags are the same in every column,
+and \code{NA} when any of its values is missing.}
 \item{any_outlier}{Logical vector indicating if each observation is an
-outlier in any variable.}
+outlier in any variable. Missing flags are ignored, so a row with
+no flag at all is \code{FALSE}.}
 \item{outlier_counts}{List with \code{total}, \code{by_variable}, and
 \code{by_observation} counts.}
 \item{outlier_indices}{Integer vector of outlier row indices.}

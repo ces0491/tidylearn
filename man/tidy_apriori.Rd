@@ -10,7 +10,9 @@ tidy_apriori(
   confidence = 0.5,
   minlen = 2,
   maxlen = 10,
-  target = "rules"
+  target = "rules",
+  control = list(verbose = FALSE),
+  ...
 )
 }
 \arguments{
@@ -27,13 +29,28 @@ tidy_apriori(
 \item{target}{Type of association mined: "rules"
 (default), "frequent itemsets",
 "maximally frequent itemsets"}
+
+\item{control}{A list of algorithmic controls for
+\code{\link[arules]{apriori}}. The mining trace is off unless the list
+sets \code{verbose = TRUE}; any other entries are passed as given.}
+
+\item{...}{Further arguments passed to \code{\link[arules]{apriori}}:
+\code{appearance}, to restrict where items may appear, or more mining
+parameters, such as \code{smax} or \code{maxtime}, which it adds to
+the ones above.}
 }
 \value{
-A list of class "tidy_rules" containing:
+A list of class "tidy_apriori" containing:
 \itemize{
-\item rules_tbl: tibble of rules with lhs, rhs, and quality measures
-\item rules: original rules object
+\item rules_tbl: tibble of rules, as \code{\link{tidy_rules}} returns
+it, or \code{NULL} for an itemset target
+\item rules: original arules object, rules or itemsets
 \item parameters: parameters used
+\item n_rules: number of rules, or of itemsets for an itemset target
+\item itemsets_tbl: for an itemset target only, a tibble with
+\code{itemset_id}, \code{itemset} (its label), \code{size}, the
+quality measures, and \code{items}, a list column holding each
+itemset's items
 }
 }
 \description{

@@ -13,7 +13,16 @@ tl_cv(data, formula, method, folds = 5, metrics = NULL, transform = NULL, ...)
 
 \item{method}{Modeling method}
 
-\item{folds}{Number of cross-validation folds}
+\item{folds}{Number of cross-validation folds, a whole number between 2
+and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn,
+and each fold then scores a single prediction. \code{"accuracy"},
+\code{"mae"}, \code{"mse"} and \code{"mape"} average to their values
+over the left-out predictions. The average \code{"rmse"} is the mean
+absolute error; \code{"precision"}, \code{"recall"},
+\code{"sensitivity"}, \code{"specificity"} and \code{"f1"} are
+undefined on the folds whose one row gives them nothing to divide by;
+and \code{"rsq"}, \code{"auc"} and \code{"pr_auc"} are undefined on
+every fold. A run scoring any of these warns once.}
 
 \item{metrics}{Character vector of metrics to compute on each fold,
 passed to \code{\link{tl_evaluate}}. If \code{NULL} (the default),
@@ -28,7 +37,11 @@ parameters from the data -- PCA rotations, cluster centroids,
 target encodings -- since fitting those before the split inflates
 every fold's score.}
 
-\item{...}{Additional arguments passed to \code{\link{tl_model}}}
+\item{...}{Additional arguments passed to \code{\link{tl_model}} for
+every fold. Arguments holding one value per row of \code{data} --
+\code{weights}, \code{subset}, \code{offset}, \code{foldid} and
+\code{strata} -- are refused, since they cannot follow the rows into
+a fold.}
 }
 \value{
 A list with two elements:
@@ -38,11 +51,17 @@ A list with two elements:
 \code{value} columns.}
 \item{\code{$summary}}{A \link[tibble]{tibble} with columns
 \code{metric}, \code{mean}, and \code{sd} summarizing
-performance across folds.}
+performance across folds. A metric undefined on a fold -- auc
+on a fold holding one class -- is \code{NA} there and left out
+of the mean and sd. So is every metric of a fold none of whose
+rows can be scored, with a warning giving the reason. A metric
+with no value on any fold has \code{NA} mean and sd.}
 }
 }
 \description{
-Cross-validation for tidylearn models
+Each fold's model is scored with \code{\link{tl_evaluate}}, so the
+response is read as that function reads it: a transformed left-hand
+side on its own scale, and classes against the fold model's.
 }
 \examples{
 \donttest{

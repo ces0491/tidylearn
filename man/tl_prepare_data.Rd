@@ -16,18 +16,21 @@ tl_prepare_data(
 )
 }
 \arguments{
-\item{data}{A data frame}
+\item{data}{A data frame. A grouped tibble is prepared as a whole and
+returned ungrouped.}
 
-\item{formula}{Optional formula (for supervised learning). Only its
-predictors are processed; a column it excludes, such as \code{- id},
-is returned unchanged.}
+\item{formula}{Optional two-sided formula (for supervised learning),
+whose response must be a column of \code{data}. Only its predictors are
+processed; a column it excludes, such as \code{- id}, is returned
+unchanged. Leave it \code{NULL} to process every column.}
 
 \item{impute_method}{Method for imputing a missing numeric value:
 "mean", "median" or "mode". A missing categorical value is always
 filled with the column's most frequent value.}
 
 \item{scale_method}{Scaling method: "standardize",
-"normalize", "robust", "none"}
+"normalize", "robust", "none". A column whose spread is zero or not
+finite, such as one holding an \code{Inf}, is left unscaled.}
 
 \item{encode_categorical}{Whether to encode categorical
 variables (default: TRUE)}
@@ -36,7 +39,8 @@ variables (default: TRUE)}
 
 \item{remove_correlated}{Remove highly correlated features (default: FALSE)}
 
-\item{correlation_cutoff}{Correlation threshold for removal (default: 0.95)}
+\item{correlation_cutoff}{Correlation threshold for removal, greater than
+0 and at most 1 (default: 0.95)}
 }
 \value{
 A list with components:

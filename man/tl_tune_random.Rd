@@ -24,10 +24,12 @@ data}
 
 \item{formula}{A formula specifying the model}
 
-\item{method}{The modeling method to tune}
+\item{method}{The modeling method to tune, one of the supervised methods
+\code{\link{tl_model}} fits}
 
-\item{param_space}{A named list of parameter spaces to sample from.
-Each element is read by its type and length:
+\item{param_space}{A named list of parameter spaces to sample from, one
+element for each \code{\link{tl_model}} argument to tune, named after
+it. Each element is read by its type and length:
 \describe{
 \item{a function}{called with no arguments to draw one value}
 \item{a list}{a set of candidates, each drawn whole, e.g.
@@ -46,20 +48,32 @@ given, whether or not they are whole}
 }}
 
 \item{n_iter}{Number of random parameter
-combinations to try}
+combinations to try, a whole number of at least 1}
 
-\item{folds}{Number of cross-validation folds}
+\item{folds}{Number of cross-validation folds, a whole number between 2
+and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn,
+and each fold then scores a single prediction. \code{"accuracy"},
+\code{"mae"}, \code{"mse"} and \code{"mape"} average to their values
+over the left-out predictions. The average \code{"rmse"} is the mean
+absolute error; \code{"precision"}, \code{"recall"},
+\code{"sensitivity"}, \code{"specificity"} and \code{"f1"} are
+undefined on the folds whose one row gives them nothing to divide by;
+and \code{"rsq"}, \code{"auc"} and \code{"pr_auc"} are undefined on
+every fold. A run scoring any of these warns once.}
 
-\item{metric}{Metric to optimize}
+\item{metric}{Metric to optimize, as for \code{\link{tl_tune_grid}}}
 
 \item{maximize}{Logical; whether to maximize (TRUE)
-or minimize (FALSE) the metric}
+or minimize (FALSE) the metric. \code{NULL}, the default, follows the
+metric, as for \code{\link{tl_tune_grid}}.}
 
 \item{verbose}{Logical; whether to print progress}
 
 \item{seed}{Random seed for reproducibility}
 
-\item{...}{Additional arguments passed to tl_model}
+\item{...}{Additional arguments passed to \code{\link{tl_model}} for
+every fold and for the final fit. Per-row arguments are refused, as for
+\code{\link{tl_tune_grid}}.}
 }
 \value{
 A tidylearn model object fitted with the best hyperparameters.

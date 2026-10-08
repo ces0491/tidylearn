@@ -9,6 +9,8 @@
 #' @param scale Logical; should variables be scaled to
 #'   unit variance? Default TRUE.
 #' @param center Logical; should variables be centered? Default TRUE.
+#'   \code{method = "princomp"} always centres, so it warns and records
+#'   \code{center = TRUE} when asked not to.
 #' @param method Character; "prcomp" (default, recommended) or "princomp"
 #'
 #' @return A list of class "tidy_pca" containing:
@@ -37,14 +39,9 @@ tidy_pca <- function(data, cols = NULL, scale = TRUE,
   # Convert to data frame if needed
   data <- as.data.frame(data)
 
-  # Select columns
-  if (!is.null(cols)) {
-    cols_enquo <- rlang::enquo(cols)
-    data_selected <- data |> dplyr::select(!!cols_enquo)
-  } else {
-    # Select only numeric columns
-    data_selected <- data |> dplyr::select(where(is.numeric))
-  }
+  data_selected <- tl_select_columns(
+    data, rlang::enquo(cols), numeric_only = TRUE, what = "PCA"
+  )
 
   tl_check_complete_numeric(data_selected, "PCA", tolerates = NULL)
 
@@ -62,6 +59,16 @@ tidy_pca <- function(data, cols = NULL, scale = TRUE,
     loadings_matrix <- pca_model$rotation
     sdev <- pca_model$sdev
   } else if (method == "princomp") {
+    # princomp() has no way to skip centring, so center = FALSE is
+    # overridden, and the settings record what was done
+    if (isFALSE(center)) {
+      warning(
+        "method = \"princomp\" always centres the data, so center = FALSE ",
+        "was ignored. Use method = \"prcomp\" to fit without centring.",
+        call. = FALSE
+      )
+      center <- TRUE
+    }
     pca_model <- stats::princomp(data_selected, cor = scale, scores = TRUE)
     scores_matrix <- pca_model$scores
     loadings_matrix <- pca_model$loadings
@@ -180,9 +187,13 @@ get_pca_loadings <- function(pca_obj, n_components = NULL) {
   loadings <- pca_obj$loadings
 
   if (!is.null(n_components)) {
-    components_to_keep <- unique(loadings$component)[1:n_components]
+    components <- unique(loadings$component)
+    # 1:n_components with n_components = 0 is c(1, 0), which would keep PC1
+    tl_check_whole_number(
+      n_components, "n_components", min = 1, max = length(components)
+    )
     loadings <- loadings |>
-      dplyr::filter(component %in% components_to_keep)
+      dplyr::filter(component %in% components[seq_len(n_components)])
   }
 
   loadings |>
@@ -243,7 +254,10 @@ augment_pca <- function(pca_obj, data, n_components = NULL) {
   scores <- pca_obj$scores |> dplyr::select(-.obs_id)
 
   if (!is.null(n_components)) {
-    scores <- scores |> dplyr::select(1:n_components)
+    tl_check_whole_number(
+      n_components, "n_components", min = 1, max = ncol(scores)
+    )
+    scores <- scores |> dplyr::select(dplyr::all_of(seq_len(n_components)))
   }
 
   dplyr::bind_cols(data, scores)
@@ -497,16 +511,14 @@ print.tidy_pca <- function(x, ...) {
 #' @keywords internal
 #' @noRd
 tl_fit_pca <- function(data, formula = NULL, scale = TRUE, center = TRUE, ...) {
-  # Extract variables to use
+  # Without a formula, tidy_pca() takes the numeric columns itself
+  data <- tl_ungroup(data)
   if (!is.null(formula)) {
-    vars <- get_formula_vars(formula, data)
-    data_for_pca <- data[, vars, drop = FALSE]
-  } else {
-    data_for_pca <- data |> dplyr::select(where(is.numeric))
+    data <- data[, tl_formula_columns(formula, data, "PCA"), drop = FALSE]
   }
 
   # Fit PCA using tidy_pca
-  pca_result <- tidy_pca(data_for_pca, scale = scale, center = center, ...)
+  pca_result <- tidy_pca(data, scale = scale, center = center, ...)
 
   # Return in expected format
   list(

@@ -23,7 +23,9 @@ tl_plot_interaction(
 
 \item{n_points}{Number of points to use for continuous variables}
 
-\item{fixed_values}{Named list of values for other variables in the model}
+\item{fixed_values}{Named list of values for other variables in the
+model. A variable not named is held at its median if it is numeric, and
+otherwise at its most frequent value, a tie going to the earlier level.}
 
 \item{confidence}{Logical; whether to show a 95\\% confidence band. The
 band is drawn when one variable is numeric and the other categorical,
@@ -37,7 +39,12 @@ response scale. For any other fit a message says no band was drawn.}
 A \code{\link[ggplot2]{ggplot}} object. Two numeric variables are
 drawn as a filled contour of the prediction; a numeric and a categorical
 variable as one line per category; two categorical variables as dodged
-bars.
+bars. A factor, character or logical variable is categorical, and only
+the values the data holds are drawn. For a classification model the
+prediction is the probability of the second class, so the response
+must have two classes. The plot's data holds the prediction in a column
+named \code{prediction}, and a band in \code{.lower} and \code{.upper},
+so a model variable with one of those names is refused.
 }
 \description{
 Plot interaction effects

@@ -9,13 +9,17 @@ tl_read_zip(path, file = NULL, format = NULL, .quiet = FALSE, ...)
 \arguments{
 \item{path}{Path to a zip file.}
 
-\item{file}{Optional name of a specific file within the archive to read.
-Supports partial matching.}
+\item{file}{Optional name of a specific file within the archive to read:
+its path within the archive (\code{"2024/sales.csv"}), its file name,
+or part of its path. An exact path wins, then an exact file name, then
+a partial match; a name that matches more than one member at the
+first of those steps that matches anything is an error listing them.}
 
 \item{format}{Optional format override for the file(s) inside the
-archive. When the archive holds more than one kind of data file,
-this selects the members of that format rather than forcing it
-onto all of them.}
+archive. Without \code{file}, this selects the members of that
+format rather than forcing it onto them, whether the archive holds
+one data file or several. With \code{file}, the named member is read
+as \code{format} whatever its extension.}
 
 \item{.quiet}{Suppress messages. Default is \code{FALSE}.}
 
@@ -26,7 +30,8 @@ A \code{tidylearn_data} object (a \link[tibble]{tibble} subclass)
 with attributes \code{tl_source}, \code{tl_format}, and
 \code{tl_timestamp}. The archive is extracted to a temporary directory
 that is cleaned up automatically. If multiple data files are found,
-a \code{source_file} column identifies the origin of each row.
+a \code{source_file} column gives each row's member as its path within
+the archive.
 }
 \description{
 Extracts a zip archive to a temporary directory and reads the contents.
@@ -35,13 +40,18 @@ multiple data files are found, they are row-bound with a \code{source_file}
 column. Use the \code{file} argument to select a specific file from
 the archive.
 }
-\examples{
-\donttest{
-# Read from a zip archive
-# data <- tl_read_zip("data.zip")
-
-# Read a specific file from the archive
-# data <- tl_read_zip("data.zip", file = "train.csv")
+\details{
+An archive with a member whose name could reach outside the extraction
+directory -- an absolute path, a drive letter on Windows, or any
+\code{..} component -- is refused before anything is extracted.
 }
+\examples{
+\dontshow{if (requireNamespace("readr", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+# readr ships a zip archive holding one CSV
+archive <- readr::readr_example("mtcars.csv.zip")
+tl_read_zip(archive)
 
+# Name a member to read just that one
+tl_read_zip(archive, file = "mtcars.csv", .quiet = TRUE)
+\dontshow{\}) # examplesIf}
 }

@@ -23,9 +23,11 @@ Dispatches to the appropriate table function based on model type and
 requested table type. Requires the gt package.
 }
 \examples{
+\dontshow{if (requireNamespace("gt", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \donttest{
 model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
 tl_table(model)
 tl_table(model, type = "coefficients")
 }
+\dontshow{\}) # examplesIf}
 }

@@ -7,7 +7,8 @@
 compare_clusterings(cluster_list, data, dist_mat = NULL)
 }
 \arguments{
-\item{cluster_list}{Named list of cluster assignment vectors}
+\item{cluster_list}{Named list of cluster assignment vectors. An entry
+without a name is reported as \code{clustering_<position>}.}
 
 \item{data}{Original data}
 

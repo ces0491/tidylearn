@@ -54,6 +54,42 @@ test_that("tl_influence_measures stores thresholds as attributes", {
   expect_true(!is.null(attr(inf, "threshold_dffits")))
 })
 
+test_that("influence measures cover a rank-deficient fit", {
+  # dfbetas() has no column for an aliased coefficient, so looping over
+  # coef() failed with "subscript out of bounds"
+  d <- transform(mtcars, wt2 = 2 * wt)
+  model <- tl_model(d, mpg ~ wt + wt2 + hp, method = "linear")
+  inf <- tl_influence_measures(model)
+
+  expect_setequal(grep("^dfbetas_", names(inf), value = TRUE),
+                  c("dfbetas__Intercept_", "dfbetas_wt", "dfbetas_hp"))
+  expect_equal(inf$dfbetas_hp, stats::dfbetas(model$fit)[, "hp"],
+               ignore_attr = TRUE)
+  # The thresholds count the three coefficients estimated, not four
+  expect_equal(attr(inf, "threshold_leverage"), 2 * 3 / 32)
+  expect_equal(attr(inf, "threshold_dffits"), 2 * sqrt(3 / 32))
+})
+
+test_that("diagnostics of an na.exclude fit match the na.omit fit", {
+  # na.exclude pads every residual and influence measure back to all 32
+  # rows while the fit used 30: "arguments imply differing number of rows:
+  # 30, 32"
+  d <- mtcars
+  d$wt[c(3, 7)] <- NA
+  excluded <- tl_model(d, mpg ~ wt + hp, method = "linear",
+                       na.action = stats::na.exclude)
+  omitted <- tl_model(d, mpg ~ wt + hp, method = "linear")
+
+  inf <- tl_influence_measures(excluded)
+  expect_identical(inf$observation, setdiff(1:32, c(3L, 7L)))
+  expect_equal(inf, tl_influence_measures(omitted))
+  expect_equal(inf$cooks_distance, stats::cooks.distance(omitted$fit),
+               ignore_attr = TRUE)
+
+  expect_equal(tl_check_assumptions(excluded, verbose = FALSE),
+               tl_check_assumptions(omitted, verbose = FALSE))
+})
+
 # -- Influence plotting --
 
 test_that("tl_plot_influence returns ggplot for cook type", {
@@ -152,6 +188,115 @@ test_that("tl_check_assumptions works for polynomial model", {
 
   expect_type(assumptions, "list")
   expect_true("linearity" %in% names(assumptions))
+})
+
+test_that("a factor's GVIF is read on the VIF scale, not as its Df", {
+  skip_if_not_installed("car")
+  # car::vif() returns a GVIF table for a multi-df term, and max() over it
+  # took the Df column: carb's 5 df were "Maximum VIF: 5", flagged as
+  # multicollinearity, while its GVIF is 1.6
+  d <- transform(mtcars, carb = factor(carb))
+  model <- tl_model(d, mpg ~ wt + carb, method = "linear")
+  result <- tl_check_assumptions(model, verbose = FALSE)$multicollinearity
+
+  gvif <- car::vif(model$fit)
+  adjusted <- gvif[, "GVIF"]^(1 / gvif[, "Df"])
+  expect_true(result$check)
+  expect_identical(result$details,
+                   paste("Maximum VIF:", round(max(adjusted), 4)))
+
+  # A collinear pair is still flagged when a factor is in the model
+  d$wt_band <- cut(d$wt, breaks = c(0, 2.5, 3.2, 3.6, 6))
+  collinear <- tl_model(d, mpg ~ wt + wt_band + hp, method = "linear")
+  result <- tl_check_assumptions(collinear, verbose = FALSE)$multicollinearity
+  gvif <- car::vif(collinear$fit)
+  adjusted <- gvif[, "GVIF"]^(1 / gvif[, "Df"])
+  expect_false(result$check)
+  expect_identical(result$details,
+                   paste("Maximum VIF:", round(max(adjusted), 4)))
+})
+
+test_that("the multicollinearity check is kept when VIF cannot run", {
+  # The fallback assigned inside the error handler, which changed a copy:
+  # mpg ~ wt came back with no multicollinearity element at all
+  single <- tl_check_assumptions(tl_model(mtcars, mpg ~ wt, method = "linear"),
+                                 verbose = FALSE)
+  expect_identical(single$multicollinearity$details,
+                   "Model has only one predictor")
+  expect_true(single$multicollinearity$check)
+
+  # car::vif() refuses aliased coefficients; the correlation fallback
+  # finds the exact copy
+  d <- transform(mtcars, wt2 = 2 * wt)
+  aliased <- tl_model(d, mpg ~ wt + wt2 + hp, method = "linear")
+  result <- tl_check_assumptions(aliased, verbose = FALSE)$multicollinearity
+  expect_false(result$check)
+  expect_identical(result$details, "Maximum correlation between predictors: 1")
+})
+
+test_that("a logistic model is not held to the OLS assumptions", {
+  skip_if_not_installed("lmtest")
+  # Shapiro-Wilk on the deviance residuals gave p = 0 with advice to
+  # transform, and bptest() tested a linear probability model
+  am_data <- transform(mtcars, am = factor(am))
+  model <- tl_model(am_data, am ~ wt + hp, method = "logistic")
+
+  for (test in c(TRUE, FALSE)) {
+    result <- tl_check_assumptions(model, test = test, verbose = FALSE)
+    expect_null(result$normality$check)
+    expect_null(result$homoscedasticity$check)
+    expect_match(result$normality$details,
+                 "Not an assumption of logistic regression", fixed = TRUE)
+    expect_match(result$homoscedasticity$details,
+                 "Not an assumption of logistic regression", fixed = TRUE)
+  }
+
+  # Linearity, independence, multicollinearity and influence still count
+  result <- tl_check_assumptions(model, verbose = FALSE)
+  expect_identical(result$overall$n_checked, 4L)
+
+  linear <- tl_check_assumptions(
+    tl_model(mtcars, mpg ~ wt + hp, method = "linear"), verbose = FALSE
+  )
+  expect_match(linear$normality$details, "Shapiro-Wilk", fixed = TRUE)
+  expect_match(linear$homoscedasticity$details, "Breusch-Pagan", fixed = TRUE)
+})
+
+test_that("an undecided check is reported as unknown, not violated", {
+  # Two fitted values leave the linearity test nothing to fit. Its NA
+  # stopped the verbose summary with "missing value where TRUE/FALSE
+  # needed" and gave "NA assumption(s) appear to be violated" without it
+  dd <- data.frame(y = rep(c(1, 3), each = 10) + rep(c(-1, 1), 10),
+                   x = rep(0:1, each = 10))
+  model <- suppressMessages(tl_model(dd, y ~ x, method = "linear"))
+
+  messages <- testthat::capture_messages(
+    result <- tl_check_assumptions(model)
+  )
+  expect_true(any(grepl("Linearity: UNKNOWN", messages, fixed = TRUE)))
+  expect_true(is.na(result$linearity$check))
+  expect_false(anyNA(unlist(result$overall[c("n_checked", "n_violated",
+                                             "n_satisfied")])))
+  expect_identical(result$overall$n_checked,
+                   result$overall$n_violated + result$overall$n_satisfied)
+  expect_no_match(result$overall$status, "NA", fixed = TRUE)
+
+  # len ~ supp has two fitted values too, but floating-point noise made
+  # them four distinct numbers, so the test ran and reported p = 1
+  supp <- tl_model(ToothGrowth, len ~ supp, method = "linear")
+  expect_true(is.na(
+    tl_check_assumptions(supp, verbose = FALSE)$linearity$check
+  ))
+})
+
+test_that("the Durbin-Watson statistic is the one lmtest reports", {
+  skip_if_not_installed("lmtest")
+  model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+  dw <- unname(lmtest::dwtest(model$fit)$statistic)
+  result <- tl_check_assumptions(model, verbose = FALSE)
+  expect_identical(result$independence$details,
+                   paste("Durbin-Watson statistic:", round(dw, 4)))
+  expect_false(result$independence$check)
 })
 
 # -- Outlier detection --
@@ -266,6 +411,66 @@ test_that("tl_detect_outliers mahalanobis requires 2+ variables", {
   )
 })
 
+test_that("Cook's distance flags influential rows despite a missing value", {
+  # lm() dropped the incomplete row, and its 31 distances were recycled
+  # into a 32-row matrix, shifting every column: nine rows were flagged
+  d <- mtcars
+  d$wt[5] <- NA
+  result <- tl_detect_outliers(d, c("mpg", "wt", "hp"), method = "cook",
+                               plot = FALSE)
+
+  cooks <- stats::cooks.distance(stats::lm(mpg ~ wt + hp, data = d))
+  expect_identical(rownames(d)[result$outlier_indices],
+                   names(cooks)[cooks > 4 / 32])
+  expect_true(all(is.na(result$outlier_flags[5, ])))
+  expect_identical(result$outlier_counts$total, 4L)
+
+  plotted <- tl_detect_outliers(d, c("mpg", "wt", "hp"), method = "cook")
+  expect_false(5 %in% plotted$plot$data$observation)
+})
+
+test_that("outlier counts survive a missing value", {
+  # any() over a row holding an NA flag is NA, so the total was NA while
+  # outlier_indices listed rows
+  # Ozone above Q3 + 1.5 IQR in rows 62 and 117, Wind in 9, 18 and 48
+  iqr <- tl_detect_outliers(airquality, method = "iqr", plot = FALSE)
+  expect_identical(iqr$outlier_counts$total, 5L)
+  expect_identical(iqr$outlier_indices, c(9L, 18L, 48L, 62L, 117L))
+
+  z <- tl_detect_outliers(airquality, method = "z-score", plot = FALSE)
+  expect_identical(z$outlier_counts$total, length(z$outlier_indices))
+
+  mahal <- tl_detect_outliers(airquality, c("Ozone", "Solar.R", "Wind"),
+                              method = "mahalanobis", plot = FALSE)
+  expect_identical(mahal$outlier_counts$total, 3L)
+})
+
+test_that("Cook's distance accepts a non-syntactic column name", {
+  # The formula was pasted together as "mpg ~ car weight + hp", which does
+  # not parse: "unexpected symbol"
+  renamed <- mtcars[, c("mpg", "wt", "hp")]
+  names(renamed)[2] <- "car weight"
+  result <- tl_detect_outliers(renamed, c("mpg", "car weight", "hp"),
+                               method = "cook", plot = FALSE)
+
+  cooks <- stats::cooks.distance(stats::lm(mpg ~ wt + hp, data = mtcars))
+  expect_identical(result$outlier_indices, unname(which(cooks > 4 / 32)))
+  expect_identical(colnames(result$outlier_flags),
+                   c("mpg", "car weight", "hp"))
+})
+
+test_that("per-variable outlier flags stay a matrix for a single row", {
+  # sapply() simplified one row's flags to a vector, and combining them
+  # failed with "dim(X) must have a positive length"
+  for (method in c("iqr", "z-score")) {
+    result <- tl_detect_outliers(mtcars[1, ], c("mpg", "wt"), method = method,
+                                 plot = FALSE)
+    expect_identical(dim(result$outlier_flags), c(1L, 2L), info = method)
+    expect_identical(colnames(result$outlier_flags), c("mpg", "wt"))
+    expect_identical(result$outlier_counts$total, 0L, info = method)
+  }
+})
+
 # -- Diagnostic dashboard --
 
 test_that("tl_diagnostic_dashboard errors without gridExtra", {
@@ -274,6 +479,21 @@ test_that("tl_diagnostic_dashboard errors without gridExtra", {
 
   model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
   expect_error(tl_diagnostic_dashboard(model), "gridExtra")
+})
+
+test_that("tl_diagnostic_dashboard refuses a fit with no residuals to draw", {
+  skip_if_not_installed("gridExtra")
+  # A tree reached rstandard() and failed with "no applicable method for
+  # 'rstandard' applied to an object of class \"rpart\""
+  tree <- tl_model(mtcars, mpg ~ wt + hp, method = "tree")
+  expect_error(
+    tl_diagnostic_dashboard(tree),
+    "The diagnostic dashboard is only available for linear-based models",
+    fixed = TRUE
+  )
+
+  linear <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+  expect_s3_class(tl_diagnostic_dashboard(linear), "gtable")
 })
 
 # -- Classification auto-detection fix --

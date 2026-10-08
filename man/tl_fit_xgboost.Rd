@@ -51,13 +51,24 @@ needed in a child (default: 1)}
 
 \item{lambda}{L2 regularization term (default: 1)}
 
-\item{early_stopping_rounds}{Early stopping rounds (default: NULL)}
+\item{early_stopping_rounds}{Early stopping rounds (default: NULL). It
+needs data to stop on, which a fit on all the rows does not have, so
+it is refused unless a validation set is passed as \code{evals} (or
+\code{watchlist} before xgboost 3.0). \code{\link{tl_tune_xgboost}}
+chooses the number of rounds by cross-validation instead.}
 
 \item{nthread}{Number of threads (default: max available)}
 
 \item{verbose}{Verbose output (default: 0)}
 
-\item{...}{Additional arguments to pass to xgb.train()}
+\item{...}{Arguments \code{xgb.train()} takes, which go to it; case
+\code{weights}, which go to the training \code{xgb.DMatrix()}; and
+booster parameters such as \code{max_leaves} or \code{tree_method},
+which go into \code{params}. A booster parameter given here, including
+\code{objective} and \code{eval_metric}, replaces the value set from
+the arguments above. With \code{booster = "gblinear"}, the tree
+parameters above are left out unless named. An offset is refused:
+predictions would not apply it.}
 
 \item{compute}{Compute tier. Either \code{"cpu"} (default) or
 \code{"gpu"}; when \code{"gpu"}, the function passes

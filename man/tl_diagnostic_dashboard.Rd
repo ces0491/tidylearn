@@ -13,7 +13,9 @@ tl_diagnostic_dashboard(
 )
 }
 \arguments{
-\item{model}{A tidylearn model object}
+\item{model}{A tidylearn model object whose fit is an \code{lm} or
+\code{glm}: method \code{"linear"}, \code{"polynomial"} or
+\code{"logistic"}}
 
 \item{include_influence}{Logical; whether to include influence diagnostics}
 

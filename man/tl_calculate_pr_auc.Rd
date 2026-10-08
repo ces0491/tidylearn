@@ -7,12 +7,19 @@
 tl_calculate_pr_auc(perf)
 }
 \arguments{
-\item{perf}{A ROCR performance object}
+\item{perf}{A ROCR performance object of precision against recall}
 }
 \value{
-The area under the PR curve
+The area under the precision-recall curve, or \code{NA} when
+the curve has fewer than two points
 }
 \description{
-Calculate the area under the precision-recall curve
+Reads the area off a curve ROCR built, and agrees with
+\code{yardstick::pr_auc()}. ROCR's curve starts at recall 0, where
+nothing is yet called positive and precision is 0/0. The area has to
+start there too, at precision 1 as yardstick's does: integrating from
+the first finite point lost everything before it, so a perfect ranking
+of 5 positives in 20 scored 0.8, a tree on two iris species 0.07, and
+constant scores left no area at all.
 }
 \keyword{internal}

@@ -9,15 +9,19 @@
 \arguments{
 \item{object}{A tidylearn_stratified model object}
 
-\item{new_data}{New data for predictions}
+\item{new_data}{New data for predictions. NULL predicts the training
+rows from their stored cluster assignments, which works for every
+clustering method; new rows can be assigned by k-means only.}
 
-\item{...}{Additional arguments}
+\item{...}{Additional arguments passed to each cluster's model, such as
+\code{type}}
 }
 \value{
 A \link[tibble]{tibble} of the columns each cluster's model
 returns for the requested \code{type} -- \code{.pred} by default, one
 column per class for \code{type = "prob"} -- and a \code{.cluster}
-column with cluster assignments.
+column with cluster assignments. Rows of a single-class cluster are
+predicted as that class, with probability 1.
 }
 \description{
 Predict from stratified models

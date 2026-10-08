@@ -42,11 +42,13 @@ come from \code{\link{tl_coefficients}}, which returns them as a tibble
 if you would rather format them yourself.
 }
 \examples{
+\dontshow{if (requireNamespace("gt", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \donttest{
 model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
 tl_table_coefficients(model)
 tl_table_coefficients(model, conf_int = TRUE)
 }
+\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link{tl_coefficients}} for the underlying tibble.

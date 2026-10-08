@@ -9,24 +9,30 @@ tl_table_comparison(..., new_data = NULL, names = NULL, digits = 4)
 \arguments{
 \item{...}{tidylearn model objects to compare}
 
-\item{new_data}{Optional test data for evaluation. If NULL, uses the
-training data of the first model.}
+\item{new_data}{Optional test data for evaluation. If NULL, the models
+are scored on their training data, which they must share: models
+fitted on different data are an error asking for \code{new_data}. A
+model fitted on engineered features, as \code{tl_auto_ml()} builds some
+of its candidates, is scored on the training data of the others.}
 
 \item{names}{Optional character vector of model names}
 
 \item{digits}{Number of decimal places (default: 4)}
 }
 \value{
-A \code{\link[gt]{gt}} table object.
+A \code{\link[gt]{gt}} table object. Its source note counts the
+rows scored, per model when the models scored different rows.
 }
 \description{
 Evaluates multiple tidylearn models and presents the results side-by-side
 in a styled gt table.
 }
 \examples{
+\dontshow{if (requireNamespace("gt", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \donttest{
 m1 <- tl_model(mtcars, mpg ~ ., method = "linear")
 m2 <- tl_model(mtcars, mpg ~ ., method = "lasso")
 tl_table_comparison(m1, m2, names = c("Linear", "Lasso"))
 }
+\dontshow{\}) # examplesIf}
 }

@@ -7,7 +7,7 @@
 
 # Suppress R CMD check notes about global variables from tidyverse NSE
 utils::globalVariables(c(
-  ".", ".id", ".obs_id", ".row_id", ":=",
+  ".", ".id", ".obs_id", ":=",
   "Actual", "Assumption", "Details", "Freq",
   "Predicted", "SE.sim", "Status",
   "abs_shap_value", "actual", "all_of",
@@ -46,28 +46,115 @@ utils::globalVariables(c(
   if (is.null(x)) y else x
 }
 
+#' terms() without R's varlist warning
+#'
+#' \code{terms()} warns "'varlist' has changed (from nvar=11) to new 12
+#' after EncodeVars() -- should no longer happen!" for a dot formula that
+#' names a variable the data lacks, such as \code{mpg ~ . + z} with
+#' \code{z} in the caller's session. The terms it returns are right. The
+#' fit's own model frame gives the warning once, as \code{lm()} does;
+#' tidylearn's other reads of the formula passed it on three or four more
+#' times per \code{tl_model()} call.
+#'
+#' @param x A formula, as for \code{stats::terms()}
+#' @param ... Passed to \code{stats::terms()}
+#' @return The terms object
+#' @keywords internal
+#' @noRd
+tl_terms <- function(x, ...) {
+  withCallingHandlers(stats::terms(x, ...), warning = tl_muffle_varlist)
+}
+
+#' Muffle R's varlist warning and no other
+#'
+#' Recognised by the parts a translation keeps -- the C routine's name and
+#' the \code{nvar=} count -- so it is muffled in any language. The error
+#' "invalid model formula in EncodeVars" names the routine too, without
+#' the parentheses or the count.
+#'
+#' @param w A warning condition
+#' @return Called for its effect: the warning is muffled, or left to
+#'   reach the caller
+#' @keywords internal
+#' @noRd
+tl_muffle_varlist <- function(w) {
+  text <- conditionMessage(w)
+  if (grepl("EncodeVars()", text, fixed = TRUE) &&
+        grepl("nvar=", text, fixed = TRUE)) {
+    invokeRestart("muffleWarning")
+  }
+}
+
 #' Safe extraction of formula variables
+#'
+#' For a one-sided formula, the columns an unsupervised method fits on. A
+#' dot stands for every numeric column, less any the formula subtracts;
+#' a column named explicitly is returned whatever its type, for the caller
+#' to judge. The unsupervised fitters select these columns by name, so a
+#' term that is not a column name -- \code{log(x)}, \code{x:z} -- is
+#' refused here: selecting its variable instead fitted the raw column. So
+#' is a name the data has no column for.
+#'
 #' @keywords internal
 #' @noRd
 get_formula_vars <- function(formula, data) {
   if (is.null(formula)) {
     return(names(data)[sapply(data, is.numeric)])
   }
+  tl_check_subtracted(formula, data)
 
   # Check if it's a one-sided formula (unsupervised)
   if (length(formula) == 2) {
-    # One-sided: ~ vars
-    rhs <- formula[[2]]
-    if (rhs == ".") {
-      names(data)[sapply(data, is.numeric)]
-    } else {
-      all.vars(formula)
+    # terms() expands the dot and applies `- x`; all.vars() on the formula
+    # returned "." itself for ~ . - x
+    labels <- attr(tl_terms(formula, data = data), "term.labels")
+    terms <- lapply(labels, str2lang)
+    bare <- vapply(terms, is.name, logical(1))
+    if (!all(bare)) {
+      one <- sum(!bare) == 1L
+      stop(
+        "Formulas for unsupervised methods name columns only, but this one ",
+        "has ", paste(labels[!bare], collapse = ", "), ". Add ",
+        if (one) "it to the data as a column" else "them as columns",
+        ", e.g. with dplyr::mutate(), and name ",
+        if (one) "that column" else "those columns", " instead.",
+        call. = FALSE
+      )
     }
+    vars <- vapply(terms, as.character, character(1))
+
+    # A name that is not a column was kept for the fitter to select, which
+    # failed with "undefined columns selected". The fitters select columns
+    # by name, so an object of that name in the caller's session does not
+    # stand in for one.
+    absent <- setdiff(vars, names(data))
+    if (length(absent) > 0L) {
+      one <- length(absent) == 1L
+      stop(
+        "Formulas for unsupervised methods name columns only, but ",
+        paste0("'", absent, "'", collapse = ", "),
+        if (one) " is not a column" else " are not columns",
+        " of the data. Check the spelling, or add ",
+        if (one) "it" else "them", " to the data, e.g. with dplyr::mutate().",
+        call. = FALSE
+      )
+    }
+
+    if ("." %in% all.vars(formula)) {
+      named <- setdiff(all.vars(formula), ".")
+      numeric_column <- vapply(
+        vars,
+        function(v) v %in% names(data) && is.numeric(data[[v]]),
+        logical(1)
+      )
+      vars <- vars[numeric_column | vars %in% named]
+    }
+    unname(vars)
   } else {
     # Two-sided: the variables the expanded terms use. all.vars() on the
     # formula itself returns "." for `y ~ .` and returns `id` for
     # `y ~ . - id`, which is exactly the column the caller excluded.
-    labels <- attr(stats::terms(formula, data = data), "term.labels")
+    labels <- attr(tl_terms(formula, data = data), "term.labels")
     unique(unlist(lapply(labels, function(label) all.vars(str2lang(label)))))
   }
 }
@@ -80,8 +167,10 @@ tl_validate_file_path <- function(path) {
     stop("'path' must be a single character string",
          call. = FALSE)
   }
+  # A connection string read with a file format arrives here as a path,
+  # and its password would otherwise be printed with it
   if (!file.exists(path)) {
-    stop("File not found: '", path, "'",
+    stop("File not found: '", tl_redact_db_url(path), "'",
          call. = FALSE)
   }
   invisible(TRUE)
@@ -134,11 +223,27 @@ tl_local_seed <- function(seed, envir = parent.frame()) {
 #' \code{model$data} whenever a predictor was missing. Anything combining
 #' the two then fails with "arguments imply differing number of rows".
 #'
+#' The rows are read off the fit's model frame where it has one, by row
+#' name: that covers every way a row can be left out, where
+#' \code{na.action()} records only the missing values. A row kept under
+#' \code{na.exclude} is not one the fit used, although \code{residuals()}
+#' pads it back in as \code{NA}.
+#'
 #' @param model A fitted tidylearn model
 #' @return Integer row indices into \code{model$data}
 #' @keywords internal
 #' @noRd
 tl_fitted_rows <- function(model) {
+  frame <- if (inherits(model$fit, "lm")) {
+    tryCatch(stats::model.frame(model$fit), error = function(e) NULL)
+  }
+  if (!is.null(frame)) {
+    rows <- match(rownames(frame), rownames(model$data))
+    if (!anyNA(rows)) {
+      return(rows)
+    }
+  }
+
   kept <- seq_len(nrow(model$data))
   omitted <- stats::na.action(model$fit)
   if (is.null(omitted)) {
@@ -233,6 +338,83 @@ tl_normalise_response <- function(y) {
   droplevels(y)
 }
 
+#' The response a two-sided formula fits
+#'
+#' The left-hand side is the bare column only when the formula says so.
+#' \code{factor(cyl) ~ wt} fits a factor and \code{I(mpg > 20) ~ wt} a
+#' logical, so deciding the task from the raw column read the wrong
+#' vector: the first was fitted by \code{lm()} on the factor codes, the
+#' second refused by logistic as numeric with 25 distinct values. The
+#' left-hand side is evaluated as \code{model.frame()} evaluates it, in the
+#' data with the formula's environment behind it.
+#'
+#' @param formula A two-sided formula
+#' @param data The data it is fitted on
+#' @return The response, one value per row of \code{data}; for a bare name
+#'   that is not a column, \code{NULL}, as \code{data[[name]]} gives
+#' @keywords internal
+#' @noRd
+tl_formula_response <- function(formula, data) {
+  lhs <- formula[[2L]]
+  if (is.name(lhs)) {
+    return(data[[as.character(lhs)]])
+  }
+
+  response <- tryCatch(
+    eval(lhs, data, environment(formula) %||% baseenv()),
+    error = function(e) {
+      stop(
+        "The response ", deparse1(lhs), " could not be computed from the ",
+        "data: ", conditionMessage(e),
+        call. = FALSE
+      )
+    }
+  )
+  # scale() and the like return a one-column matrix
+  if (is.matrix(response) && ncol(response) == 1L) {
+    response <- response[, 1]
+  }
+  response
+}
+
+#' Read observed classes against the levels a model was trained on
+#'
+#' \code{tl_normalise_response()} cleans the training response, but data
+#' scored later never passes through it: a test split of
+#' \code{iris[iris$Species != "setosa", ]} still declares setosa, so
+#' yardstick refused truth and estimate as having different levels, and the
+#' ROC and lift plots read the binary model as multiclass. A test factor
+#' whose levels were merely reordered silently moved the positive class.
+#' Everything that scores a classification model reads the observed classes
+#' through here, so the levels -- and with them the positive class, the
+#' second level -- follow the model rather than the data.
+#'
+#' A class the model never saw (one a CV training fold happened to miss) has
+#' no prediction or probability column to compare with, so those rows are
+#' left out of the scoring, with a warning naming the classes.
+#'
+#' @param actuals Observed classes: factor, character, logical or numeric
+#' @param model_levels The model's classes, \code{model$spec$response_levels}
+#' @return A list: \code{actuals}, a factor with levels \code{model_levels};
+#'   \code{keep}, a logical vector, FALSE where the class is missing or one
+#'   the model was not trained on
+#' @keywords internal
+#' @noRd
+tl_align_classes <- function(actuals, model_levels) {
+  observed <- as.character(actuals)
+  unseen <- !is.na(observed) & !observed %in% model_levels
+  if (any(unseen)) {
+    warning(
+      sum(unseen), " row(s) belong to a class the model was not trained ",
+      "on (", paste(unique(observed[unseen]), collapse = ", "), ") and ",
+      "are left out of the scoring.",
+      call. = FALSE
+    )
+  }
+  aligned <- factor(observed, levels = model_levels)
+  list(actuals = aligned, keep = !is.na(aligned))
+}
+
 #' Identify rows usable for prediction
 #'
 #' Several upstream predict methods default to \code{na.omit} and return a
@@ -252,9 +434,14 @@ tl_complete_predictor_rows <- function(formula, new_data) {
   # "y ~ ." and the check would silently pass every row.
   # If the formula cannot be expanded against new_data, fall back to the
   # names written on its right-hand side. get_formula_vars() is no use
-  # here: it expands the formula the same way and fails the same way.
+  # here: it expands the formula the same way and fails the same way. A
+  # column the formula subtracts is not a predictor, so a missing value in
+  # it leaves the row usable.
   predictors <- tryCatch(
-    all.vars(stats::delete.response(stats::terms(formula, data = new_data))),
+    all.vars(stats::delete.response(tl_terms(
+      tl_fit_formula(formula, new_data, predicting = TRUE),
+      data = new_data
+    ))),
     error = function(e) all.vars(formula[[length(formula)]])
   )
   predictors <- intersect(predictors, names(new_data))
@@ -323,14 +510,38 @@ tl_realign_prob_matrix <- function(probs, keep) {
 #'
 #' @param formula The model formula
 #' @param new_data Data to predict on
-#' @param xlev Factor levels recorded at fit time (may be NULL)
+#' @param xlev Factor levels recorded at fit time (may be NULL). Its
+#'   \code{"terms"} attribute, when \code{tl_model()} set one, is the
+#'   training predictor terms the matrix is built from.
 #' @return A model matrix with the intercept column dropped
 #' @keywords internal
 #' @noRd
 tl_predictor_matrix <- function(formula, new_data, xlev = NULL) {
-  rhs_terms <- stats::delete.response(stats::terms(formula, data = new_data))
+  # The training terms, which tl_model() keeps with the levels, carry the
+  # values a data-dependent term was computed with -- the centre and scale
+  # of scale(hp), the knots of a spline -- as predict.lm() uses them.
+  # Rebuilt from the formula, such a term was recomputed on the rows
+  # predicted, so a row scored alone differed from the same row in the
+  # full frame. A model without them is rebuilt from the formula, less any
+  # column it subtracts, which the matrix never uses.
+  rhs_terms <- attr(xlev, "terms")
+  if (!inherits(rhs_terms, "terms")) {
+    rhs_terms <- stats::delete.response(tl_terms(
+      tl_fit_formula(formula, new_data, predicting = TRUE),
+      data = new_data
+    ))
+  }
 
-  frame <- if (is.null(xlev)) {
+  # xlev is keyed by column, and model.frame() applies it to the frame's
+  # variables. For a computed term such as relevel(f, "b") the variable is
+  # the expression, so passing the column's levels warned "variable 'f' is
+  # not a factor" on every prediction.
+  frame_variables <- vapply(
+    as.list(attr(rhs_terms, "variables"))[-1], deparse1, character(1)
+  )
+  xlev <- xlev[names(xlev) %in% frame_variables]
+
+  frame <- if (length(xlev) == 0L) {
     stats::model.frame(rhs_terms, new_data, na.action = stats::na.pass)
   } else {
     stats::model.frame(rhs_terms, new_data, na.action = stats::na.pass,
@@ -339,6 +550,299 @@ tl_predictor_matrix <- function(formula, new_data, xlev = NULL) {
 
   mm <- stats::model.matrix(rhs_terms, frame)
   mm[, colnames(mm) != "(Intercept)", drop = FALSE]
+}
+
+#' The columns a fitted formula reads
+#'
+#' Every variable of the formula's terms, with a dot expanded against the
+#' training data: the response, the terms, any offset, and a column the
+#' formula subtracts. The last is not a predictor, but \code{predict.lm()}
+#' and the other model-frame methods evaluate every variable of the terms
+#' they stored, and without it \code{y ~ . - qsec} failed with "object
+#' 'qsec' not found".
+#'
+#' @param formula The model formula
+#' @param data The training data
+#' @return Variable names, or NULL when the formula cannot be expanded
+#' @keywords internal
+#' @noRd
+tl_model_columns <- function(formula, data) {
+  if (!inherits(formula, "formula") || is.null(data)) {
+    return(NULL)
+  }
+  model_terms <- tryCatch(
+    tl_terms(formula, data = data),
+    error = function(e) NULL
+  )
+  if (is.null(model_terms)) {
+    return(NULL)
+  }
+  all.vars(model_terms)
+}
+
+#' A formula without the columns it subtracts
+#'
+#' \code{terms()} keeps a subtracted column among its variables, so a fit
+#' on \code{y ~ . - id} stored terms that name \code{id}, and predict() on
+#' rows without it failed with "object 'id' not found". Such a formula is
+#' written out from its expanded terms, which name only the columns the
+#' model uses. Any other formula is returned as it is: written out, a dot
+#' would list every column in the fit's printed call.
+#'
+#' At fit time a subtracted name that is neither a column nor a variable in
+#' the formula's environment is refused (\code{tl_check_subtracted()}): it
+#' is almost always a misspelling, and written out, the column the caller
+#' meant to drop would be fitted. At prediction new data may lack a
+#' subtracted column, since the model never uses it.
+#'
+#' @param formula A model formula
+#' @param data The data its dot expands against
+#' @param predicting TRUE when \code{data} is new data rather than the
+#'   training data
+#' @return \code{formula}, written out without its subtracted columns when
+#'   it has any
+#' @keywords internal
+#' @noRd
+tl_fit_formula <- function(formula, data, predicting = FALSE) {
+  subtracted <- tl_subtracted_vars(formula)
+  if (length(subtracted) == 0L) {
+    return(formula)
+  }
+  absent <- setdiff(subtracted, names(data))
+  if (!predicting) {
+    tl_check_subtracted(formula, data)
+  }
+
+  # The dot is expanded against the data's own columns. Only a subtracted
+  # name the data lacks -- a column new data does not have, or a variable
+  # in the formula's environment -- is added, empty, and the subtraction
+  # takes it out again: terms() warns "'varlist' has changed ... should no
+  # longer happen!" without it. Anything else the formula names but the
+  # data lacks stays out, or it would join the dot as a column.
+  columns <- data[0, , drop = FALSE]
+  for (variable in absent) {
+    columns[[variable]] <- logical(0)
+  }
+
+  model_terms <- tryCatch(
+    tl_terms(formula, data = columns),
+    error = function(e) NULL
+  )
+  if (is.null(model_terms)) {
+    return(formula)
+  }
+
+  variables <- as.list(attr(model_terms, "variables"))[-1]
+  response <- attr(model_terms, "response")
+  used <- c(
+    if (response > 0) all.vars(variables[[response]]),
+    unlist(lapply(
+      attr(model_terms, "term.labels"),
+      function(label) all.vars(str2lang(label))
+    )),
+    unlist(lapply(variables[attr(model_terms, "offset")], all.vars))
+  )
+  if (all(all.vars(model_terms) %in% used)) {
+    return(formula)
+  }
+  stats::formula(tl_terms(formula, data = columns, simplify = TRUE))
+}
+
+#' The variables a formula's right-hand side subtracts
+#'
+#' Read off the formula as written, through its chain of \code{+} and
+#' \code{-}, so it needs no \code{terms()} call and no data.
+#'
+#' @param formula A model formula
+#' @return Variable names, without the dot
+#' @keywords internal
+#' @noRd
+tl_subtracted_vars <- function(formula) {
+  subtracted <- character(0)
+  walk <- function(expr) {
+    if (!is.call(expr)) {
+      return(invisible(NULL))
+    }
+    head <- expr[[1L]]
+    if (identical(head, as.name("-"))) {
+      if (length(expr) == 3L) {
+        walk(expr[[2L]])
+        subtracted <<- c(subtracted, all.vars(expr[[3L]]))
+      } else {
+        subtracted <<- c(subtracted, all.vars(expr[[2L]]))
+      }
+    } else if (identical(head, as.name("+")) ||
+                 identical(head, as.name("("))) {
+      for (operand in as.list(expr)[-1L]) walk(operand)
+    }
+  }
+  walk(formula[[length(formula)]])
+  setdiff(unique(subtracted), ".")
+}
+
+#' Refuse a subtracted name the formula cannot find
+#'
+#' \code{terms()} subtracts a name that is not a column without complaint,
+#' so \code{mpg ~ . - qsce} kept qsec in a fit written out from it, where
+#' \code{lm()} on the formula itself stopped with "object 'qsce' not
+#' found".
+#'
+#' A two-sided formula is fitted through \code{model.frame()}, which takes
+#' a variable the data lacks from the formula's environment, so a name
+#' found there is accepted as \code{lm()} accepts it: \code{mpg ~ wt * z - z}
+#' fits \code{wt:z} without \code{z}. A function found there is no variable
+#' \code{model.frame()} can use, and a short misspelling such as \code{df}
+#' can match one. A one-sided formula names columns only, so there the name
+#' has to be a column.
+#'
+#' @param formula A model formula
+#' @param data The training data
+#' @return \code{TRUE}, invisibly, when every subtracted name is a column
+#'   or, for a two-sided formula, a variable in the formula's environment
+#' @keywords internal
+#' @noRd
+tl_check_subtracted <- function(formula, data) {
+  absent <- setdiff(tl_subtracted_vars(formula), names(data))
+  two_sided <- length(formula) == 3L
+  if (two_sided && length(absent) > 0L) {
+    env <- environment(formula) %||% baseenv()
+    found <- vapply(absent, function(name) {
+      value <- get0(name, envir = env, inherits = TRUE)
+      !is.null(value) && !is.function(value)
+    }, logical(1))
+    absent <- absent[!found]
+  }
+  if (length(absent) > 0L) {
+    one <- length(absent) == 1L
+    stop(
+      "The formula subtracts ", paste0("'", absent, "'", collapse = ", "),
+      if (one) ", which is not a column" else ", which are not columns",
+      " of the data",
+      if (two_sided) {
+        if (one) {
+          " or a variable in the formula's environment"
+        } else {
+          " or variables in the formula's environment"
+        }
+      },
+      ". Check the spelling: subtracting a name the data does not have ",
+      "drops nothing.",
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
+}
+
+#' Categorical columns a formula uses as they are
+#'
+#' The variables that make up a term on their own, or an interaction of
+#' such, and appear in no term that computes something from them. Only
+#' those can be stored as factors without changing what the formula
+#' computes: \code{as.numeric()} of a factor reads its level codes, and
+#' \code{nchar()} refuses one.
+#'
+#' @param formula A two-sided model formula
+#' @param data The training data
+#' @return Variable names
+#' @keywords internal
+#' @noRd
+tl_bare_term_vars <- function(formula, data) {
+  labels <- attr(tl_terms(formula, data = data), "term.labels")
+
+  interaction_parts <- function(expr) {
+    if (is.call(expr) && identical(expr[[1L]], as.name(":"))) {
+      c(interaction_parts(expr[[2L]]), interaction_parts(expr[[3L]]))
+    } else {
+      list(expr)
+    }
+  }
+
+  bare <- character(0)
+  computed <- character(0)
+  parts <- do.call(c, lapply(lapply(labels, str2lang), interaction_parts))
+  for (part in parts) {
+    if (is.name(part)) {
+      bare <- c(bare, as.character(part))
+    } else {
+      computed <- c(computed, all.vars(part))
+    }
+  }
+  setdiff(unique(bare), computed)
+}
+
+#' Quote values for a message
+#'
+#' @param x Values to list.
+#' @param max How many to show before eliding the rest.
+#' @return A single string such as \code{"a", "b", ...}.
+#' @keywords internal
+#' @noRd
+tl_quote_list <- function(x, max = 5L) {
+  shown <- paste0("\"", utils::head(x, max), "\"", collapse = ", ")
+  if (length(x) > max) paste0(shown, ", ...") else shown
+}
+
+#' Read new data's categorical predictors against the training levels
+#'
+#' A backend reads a factor by its declared levels, and new data declares
+#' fewer whenever it holds only some of the categories: randomForest
+#' refused such a frame for its level count, and coded a character column
+#' by the values present, so a row's prediction depended on the rows
+#' scored with it. Every column the model recorded levels for is put on
+#' those levels here, before any method's predict sees it. A value outside
+#' them is refused by name, where gbm alone scored one without complaint.
+#'
+#' @param new_data Data to predict on.
+#' @param xlev Training levels, \code{model$spec$xlev}.
+#' @param training The training data, which says whether a factor is
+#'   ordered, or NULL to keep new_data's own.
+#' @return \code{new_data}, those columns factors on the training levels.
+#' @keywords internal
+#' @noRd
+tl_align_predictor_levels <- function(new_data, xlev, training = NULL) {
+  unseen <- character(0)
+
+  for (column in intersect(names(xlev), names(new_data))) {
+    trained <- xlev[[column]]
+    values <- new_data[[column]]
+    # randomForest treats an ordered factor as numeric, and refuses an
+    # unordered one in its place
+    ordered <- if (is.null(training[[column]])) {
+      is.ordered(values)
+    } else {
+      is.ordered(training[[column]])
+    }
+    if (is.factor(values) && identical(levels(values), trained) &&
+          is.ordered(values) == ordered) {
+      next
+    }
+
+    observed <- as.character(values)
+    new_levels <- unique(observed[!is.na(observed) & !observed %in% trained])
+    if (length(new_levels) > 0) {
+      unseen <- c(unseen, paste0(
+        "'", column, "' has ", tl_quote_list(new_levels),
+        " (trained on ", tl_quote_list(trained, max = 10L), ")"
+      ))
+      next
+    }
+
+    new_data[[column]] <- factor(
+      observed,
+      levels = trained, ordered = ordered,
+      exclude = if (anyNA(trained)) NULL else NA
+    )
+  }
+
+  if (length(unseen) > 0) {
+    stop(
+      "new_data holds levels the model was not trained on: ",
+      paste(unseen, collapse = "; "),
+      ". Recode or drop those rows before predicting.",
+      call. = FALSE
+    )
+  }
+  new_data
 }
 
 #' Check if required packages are installed
@@ -475,7 +979,7 @@ tl_as_formula <- function(formula, arg = "formula") {
 tl_check_predictor_variance <- function(data, formula, method) {
   predictors <- tryCatch(
     {
-      labels <- attr(stats::terms(formula, data = data), "term.labels")
+      labels <- attr(tl_terms(formula, data = data), "term.labels")
       unique(unlist(lapply(labels, function(l) all.vars(str2lang(l)))))
     },
     error = function(e) setdiff(all.vars(formula), all.vars(formula)[1])
@@ -603,26 +1107,122 @@ tl_spec_methods <- function(models) {
   )
 }
 
-#' Put the `data` symbol back into a fitted model's stored call
+#' Take the training data out of a fitted model's stored call
 #'
 #' \code{do.call()} evaluates its arguments before it builds the call, so
 #' the \code{match.call()} the wrapped function runs records the whole
 #' training frame as a literal. \code{print()} on the fitted object then
 #' spills every row, and on a 960-row frame the call alone was 159 Kb of
-#' a 1.5 Mb forest -- a second copy of data the model already carries.
-#' Calling the function directly is not the remedy: leaving an argument
-#' out is what lets the wrapped package apply the default it documents,
-#' and only \code{do.call()} can leave one out.
+#' a 1.5 Mb forest. Calling the function directly is not the remedy:
+#' leaving an argument out is what lets the wrapped package apply the
+#' default it documents, and only \code{do.call()} can leave one out.
 #'
 #' @param fit A fitted model that stores its call as \code{$call}.
-#' @return \code{fit}, with \code{call$data} back to the symbol.
+#' @return \code{fit}, its call referring to the data through
+#'   \code{tl_hold_call_args()} and naming its function through
+#'   \code{tl_call_head()}.
 #' @keywords internal
 #' @noRd
 tl_restore_call_data <- function(fit) {
   if (!is.null(fit$call) && is.call(fit$call) && !is.null(fit$call$data)) {
-    fit$call$data <- quote(data)
+    fit <- tl_hold_call_args(fit, c("data", "weights", "subset"))
+    if (is.name(fit$call[[1]])) {
+      fit$call[[1]] <- tl_call_head(as.character(fit$call[[1]]))
+    }
   }
   fit
+}
+
+#' Hold a stored call's values where re-running the call finds them
+#'
+#' A call built by \code{do.call()} holds its values literally, and
+#' \code{print()} on the fit spills them. Writing each argument's name
+#' back in its place printed well but broke \code{update()} and
+#' \code{step()}, which re-evaluate the call in their caller's frame:
+#' \code{data} there was whatever the caller had called \code{data} -- a
+#' script's full frame, so an 18-row fit was refitted on 32 rows -- or
+#' \code{utils::data()}, and \code{weights} found \code{stats::weights()}.
+#' Each value is kept in an environment the call refers to instead, so the
+#' call prints in a line as \code{<environment>$data} and re-evaluating it
+#' anywhere reaches the rows and weights the model was fitted with. The
+#' environment shares the values with the model rather than copying them,
+#' though \code{saveRDS()} writes them out a second time.
+#'
+#' @param fit A fitted model that stores its call as \code{$call}.
+#' @param args Names of the arguments to hold.
+#' @return \code{fit}, with those arguments of its call replaced.
+#' @keywords internal
+#' @noRd
+tl_hold_call_args <- function(fit, args) {
+  # An argument the backend recorded as a name or expression was never a
+  # literal value, so it has nothing to hold
+  held <- Filter(
+    function(arg) !is.language(fit$call[[arg]]),
+    intersect(names(fit$call), args)
+  )
+  if (length(held) == 0L) {
+    return(fit)
+  }
+
+  store <- new.env(parent = emptyenv())
+  for (arg in held) {
+    assign(arg, fit$call[[arg]], envir = store)
+    fit$call[[arg]] <- call("$", store, as.name(arg))
+  }
+  fit
+}
+
+#' The head of a stored call, with the package it comes from
+#'
+#' \code{update()} evaluates a fit's call in the caller's environment, and
+#' a session that has loaded tidylearn has not attached rpart,
+#' randomForest, e1071, nnet or gbm: a bare \code{rpart(...)} head failed
+#' with "could not find function \"rpart\"". Heads from those packages are
+#' written \code{pkg::fun}. \code{lm()} and \code{glm()} stay bare, since
+#' stats is attached in every session.
+#'
+#' @param name The function's name, as tidylearn calls it.
+#' @param fun The function, or NULL to look the name up as tidylearn sees
+#'   it, through its imports.
+#' @return A name, or a \code{pkg::fun} call.
+#' @keywords internal
+#' @noRd
+tl_call_head <- function(name, fun = NULL) {
+  if (is.null(fun)) {
+    fun <- tryCatch(
+      get(name, envir = environment(tl_call_head), mode = "function"),
+      error = function(e) NULL
+    )
+  }
+  package <- if (is.function(fun) && !is.null(environment(fun))) {
+    environmentName(environment(fun))
+  } else {
+    ""
+  }
+  if (!nzchar(package) ||
+        package %in% c("base", "stats", "R_GlobalEnv", "tidylearn")) {
+    return(as.name(name))
+  }
+  call("::", as.name(package), as.name(name))
+}
+
+#' The rows a subset argument selects
+#'
+#' Indexing the row numbers with \code{subset} selects what
+#' \code{model.frame()} selects with it: a logical is recycled and its
+#' \code{NA} selects no row, negative numbers drop rows, and names match
+#' row names.
+#'
+#' @param data The training data.
+#' @param subset The \code{subset} argument, as passed.
+#' @return Integer row positions.
+#' @keywords internal
+#' @noRd
+tl_subset_rows <- function(data, subset) {
+  rows <- seq_len(nrow(data))
+  names(rows) <- rownames(data)
+  kept <- rows[subset]
+  unname(kept[!is.na(kept)])
 }
 
 #' Fitting arguments that hold one value per training row
@@ -703,15 +1303,18 @@ tl_comparison_names <- function(models, names, label) {
 #' evaluate.
 #'
 #' The stored call then holds every value literally, so \code{print()} on
-#' the fit would spill the whole frame and weight vector. Each is put back
-#' as the symbol of its argument name, and the function name replaces the
-#' function object. \code{family} is left to the caller: as a bare symbol
-#' it resolves to \code{stats::family()} when \code{update()} or
-#' \code{step()} re-runs the call.
+#' the fit would spill the whole frame and weight vector. The data, case
+#' weights, subset and control list are held by \code{tl_hold_call_args()}
+#' instead, and the function name replaces the function object.
+#' \code{family} is left to the caller: as a bare symbol it resolves to
+#' \code{stats::family()} when \code{update()} or \code{step()} re-runs the
+#' call.
 #'
 #' A vector \code{offset} is refused. It would fit, but \code{predict()}
 #' evaluates the stored \code{offset} in the new data, finds
-#' \code{stats::offset()} and fails.
+#' \code{stats::offset()} and fails. Only \code{lm()} and \code{glm()} apply
+#' an \code{offset()} term of the formula at prediction, so only their
+#' refusal points there; the other functions routed here would drop it.
 #'
 #' @param fun The fitting function.
 #' @param fun_name Its name, for the stored call.
@@ -721,24 +1324,27 @@ tl_comparison_names <- function(models, names, label) {
 #' @noRd
 tl_fit_by_value <- function(fun, fun_name, args) {
   if ("offset" %in% names(args)) {
+    if (fun_name %in% c("lm", "glm")) {
+      stop(
+        "Pass an offset in the formula, as offset(<column>), rather than ",
+        "as the 'offset' argument.\nAn argument offset cannot be applied to ",
+        "new data at predict().",
+        call. = FALSE
+      )
+    }
     stop(
-      "Pass an offset in the formula, as offset(<column>), rather than ",
-      "as the 'offset' argument.\nAn argument offset cannot be applied to ",
-      "new data at predict().",
+      fun_name, "() cannot apply an offset to new data at predict(), as ",
+      "an argument or in the formula. For a model with an offset, fit ",
+      "method = \"linear\" or \"logistic\" with offset(<column>) in the ",
+      "formula.",
       call. = FALSE
     )
   }
 
   fit <- do.call(fun, args)
   if (is.list(fit) && is.call(fit$call)) {
-    fit$call[[1]] <- as.name(fun_name)
-    literal <- intersect(
-      names(fit$call),
-      c("data", "weights", "subset", "control")
-    )
-    for (arg in literal) {
-      fit$call[[arg]] <- as.name(arg)
-    }
+    fit$call[[1]] <- tl_call_head(fun_name, fun)
+    fit <- tl_hold_call_args(fit, c("data", "weights", "subset", "control"))
   }
   fit
 }

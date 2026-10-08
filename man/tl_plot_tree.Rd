@@ -19,8 +19,10 @@ for its side effect of drawing the tree.
 Plot a decision tree
 }
 \examples{
+\dontshow{if (requireNamespace("rpart.plot", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \donttest{
 model <- tl_model(iris, Species ~ ., method = "tree")
 tl_plot_tree(model)
 }
+\dontshow{\}) # examplesIf}
 }

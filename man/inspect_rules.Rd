@@ -7,17 +7,21 @@
 inspect_rules(rules_obj, by = "lift", n = 10, decreasing = TRUE)
 }
 \arguments{
-\item{rules_obj}{A tidy_apriori object or rules object}
+\item{rules_obj}{A tidy_apriori object, an arules rules or itemsets
+object, or a tibble of rules}
 
-\item{by}{Sort by: "support", "confidence", "lift" (default), "count"}
+\item{by}{Sort by: "support", "confidence", "lift" (default), "count".
+Itemsets have no lift, so for them the default sorts by support.}
 
 \item{n}{Number of rules to display (default: 10)}
 
-\item{decreasing}{Sort in decreasing order? (default: TRUE)}
+\item{decreasing}{If TRUE (default), the \code{n} rules with the
+highest values of \code{by}, highest first; if FALSE, the \code{n}
+with the lowest, lowest first, as in arules' \code{head(by = )}.}
 }
 \value{
-A tibble of the top \code{n} rules sorted by the specified quality
-measure.
+A tibble of the \code{n} rules ranked highest (or, with
+\code{decreasing = FALSE}, lowest) by the quality measure \code{by}.
 }
 \description{
 View rules sorted by various quality measures

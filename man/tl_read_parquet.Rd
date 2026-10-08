@@ -21,8 +21,10 @@ Reads a Parquet file into a \code{tidylearn_data} object. Requires the
 \pkg{nanoparquet} package.
 }
 \examples{
-\donttest{
-# data <- tl_read_parquet("path/to/data.parquet")
-}
-
+\dontshow{if (requireNamespace("nanoparquet", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+path <- tempfile(fileext = ".parquet")
+nanoparquet::write_parquet(mtcars, path)
+tl_read_parquet(path)
+unlink(path)
+\dontshow{\}) # examplesIf}
 }

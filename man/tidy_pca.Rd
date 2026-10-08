@@ -15,7 +15,9 @@ syntax). If NULL, uses all numeric columns.}
 \item{scale}{Logical; should variables be scaled to
 unit variance? Default TRUE.}
 
-\item{center}{Logical; should variables be centered? Default TRUE.}
+\item{center}{Logical; should variables be centered? Default TRUE.
+\code{method = "princomp"} always centres, so it warns and records
+\code{center = TRUE} when asked not to.}
 
 \item{method}{Character; "prcomp" (default, recommended) or "princomp"}
 }

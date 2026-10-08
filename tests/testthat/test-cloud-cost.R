@@ -125,6 +125,59 @@ test_that("budget arguments are validated", {
   )
 })
 
+test_that("the timeout cap is validated before it is used", {
+  # timeout_cap = NA reached an if() and failed with "missing value where
+  # TRUE/FALSE needed"; -1 was compared with the estimate as if it were a
+  # cap
+  for (cap in list(NA, -1, 0, Inf, "3600", c(60, 120))) {
+    expect_error(
+      tl_cloud_check_budget(fake_advice(100), timeout_cap = cap),
+      "'timeout_cap' must be a single positive number of seconds",
+      info = deparse(cap)
+    )
+  }
+  expect_error(
+    tl_cloud_check_budget(fake_advice(NA_real_)),
+    "The advice has no cloud runtime estimate"
+  )
+})
+
+test_that("a cap below the timeout floor is refused", {
+  # A 30 s cap set a 30 s timeout, under the 60 s floor, so every job
+  # would be killed during cold start having billed for nothing useful
+  expect_error(
+    tl_cloud_timeout_seconds(10, timeout_cap = 30),
+    "'timeout_cap' must be at least 60 seconds"
+  )
+  expect_error(
+    tl_cloud_check_budget(fake_advice(10), timeout_cap = 30),
+    "'timeout_cap' must be at least 60 seconds"
+  )
+
+  # The floor itself is a usable cap
+  expect_equal(tl_cloud_timeout_seconds(10, timeout_cap = 60), 60L)
+})
+
+test_that("a cap that cuts the timeout's headroom is flagged", {
+  # An estimate of 3599 s got a 3600 s timeout -- one second of headroom on
+  # an order-of-magnitude estimate -- without a word
+  expect_warning(
+    budget <- tl_cloud_check_budget(fake_advice(3599)),
+    "leaves 1.0x headroom over this fit's estimate"
+  )
+  expect_equal(budget$timeout_seconds, 3600L)
+
+  # 3600 / 1201 is 2.998, rounded down so it never reads as the full 3x
+  expect_warning(
+    tl_cloud_check_budget(fake_advice(1201)),
+    "leaves 2.9x headroom"
+  )
+
+  # The full 3x fits inside the cap, so nothing to flag
+  expect_no_warning(budget <- tl_cloud_check_budget(fake_advice(1200)))
+  expect_equal(budget$timeout_seconds, 3600L)
+})
+
 # ---- Formatting ----
 
 test_that("durations and costs read sensibly", {
@@ -155,6 +208,25 @@ test_that("the summary states the destination and the worst case", {
 
   # Metadata only -- no row values anywhere (T6).
   expect_false(grepl("[0-9]+\\.[0-9]{4,}", txt))
+})
+
+test_that("large counts in the summary are written out in full", {
+  # format() writes a round number in scientific notation when that is
+  # shorter, so ten million rows read "1e+07"
+  budget <- tl_cloud_check_budget(fake_advice(120), max_cost = 5)
+  lines <- tl_cloud_upload_summary(
+    method = "xgboost", host = "ws--fit.modal.run",
+    n_rows = 1e7, n_cols = 1250, size_mb = 1e8,
+    budget = budget, est_seconds = 120
+  )
+  txt <- paste(lines, collapse = "\n")
+
+  expect_match(txt, "10,000,000 x 1,250", fixed = TRUE)
+  expect_match(txt, "Estimated MB:  100,000,000", fixed = TRUE)
+  expect_false(grepl("[0-9]e[+]", txt))
+
+  expect_equal(tl_cloud_format_cost(2e6), "$2,000,000.00")
+  expect_equal(tl_cloud_format_duration(3.6e9), "1,000,000 h")
 })
 
 test_that("a session-added destination is flagged in the summary", {

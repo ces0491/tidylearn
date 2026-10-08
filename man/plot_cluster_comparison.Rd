@@ -23,10 +23,12 @@ The return value of \code{\link[gridExtra]{grid.arrange}}, a
 Compare multiple clustering results side-by-side
 }
 \examples{
+\dontshow{if (requireNamespace("gridExtra", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \donttest{
 df <- iris[, 1:4]
 df$km3 <- kmeans(df, 3)$cluster
 df$km4 <- kmeans(df, 4)$cluster
 plot_cluster_comparison(df, c("km3", "km4"), "Sepal.Length", "Sepal.Width")
 }
+\dontshow{\}) # examplesIf}
 }

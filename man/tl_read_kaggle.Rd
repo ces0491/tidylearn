@@ -8,16 +8,25 @@ tl_read_kaggle(source, file = NULL, dest = NULL, type = "dataset", ...)
 }
 \arguments{
 \item{source}{A Kaggle dataset slug (e.g., \code{"user/dataset-name"}) or a
-Kaggle URL.}
+Kaggle URL. A URL may point at any tab of the dataset or competition
+page (\code{/data}, \code{/code}, \code{/versions/2}) and may carry a
+query; a competition URL is read as a competition without
+\code{type} being set.}
 
-\item{file}{The specific file to read from the dataset. If \code{NULL} and
-the dataset contains exactly one file, it is read automatically.}
+\item{file}{The specific file to read from the dataset, as a path within
+it; a file the CLI saved under its base name is found too. If
+\code{NULL}, the download is searched for files these readers handle
+(CSV, TSV, Excel, Parquet and JSON, with compressed CSV/TSV and
+\code{.ndjson}); with several, the newest is read and a message names
+it.}
 
-\item{dest}{Directory to download files to. The default is a fresh
-per-dataset directory under \code{tempdir()}; supply a path to keep
-the download.}
+\item{dest}{Directory to keep the download in. The default is a fresh
+per-dataset directory under \code{tempdir()}. A supplied \code{dest}
+receives this download's files, replacing files of the same name;
+nothing else in it is read, unpacked or changed.}
 
-\item{type}{Either \code{"dataset"} (default) or \code{"competition"}.}
+\item{type}{Either \code{"dataset"} (default) or \code{"competition"}.
+Left unset, a competition URL in \code{source} sets it.}
 
 \item{...}{Additional arguments passed to the format-specific reader.}
 }
@@ -30,9 +39,12 @@ a \code{tidylearn_data} object. Requires the Kaggle CLI to be installed and
 configured (\code{pip install kaggle}).
 }
 \examples{
-\donttest{
-# data <- tl_read_kaggle("zillow/zecon", file = "Zip_time_series.csv")
-# data <- tl_read_kaggle("titanic", file = "train.csv", type = "competition")
+\dontrun{
+# Needs the Kaggle CLI and Kaggle credentials
+tl_read_kaggle("zillow/zecon", file = "Zip_time_series.csv")
+tl_read_kaggle("titanic", file = "train.csv", type = "competition")
+tl_read_kaggle("https://www.kaggle.com/competitions/titanic/data",
+               file = "train.csv")
 }
 
 }

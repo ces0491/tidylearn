@@ -6,20 +6,30 @@ NULL
 
 # Hosts tidylearn is willing to send user data to by default. Deployed
 # Modal Web Functions live under *.modal.run; modal.com covers Modal's
-# own API hosts. Modal customers on custom domains can add to this with
-# tl_cloud_allow_host(), which is a deliberate per-session action --
+# own API hosts. Any Modal workspace's endpoint matches *.modal.run, not
+# only the user's own. Modal customers on custom domains can add to this
+# with tl_cloud_allow_host(), which is a deliberate per-session action --
 # see T9 in inst/security/threat-model.md.
 .tl_modal_hosts <- c("modal.run", "modal.com")
 
 #' Validate a host name offered for the allowlist
 #'
 #' Rejects anything that is not a bare host: URLs, ports, paths,
-#' wildcards, and single-label names. A single label such as `"com"`
-#' would widen the allowlist to an entire TLD, which defeats T9
-#' entirely.
+#' wildcards, empty labels, and names of fewer than three labels. A
+#' single label such as `"com"` would widen the allowlist to an entire
+#' TLD, and two labels can be a public suffix such as `"co.uk"` or
+#' `"github.io"`, under which anyone can register a site; either defeats
+#' T9. tidylearn has no copy of the Public Suffix List, so the label
+#' count is the rule: it refuses every two-label suffix, and a longer
+#' public suffix still passes.
+#'
+#' The trailing dot of a fully qualified name (`"fits.example.com."`) is
+#' dropped: an endpoint's host never carries it, so a host stored with it
+#' would match nothing.
 #'
 #' @param host A character vector of candidate host names.
-#' @return The hosts, lower-cased. Errors if any is unacceptable.
+#' @return The hosts, lower-cased and without a trailing dot. Errors if any
+#'   is unacceptable.
 #' @keywords internal
 #' @noRd
 tl_validate_host_name <- function(host) {
@@ -31,7 +41,7 @@ tl_validate_host_name <- function(host) {
     )
   }
 
-  host <- tolower(trimws(host))
+  host <- sub("\\.$", "", tolower(trimws(host)))
 
   for (h in host) {
     if (grepl("[/@?#*[:space:]]|://|:[0-9]+$", h)) {
@@ -44,10 +54,24 @@ tl_validate_host_name <- function(host) {
 
     labels <- strsplit(h, ".", fixed = TRUE)[[1]]
 
-    if (length(labels) < 2L || any(!nzchar(labels))) {
+    # strsplit() drops a final empty field, so a dot left at the end after
+    # the root dot was removed is checked for directly
+    if (any(!nzchar(labels)) || endsWith(h, ".")) {
       stop(
-        "'", h, "' is not a valid host name. A single label would ",
-        "widen the allowlist to an entire top-level domain.",
+        "'", h, "' is not a valid host name: it has an empty label.",
+        call. = FALSE
+      )
+    }
+
+    # Two labels can be a public suffix: allowing co.uk would let
+    # attacker.co.uk through
+    if (length(labels) < 3L) {
+      stop(
+        "'", h, "' is too broad to allow: a name with fewer than three ",
+        "labels can be a top-level domain or a public suffix such as ",
+        "'co.uk' or 'github.io', and allowing it would admit every site ",
+        "under it. Give the endpoint's full host name, such as ",
+        "'fits.example.com'.",
         call. = FALSE
       )
     }
@@ -72,9 +96,14 @@ tl_validate_host_name <- function(host) {
 #' `"fits.example.com"` accepts `https://fits.example.com` and
 #' `https://a.fits.example.com`, and nothing else.
 #'
+#' Give the endpoint's full host name. A name of fewer than three labels,
+#' such as `"example.com"` or `"co.uk"`, is refused: two labels can be a
+#' public suffix, under which anyone can register a site, and allowing
+#' one would admit all of them.
+#'
 #' @param host A character vector of host names to allow, or `NULL` to
-#'   clear every host added this session. Bare host names only — not
-#'   URLs, ports, paths or wildcards.
+#'   clear every host added this session. Bare host names of at least
+#'   three labels only — not URLs, ports, paths or wildcards.
 #' @return The full allowlist after the change, invisibly.
 #' @seealso [tl_cloud_allowed_hosts()], and T9 in
 #'   `system.file("security/threat-model.md", package = "tidylearn")`.

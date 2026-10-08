@@ -14,27 +14,71 @@ tl_calc_classification_metrics(
 )
 }
 \arguments{
-\item{actuals}{Actual values (ground truth)}
+\item{actuals}{Observed classes: a factor, or a character, logical or
+numeric vector.}
 
-\item{predicted}{Predicted class values}
+\item{predicted}{Predicted classes, one for each element of
+\code{actuals}.}
 
-\item{predicted_probs}{Predicted probabilities (for metrics like AUC)}
+\item{predicted_probs}{Class probabilities, needed for \code{"auc"},
+\code{"pr_auc"} and \code{thresholds}: a data frame (or matrix) with a
+row for each element of \code{actuals} and a column for each class,
+named by class -- the shape \code{predict(model, type = "prob")}
+returns. Without it, \code{"auc"} and \code{"pr_auc"} are left out of
+the result, with a warning when they were asked for by name.}
 
-\item{metrics}{Character vector of metrics to compute}
+\item{metrics}{Character vector of metrics to compute, from
+\code{"accuracy"}, \code{"precision"}, \code{"recall"},
+\code{"sensitivity"}, \code{"specificity"}, \code{"f1"}, \code{"auc"}
+and \code{"pr_auc"}. For more than two classes, \code{"precision"},
+\code{"recall"}, \code{"specificity"} and \code{"f1"} are macro
+averages, and \code{"auc"} and \code{"pr_auc"} average the one-vs-rest
+areas of the classes.}
 
-\item{thresholds}{Optional vector of thresholds to evaluate
-for threshold-dependent metrics}
+\item{thresholds}{Optional numeric vector of cut-offs on the positive
+class's probability, for binary classification. Each adds rows
+scoring the classes that cut-off assigns. Needs
+\code{predicted_probs}.}
 
-\item{...}{Additional arguments}
+\item{...}{Not used.}
 }
 \value{
 A \link[tibble]{tibble} with columns \code{metric} (character)
-and \code{value} (numeric) containing the requested classification
-metrics. When \code{thresholds} are supplied, additional rows are
-appended with threshold-specific metric names.
+and \code{value} (numeric), one row per requested metric. For more
+than two classes, \code{"auc"} is followed by an \code{auc_<class>}
+row for each class.
+
+\code{"auc"} and \code{"pr_auc"} need at least two classes among the
+scored rows, and are \code{NA}, with a warning, when there is only
+one. A class with no scored row has no one-vs-rest area: its
+\code{auc_<class>} row is \code{NA}, the averages cover the other
+classes, and a warning names it.
+
+With \code{thresholds}, six rows per cut-off follow -- for a cut-off
+of 0.5, \code{accuracy_t0.5}, \code{precision_t0.5},
+\code{recall_t0.5}, \code{f1_t0.5}, \code{f2_t0.5} and
+\code{f0.5_t0.5} -- and the tibble gains a \code{threshold} column,
+\code{NA} on the other rows.
 }
 \description{
-Calculate classification metrics
+Scores predicted classes, and optionally class probabilities, against
+observed classes.
+}
+\details{
+The classes, in order, are the levels of \code{predicted} when it is a
+factor of two or more levels -- which is how \code{predict()} returns
+them, in the model's order -- and otherwise the classes present in
+\code{actuals}. Any other class found in \code{actuals} or
+\code{predicted} follows them. For two classes the second is the
+positive class. \code{\link{tl_evaluate}} instead leaves out rows of a
+class the model was never trained on, since it knows the model's
+classes.
+
+A row missing its observed class, its prediction or one of its
+probabilities is dropped before anything is computed, so every metric
+describes the same rows. With no row left -- \code{actuals} empty, or
+every row incomplete -- there is nothing to score, and it is an error
+of class \code{tidylearn_no_scored_rows}.
 }
 \examples{
 \donttest{

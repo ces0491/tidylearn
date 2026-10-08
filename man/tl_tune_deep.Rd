@@ -7,7 +7,7 @@
 tl_tune_deep(
   data,
   formula,
-  is_classification = FALSE,
+  is_classification = NULL,
   hidden_layers_options = list(c(32), c(64, 32), c(128, 64, 32)),
   learning_rates = c(0.01, 0.001, 1e-04),
   batch_sizes = c(16, 32, 64),
@@ -22,7 +22,10 @@ tl_tune_deep(
 \item{formula}{A formula specifying the model}
 
 \item{is_classification}{Logical indicating if this is a
-classification problem}
+classification problem. \code{NULL} (default) reads it from the
+response, as \code{\link{tl_model}} does: a factor or character
+response is classification. \code{FALSE} with such a response is an
+error.}
 
 \item{hidden_layers_options}{List of vectors defining hidden
 layer configurations to try}
@@ -35,14 +38,21 @@ layer configurations to try}
 
 \item{epochs}{Number of training epochs (default: 30)}
 
-\item{validation_split}{Proportion of data for validation
-(default: 0.2)}
+\item{validation_split}{Proportion of the rows held out to score each
+configuration on, drawn at random (default: 0.2). Every configuration
+is scored on the same rows.}
 
-\item{...}{Additional arguments}
+\item{...}{Additional arguments passed to keras's fit() for every
+configuration; \code{verbose} (default 0) replaces the value used
+otherwise. Arguments with one value per row -- \code{weights},
+\code{subset}, \code{offset}, \code{foldid}, \code{strata} -- are
+refused, since each configuration is fitted on part of the rows.}
 }
 \value{
-A list with elements \code{model} (the best fitted deep learning
-model), \code{best_hidden_layers} (optimal layer configuration),
+A list with elements \code{model} (the best configuration refitted
+as a \code{tidylearn_model}, so \code{predict()} and the deep plots take
+it; the keras model is at \code{$model$fit$model}),
+\code{best_hidden_layers} (optimal layer configuration),
 \code{best_learning_rate}, \code{best_batch_size}, and
 \code{tuning_results} (a data frame of all hyperparameter combinations
 and their validation losses).
@@ -54,10 +64,10 @@ Tune a deep learning model
 \dontrun{
 if (requireNamespace("keras", quietly = TRUE)) {
   result <- tl_tune_deep(iris, Species ~ .,
-    is_classification = TRUE,
     hidden_layers_options = list(c(10), c(10, 5)),
     learning_rates = c(0.01, 0.001), batch_sizes = c(32),
     epochs = 5)
+  predict(result$model, iris[1:5, ])
 }
 }
 }

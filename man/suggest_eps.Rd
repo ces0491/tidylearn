@@ -9,7 +9,10 @@ suggest_eps(data, minPts = 5, method = "percentile", percentile = 0.95)
 \arguments{
 \item{data}{A data frame or matrix}
 
-\item{minPts}{Minimum points parameter (used as k for k-NN)}
+\item{minPts}{The \code{minPts} you will pass to \code{\link{tidy_dbscan}}
+(default: 5). The k-NN distance is read at \code{k = minPts - 1}, the
+neighbours a core point needs besides itself, as
+\code{\link[dbscan]{kNNdistplot}} does.}
 
 \item{method}{Method to suggest eps: "percentile" (default), "knee"}
 

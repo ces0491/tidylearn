@@ -1,6 +1,6 @@
 Package: tidylearn
 Title: A Unified Tidy Interface to R's Machine Learning Ecosystem
-Version: 0.5.0.9000
+Version: 0.6.0
 Authors@R:
     person("Cesaire", "Tobias", email = "cesaire@sheetsolved.com", role = c("aut", "cre"))
 Description: Provides a unified tidyverse-compatible interface to R's machine
@@ -28,11 +28,11 @@ Depends:
     R (>= 4.1.0)
 Imports:
     dplyr (>= 1.0.0),
-    ggplot2 (>= 3.3.0),
+    ggplot2 (>= 3.4.0),
     tibble (>= 3.0.0),
     tidyr (>= 1.0.0),
     purrr (>= 0.3.0),
-    rlang (>= 0.4.0),
+    rlang (>= 1.0.0),
     magrittr,
     parallel,
     stats,

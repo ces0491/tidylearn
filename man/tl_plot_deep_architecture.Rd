@@ -9,11 +9,16 @@ tl_plot_deep_architecture(model, ...)
 \arguments{
 \item{model}{A tidylearn deep learning model object}
 
-\item{...}{Additional arguments}
+\item{...}{Additional arguments passed to the \code{plot()} method keras
+provides for its models, such as \code{to_file} or \code{dpi}.
+\code{show_shapes} and \code{show_layer_names} default to \code{TRUE}.}
 }
 \value{
-The return value of \code{keras::plot_model()}, an architecture
-diagram of the Keras model.
+\code{NULL}, invisibly. Called for its side effect: keras draws
+the architecture diagram on the current graphics device, or writes it
+to \code{to_file}. keras renders it through the Python packages
+\code{pydot} and \code{graphviz}, and errors saying so when they are
+not installed.
 }
 \description{
 Plot deep learning model architecture

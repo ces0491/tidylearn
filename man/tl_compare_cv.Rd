@@ -9,11 +9,26 @@ tl_compare_cv(data, models, folds = 5, metrics = NULL, ...)
 \arguments{
 \item{data}{A data frame containing the training data}
 
-\item{models}{A list of tidylearn model objects}
+\item{models}{A named list of supervised tidylearn models, all of them
+classification or all regression. An unnamed model is named
+\code{Model_<position>}.}
 
-\item{folds}{Number of cross-validation folds}
+\item{folds}{Number of cross-validation folds, a whole number between 2
+and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn,
+and each fold then scores a single prediction. \code{"accuracy"},
+\code{"mae"}, \code{"mse"} and \code{"mape"} average to their values
+over the left-out predictions. The average \code{"rmse"} is the mean
+absolute error; \code{"precision"}, \code{"recall"},
+\code{"sensitivity"}, \code{"specificity"} and \code{"f1"} are
+undefined on the folds whose one row gives them nothing to divide by;
+and \code{"rsq"}, \code{"auc"} and \code{"pr_auc"} are undefined on
+every fold. A run scoring any of these warns once.}
 
-\item{metrics}{Character vector of metrics to compute}
+\item{metrics}{Character vector of metrics to compute, from those
+\code{\link{tl_evaluate}} computes for the task. Defaults to
+\code{c("accuracy", "precision", "recall", "f1", "auc")} for
+classification and \code{c("rmse", "mae", "rsq", "mape")} for
+regression.}
 
 \item{...}{Arguments passed to \code{\link{tl_model}} for every fold
 fit. Each model is refitted with the arguments it was built with;
@@ -24,15 +39,23 @@ A list with two elements:
 \describe{
 \item{\code{$fold_metrics}}{A data frame with columns
 \code{metric}, \code{value}, \code{fold}, and \code{model}
-containing per-fold results for every model.}
+containing per-fold results for every model. A metric undefined
+on a fold -- \code{"auc"} on a fold holding one class -- is
+\code{NA} there, and so is every metric of a fold none of whose
+rows can be scored, with a warning naming the fold.}
 \item{\code{$summary}}{A data frame with columns \code{model},
 \code{metric}, \code{mean_value}, \code{sd_value},
 \code{min_value}, and \code{max_value} summarizing
-cross-validation performance.}
+cross-validation performance over the folds with a value. A
+metric with no value on any fold is \code{NA} throughout.}
 }
 }
 \description{
-Compare models using cross-validation
+Each model is refitted on every fold from its formula, method and
+fitting arguments. A model a refit would not reproduce is refused: one
+built by \code{\link{tl_semisupervised}} or \code{\link{tl_anomaly_aware}},
+or one of \code{\link{tl_auto_ml}}'s candidates fitted on features it
+engineered.
 }
 \examples{
 \donttest{

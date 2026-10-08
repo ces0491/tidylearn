@@ -15,7 +15,9 @@ tidy_mds(data, method = "classical", ndim = 2, distance = "euclidean", ...)
 \item{ndim}{Number of dimensions for output (default: 2)}
 
 \item{distance}{Character; distance metric if data is
-not already a dist object (default: "euclidean")}
+not already a dist object (default: "euclidean"): any method
+\code{\link[stats]{dist}} accepts, on the numeric columns, or "gower"
+(see \code{\link{tidy_gower}}), on every column}
 
 \item{...}{Additional arguments passed to specific MDS functions}
 }

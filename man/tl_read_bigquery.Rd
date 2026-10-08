@@ -7,11 +7,14 @@
 tl_read_bigquery(project, query, dataset = NULL, ...)
 }
 \arguments{
-\item{project}{Google Cloud project ID.}
+\item{project}{Google Cloud project ID, or a
+\code{bigquery://project/dataset} URI, whose dataset is used when
+\code{dataset} is not given.}
 
 \item{query}{A SQL query string (Standard SQL).}
 
-\item{dataset}{Optional default dataset for unqualified table names.}
+\item{dataset}{Optional default dataset for unqualified table names,
+in \code{project}.}
 
 \item{...}{Additional arguments passed to
 \code{bigrquery::bq_project_query()}.}
@@ -25,11 +28,19 @@ Executes a SQL query against Google BigQuery and returns the result as a
 valid Google Cloud authentication.
 }
 \examples{
-\donttest{
-# data <- tl_read_bigquery(
-#   project = "my-project",
-#   query = "SELECT * FROM `my_dataset.my_table` LIMIT 1000"
-# )
+\dontrun{
+# Needs Google Cloud credentials
+tl_read_bigquery(
+  project = "my-project",
+  query = "SELECT * FROM `my_dataset.my_table` LIMIT 1000"
+)
+
+# Unqualified table names resolve against `dataset`
+tl_read_bigquery(
+  project = "my-project",
+  query = "SELECT * FROM my_table LIMIT 1000",
+  dataset = "my_dataset"
+)
 }
 
 }

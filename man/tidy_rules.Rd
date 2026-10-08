@@ -10,8 +10,14 @@ tidy_rules(rules)
 \item{rules}{A rules object from arules}
 }
 \value{
-A tibble with columns \code{rule_id}, \code{lhs}, \code{rhs}, and
-quality measures (e.g., \code{support}, \code{confidence}, \code{lift}).
+A tibble with columns \code{rule_id}, \code{lhs}, \code{rhs},
+the quality measures (e.g., \code{support}, \code{confidence},
+\code{lift}), and the list columns \code{lhs_items} and
+\code{rhs_items}, each rule's items on that side as a character
+vector. The \code{lhs} and \code{rhs} labels are for reading; the
+helpers that match items read the lists, since an item name can hold
+the comma that separates items in a label. An empty rule set gives a
+zero-row tibble with the same columns.
 }
 \description{
 Convert Association Rules to Tidy Tibble

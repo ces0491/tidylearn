@@ -10,10 +10,13 @@ tl_model(data, formula = NULL, method = "linear", ..., compute = "cpu")
 \item{data}{A data frame containing the training data}
 
 \item{formula}{A formula specifying the model. For
-unsupervised methods, use \code{~ vars} or NULL.}
+unsupervised methods, use \code{~ vars} or NULL; a one-sided formula
+names columns, and \code{~ . - x} means every numeric column but
+\code{x}. Supervised methods need a two-sided formula.}
 
 \item{method}{The modeling method. Supervised: "linear"
-(stats::lm), "logistic" (stats::glm), "tree" (rpart),
+(stats::lm), "polynomial" (stats::lm on polynomial terms),
+"logistic" (stats::glm), "tree" (rpart),
 "forest" (randomForest), "boost" (gbm),
 "ridge"/"lasso"/"elastic_net" (glmnet), "svm" (e1071),
 "nn" (nnet), "deep" (keras), "xgboost" (xgboost).
@@ -23,11 +26,12 @@ error rather than a meaningless fit: \code{"linear"} and
 needs exactly two classes, and every other supervised method takes
 either.
 Unsupervised: "pca" (stats::prcomp),
-"mds" (stats/MASS/smacof), "kmeans" (stats::kmeans),
-"pam"/"clara" (cluster), "hclust" (stats::hclust),
-"dbscan" (dbscan).}
+"mds" (stats::cmdscale, or smacof or MASS through \code{mds_method}),
+"kmeans" (stats::kmeans), "pam"/"clara" (cluster),
+"hclust" (stats::hclust), "dbscan" (dbscan).}
 
-\item{...}{Additional arguments passed to the underlying model function}
+\item{...}{Arguments for the method: see the Method arguments section.
+Anything else is passed to the underlying model function.}
 
 \item{compute}{Compute tier for the fit. One of \code{"cpu"} (default,
 existing behaviour), \code{"gpu"} (route to local CUDA when the
@@ -42,7 +46,9 @@ with a warning.}
 A \code{tidylearn_model} object (S3) containing the fitted model
 (\code{$fit}, or \code{$fit$model} for an unsupervised method),
 model specification (\code{$spec}), and training data
-(\code{$data}). The object also inherits from a method-specific class
+(\code{$data}). \code{update()} and \code{step()} on \code{$fit}
+refit on the training rows and weights, whatever is in the calling
+environment. The object also inherits from a method-specific class
 (e.g., \code{tidylearn_linear}) and a paradigm class
 (\code{tidylearn_supervised} or \code{tidylearn_unsupervised}).
 }
@@ -68,7 +74,86 @@ actually contains: subsetting a data frame keeps every factor level,
 and a level no row uses would otherwise be reported as a class, given
 its own (zero) probability column, and counted when deciding whether
 the problem is binary. The fit is unaffected.
+
+Whether a supervised model is a classification or a regression is
+decided by the response the formula computes, so \code{factor(cyl) ~ wt}
+is a classification even though \code{cyl} is numeric. A factor or text
+response is a classification. A logical response is a regression for
+every method but \code{"logistic"} -- with \code{"linear"}, a linear
+probability model -- so write \code{factor(y) ~ ...} to classify it.
+
+A categorical predictor stored as text, as \code{tl_read()} returns it,
+is made a factor before the fit and stored as one in \code{$data}, so
+every method treats it as a category. At \code{predict()}, categorical
+columns in new data are read against the levels seen in training: new
+data may hold only some of them, and a level the model was not trained
+on is an error that names the column.
 }
+\section{Method arguments}{
+
+Arguments in \code{...} are passed to the function the method wraps,
+except for these, which tidylearn takes itself:
+\describe{
+\item{\code{"polynomial"}}{\code{degree} (default 2). Each numeric main
+effect is replaced by \code{poly(term, degree, raw = TRUE)} and the
+result fitted with \code{lm()}. A numeric term is one that computes a
+numeric vector, such as \code{wt} or \code{log(wt)}, or a one-column
+matrix, such as \code{scale(wt)}. One that is also part of an
+interaction keeps its own term and gains \code{I(x^2)} up to
+\code{I(x^degree)}, so the interaction is coded as written. Factor
+and other non-numeric terms, interactions, \code{I()} terms, bases
+such as \code{poly()} or a spline's, the response as written, an
+\code{offset()} and a removed intercept are kept as they are.}
+\item{\code{"ridge"}, \code{"lasso"}, \code{"elastic_net"}}{
+\code{alpha}, glmnet's mixing parameter (by default 0, 1 and 0.5);
+\code{lambda}, a single penalty to fit at, a sequence of penalties for
+\code{glmnet::cv.glmnet()} to choose from, or \code{NULL} (the
+default) to let it choose its own; and \code{cv_folds} (default 5),
+the number of folds for that cross-validation, which takes the place
+of glmnet's \code{nfolds}. \code{predict()} uses the \code{lambda.1se}
+penalty. tidylearn sets \code{x}, \code{y}, \code{family} and
+\code{nfolds} itself and refuses them, along with any argument glmnet
+does not take.}
+\item{\code{"svm"}}{\code{tune} (default \code{FALSE}) and
+\code{tune_folds} (default 5), to choose \code{cost} by
+cross-validation before the fit, with \code{gamma} for a non-linear
+kernel and \code{degree} for a polynomial one.}
+\item{\code{"deep"}}{\code{hidden_layers}, \code{activation},
+\code{dropout}, \code{epochs}, \code{batch_size},
+\code{validation_split} and \code{learning_rate}.}
+\item{\code{"pca"}}{\code{scale} and \code{center} (both \code{TRUE}).}
+\item{\code{"mds"}}{\code{mds_method}, the variant:
+\code{"classical"} (the default, \code{stats::cmdscale()}),
+\code{"metric"} or \code{"nonmetric"} (smacof), or \code{"sammon"}
+or \code{"kruskal"} (MASS). \code{k}, or its alias \code{ndim}, is
+the number of dimensions (default 2).}
+\item{\code{"kmeans"}, \code{"pam"}, \code{"clara"}}{\code{k}, the
+number of clusters (default 3); for \code{"pam"}, \code{metric}
+as well (default \code{"euclidean"}).}
+\item{\code{"hclust"}}{\code{hclust_method}, the linkage:
+\code{"average"} (the default), \code{"ward.D"}, \code{"ward.D2"},
+\code{"single"}, \code{"complete"}, \code{"mcquitty"},
+\code{"median"} or \code{"centroid"}; and \code{distance} (default
+\code{"euclidean"}).}
+\item{\code{"dbscan"}}{\code{eps} (default 0.5), \code{minPts}
+(default 5) and \code{distance} (default \code{"euclidean"}).}
+}
+Some defaults differ from the wrapped function's: \code{"forest"} computes
+importance (\code{importance = TRUE}), \code{"boost"} grows trees of
+\code{interaction.depth = 3}, and \code{"nn"} fits \code{size = 5}
+hidden units with \code{trace = FALSE}.
+
+\code{weights} and \code{subset} take values, one per row of
+\code{data} (such as \code{weights = data$w}), not column names. A
+\code{subset} is applied before the fit, and \code{$data} holds only
+the rows it selects. Case weights are applied by every supervised method
+except \code{"svm"} and \code{"deep"}, which refuse them. An offset,
+written as \code{offset()} in the formula, is applied by
+\code{"linear"}, \code{"polynomial"} and \code{"logistic"}; the other
+methods refuse one, because their \code{predict()} would not add it
+back.
+}
+
 \examples{
 \donttest{
 # Classification -> wraps randomForest::randomForest()

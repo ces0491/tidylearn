@@ -43,11 +43,19 @@ optional when \code{x} is a fitted model (defaults to the model's
 training data).}
 
 \item{formula}{Optional formula. Used to determine the number of
-effective predictors. Ignored when \code{x} is a fitted model.}
+effective predictors: the terms it expands to against \code{data}, so
+\code{y ~ . - id} counts every column but \code{y} and \code{id}. Ignored when \code{x}
+is a fitted model.}
 
-\item{hyperparams}{Named list of hyperparameters that affect runtime
-(e.g. \code{list(nrounds = 1000)} for xgboost, \code{list(epochs = 50, units = 256)} for deep learning). Missing entries fall back to
-per-method defaults.}
+\item{hyperparams}{Named list of hyperparameters that affect runtime:
+\code{degree} (polynomial), \code{ntree} (forest), \code{n.trees} (boost), \code{nrounds}
+(xgboost), \code{size} and \code{maxit} (nn), and \code{epochs} and \code{hidden_layers}
+(deep), e.g. \code{list(nrounds = 1000)} or
+\code{list(epochs = 50, hidden_layers = c(64, 32))}. Each must be a
+positive number, or a vector of them for \code{hidden_layers}. Missing
+entries take the defaults of the method's fit function, so the
+estimate is for the fit \code{\link[=tl_model]{tl_model()}} would run; other entries are
+ignored.}
 
 \item{gpu_check}{Optional \code{tidylearn_gpu_check} object. If omitted,
 \code{tl_check_gpu()} is called once internally.}
@@ -79,9 +87,10 @@ advice$recommendation
 print(advice)
 
 \donttest{
-# Dispatching on a fitted model requires the backend to be installed
+# Dispatching on a fitted model requires the backend to be installed.
+# CRAN asks examples to use at most two threads.
 if (requireNamespace("xgboost", quietly = TRUE)) {
-  model <- tl_model(iris, Species ~ ., method = "xgboost")
+  model <- tl_model(iris, Species ~ ., method = "xgboost", nthread = 2)
   tl_compute_advisor(model)
 }
 }

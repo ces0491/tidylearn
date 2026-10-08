@@ -7,7 +7,7 @@
 plot_knn_dist(data, k = 4, add_suggestion = TRUE, percentile = 0.95)
 }
 \arguments{
-\item{data}{A data frame or tidy_knn_dist result}
+\item{data}{A data frame, matrix, or tidy_knn_dist result}
 
 \item{k}{If data is a data frame, k for k-NN (default: 4)}
 

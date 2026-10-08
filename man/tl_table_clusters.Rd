@@ -19,12 +19,15 @@ tl_table_clusters(model, k = 3, digits = 2, ...)
 A \code{\link[gt]{gt}} table object.
 }
 \description{
-Produces a styled gt table showing cluster sizes and mean feature values.
-Supports kmeans, pam, clara, dbscan, and hclust models.
+Produces a styled gt table showing cluster sizes and mean feature values
+for the columns the clustering used. Supports kmeans, pam, clara, dbscan,
+and hclust models.
 }
 \examples{
+\dontshow{if (requireNamespace("gt", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \donttest{
 model <- tl_model(iris[, 1:4], method = "kmeans", k = 3)
 tl_table_clusters(model)
 }
+\dontshow{\}) # examplesIf}
 }

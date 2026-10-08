@@ -12,7 +12,9 @@ tl_plot_model(model, type = "auto", ...)
 \item{type}{Plot type. For regression: "auto", "actual_predicted",
 "residuals", "diagnostics". For classification: "auto", "confusion",
 "roc", "precision_recall", "calibration", "lift", "gain".
-"importance" is available for tree-based and regularized models.}
+"importance" is available for tree-based and regularized models.
+"diagnostics" needs a model fitted by \code{lm()} or \code{glm()}:
+method "linear", "polynomial" or "logistic".}
 
 \item{...}{Additional arguments passed to the underlying plot function}
 }

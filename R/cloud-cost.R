@@ -51,15 +51,38 @@ tl_cloud_timeout_seconds <- function(est_seconds,
     stop("'est_seconds' must be a single non-negative number.",
          call. = FALSE)
   }
-  if (!is.numeric(timeout_cap) || length(timeout_cap) != 1L ||
-        is.na(timeout_cap) || timeout_cap <= 0) {
-    stop("'timeout_cap' must be a single positive number of seconds.",
-         call. = FALSE)
-  }
+  tl_cloud_check_timeout_cap(timeout_cap)
 
   wanted <- ceiling(est_seconds * .tl_cloud_timeout_factor)
 
   as.integer(min(timeout_cap, max(.tl_cloud_timeout_floor, wanted)))
+}
+
+#' Validate a timeout cap
+#'
+#' Infinite is refused along with zero and negatives: the cap is what
+#' keeps the timeout below Modal's own 24-hour ceiling. A cap below the
+#' timeout floor is refused too, rather than letting either give way:
+#' honouring it would set a timeout under the floor, which kills every job
+#' during cold start, and raising it to the floor would bill past the
+#' bound the caller set.
+#'
+#' @param timeout_cap The value supplied.
+#' @keywords internal
+#' @noRd
+tl_cloud_check_timeout_cap <- function(timeout_cap) {
+  if (!is.numeric(timeout_cap) || length(timeout_cap) != 1L ||
+        !is.finite(timeout_cap) || timeout_cap <= 0) {
+    stop("'timeout_cap' must be a single positive number of seconds.",
+         call. = FALSE)
+  }
+  if (timeout_cap < .tl_cloud_timeout_floor) {
+    stop("'timeout_cap' must be at least ", .tl_cloud_timeout_floor,
+         " seconds: a job killed sooner dies during cold start and bills ",
+         "for nothing useful.",
+         call. = FALSE)
+  }
+  invisible(TRUE)
 }
 
 #' Worst-case cost of a cloud job
@@ -92,6 +115,10 @@ tl_cloud_worst_case_cost <- function(timeout_seconds, tier_name) {
 #'   produced nothing;
 #' * a worst-case cost above `max_cost`.
 #'
+#' Warns when the cap cuts the timeout below the usual multiple of the
+#' estimate, since a job that runs a little long is then killed having
+#' billed for the whole timeout.
+#'
 #' @param advice A `tidylearn_compute_advice` object.
 #' @param max_cost Maximum acceptable worst-case spend, in USD.
 #' @param timeout_cap Maximum timeout, in seconds.
@@ -112,9 +139,18 @@ tl_cloud_check_budget <- function(advice,
     stop("'max_cost' must be a single positive number of dollars.",
          call. = FALSE)
   }
+  # Checked before the comparison below, which an NA cap would reach as an
+  # if() condition and a negative one would pass as a cap
+  tl_cloud_check_timeout_cap(timeout_cap)
 
   cloud <- advice$cloud
   est_seconds <- cloud$est_seconds
+
+  if (!is_finite_num(est_seconds) || est_seconds < 0) {
+    stop("The advice has no cloud runtime estimate, so no timeout or ",
+         "worst-case cost can be set for the job.",
+         call. = FALSE)
+  }
 
   if (est_seconds >= timeout_cap) {
     stop(
@@ -129,6 +165,23 @@ tl_cloud_check_budget <- function(advice,
   }
 
   timeout_seconds <- tl_cloud_timeout_seconds(est_seconds, timeout_cap)
+
+  # Under the 3600 s default cap a 3599 s estimate gets one second of
+  # headroom on an order-of-magnitude estimate. The ratio is rounded down
+  # so that 2.998x never reads as the full 3x.
+  if (timeout_seconds < ceiling(est_seconds * .tl_cloud_timeout_factor)) {
+    headroom <- floor(timeout_seconds / est_seconds * 10) / 10
+    warning(
+      "The ", tl_cloud_format_duration(timeout_cap), " timeout cap leaves ",
+      format(headroom, nsmall = 1), "x headroom over this fit's estimate of ",
+      tl_cloud_format_duration(est_seconds), ", short of the ",
+      .tl_cloud_timeout_factor, "x a rough estimate needs. A job that runs ",
+      "long is killed at the cap and bills for the full timeout. Raise ",
+      "'timeout_cap' to give it room.",
+      call. = FALSE
+    )
+  }
+
   worst_case <- tl_cloud_worst_case_cost(timeout_seconds,
                                          cloud$tier_name)
 
@@ -160,13 +213,14 @@ tl_cloud_check_budget <- function(advice,
 #' @keywords internal
 #' @noRd
 tl_cloud_format_duration <- function(seconds) {
+  # Through tl_format_number(), so large values print in full
   if (seconds < 60) {
-    return(paste0(round(seconds), "s"))
+    return(paste0(tl_format_number(seconds), "s"))
   }
   if (seconds < 3600) {
-    return(paste0(round(seconds / 60, 1), " min"))
+    return(paste0(tl_format_number(seconds / 60, 1, nsmall = 0), " min"))
   }
-  paste0(round(seconds / 3600, 1), " h")
+  paste0(tl_format_number(seconds / 3600, 1, nsmall = 0), " h")
 }
 
 #' Format a cost for user-facing messages
@@ -179,7 +233,7 @@ tl_cloud_format_cost <- function(usd) {
   if (usd < 0.01) {
     return("<$0.01")
   }
-  paste0("$", format(round(usd, 2), nsmall = 2, trim = TRUE))
+  paste0("$", tl_format_number(usd, 2))
 }
 
 #' Build the pre-upload summary
@@ -209,9 +263,9 @@ tl_cloud_upload_summary <- function(method, host, n_rows, n_cols,
     "Uploading to Modal:",
     paste0("  Method:        ", method),
     paste0("  Destination:   ", destination),
-    paste0("  Rows x cols:   ", format(n_rows, big.mark = ","), " x ",
-           n_cols),
-    paste0("  Estimated MB:  ", round(size_mb)),
+    paste0("  Rows x cols:   ", tl_format_number(n_rows), " x ",
+           tl_format_number(n_cols)),
+    paste0("  Estimated MB:  ", tl_format_number(size_mb)),
     paste0("  Modal tier:    ", budget$tier_label),
     paste0("  Estimated:     ", tl_cloud_format_duration(est_seconds),
            ", ", tl_cloud_format_cost(budget$expected_cost)),

@@ -23,8 +23,10 @@ Produces a styled gt table of variable loadings on each principal component,
 with a diverging colour scale to highlight strong loadings.
 }
 \examples{
+\dontshow{if (requireNamespace("gt", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \donttest{
 model <- tl_model(iris[, 1:4], method = "pca")
 tl_table_loadings(model)
 }
+\dontshow{\}) # examplesIf}
 }

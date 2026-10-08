@@ -23,5 +23,6 @@ f <- tempfile(fileext = ".csv")
 write.csv(iris, f, row.names = FALSE)
 d <- tl_read(f)
 print(d)
+unlink(f)
 }
 }

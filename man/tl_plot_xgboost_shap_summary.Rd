@@ -18,7 +18,9 @@ tl_plot_xgboost_shap_summary(model, data = NULL, top_n = 10, n_samples = 100)
 (default: 100, NULL for all)}
 }
 \value{
-A \code{\link[ggplot2]{ggplot}} object.
+A \code{\link[ggplot2]{ggplot}} object. Features are ranked by
+mean absolute SHAP value; a multiclass model is drawn one panel per
+class.
 }
 \description{
 Plot SHAP summary for XGBoost model
@@ -26,7 +28,7 @@ Plot SHAP summary for XGBoost model
 \examples{
 \donttest{
 if (requireNamespace("xgboost", quietly = TRUE)) {
-  model <- tl_model(mtcars, mpg ~ ., method = "xgboost")
+  model <- tl_model(mtcars, mpg ~ ., method = "xgboost", nthread = 2)
   tl_plot_xgboost_shap_summary(model, n_samples = 20)
 }
 }

@@ -23,8 +23,10 @@ Produces a styled gt table of feature importance with a colour gradient.
 Supports tree-based, regularised, and xgboost models.
 }
 \examples{
+\dontshow{if (requireNamespace("gt", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \donttest{
 model <- tl_model(iris, Species ~ ., method = "forest")
 tl_table_importance(model)
 }
+\dontshow{\}) # examplesIf}
 }

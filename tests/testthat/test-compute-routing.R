@@ -13,8 +13,7 @@ fake_gpu_off <- structure(
     backends = list(
       xgboost    = list(installed = FALSE, gpu_likely_works = FALSE),
       tensorflow = list(installed = FALSE, gpu_likely_works = FALSE),
-      keras      = list(installed = FALSE, gpu_likely_works = FALSE),
-      torch      = list(installed = FALSE, gpu_likely_works = FALSE)
+      keras      = list(installed = FALSE, gpu_likely_works = FALSE)
     ),
     messages = character(0)
   ),
@@ -33,8 +32,7 @@ fake_gpu_xgb <- structure(
     backends = list(
       xgboost    = list(installed = TRUE,  gpu_likely_works = TRUE),
       tensorflow = list(installed = FALSE, gpu_likely_works = FALSE),
-      keras      = list(installed = FALSE, gpu_likely_works = FALSE),
-      torch      = list(installed = FALSE, gpu_likely_works = FALSE)
+      keras      = list(installed = FALSE, gpu_likely_works = FALSE)
     ),
     messages = character(0)
   ),
@@ -171,6 +169,27 @@ test_that("tl_resolve_compute('auto') picks gpu for long GPU-capable job", {
     "chose 'gpu'"
   )
   expect_equal(result, "gpu")
+})
+
+test_that("tl_resolve_compute('auto') sizes a workload past 2^31 cells", {
+  # The advisor's rows-times-predictors product overflowed to NA, so
+  # compute = "auto" failed for 1e7 rows by 250 predictors rather than
+  # advising on it
+  testthat::local_mocked_bindings(
+    tl_check_gpu = function(...) fake_gpu_xgb,
+    .package = "tidylearn"
+  )
+  # 1e7 rows reported, none allocated: routing reads only nrow() and names
+  cols <- stats::setNames(rep(list(numeric(0)), 251),
+                          c("y", paste0("x", 1:250)))
+  big <- structure(cols, row.names = c(NA_integer_, -10000000L),
+                   class = "data.frame")
+
+  expect_message(
+    result <- tl_resolve_compute("xgboost", big, y ~ ., compute = "auto"),
+    "advisor recommended 'cloud'"
+  )
+  expect_equal(result, "cpu")
 })
 
 # ---- tl_model() integration ----

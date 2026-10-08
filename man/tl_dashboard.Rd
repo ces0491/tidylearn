@@ -21,10 +21,10 @@ A \code{\link[shiny]{shinyApp}} object.
 Create interactive visualization dashboard for a model
 }
 \examples{
+\dontshow{if (rlang::is_installed(c("shiny", "shinydashboard", "DT"))) withAutoprint(\{ # examplesIf}
 \donttest{
-if (requireNamespace("shiny")) {
-  model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
-  app <- tl_dashboard(model)
+model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+app <- tl_dashboard(model)
 }
-}
+\dontshow{\}) # examplesIf}
 }

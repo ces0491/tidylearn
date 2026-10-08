@@ -7,7 +7,10 @@
 tidy_silhouette(clusters, dist_mat)
 }
 \arguments{
-\item{clusters}{Vector of cluster assignments}
+\item{clusters}{Vector of cluster assignments: numeric, factor or
+character. Numeric labels, or labels that read as whole numbers (such
+as the \code{cluster} factor from \code{augment_kmeans()}), are kept
+as they are; other labels are reported as given.}
 
 \item{dist_mat}{Distance matrix (dist object)}
 }

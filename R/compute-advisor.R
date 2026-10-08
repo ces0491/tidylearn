@@ -20,11 +20,18 @@
 #'   optional when `x` is a fitted model (defaults to the model's
 #'   training data).
 #' @param formula Optional formula. Used to determine the number of
-#'   effective predictors. Ignored when `x` is a fitted model.
-#' @param hyperparams Named list of hyperparameters that affect runtime
-#'   (e.g. `list(nrounds = 1000)` for xgboost, `list(epochs = 50,
-#'   units = 256)` for deep learning). Missing entries fall back to
-#'   per-method defaults.
+#'   effective predictors: the terms it expands to against `data`, so
+#'   `y ~ . - id` counts every column but `y` and `id`. Ignored when `x`
+#'   is a fitted model.
+#' @param hyperparams Named list of hyperparameters that affect runtime:
+#'   `degree` (polynomial), `ntree` (forest), `n.trees` (boost), `nrounds`
+#'   (xgboost), `size` and `maxit` (nn), and `epochs` and `hidden_layers`
+#'   (deep), e.g. `list(nrounds = 1000)` or
+#'   `list(epochs = 50, hidden_layers = c(64, 32))`. Each must be a
+#'   positive number, or a vector of them for `hidden_layers`. Missing
+#'   entries take the defaults of the method's fit function, so the
+#'   estimate is for the fit [tl_model()] would run; other entries are
+#'   ignored.
 #' @param gpu_check Optional `tidylearn_gpu_check` object. If omitted,
 #'   `tl_check_gpu()` is called once internally.
 #' @param ... Unused, reserved for method-specific extensions.
@@ -42,9 +49,10 @@
 #' print(advice)
 #'
 #' \donttest{
-#' # Dispatching on a fitted model requires the backend to be installed
+#' # Dispatching on a fitted model requires the backend to be installed.
+#' # CRAN asks examples to use at most two threads.
 #' if (requireNamespace("xgboost", quietly = TRUE)) {
-#'   model <- tl_model(iris, Species ~ ., method = "xgboost")
+#'   model <- tl_model(iris, Species ~ ., method = "xgboost", nthread = 2)
 #'   tl_compute_advisor(model)
 #' }
 #' }
@@ -79,6 +87,7 @@ tl_compute_advisor.character <- function(x,
   if (!is.list(hyperparams)) {
     stop("'hyperparams' must be a list.", call. = FALSE)
   }
+  tl_check_advisor_hyperparams(method, hyperparams)
   if (is.null(gpu_check)) {
     gpu_check <- tl_check_gpu()
   } else if (!inherits(gpu_check, "tidylearn_gpu_check")) {
@@ -90,7 +99,13 @@ tl_compute_advisor.character <- function(x,
 
   n_rows <- nrow(data)
   n_cols <- tl_effective_p_internal(data, formula)
-  est_size_mb <- (n_rows * n_cols * 8) / 1e6
+
+  # Doubles from here on: as an integer product, rows times predictors
+  # overflows to NA past 2^31 - 1 cells, such as 1e7 rows by 250
+  # predictors.
+  rows_num <- as.numeric(n_rows)
+  cols_num <- as.numeric(n_cols)
+  est_size_mb <- (rows_num * cols_num * 8) / 1e6
 
   problem <- list(
     method      = method,
@@ -100,13 +115,13 @@ tl_compute_advisor.character <- function(x,
   )
 
   local_cpu <- tl_estimate_local_cpu_internal(
-    method, n_rows, n_cols, hyperparams
+    method, rows_num, cols_num, hyperparams
   )
   local_gpu <- tl_estimate_local_gpu_internal(
-    method, n_rows, n_cols, hyperparams, gpu_check
+    method, rows_num, cols_num, hyperparams, gpu_check
   )
   cloud <- tl_estimate_cloud_internal(
-    method, n_rows, n_cols, hyperparams, est_size_mb
+    method, rows_num, cols_num, hyperparams, est_size_mb
   )
 
   rec <- tl_recommend_internal(local_cpu, local_gpu, cloud)
@@ -184,36 +199,94 @@ tl_compute_advisor.default <- function(x, ...) {
   svm         = list(cpu_const = 5e-7,  ram_mult = 6, gpu_speedup = 1)
 )
 
-# Returns the number of complexity units for a given method, given
-# data dimensions and (optional) hyperparameters. Sensible defaults
-# match the underlying package defaults where possible.
-tl_method_complexity_internal <- function(method, n_rows, n_cols, hyp) {
-  pull <- function(name, default) {
-    val <- hyp[[name]]
-    if (is.null(val) || !is.numeric(val) || length(val) != 1L) default else val
+# The hyperparameters each method's runtime estimate reads
+.tl_advisor_hyperparams <- list(
+  polynomial = "degree",
+  forest     = "ntree",
+  boost      = "n.trees",
+  xgboost    = "nrounds",
+  nn         = c("size", "maxit"),
+  deep       = c("epochs", "hidden_layers")
+)
+
+# Refuse a runtime hyperparameter that is not a positive number. NA would
+# make every estimate NA and fail far from the cause ("attempt to select
+# less than one element"), and a negative value gives a negative runtime.
+# Only the names the method's estimate reads are checked: tl_model()
+# forwards every fit argument here.
+tl_check_advisor_hyperparams <- function(method, hyp) {
+  for (name in .tl_advisor_hyperparams[[method]]) {
+    value <- hyp[[name]]
+    if (is.null(value)) {
+      next
+    }
+
+    layers <- identical(name, "hidden_layers")
+    valid <- is.numeric(value) && length(value) >= 1L &&
+      (layers || length(value) == 1L) &&
+      all(is.finite(value)) && all(value > 0)
+
+    if (!valid) {
+      stop(
+        "Hyperparameter '", name, "' must be ",
+        if (layers) "positive numbers" else "a single positive number",
+        "; got ", paste(deparse(value), collapse = ""), ".",
+        call. = FALSE
+      )
+    }
   }
+  invisible(TRUE)
+}
+
+# A runtime hyperparameter: the caller's value, or the default of the
+# tl_fit_*() function that would run, read from its formals so the
+# estimate follows the fit function's defaults when they change.
+tl_advisor_param <- function(method, name, hyp) {
+  value <- hyp[[name]]
+  if (!is.null(value)) {
+    return(value)
+  }
+  fit_fn <- get(paste0("tl_fit_", method), mode = "function")
+  eval(formals(fit_fn)[[name]], baseenv())
+}
+
+# Returns the number of complexity units for a given method, given
+# data dimensions and (optional) hyperparameters. Hyperparameters not
+# supplied take the defaults of the method's fit function.
+tl_method_complexity_internal <- function(method, n_rows, n_cols, hyp) {
+  # Doubles: rows times columns overflows an integer past 2^31 - 1
+  n_rows <- as.numeric(n_rows)
+  n_cols <- as.numeric(n_cols)
+  param <- function(name) tl_advisor_param(method, name, hyp)
 
   switch(
     method,
     "linear"      = n_rows * n_cols^2,
-    "polynomial"  = n_rows * n_cols^2 * pull("degree", 2)^2,
+    "polynomial"  = n_rows * n_cols^2 * param("degree")^2,
     "logistic"    = n_rows * n_cols^2 * 5,
     "ridge"       = n_rows * n_cols * 100,
     "lasso"       = n_rows * n_cols * 100,
     "elastic_net" = n_rows * n_cols * 100,
     "tree"        = n_rows * log2(n_rows + 1) * n_cols,
-    "forest"      = n_rows * sqrt(n_cols) * pull("ntree", 500) *
+    "forest"      = n_rows * sqrt(n_cols) * param("ntree") *
       log2(n_rows + 1),
-    "boost"       = n_rows * n_cols * pull("n.trees", 100),
-    "xgboost"     = n_rows * n_cols * pull("nrounds", 100),
-    "nn"          = n_rows * n_cols * pull("size", 10) * pull("maxit", 100),
-    "deep"        = n_rows * n_cols * pull("epochs", 10) * pull("units", 128),
+    "boost"       = n_rows * n_cols * param("n.trees"),
+    "xgboost"     = n_rows * n_cols * param("nrounds"),
+    "nn"          = n_rows * n_cols * param("size") * param("maxit"),
+    # Per row and epoch, one multiply-add for every weight between
+    # consecutive layers: inputs, each hidden layer, then one output
+    "deep"        = {
+      layers <- param("hidden_layers")
+      n_rows * param("epochs") * sum(c(n_cols, layers) * c(layers, 1))
+    },
     "svm"         = n_rows^2 * n_cols,
     n_rows * n_cols
   )
 }
 
-# Number of effective predictors for runtime estimation.
+# Number of effective predictors for runtime estimation: the terms the
+# formula expands to against the data. all.vars() on the right-hand side
+# would read y ~ . - id as two predictors, "." and id.
 tl_effective_p_internal <- function(data, formula) {
   if (is.null(formula)) {
     return(max(ncol(data) - 1L, 1L))
@@ -222,17 +295,14 @@ tl_effective_p_internal <- function(data, formula) {
     formula <- stats::as.formula(formula)
   }
 
-  rhs <- if (length(formula) == 3L) formula[[3]] else formula[[2]]
-  rhs_vars <- all.vars(rhs)
-
-  if (length(rhs_vars) == 0L || identical(rhs_vars, ".")) {
-    return(max(ncol(data) - 1L, 1L))
-  }
-  length(rhs_vars)
+  labels <- attr(stats::terms(formula, data = data), "term.labels")
+  max(length(labels), 1L)
 }
 
 # Local CPU runtime + RAM + feasibility heuristic.
 tl_estimate_local_cpu_internal <- function(method, n_rows, n_cols, hyp) {
+  n_rows <- as.numeric(n_rows)
+  n_cols <- as.numeric(n_cols)
   profile <- .tl_method_profiles[[method]]
   complexity <- tl_method_complexity_internal(method, n_rows, n_cols, hyp)
   cores_raw <- parallel::detectCores(logical = FALSE)
@@ -248,7 +318,7 @@ tl_estimate_local_cpu_internal <- function(method, n_rows, n_cols, hyp) {
   notes <- if (!feasible) {
     paste0(
       "Estimated peak RAM (~",
-      format(round(est_peak_ram_mb), big.mark = ","),
+      tl_format_number(est_peak_ram_mb),
       " MB) exceeds the 16 GB heuristic ceiling. May not fit on a ",
       "typical laptop."
     )
@@ -456,7 +526,7 @@ tl_estimate_cloud_internal <- function(method, n_rows, n_cols, hyp,
       caveats,
       paste0(
         "No Modal tier in the requested class has the estimated ~",
-        format(round(ram_needed_gb, 1), nsmall = 1),
+        tl_format_number(ram_needed_gb, 1),
         " GB RAM headroom; showing the largest available tier."
       )
     )
@@ -501,7 +571,7 @@ tl_recommend_internal <- function(cpu, gpu, cloud) {
       reasoning,
       paste0(
         "Local CPU infeasible: estimated peak RAM ~",
-        format(round(cpu$est_peak_ram_mb), big.mark = ","),
+        tl_format_number(cpu$est_peak_ram_mb),
         " MB exceeds laptop heuristic ceiling."
       )
     )
@@ -512,9 +582,9 @@ tl_recommend_internal <- function(cpu, gpu, cloud) {
           reasoning,
           paste0(
             "Recommend cloud tier '", cloud$tier_label,
-            "' (~", format(round(cloud$ram_needed_gb, 1), nsmall = 1),
+            "' (~", tl_format_number(cloud$ram_needed_gb, 1),
             " GB RAM needed). Estimated cost: $",
-            format(round(cloud$est_cost_usd, 2), nsmall = 2),
+            tl_format_number(cloud$est_cost_usd, 2),
             "."
           )
         )
@@ -536,7 +606,7 @@ tl_recommend_internal <- function(cpu, gpu, cloud) {
       recommendation = "cpu",
       reasoning = paste0(
         "Estimated local CPU runtime ~",
-        format(round(cpu_seconds, 1), nsmall = 1),
+        tl_format_number(cpu_seconds, 1),
         "s. Cloud cold-start (~45s) would dominate; just run it locally."
       )
     ))
@@ -552,7 +622,7 @@ tl_recommend_internal <- function(cpu, gpu, cloud) {
         recommendation = "gpu",
         reasoning = paste0(
           "Local GPU is ~",
-          format(round(speedup, 1), nsmall = 1),
+          tl_format_number(speedup, 1),
           "x faster than CPU here and is already available."
         )
       ))
@@ -567,9 +637,9 @@ tl_recommend_internal <- function(cpu, gpu, cloud) {
         recommendation = "cloud",
         reasoning = paste0(
           "Cloud tier '", cloud$tier_label, "' ~",
-          format(round(cloud_speedup, 1), nsmall = 1),
+          tl_format_number(cloud_speedup, 1),
           "x faster than local CPU. Estimated cost: $",
-          format(round(cloud$est_cost_usd, 2), nsmall = 2),
+          tl_format_number(cloud$est_cost_usd, 2),
           "."
         )
       ))
@@ -581,7 +651,7 @@ tl_recommend_internal <- function(cpu, gpu, cloud) {
     recommendation = "cpu",
     reasoning = paste0(
       "Estimated local CPU runtime ~",
-      format(round(cpu_seconds), big.mark = ","),
+      tl_format_number(cpu_seconds),
       "s. No meaningfully faster tier available."
     )
   )
@@ -591,6 +661,14 @@ tl_recommend_internal <- function(cpu, gpu, cloud) {
 
 is_finite_num <- function(x) {
   is.numeric(x) && length(x) == 1L && is.finite(x)
+}
+
+# A number for a message or printout, written out in full with thousands
+# separators: scientific = FALSE, since format() otherwise switches to
+# scientific notation whenever that is shorter (100000 as "1e+05").
+tl_format_number <- function(x, digits = 0, nsmall = digits) {
+  format(round(x, digits), nsmall = nsmall, big.mark = ",",
+         scientific = FALSE, trim = TRUE)
 }
 
 #' Print method for `tidylearn_compute_advice` objects
@@ -607,9 +685,9 @@ print.tidylearn_compute_advice <- function(x, ...) {
   cat("<tidylearn compute advice>\n")
   cat(
     "Problem:        ", x$problem$method,
-    " on ", format(x$problem$rows, big.mark = ","), " rows x ",
-    x$problem$cols, " cols ",
-    "(~", format(round(x$problem$est_size_mb, 1), nsmall = 1), " MB)\n",
+    " on ", tl_format_number(x$problem$rows), " rows x ",
+    tl_format_number(x$problem$cols), " cols ",
+    "(~", tl_format_number(x$problem$est_size_mb, 1), " MB)\n",
     sep = ""
   )
   cat("\n")
@@ -617,15 +695,15 @@ print.tidylearn_compute_advice <- function(x, ...) {
 
   fmt_seconds <- function(s) {
     if (!is_finite_num(s)) return("--")
-    if (s < 60)   return(paste0(format(round(s, 1), nsmall = 1), "s"))
-    if (s < 3600) return(paste0(format(round(s / 60, 1), nsmall = 1), "m"))
-    paste0(format(round(s / 3600, 1), nsmall = 1), "h")
+    if (s < 60)   return(paste0(tl_format_number(s, 1), "s"))
+    if (s < 3600) return(paste0(tl_format_number(s / 60, 1), "m"))
+    paste0(tl_format_number(s / 3600, 1), "h")
   }
 
   cat(sprintf(
     "  Local CPU:    %s   (peak RAM ~%s MB, %d cores)%s\n",
     fmt_seconds(x$local_cpu$est_seconds),
-    format(round(x$local_cpu$est_peak_ram_mb), big.mark = ","),
+    tl_format_number(x$local_cpu$est_peak_ram_mb),
     x$local_cpu$cores_used,
     if (!isTRUE(x$local_cpu$feasible)) "  [infeasible]" else ""
   ))
@@ -643,7 +721,7 @@ print.tidylearn_compute_advice <- function(x, ...) {
     "  Cloud:        %s   (~$%s)%s   %s\n",
     fmt_seconds(x$cloud$est_seconds),
     if (is_finite_num(x$cloud$est_cost_usd)) {
-      format(round(x$cloud$est_cost_usd, 2), nsmall = 2)
+      tl_format_number(x$cloud$est_cost_usd, 2)
     } else {
       "--"
     },

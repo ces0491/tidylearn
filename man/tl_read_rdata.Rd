@@ -28,10 +28,24 @@ argument to specify which object to extract.
 If \code{name} is \code{NULL} and
 the file contains exactly one data frame, it is returned automatically.
 }
-\examples{
-\donttest{
-# data <- tl_read_rdata("path/to/data.rdata")
-# data <- tl_read_rdata("path/to/data.rdata", name = "my_data")
+\section{Reading files you did not create}{
+
+\code{load()} rebuilds whatever R objects the file describes, so read
+only files from a source you trust. On R before 4.4.0 a crafted file
+can run code as it is read (CVE-2024-27322). The remote readers
+\code{tl_read_github()} and \code{tl_read_s3()} refuse \code{.rds}
+and \code{.rdata} files on those versions unless
+\code{trust_rds = TRUE}.
 }
+
+\examples{
+path <- tempfile(fileext = ".rdata")
+cars <- mtcars
+flowers <- iris
+save(cars, flowers, file = path)
+
+# With more than one data frame in the file, name the one to read
+tl_read_rdata(path, name = "flowers")
+unlink(path)
 
 }

@@ -4,10 +4,16 @@
 \alias{tl_read_github}
 \title{Read from GitHub}
 \usage{
-tl_read_github(source, path = NULL, ref = "main", ...)
+tl_read_github(source, path = NULL, ref = "main", ..., trust_rds = FALSE)
 }
 \arguments{
-\item{source}{A GitHub URL or \code{"owner/repo"} string.}
+\item{source}{A GitHub URL or \code{"owner/repo"} string. A URL is either
+a file page (\code{https://github.com/<owner>/<repo>/blob/<ref>/<path>},
+with \code{raw} in place of \code{blob} or with neither, and with or
+without \code{www.} and a query such as \code{?raw=true}) or a
+raw file (\code{https://raw.githubusercontent.com/...}), whose query is
+kept for the download. Zip archives are not read from GitHub: download
+the file and read it with \code{tl_read_zip()}.}
 
 \item{path}{Path to the file within the repository (required when
 \code{source} is \code{"owner/repo"} format).}
@@ -15,6 +21,12 @@ tl_read_github(source, path = NULL, ref = "main", ...)
 \item{ref}{Branch, tag, or commit SHA. Default is \code{"main"}.}
 
 \item{...}{Additional arguments passed to the format-specific reader.}
+
+\item{trust_rds}{Logical. Read an \code{.rds}, \code{.rdata} or
+\code{.rda} file on R older than 4.4.0? Those versions can run code
+embedded in a crafted file as it is read (CVE-2024-27322), so such
+files are refused there unless this is \code{TRUE}. It has no effect
+on R 4.4.0 or later. Default \code{FALSE}.}
 }
 \value{
 A \code{tidylearn_data} object containing the downloaded data.
@@ -24,12 +36,18 @@ Downloads a raw file from a GitHub repository and reads it into a
 \code{tidylearn_data} object. Accepts either a full GitHub URL or a
 \code{owner/repo} shorthand with a file path.
 }
+\section{Reading R serialisation files}{
+
+An \code{.rds} or \code{.rdata} file is rebuilt with \code{readRDS()} or
+\code{load()}, which recreate whatever R objects the file describes.
+Read them only from a repository you trust, on any version of R.
+}
+
 \examples{
-\donttest{
-# data <- tl_read_github("user/repo", path = "data/file.csv")
-# data <- tl_read_github(
-#   "https://github.com/user/repo/blob/main/data/file.csv"
-# )
+\dontrun{
+# Downloads over the network
+tl_read_github("user/repo", path = "data/file.csv")
+tl_read_github("https://github.com/user/repo/blob/main/data/file.csv")
 }
 
 }

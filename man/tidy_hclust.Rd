@@ -17,7 +17,8 @@ tidy_hclust(data, method = "average", distance = "euclidean", cols = NULL)
 dist object (default: "euclidean")}
 
 \item{cols}{Columns to include (tidy select).
-If NULL, uses all numeric columns.}
+If NULL, uses all numeric columns, or every column for
+\code{distance = "gower"}.}
 }
 \value{
 A list of class "tidy_hclust" containing:
@@ -25,6 +26,7 @@ A list of class "tidy_hclust" containing:
 \item model: hclust object
 \item dist: distance matrix used
 \item method: linkage method used
+\item distance_method: distance metric used
 \item data: original data (for plotting)
 }
 }

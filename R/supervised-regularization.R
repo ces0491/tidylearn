@@ -15,11 +15,11 @@ NULL
 #'   classification problem
 #' @param alpha Mixing parameter (0 for Ridge, 1 for Lasso,
 #'   between 0-1 for Elastic Net)
-#' @param lambda Regularization parameter (if NULL, uses
-#'   cross-validation to select)
+#' @param lambda Regularization parameter: a single penalty, or NULL or a
+#'   sequence of penalties for cross-validation to choose from
 #' @param cv_folds Number of folds for cross-validation
 #'   (default: 5)
-#' @param ... Additional arguments to pass to glmnet()
+#' @param ... Additional arguments to pass to glmnet() or cv.glmnet()
 #' @return A fitted Ridge regression model
 #' @keywords internal
 tl_fit_ridge <- function(data, formula,
@@ -40,11 +40,11 @@ tl_fit_ridge <- function(data, formula,
 #'   classification problem
 #' @param alpha Mixing parameter (0 for Ridge, 1 for Lasso,
 #'   between 0-1 for Elastic Net)
-#' @param lambda Regularization parameter (if NULL, uses
-#'   cross-validation to select)
+#' @param lambda Regularization parameter: a single penalty, or NULL or a
+#'   sequence of penalties for cross-validation to choose from
 #' @param cv_folds Number of folds for cross-validation
 #'   (default: 5)
-#' @param ... Additional arguments to pass to glmnet()
+#' @param ... Additional arguments to pass to glmnet() or cv.glmnet()
 #' @return A fitted Lasso regression model
 #' @keywords internal
 tl_fit_lasso <- function(data, formula,
@@ -65,11 +65,11 @@ tl_fit_lasso <- function(data, formula,
 #'   classification problem
 #' @param alpha Mixing parameter (default: 0.5 for
 #'   Elastic Net)
-#' @param lambda Regularization parameter (if NULL, uses
-#'   cross-validation to select)
+#' @param lambda Regularization parameter: a single penalty, or NULL or a
+#'   sequence of penalties for cross-validation to choose from
 #' @param cv_folds Number of folds for cross-validation
 #'   (default: 5)
-#' @param ... Additional arguments to pass to glmnet()
+#' @param ... Additional arguments to pass to glmnet() or cv.glmnet()
 #' @return A fitted Elastic Net regression model
 #' @keywords internal
 tl_fit_elastic_net <- function(data, formula,
@@ -93,30 +93,102 @@ tl_fit_elastic_net <- function(data, formula,
 #'   classification problem
 #' @param alpha Mixing parameter (0 for Ridge, 1 for Lasso,
 #'   between 0-1 for Elastic Net)
-#' @param lambda Regularization parameter (if NULL, uses
-#'   cross-validation to select)
+#' @param lambda Regularization parameter: a single penalty to fit at, or
+#'   \code{NULL} (the default) or a sequence of penalties, from which
+#'   cross-validation chooses one
 #' @param cv_folds Number of folds for cross-validation
 #'   (default: 5)
-#' @param ... Additional arguments to pass to glmnet()
+#' @param ... Additional arguments to pass to glmnet() or cv.glmnet(). A
+#'   name neither function takes is an error, as are \code{x}, \code{y},
+#'   \code{family} and \code{nfolds}, which tidylearn sets itself, and
+#'   \code{relax = TRUE} and \code{gamma}: predictions and coefficients
+#'   come from the unrelaxed fit.
+#' @param weights Optional case weights, one per row of \code{data}
+#' @param foldid Optional fold for each row of \code{data}, for the
+#'   cross-validation that chooses lambda
+#' @param subset Optional rows of \code{data} to fit on
+#' @param offset Not supported: glmnet would need the offset again at
+#'   every prediction. An error if supplied.
 #' @return A fitted regularized regression model
 #' @keywords internal
 tl_fit_regularized <- function(data, formula,
                                is_classification = FALSE,
                                alpha = 0, lambda = NULL,
-                               cv_folds = 5, ...) {
+                               cv_folds = 5, ...,
+                               weights = NULL, foldid = NULL,
+                               subset = NULL, offset = NULL) {
   # Check if glmnet is installed
   tl_check_packages("glmnet")
+
+  # One penalty is fitted as given. The default path, or a sequence of
+  # penalties, is cross-validated so that a single one is chosen: fitted
+  # along a sequence with none chosen, the model left predict() nothing to
+  # use.
+  cross_validate <- is.null(lambda) || length(lambda) > 1L
+
+  tl_check_glmnet_args(list(...), cross_validate, !is.null(foldid))
+
+  if (!is.null(offset)) {
+    stop(
+      "ridge, lasso and elastic_net do not take an offset: glmnet needs it\n",
+      "again at every prediction, and predict() has no way to supply it. Fit\n",
+      "method = \"linear\" or \"logistic\" with offset(<column>) in the ",
+      "formula for a\nmodel with an offset.",
+      call. = FALSE
+    )
+  }
 
   # Parse the formula
   response_var <- all.vars(formula)[1]
 
-  # Create model matrix for predictors
-  # Remove intercept as glmnet adds it by default
-  model_frame <- stats::model.frame(formula, data = data)
+  # The per-row arguments go into the model frame, so the rows na.omit and
+  # subset remove are removed from them as well. Kept beside it, they still
+  # had every row, and one missing predictor left glmnet with 32 weights for
+  # 31 rows. do.call() puts the values themselves in the call: model.frame()
+  # looks a name up in the data and the formula's environment, neither of
+  # which holds this function's variables.
+  frame_args <- list(formula = formula, data = data)
+  frame_args$weights <- weights
+  frame_args$foldid <- foldid
+  frame_args$subset <- subset
+  model_frame <- do.call(stats::model.frame, frame_args)
   design_terms <- stats::terms(model_frame)
-  x_mat <- stats::model.matrix(
-    design_terms, model_frame
-  )[, -1, drop = FALSE]
+
+  offset_term <- attr(design_terms, "offset")
+  if (!is.null(offset_term)) {
+    stop(
+      "ridge, lasso and elastic_net cannot use the formula's ",
+      deparse1(attr(design_terms, "variables")[[offset_term[1] + 1L]]),
+      ".\nglmnet would need it again at every prediction, and fitting ",
+      "without it would\nignore part of the formula. Fit method = \"linear\" ",
+      "or \"logistic\" for a model\nwith an offset, or make the variable a ",
+      "predictor.",
+      call. = FALSE
+    )
+  }
+
+  # glmnet fits its own intercept, so drop R's intercept column -- by name.
+  # Dropping the first column took a predictor instead when the formula has
+  # none, as in y ~ x1 + x2 - 1.
+  design <- stats::model.matrix(design_terms, model_frame)
+  x_mat <- design[, colnames(design) != "(Intercept)", drop = FALSE]
+
+  # glmnet's own message, "x should be a matrix with 2 or more columns",
+  # names an argument the caller never passed
+  if (ncol(x_mat) < 2L) {
+    stop(
+      "ridge, lasso and elastic_net need at least two predictor columns, ",
+      "but\n", deparse1(formula), " gives ",
+      if (ncol(x_mat) == 0L) {
+        "none"
+      } else {
+        paste0("one (", colnames(x_mat), ")")
+      },
+      ". Add a predictor, or fit an unpenalised model:\nmethod = \"linear\" ",
+      "for a numeric response, \"logistic\" for two classes.",
+      call. = FALSE
+    )
+  }
 
   # Take the response from the model frame rather than from `data`.
   # model.frame() applies na.omit, so one missing predictor drops that row
@@ -126,6 +198,8 @@ tl_fit_regularized <- function(data, formula,
   # column responsible. lm(), rpart(), nnet() and svm() all drop the row
   # and carry on; this now does the same.
   y <- stats::model.response(model_frame)
+  case_weights <- stats::model.weights(model_frame)
+  fold_ids <- model_frame[["(foldid)"]]
 
   # Retain the terms and factor levels so prediction can rebuild an
   # identically-coded design matrix on new data
@@ -133,8 +207,18 @@ tl_fit_regularized <- function(data, formula,
 
   # Determine the appropriate family based on problem type
   if (is_classification) {
-    if (!is.factor(y)) {
-      y <- factor(y)
+    # The classes of the rows being fitted. A class whose every row has a
+    # missing value is gone from the model frame but stays a level, and
+    # glmnet stops on "one multinomial or binomial class has 1 or 0
+    # observations; not allowed".
+    y <- tl_normalise_response(y)
+    if (nlevels(y) < 2L) {
+      stop(
+        "ridge, lasso and elastic_net need rows of at least two classes, ",
+        "but\nthe rows left once those with missing values are dropped are ",
+        "all\n'", levels(y), "'.",
+        call. = FALSE
+      )
     }
 
     if (length(levels(y)) == 2) {
@@ -150,14 +234,18 @@ tl_fit_regularized <- function(data, formula,
   }
 
   # Fit the model
-  if (is.null(lambda)) {
-    # Use cross-validation to select optimal lambda
+  if (cross_validate) {
+    # Use cross-validation to select optimal lambda. weights and foldid are
+    # NULL when not given, which is glmnet's own default.
     cv_model <- glmnet::cv.glmnet(
       x = x_mat,
       y = y,
+      weights = case_weights,
+      foldid = fold_ids,
       alpha = alpha,
       family = family,
       nfolds = cv_folds,
+      lambda = lambda,
       ...
     )
 
@@ -165,16 +253,14 @@ tl_fit_regularized <- function(data, formula,
     lambda_min <- cv_model$lambda.min
     lambda_1se <- cv_model$lambda.1se
 
-    # Fit final model with optimal lambda
-    # Use lambda.1se for better generalization
-    model <- glmnet::glmnet(
-      x = x_mat,
-      y = y,
-      alpha = alpha,
-      family = family,
-      lambda = cv_model$lambda,
-      ...
-    )
+    # cv.glmnet() has already fitted the full data along this path, and
+    # coef() and predict() on cv_model read that fit. A second glmnet() run
+    # at lambda = cv_model$lambda agreed with it only to the solver's
+    # tolerance, and at the largest penalty -- where glmnet's own path has
+    # every slope exactly zero -- it left a floating-point residue such as
+    # -6e-17 on one, which importance reported as the most important
+    # predictor.
+    model <- cv_model$glmnet.fit
 
     # Store cross-validation results
     attr(model, "cv_results") <- cv_model
@@ -185,6 +271,7 @@ tl_fit_regularized <- function(data, formula,
     model <- glmnet::glmnet(
       x = x_mat,
       y = y,
+      weights = case_weights,
       alpha = alpha,
       family = family,
       lambda = lambda,
@@ -206,11 +293,112 @@ tl_fit_regularized <- function(data, formula,
   attr(model, "tl_terms") <- design_terms
   attr(model, "tl_xlevels") <- design_xlevels
   attr(model, "tl_colnames") <- colnames(x_mat)
+  # Each design column's standard deviation over the rows fitted, in design
+  # order, for importance to scale the coefficients by. Recomputed from
+  # model$data it would include the rows dropped for a missing value.
+  attr(model, "tl_x_sd") <- apply(x_mat, 2, stats::sd)
   if (is_classification) {
     attr(model, "response_levels") <- levels(y)
   }
 
   model
+}
+
+#' Refuse arguments that glmnet would ignore
+#'
+#' \code{glmnet()} and \code{cv.glmnet()} both take \code{...} and discard
+#' names they do not know, so a misspelt \code{standardise = FALSE} changed
+#' nothing while the model's \code{$spec$args} recorded it as used. A
+#' cross-validation argument at a single penalty reached \code{glmnet()}
+#' alone and went the same way. The arguments tidylearn sets itself are
+#' refused as well, with what sets them, and so is a relaxed fit, which
+#' nothing downstream reads.
+#'
+#' @param args The arguments in \code{...}, as a list.
+#' @param cross_validate Whether \code{cv.glmnet()} will run.
+#' @param foldid_given Whether \code{foldid}, a formal of the caller, was
+#'   supplied.
+#' @return \code{TRUE}, invisibly, when every argument will be used.
+#' @keywords internal
+#' @noRd
+tl_check_glmnet_args <- function(args, cross_validate, foldid_given) {
+  arg_names <- names2(args)
+  arg_names <- arg_names[arg_names != ""]
+  fit_args <- setdiff(names(formals(glmnet::glmnet)), "...")
+  cv_args <- setdiff(names(formals(glmnet::cv.glmnet)), "...")
+
+  # glmnet would fit the relaxed lasso, but predict(), the coefficients,
+  # importance and the plots all read the unrelaxed path, at glmnet's
+  # default gamma = 1. relax = FALSE is glmnet's default and changes nothing.
+  if (isTRUE(args[["relax"]])) {
+    stop(
+      "relax = TRUE fits a relaxed lasso, but tidylearn predicts and ",
+      "reports coefficients\nfrom the unrelaxed fit, so it would change ",
+      "nothing. Call glmnet::cv.glmnet(relax = TRUE)\ndirectly for a ",
+      "relaxed model.",
+      call. = FALSE
+    )
+  }
+  if ("gamma" %in% arg_names) {
+    stop(
+      "'gamma' chooses among relaxed fits, which tidylearn does not use, so ",
+      "it would change\nnothing. Call glmnet::cv.glmnet(relax = TRUE) ",
+      "directly for a relaxed model.",
+      call. = FALSE
+    )
+  }
+
+  # Passed again beside tidylearn's own value, these failed with R's
+  # "formal argument matched by multiple actual arguments"
+  set_here <- c(
+    x = "tidylearn sets 'x' and 'y' from the formula and data",
+    y = "tidylearn sets 'x' and 'y' from the formula and data",
+    family = paste0(
+      "tidylearn sets 'family' from the response: gaussian for a numeric ",
+      "response,\nbinomial for two classes, multinomial for more"
+    ),
+    nfolds = "tidylearn sets 'nfolds' from cv_folds; pass cv_folds instead"
+  )
+  owned <- intersect(arg_names, names(set_here))
+  if (length(owned) > 0) {
+    stop(
+      paste(unique(set_here[owned]), collapse = ".\n"), ".",
+      call. = FALSE
+    )
+  }
+
+  unknown <- setdiff(arg_names, c(fit_args, cv_args))
+  if (length(unknown) > 0) {
+    stop(
+      "glmnet::glmnet() and glmnet::cv.glmnet() have no ",
+      if (length(unknown) == 1L) "argument" else "arguments", " named ",
+      paste0("'", unknown, "'", collapse = ", "),
+      ".\nridge, lasso and elastic_net would ignore ",
+      if (length(unknown) == 1L) "it" else "them",
+      " without saying so. Check the spelling\nagainst ?glmnet::glmnet and ",
+      "?glmnet::cv.glmnet.",
+      call. = FALSE
+    )
+  }
+
+  if (!cross_validate) {
+    cv_only <- intersect(
+      c(arg_names, if (foldid_given) "foldid"),
+      setdiff(cv_args, fit_args)
+    )
+    if (length(cv_only) > 0) {
+      stop(
+        paste0("'", cv_only, "'", collapse = ", "),
+        if (length(cv_only) == 1L) " only applies" else " only apply",
+        " to the cross-validation that chooses lambda, and none\nruns when ",
+        "a single lambda is given. Leave lambda = NULL, or give a sequence ",
+        "of\npenalties, to have one chosen by cross-validation.",
+        call. = FALSE
+      )
+    }
+  }
+
+  invisible(TRUE)
 }
 
 #' Plot regularization path for a regularized model
@@ -234,113 +422,160 @@ tl_plot_regularization_path <- function(model,
   # Extract the glmnet model
   fit <- model$fit
 
-  # Get coefficient matrix
-  coef_matrix <- as.matrix(coef(fit))
+  # A path runs through the penalties fitted. At a single penalty each term
+  # was one point, so no line was drawn.
+  if (length(fit$lambda) < 2L) {
+    stop(
+      "The regularization path needs a model fitted along several ",
+      "penalties,\nbut this one was fitted at the single penalty lambda = ",
+      signif(fit$lambda, 4), ".\nFit it with lambda = NULL, or a sequence ",
+      "of penalties, to draw a path;\ntl_coefficients() gives the ",
+      "coefficients at this one.",
+      call. = FALSE
+    )
+  }
+  # Every model fitted along several penalties is cross-validated now. One
+  # fitted by an earlier version may not be, and has no lambda.min or
+  # lambda.1se to mark.
+  cross_validated <- !is.null(attr(fit, "cv_results"))
 
-  # Exclude intercept
-  coef_matrix <- coef_matrix[-1, , drop = FALSE]
+  # One row per term and penalty. A multinomial fit has a path per class,
+  # and its coef() is a list of matrices that as.matrix() could not use.
+  coef_df <- tl_glmnet_path_tbl(fit)
+  by_class <- "class" %in% names(coef_df)
 
-  # Create a data frame for plotting
-  coef_df <- tibble::tibble(
-    lambda = rep(
-      fit$lambda, each = nrow(coef_matrix)
-    ),
-    feature = rep(
-      rownames(coef_matrix),
-      times = length(fit$lambda)
-    ),
-    coefficient = as.vector(coef_matrix)
-  )
-
-  # Identify the top features (by max absolute coef)
-  top_features <- coef_df |>
-    dplyr::group_by(.data$feature) |>
+  # Identify the top features (by max absolute coef), within each class.
+  # Paths are told apart by term_id rather than by name: a factor a with
+  # level b and a numeric column ab both make a term called ab.
+  top <- coef_df |>
+    dplyr::group_by(
+      dplyr::across(dplyr::any_of(c("class", "term_id", "feature")))
+    ) |>
     dplyr::summarize(
       max_abs_coef = max(abs(.data$coefficient)),
       .groups = "drop"
     ) |>
-    dplyr::arrange(dplyr::desc(.data$max_abs_coef)) |>
+    dplyr::arrange(dplyr::desc(.data$max_abs_coef), .data$feature) |>
+    dplyr::group_by(dplyr::across(dplyr::any_of("class"))) |>
     dplyr::slice_head(n = label_n) |>
-    dplyr::pull(.data$feature)
+    dplyr::ungroup()
 
   # Mark top features for labeling
-  coef_df <- coef_df |>
-    dplyr::mutate(
-      is_top = .data$feature %in% top_features
-    )
+  path_key <- function(df) {
+    paste(if (by_class) df$class else "", df$term_id)
+  }
+  coef_df$is_top <- path_key(coef_df) %in% path_key(top)
 
   # Get optimal lambda values
   lambda_min <- attr(fit, "lambda_min")
   lambda_1se <- attr(fit, "lambda_1se")
 
+  smallest_lambda <- min(fit$lambda)
+  label_data <- coef_df[coef_df$is_top & coef_df$lambda == smallest_lambda, ,
+                        drop = FALSE]
+
+  # Room on the left for the labels, which sit inside the panel left of the
+  # smallest penalty. A fixed left expansion of 0.16 clipped long names --
+  # Speciesversicolor lost its first letters at 7 x 5 inches -- so the room
+  # grows with the longest label: about 0.07 in per character at the label
+  # size, on a plot about 7 in wide, whose panel is about 6.3 in. A left
+  # expansion of a gives the labels a / (1 + a + 0.02) of the panel. The
+  # 0.16 floor is what names as short as mtcars' need, and keeps their
+  # layout.
+  label_share <- (0.07 * max(nchar(label_data$feature), 0L) + 0.05) / 6.3
+  left_expand <- if (label_share >= 0.6) {
+    1.5
+  } else {
+    min(1.5, max(0.16, label_share * 1.02 / (1 - label_share)))
+  }
+
   # Create the plot
   p <- ggplot2::ggplot(
     coef_df,
     ggplot2::aes(
-      x = lambda,
-      y = coefficient,
-      group = feature,
-      color = is_top
+      x = .data$lambda,
+      y = .data$coefficient,
+      group = .data$term_id,
+      color = .data$is_top
     )
   ) +
     ggplot2::geom_line(
       # `size` on a line is deprecated since ggplot2 3.4.0
-      ggplot2::aes(alpha = is_top, linewidth = is_top)
+      ggplot2::aes(alpha = .data$is_top, linewidth = .data$is_top)
     ) +
-    ggplot2::geom_vline(
-      xintercept = lambda_min,
-      linetype = "dashed",
-      color = "blue"
-    ) +
-    ggplot2::geom_vline(
-      xintercept = lambda_1se,
-      linetype = "dashed",
-      color = "red"
-    ) +
-    # Room on the left for the labels the panel would otherwise clip
     ggplot2::scale_x_log10(
-      expand = ggplot2::expansion(mult = c(0.16, 0.02))
+      expand = ggplot2::expansion(mult = c(left_expand, 0.02))
     ) +
+    # Named, so each path takes the values for whether it is labelled. By
+    # position, TRUE took the first value whenever every path was labelled,
+    # so a model with label_n or fewer predictors was drawn grey and thin.
     ggplot2::scale_alpha_manual(
-      values = c(0.3, 1)
+      values = c("FALSE" = 0.3, "TRUE" = 1)
     ) +
     ggplot2::scale_linewidth_manual(
-      values = c(0.5, 1.2)
+      values = c("FALSE" = 0.5, "TRUE" = 1.2)
     ) +
     ggplot2::scale_color_manual(
-      values = c("gray", "steelblue")
+      values = c("FALSE" = "gray", "TRUE" = "steelblue")
     ) +
+    # On a plot narrower than the room was sized for, a long label runs
+    # into the axis area rather than losing letters at the panel edge
+    ggplot2::coord_cartesian(clip = "off") +
     ggplot2::labs(
       title = "Regularization Path",
-      subtitle = paste0(
+      subtitle = if (cross_validated) {
         "Blue: lambda.min, Red: lambda.1se"
-      ),
+      } else {
+        "No cross-validation ran, so no lambda.min or lambda.1se is marked"
+      },
       x = "Lambda (log scale)",
       y = "Coefficients"
     ) +
     ggplot2::theme_minimal() +
     ggplot2::theme(legend.position = "none")
 
+  if (cross_validated) {
+    p <- p +
+      ggplot2::geom_vline(
+        xintercept = lambda_min,
+        linetype = "dashed",
+        color = "blue"
+      ) +
+      ggplot2::geom_vline(
+        xintercept = lambda_1se,
+        linetype = "dashed",
+        color = "red"
+      )
+  }
+
+  if (by_class) {
+    # A panel per class, each on its own scale
+    p <- p + ggplot2::facet_wrap(
+      ggplot2::vars(.data$class), ncol = 1, scales = "free_y"
+    )
+  }
+
   # Label each path where it starts, at the smallest lambda -- the left
   # of a log axis, not the right, which the previous comment here had
   # backwards along with the `hjust` that followed from it.
   if (label_n > 0) {
-    smallest_lambda <- min(fit$lambda)
-
-    label_data <- coef_df |>
-      dplyr::filter(
-        .data$is_top,
-        .data$lambda == smallest_lambda
-      )
-
     # Two coefficients can start arbitrarily close together -- on mtcars
     # two of the five are within 0.02 -- so the labels printed on top of
     # each other. Draw them at spread positions and connect each to its
-    # own line, so a moved label still says which path it belongs to.
-    label_data$label_y <- tl_spread_labels(
-      label_data$coefficient,
-      min_gap = 0.07 * diff(range(coef_df$coefficient))
-    )
+    # own line, so a moved label still says which path it belongs to. Each
+    # class's labels are spread within its own panel.
+    panel_of <- function(df) {
+      if (by_class) as.character(df$class) else rep("", nrow(df))
+    }
+    label_data$label_y <- label_data$coefficient
+    for (panel in unique(panel_of(label_data))) {
+      rows <- panel_of(label_data) == panel
+      span <- diff(range(coef_df$coefficient[panel_of(coef_df) == panel]))
+      label_data$label_y[rows] <- tl_spread_labels(
+        label_data$coefficient[rows],
+        min_gap = 0.07 * span
+      )
+    }
 
     # Sitting on the lines they were also unreadable, inheriting the same
     # colour as the path behind them. Put them outside the leftmost point
@@ -371,6 +606,42 @@ tl_plot_regularization_path <- function(model,
   p
 }
 
+#' A glmnet fit's coefficient paths, as a tibble
+#'
+#' @param fit A glmnet fit.
+#' @return A tibble with one row per term and penalty: \code{term_id} (the
+#'   term's position, which a repeated name cannot confuse), \code{feature},
+#'   \code{lambda} and \code{coefficient}, led by a \code{class} factor for
+#'   a multinomial fit. The intercept is left out.
+#' @keywords internal
+#' @noRd
+tl_glmnet_path_tbl <- function(fit) {
+  one_class <- function(coefs) {
+    coefs <- as.matrix(coefs)
+    coefs <- coefs[rownames(coefs) != "(Intercept)", , drop = FALSE]
+    tibble::tibble(
+      term_id = rep(seq_len(nrow(coefs)), times = ncol(coefs)),
+      feature = rep(rownames(coefs), times = ncol(coefs)),
+      lambda = rep(fit$lambda, each = nrow(coefs)),
+      coefficient = as.vector(coefs)
+    )
+  }
+
+  coefs <- stats::coef(fit)
+  if (!is.list(coefs)) {
+    return(one_class(coefs))
+  }
+
+  per_class <- lapply(names(coefs), function(class_name) {
+    tibble::add_column(one_class(coefs[[class_name]]),
+                       class = class_name, .before = 1)
+  })
+  paths <- dplyr::bind_rows(per_class)
+  # In the order of the classes, so the panels are too
+  paths$class <- factor(paths$class, levels = names(coefs))
+  paths
+}
+
 #' Plot cross-validation results for a regularized model
 #'
 #' Shows the cross-validation error as a function of
@@ -398,7 +669,7 @@ tl_plot_regularization_cv <- function(model, ...) {
   if (is.null(cv_results)) {
     stop(
       "Cross-validation results not available. ",
-      "Model must be fitted with lambda = NULL.",
+      "Model must be fitted with lambda = NULL or a sequence of penalties.",
       call. = FALSE
     )
   }
@@ -420,12 +691,11 @@ tl_plot_regularization_cv <- function(model, ...) {
   lambda_min <- cv_results$lambda.min
   lambda_1se <- cv_results$lambda.1se
 
-  # Determine y-axis label based on model type
-  if (model$spec$is_classification) {
-    y_label <- "Binomial Deviance"
-  } else {
-    y_label <- "Mean Squared Error"
-  }
+  # The measure cross-validation used, as glmnet names it. Read from the
+  # model type, the label said "Binomial Deviance" for every classifier, a
+  # multinomial one included, and "Mean Squared Error" whatever type.measure
+  # chose.
+  y_label <- unname(cv_results$name) %||% "Cross-validated error"
 
   # Create the plot
   p <- ggplot2::ggplot(
@@ -533,7 +803,6 @@ tl_predict_glmnet <- function(model, new_data,
   is_classification <- model$spec$is_classification
 
   formula <- model$spec$formula
-  response_var <- model$spec$response_var
 
   # Rebuild the design matrix exactly as the fit did. Deriving it from a
   # "~ predictors - 1" formula instead would one-hot encode the first
@@ -555,9 +824,10 @@ tl_predict_glmnet <- function(model, new_data,
     xlev = design_xlevels,
     na.action = stats::na.pass
   )
-  x_new <- stats::model.matrix(
-    predictor_terms, new_frame
-  )[, -1, drop = FALSE]
+  # By name, as at fit time: without an intercept the first column is a
+  # predictor
+  x_new <- stats::model.matrix(predictor_terms, new_frame)
+  x_new <- x_new[, colnames(x_new) != "(Intercept)", drop = FALSE]
 
   # Predict at the same penalty the coefficients, the coefficient table and
   # importance report by default. Predicting at lambda_min while those
@@ -576,10 +846,10 @@ tl_predict_glmnet <- function(model, new_data,
     )))
   }
 
-  class_levels <- attr(fit, "response_levels")
-  if (is.null(class_levels)) {
-    class_levels <- levels(factor(model$data[[response_var]]))
-  }
+  # The classes fitted, or for a fit that predates storing them, the
+  # model's. The training column is the raw one for a computed response,
+  # so cut(mpg, ...) ~ . had one class per distinct mpg.
+  class_levels <- attr(fit, "response_levels") %||% tl_model_classes(model)
 
   if (type == "prob") {
     probs <- stats::predict(

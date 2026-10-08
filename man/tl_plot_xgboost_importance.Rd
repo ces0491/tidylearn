@@ -11,12 +11,20 @@ tl_plot_xgboost_importance(model, top_n = 10, importance_type = "gain", ...)
 
 \item{top_n}{Number of top features to display (default: 10)}
 
-\item{importance_type}{Type of importance: "gain", "cover", "frequency"}
+\item{importance_type}{Type of importance: "gain" (default), "cover",
+"frequency" or "weight", read from the matching column of
+\code{xgboost::xgb.importance()}. A linear booster
+(\code{booster = "gblinear"}) reports only "weight", its coefficients,
+which it uses when \code{importance_type} is left out; they are ranked
+by size, and for a multiclass model by their mean size over the
+classes. A coefficient's size depends on its predictor's scale.}
 
-\item{...}{Additional arguments}
+\item{...}{Additional arguments passed to \code{xgboost::xgb.importance()}}
 }
 \value{
-A \code{\link[ggplot2]{ggplot}} object.
+A \code{\link[ggplot2]{ggplot}} object. Its data holds the
+\code{top_n} features and their \code{importance}, relative to the
+most important feature's.
 }
 \description{
 Plot feature importance for an XGBoost model
@@ -24,7 +32,7 @@ Plot feature importance for an XGBoost model
 \examples{
 \donttest{
 if (requireNamespace("xgboost", quietly = TRUE)) {
-  model <- tl_model(mtcars, mpg ~ ., method = "xgboost")
+  model <- tl_model(mtcars, mpg ~ ., method = "xgboost", nthread = 2)
   tl_plot_xgboost_importance(model)
 }
 }

@@ -18,9 +18,20 @@ with attributes \code{tl_source}, \code{tl_format}, and
 Reads an RDS file into a \code{tidylearn_data} object. Uses base R
 \code{readRDS()} — no additional packages required.
 }
-\examples{
-\donttest{
-# data <- tl_read_rds("path/to/data.rds")
+\section{Reading files you did not create}{
+
+\code{readRDS()} rebuilds whatever R objects the file describes, so
+read only files from a source you trust. On R before 4.4.0 a crafted
+file can run code as it is read (CVE-2024-27322). The remote readers
+\code{tl_read_github()} and \code{tl_read_s3()} refuse \code{.rds}
+and \code{.rdata} files on those versions unless
+\code{trust_rds = TRUE}.
 }
+
+\examples{
+path <- tempfile(fileext = ".rds")
+saveRDS(mtcars, path)
+tl_read_rds(path)
+unlink(path)
 
 }

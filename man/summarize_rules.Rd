@@ -7,7 +7,8 @@
 summarize_rules(rules_obj)
 }
 \arguments{
-\item{rules_obj}{A tidy_apriori object or rules tibble}
+\item{rules_obj}{A tidy_apriori object, an arules rules object, or a
+rules tibble}
 }
 \value{
 A list with \code{n_rules} and summary statistics (\code{min},

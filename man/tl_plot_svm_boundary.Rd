@@ -9,9 +9,11 @@ tl_plot_svm_boundary(model, x_var = NULL, y_var = NULL, grid_size = 100, ...)
 \arguments{
 \item{model}{A tidylearn SVM model object}
 
-\item{x_var}{Name of the x-axis variable}
+\item{x_var}{Name of the x-axis variable. Defaults to the first numeric
+predictor in the model's formula.}
 
-\item{y_var}{Name of the y-axis variable}
+\item{y_var}{Name of the y-axis variable. Defaults to the next numeric
+predictor in the model's formula.}
 
 \item{grid_size}{Number of points in each dimension
 for the grid (default: 100)}
@@ -19,7 +21,9 @@ for the grid (default: 100)}
 \item{...}{Additional arguments}
 }
 \value{
-A \code{\link[ggplot2]{ggplot}} object.
+A \code{\link[ggplot2]{ggplot}} object. The other predictors are
+held at their mean, or their most frequent level. A two-class model
+fitted with probabilities also gets the 0.5 probability contour.
 }
 \description{
 Plot SVM decision boundary

@@ -26,7 +26,7 @@ test_that("tl_default_param_grid returns named list for svm", {
 
 test_that("tl_default_param_grid handles all supported methods", {
   methods <- c("tree", "forest", "boost", "svm", "nn",
-               "ridge", "lasso", "elastic_net", "deep")
+               "ridge", "lasso", "elastic_net", "deep", "xgboost")
 
   for (method in methods) {
     grid <- tl_default_param_grid(method, size = "small")
@@ -102,6 +102,39 @@ test_that("tl_tune_grid validates param_grid input", {
                  param_grid = "not a list"),
     "param_grid must be a named list"
   )
+})
+
+test_that("a grid or space must name every element, once", {
+  # An unnamed candidate vector reached tl_model() positionally, where
+  # rpart.control() discarded it: list(c(0.01, 0.1)) fitted the same tree
+  # twice and returned best_params with an element named "<dbl>"
+  unnamed <- list(c(0.01, 0.1))
+  partly <- list(cp = c(0.01, 0.1), c(5, 10))
+  for (grid in list(unnamed, partly)) {
+    expect_error(
+      tl_tune_grid(mtcars, mpg ~ wt, method = "tree", param_grid = grid,
+                   folds = 2, verbose = FALSE),
+      "param_grid must be a named list: element [12] has no name"
+    )
+    expect_error(
+      tl_tune_random(mtcars, mpg ~ wt, method = "tree", param_space = grid,
+                     n_iter = 2, folds = 2, verbose = FALSE, seed = 1),
+      "param_space must be a named list: element [12] has no name"
+    )
+  }
+  expect_error(
+    tl_tune_grid(mtcars, mpg ~ wt, method = "tree",
+                 param_grid = list(cp = 0.01, cp = 0.1), folds = 2,
+                 verbose = FALSE),
+    "param_grid names must be unique.*repeated: cp"
+  )
+
+  # A data frame of candidates is named by its columns, and still runs
+  set.seed(1)
+  tuned <- tl_tune_grid(mtcars, mpg ~ wt, method = "tree",
+                        param_grid = data.frame(cp = c(0.01, 0.1)),
+                        folds = 2, verbose = FALSE)
+  expect_named(attr(tuned, "tuning_results")$best_params, "cp")
 })
 
 test_that("tl_tune_random works with tree method", {
@@ -243,6 +276,25 @@ test_that("tuning direction follows the metric, not the task", {
   expect_false(attr(model, "tuning_results")$maximize)
 })
 
+test_that("the tuners take a metric's direction from the pipelines' rule", {
+  # The tuners kept their own list of error metrics and read every other
+  # name, unknown ones included, as higher-is-better
+  known <- c(tl_known_metrics(TRUE), tl_known_metrics(FALSE))
+  for (metric in known) {
+    expect_identical(tl_metric_maximize(metric),
+                     tl_metric_higher_better(metric), info = metric)
+  }
+  testthat::local_mocked_bindings(
+    tl_metric_higher_better = function(metrics) rep(FALSE, length(metrics))
+  )
+  expect_false(tl_metric_maximize("accuracy"))
+  testthat::local_mocked_bindings(
+    tl_metric_higher_better = function(metrics) rep(NA, length(metrics))
+  )
+  expect_error(tl_metric_maximize("mystery"),
+               "Metric \"mystery\" has no direction to optimise")
+})
+
 test_that("an explicit maximize argument is still honoured", {
   data <- tuning_fixture()
   model <- tl_tune_grid(
@@ -343,6 +395,97 @@ test_that("grid plot falls back to scatter when there are too many levels", {
     "too many unique values"
   )
   expect_s3_class(plot, "ggplot")
+})
+
+test_that("tuning plots draw list-valued parameters", {
+  # crossing() keeps a list candidate, such as rpart's parms, as a list
+  # column, and every plot type failed on it: "unimplemented type 'list'"
+  # for parallel and importance, a scale error for scatter and grid
+  set.seed(1)
+  tuned <- tl_tune_grid(
+    iris, Species ~ ., method = "tree",
+    param_grid = list(cp = c(0.01, 0.1),
+                      parms = list(list(split = "gini"),
+                                   list(split = "information"))),
+    folds = 2, verbose = FALSE
+  )
+  for (plot_type in c("scatter", "grid", "parallel", "importance")) {
+    plot <- tl_plot_tuning_results(tuned, plot_type = plot_type)
+    expect_no_error(ggplot2::ggplot_build(plot))
+  }
+
+  # Each cell is labelled the way the verbose messages describe it
+  plot <- tl_plot_tuning_results(tuned, plot_type = "scatter")
+  expect_setequal(
+    as.character(plot$data$parms),
+    c("list(split = \"gini\")", "list(split = \"information\")")
+  )
+
+  # Every set is its own line. Lines were grouped by rank, so sets whose
+  # scores tied -- all four here -- were joined into one
+  plot <- tl_plot_tuning_results(tuned, plot_type = "parallel")
+  is_line <- vapply(plot$layers, function(layer) {
+    inherits(layer$geom, "GeomLine")
+  }, logical(1))
+  lines <- ggplot2::layer_data(plot, which(is_line))
+  n_sets <- nrow(attr(tuned, "tuning_results")$results)
+  expect_length(unique(lines$group), n_sets)
+
+  # A vector-valued candidate, as in the deep grid's hidden_layers, failed
+  # the default scatter. The importance of a categorical parameter is its
+  # eta squared from a one-way ANOVA of the score.
+  combinations <- list(
+    list(hidden_layers = 10, activation = "relu"),
+    list(hidden_layers = c(10, 5), activation = "relu"),
+    list(hidden_layers = 10, activation = "tanh"),
+    list(hidden_layers = c(10, 5), activation = "tanh")
+  )
+  scores <- c(0.3, 0.5, 0.4, 0.6)
+  results <- tl_tune_results_frame(
+    lapply(scores, function(s) list(mean_metric = s, n_folds_ok = 2L)),
+    combinations, c("hidden_layers", "activation")
+  )
+  expect_type(results$hidden_layers, "list")
+  deep <- structure(list(), tuning_results = list(
+    results = results, metric = "accuracy", maximize = TRUE
+  ))
+  for (plot_type in c("scatter", "grid", "parallel")) {
+    expect_no_error(ggplot2::ggplot_build(
+      tl_plot_tuning_results(deep, plot_type = plot_type)
+    ))
+  }
+  importance <- tl_plot_tuning_results(deep, plot_type = "importance")$data
+  # Group means 0.35 and 0.55 around 0.45: 0.04 of a total 0.05
+  expect_equal(importance$importance[importance$parameter == "hidden_layers"],
+               0.8)
+  expect_equal(importance$importance[importance$parameter == "activation"],
+               0.2)
+})
+
+test_that("a categorical parameter with one observed value has importance 0", {
+  # aov() needs two levels, so a kernel fixed at "radial" -- or one whose
+  # other value failed every fold -- stopped the plot with "contrasts can
+  # be applied only to factors with 2 or more levels"
+  tuned <- tl_tune_random(
+    iris, Species ~ ., method = "svm",
+    param_space = list(kernel = "radial", cost = c(0.1, 10)),
+    n_iter = 3, folds = 2, verbose = FALSE, seed = 2
+  )
+  importance <- tl_plot_tuning_results(tuned, plot_type = "importance")$data
+  expect_identical(importance$importance[importance$parameter == "kernel"], 0)
+
+  results <- attr(tuned, "tuning_results")$results
+  expected <- abs(stats::cor(results$cost, results$mean_metric))
+  expect_equal(importance$importance[importance$parameter == "cost"], expected)
+
+  set.seed(3)
+  failing <- suppressWarnings(tl_tune_grid(
+    iris[, 1:4], Sepal.Length ~ ., method = "svm",
+    param_grid = list(kernel = c("linear", "nope"), cost = c(1, 2)),
+    folds = 2, verbose = FALSE
+  ))
+  importance <- tl_plot_tuning_results(failing, plot_type = "importance")$data
+  expect_identical(importance$importance[importance$parameter == "kernel"], 0)
 })
 
 test_that("tl_compare_cv returns per-fold and summary tables", {
@@ -449,6 +592,55 @@ test_that("a metric the task cannot produce is named, not a length error", {
     expect_match(msg, "rmse", info = bad)
     expect_false(grepl("replacement has length zero", msg), info = bad)
   }
+})
+
+test_that("the tuners name a bad metric, direction, fold count or n_iter", {
+  # metric = c("rmse", "mae") failed with "the condition has length > 1",
+  # n_iter = 0 reported that every parameter set failed in every fold, and a
+  # fold count rsample refused came back as an error about `v`
+  grid <- list(cp = c(0.01, 0.1))
+  tune <- function(...) {
+    tl_tune_grid(mtcars, mpg ~ wt, method = "tree", param_grid = grid,
+                 verbose = FALSE, ...)
+  }
+  search <- function(...) {
+    tl_tune_random(mtcars, mpg ~ wt, method = "tree", param_space = grid,
+                   verbose = FALSE, seed = 1, ...)
+  }
+
+  expect_error(tune(folds = 2, metric = c("rmse", "mae")),
+               "'metric' must be a single metric name")
+  expect_error(search(folds = 2, metric = c("rmse", "mae")),
+               "'metric' must be a single metric name")
+  expect_error(tune(folds = 2, maximize = c(TRUE, FALSE)),
+               "'maximize' must be TRUE, FALSE or NULL")
+  expect_error(search(folds = 2, n_iter = 0),
+               "'n_iter' must be a single whole number of at least 1; got 0")
+  expect_error(search(folds = 2, n_iter = 2.5),
+               "'n_iter' must be a single whole number of at least 1; got 2.5")
+  for (folds in list(2.5, 1, c(2, 3), 40)) {
+    expect_error(tune(folds = folds),
+                 "'folds' must be a whole number between 2 and nrow\\(data\\)",
+                 info = deparse(folds))
+    expect_error(search(folds = folds),
+                 "'folds' must be a whole number between 2 and nrow\\(data\\)",
+                 info = deparse(folds))
+  }
+  expect_error(
+    tl_tune_grid(mtcars, mpg ~ wt, method = "forrest", param_grid = grid,
+                 folds = 2, verbose = FALSE),
+    "'method' must be one of the supervised methods"
+  )
+
+  # An unknown name is refused before anything is fitted
+  fitted <- 0
+  testthat::local_mocked_bindings(tl_model = function(...) {
+    fitted <<- fitted + 1
+    stop("tl_model() should not be reached")
+  })
+  expect_error(tune(folds = 2, metric = "acuracy"),
+               "Metric \"acuracy\" was not produced for this task")
+  expect_identical(fitted, 0)
 })
 
 test_that("tl_tune_xgboost runs, and takes nrounds without colliding", {
@@ -609,6 +801,32 @@ test_that("tl_compare_cv refuses a per-row argument it cannot split", {
   )
 })
 
+test_that("the tuners refuse a per-row argument they cannot split", {
+  # Every fold received the whole weight vector, so each fit failed with
+  # "variable lengths differ" and the search ended in "Every parameter set
+  # failed in every fold"
+  w <- rep(c(1, 2), length.out = nrow(mtcars))
+  expect_error(
+    tl_tune_grid(mtcars, mpg ~ wt + hp, method = "tree",
+                 param_grid = list(cp = c(0.01, 0.1)), folds = 3,
+                 verbose = FALSE, weights = w),
+    "tl_tune_grid\\(\\) cannot re-split 'weights' across folds"
+  )
+  expect_error(
+    tl_tune_random(mtcars, mpg ~ wt + hp, method = "tree",
+                   param_space = list(cp = c(0.01, 0.1)), n_iter = 2,
+                   folds = 3, verbose = FALSE, seed = 1, subset = 1:20),
+    "tl_tune_random\\(\\) cannot re-split 'subset' across folds"
+  )
+
+  # Other fitting arguments still reach every fold and the final fit
+  set.seed(1)
+  tuned <- tl_tune_grid(mtcars, mpg ~ wt + hp, method = "tree",
+                        param_grid = list(cp = c(0.01, 0.1)), folds = 3,
+                        verbose = FALSE, maxdepth = 1)
+  expect_identical(tuned$fit$control$maxdepth, 1)
+})
+
 test_that("forward and both selection expand a dot formula", {
   # step() expanded `.` against the start model's `1`, so there were no
   # terms to add and every call returned mpg ~ 1
@@ -627,6 +845,37 @@ test_that("forward and both selection expand a dot formula", {
   reference <- step(lm(mpg ~ wt + hp + qsec + drat, data = mtcars),
                     trace = FALSE)
   expect_equal(coef(model$fit), coef(reference))
+})
+
+test_that("forward and both selection keep offsets and the intercept setting", {
+  # The starting model was update(formula, . ~ 1), which dropped offset()
+  # terms and put back an intercept the caller had removed with - 1
+  for (direction in c("forward", "both")) {
+    model <- tl_step_selection(mtcars, mpg ~ wt + hp + offset(qsec),
+                               direction = direction)
+    reference <- step(
+      lm(mpg ~ 1 + offset(qsec), mtcars),
+      scope = list(lower = ~ 1 + offset(qsec),
+                   upper = ~ wt + hp + offset(qsec)),
+      direction = direction, trace = 0
+    )
+    expect_equal(coef(model$fit), coef(reference), info = direction)
+    expect_equal(
+      unname(stats::model.offset(stats::model.frame(model$fit))),
+      mtcars$qsec, info = direction
+    )
+
+    model <- tl_step_selection(mtcars, mpg ~ wt + hp - 1,
+                               direction = direction)
+    expect_identical(attr(stats::terms(model$fit), "intercept"), 0L,
+                     info = direction)
+    reference <- step(
+      lm(mpg ~ 0, mtcars),
+      scope = list(lower = ~ 0, upper = ~ wt + hp - 1),
+      direction = direction, trace = 0
+    )
+    expect_equal(coef(model$fit), coef(reference), info = direction)
+  }
 })
 
 test_that("tl_compare_cv refuses foldid, and overrides a list argument whole", {
@@ -691,6 +940,283 @@ test_that("tuning logistic on a numeric 0/1 response scores accuracy", {
     param_grid = list(cp = c(0.01, 0.1)), folds = 2, verbose = FALSE
   )
   expect_identical(attr(tree, "tuning_results")$metric, "rmse")
+})
+
+test_that("the tuners read the task from the response the formula computes", {
+  # tl_model() fits factor(am) ~ wt + hp as a classification, but the
+  # tuners read the raw 0/1 column: they defaulted to rmse, which the
+  # classifier does not produce, and refused metric = "accuracy"
+  set.seed(1)
+  tuned <- tl_tune_grid(mtcars, factor(am) ~ wt + hp, method = "tree",
+                        param_grid = list(cp = c(0.01, 0.1)), folds = 3,
+                        verbose = FALSE)
+  tuning <- attr(tuned, "tuning_results")
+  expect_identical(tuning$metric, "accuracy")
+  expect_true(tuning$maximize)
+  expect_true(tuned$spec$is_classification)
+
+  # The score is rpart's accuracy on the left-out rows, fold by fold
+  set.seed(1)
+  splits <- rsample::vfold_cv(mtcars, v = 3)$splits
+  accuracy <- vapply(splits, function(split) {
+    fit <- rpart::rpart(factor(am) ~ wt + hp, data = rsample::analysis(split),
+                        method = "class")
+    test <- rsample::assessment(split)
+    mean(as.character(predict(fit, test, type = "class")) ==
+           as.character(test$am))
+  }, numeric(1))
+  expect_equal(tuning$results$mean_metric[tuning$results$cp == 0.01],
+               mean(accuracy))
+
+  # An explicit classification metric is accepted, a regression one refused
+  tuned <- tl_tune_random(mtcars, factor(am) ~ wt + hp, method = "tree",
+                          param_space = list(cp = c(0.01, 0.1)), n_iter = 2,
+                          folds = 3, metric = "f1", verbose = FALSE, seed = 1)
+  expect_identical(attr(tuned, "tuning_results")$metric, "f1")
+  expect_error(
+    tl_tune_grid(mtcars, factor(am) ~ wt + hp, method = "tree",
+                 param_grid = list(cp = 0.01), folds = 3, metric = "rmse",
+                 verbose = FALSE),
+    "Metric \"rmse\" was not produced for this task"
+  )
+
+  # A transformed numeric response is still regression
+  set.seed(1)
+  tuned <- tl_tune_grid(mtcars, log(mpg) ~ wt + hp, method = "tree",
+                        param_grid = list(cp = 0.01), folds = 3,
+                        verbose = FALSE)
+  expect_identical(attr(tuned, "tuning_results")$metric, "rmse")
+})
+
+test_that("folds = nrow(data) is leave-one-out", {
+  # The fold check allows nrow(data), as tl_cv() does, and rsample's
+  # vfold_cv() then refused it with "Leave-one-out cross-validation is not
+  # supported by this function"
+  d <- mtcars[1:10, c("mpg", "wt")]
+
+  # minsplit = 20 leaves a 9-row tree unsplit, so each left-out row is
+  # predicted by the mean of the other nine
+  loo_error <- vapply(seq_len(nrow(d)), function(i) {
+    abs(d$mpg[i] - mean(d$mpg[-i]))
+  }, numeric(1))
+  loo <- "each fold holds one row (leave-one-out)"
+  expect_warning(
+    tuned <- suppressMessages(tl_tune_grid(
+      d, mpg ~ wt, method = "tree", param_grid = list(cp = 0.01),
+      folds = nrow(d), verbose = FALSE
+    )),
+    loo, fixed = TRUE
+  )
+  results <- attr(tuned, "tuning_results")$results
+  expect_identical(results$n_folds_ok, 10L)
+  expect_equal(results$mean_metric, mean(loo_error))
+  expect_warning(
+    tuned <- suppressMessages(tl_tune_random(
+      d, mpg ~ wt, method = "tree", param_space = list(cp = 0.01),
+      n_iter = 1, folds = nrow(d), verbose = FALSE, seed = 1
+    )),
+    loo, fixed = TRUE
+  )
+  expect_identical(attr(tuned, "tuning_results")$results$n_folds_ok, 10L)
+
+  # tl_compare_cv() leaves each row out in turn as well
+  linear <- suppressMessages(tl_model(d, mpg ~ wt, method = "linear"))
+  expect_warning(
+    cv <- suppressMessages(tl_compare_cv(
+      d, list(linear = linear), folds = nrow(d), metrics = "rmse"
+    )),
+    loo, fixed = TRUE
+  )
+  loo_lm <- vapply(seq_len(nrow(d)), function(i) {
+    fit <- lm(mpg ~ wt, d[-i, ])
+    abs(d$mpg[i] - predict(fit, d[i, ]))
+  }, numeric(1))
+  expect_identical(nrow(cv$fold_metrics), 10L)
+  expect_equal(cv$summary$mean_value, mean(loo_lm))
+})
+
+test_that("a leave-one-out search warns once that each fold scores one row", {
+  # rmse on a one-row fold is that row's absolute error, so a leave-one-out
+  # search on rmse averaged the mean absolute error under rmse's name, and
+  # nothing said so
+  d <- mtcars[1:10, c("mpg", "wt")]
+  loo <- "each fold holds one row (leave-one-out)"
+  count_loo <- function(run) sum(grepl(loo, run$warnings, fixed = TRUE))
+
+  run <- collect_warnings(suppressMessages(tl_tune_grid(
+    d, mpg ~ wt, method = "tree", param_grid = list(cp = c(0.01, 0.1)),
+    folds = nrow(d), verbose = FALSE
+  )))
+  expect_identical(count_loo(run), 1L)
+  expect_match(
+    run$warnings[grepl(loo, run$warnings, fixed = TRUE)],
+    paste0("With 10 folds for 10 rows, each fold holds one row ",
+           "(leave-one-out) and is scored on that row's prediction alone. ",
+           "rmse on one row is the absolute error, so its average over the ",
+           "folds is the mean absolute error"),
+    fixed = TRUE
+  )
+
+  run <- collect_warnings(suppressMessages(tl_tune_random(
+    d, mpg ~ wt, method = "tree", param_space = list(cp = c(0.01, 0.1)),
+    n_iter = 3, folds = nrow(d), verbose = FALSE, seed = 1
+  )))
+  expect_identical(count_loo(run), 1L)
+
+  # Ordinary k-fold folds hold several rows each, and say nothing of it
+  set.seed(1)
+  run <- collect_warnings(suppressMessages(tl_tune_grid(
+    d, mpg ~ wt, method = "tree", param_grid = list(cp = c(0.01, 0.1)),
+    folds = 5, verbose = FALSE
+  )))
+  expect_identical(count_loo(run), 0L)
+
+  # mae averages to the mean absolute error of the left-out predictions,
+  # so a leave-one-out search on it has nothing to be warned about
+  run <- collect_warnings(suppressMessages(tl_tune_grid(
+    d, mpg ~ wt, method = "tree", param_grid = list(cp = c(0.01, 0.1)),
+    folds = nrow(d), metric = "mae", verbose = FALSE
+  )))
+  expect_identical(count_loo(run), 0L)
+  expect_equal(
+    attr(run$value, "tuning_results")$results$mean_metric,
+    rep(mean(abs(d$mpg - vapply(seq_len(10), function(i) {
+      mean(d$mpg[-i])
+    }, numeric(1)))), 2)
+  )
+})
+
+test_that("a leave-one-out comparison warns once, not once per fold", {
+  # Each one-row fold left precision or recall undefined, and auc with a
+  # single class, and comparing two classifiers over mtcars' 32 rows gave
+  # over 200 warnings from yardstick and tidylearn, none saying why
+  dm <- mtcars
+  dm$am <- factor(dm$am, labels = c("auto", "manual"))
+  m1 <- tl_model(dm, am ~ wt, method = "tree")
+  m2 <- suppressWarnings(tl_model(dm, am ~ wt + hp, method = "logistic"))
+
+  classes <- character()
+  messages <- character()
+  cv <- withCallingHandlers(
+    tl_compare_cv(dm, list(a = m1, b = m2), folds = nrow(dm)),
+    warning = function(w) {
+      classes <<- c(classes, class(w)[1])
+      messages <<- c(messages, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  loo <- grepl("each fold holds one row (leave-one-out)", messages,
+               fixed = TRUE)
+  # Once, and before any fold is scored
+  expect_identical(which(loo), 1L)
+  expect_match(
+    messages[loo],
+    paste0("precision, recall and f1 are undefined on the folds where that ",
+           "one row leaves nothing to divide by; auc needs more than one ",
+           "row and is NA on every fold. accuracy averages to its value ",
+           "over the left-out predictions."),
+    fixed = TRUE
+  )
+  expect_false(any(startsWith(classes, "yardstick_warning")))
+  expect_false(any(grepl("undefined when the scored rows hold a single class",
+                         messages, fixed = TRUE)))
+  # A warning the one-row folds do not explain still comes through:
+  # glm() fitted the logistic model to perfectly separated rows in some
+  # of the folds
+  expect_true(any(startsWith(messages[!loo], "glm.fit:")))
+
+  # The scores are unchanged: accuracy is the leave-one-out accuracy, and
+  # auc is NA
+  hits <- vapply(seq_len(nrow(dm)), function(i) {
+    fit <- tl_model(dm[-i, ], am ~ wt, method = "tree")
+    as.character(predict(fit, dm[i, ], type = "class")$.pred) ==
+      as.character(dm$am[i])
+  }, logical(1))
+  summary_a <- cv$summary[cv$summary$model == "a", ]
+  expect_equal(summary_a$mean_value[summary_a$metric == "accuracy"],
+               mean(hits))
+  expect_true(is.na(summary_a$mean_value[summary_a$metric == "auc"]))
+})
+
+test_that("the response note is given once per search, not once per fold", {
+  # tl_model() notes a numeric response with few values once per fit, and
+  # every fold refit repeated it: a 2-set, 3-fold search printed it 7 times
+  note <- "Note: Response 'cyl' has 3 unique numeric values"
+  messages_of <- function(expr) {
+    seen <- character()
+    withCallingHandlers(expr, message = function(m) {
+      seen <<- c(seen, conditionMessage(m))
+      invokeRestart("muffleMessage")
+    })
+    seen
+  }
+
+  set.seed(1)
+  seen <- messages_of(tl_tune_grid(
+    mtcars, cyl ~ wt + hp, method = "tree",
+    param_grid = list(cp = c(0.01, 0.1)), folds = 3, verbose = TRUE
+  ))
+  # Once, from the final fit on all the rows
+  expect_identical(sum(grepl(note, seen, fixed = TRUE)), 1L)
+  # The search's own progress messages are still given
+  expect_true(any(grepl("Parameter set 2 of 2", seen, fixed = TRUE)))
+
+  seen <- messages_of(tl_tune_random(
+    mtcars, cyl ~ wt + hp, method = "tree",
+    param_space = list(cp = c(0.01, 0.1)), n_iter = 2, folds = 3,
+    verbose = FALSE, seed = 1
+  ))
+  expect_identical(sum(grepl(note, seen, fixed = TRUE)), 1L)
+
+  # tl_compare_cv() refits models the caller has already built, and the
+  # note was given when they were
+  shallow <- suppressMessages(tl_model(mtcars, cyl ~ wt, method = "tree"))
+  deep <- suppressMessages(tl_model(mtcars, cyl ~ wt + hp, method = "tree"))
+  set.seed(1)
+  seen <- messages_of(tl_compare_cv(
+    mtcars, list(shallow = shallow, deep = deep), folds = 3, metrics = "rmse"
+  ))
+  expect_identical(sum(grepl(note, seen, fixed = TRUE)), 0L)
+})
+
+test_that("the logistic conversion warning is given once per search", {
+  # A numeric 0/1 response is converted to a factor for logistic regression,
+  # with a warning on every fit, so a 2-set, 3-fold search warned 7 times
+  conversions <- function(expr) {
+    n <- 0L
+    withCallingHandlers(expr, warning = function(w) {
+      if (inherits(w, "tidylearn_response_conversion")) n <<- n + 1L
+      invokeRestart("muffleWarning")
+    })
+    n
+  }
+
+  set.seed(1)
+  expect_identical(conversions(tl_tune_grid(
+    mtcars, am ~ wt + hp, method = "logistic",
+    param_grid = list(maxit = c(25, 50)), folds = 3, verbose = FALSE
+  )), 1L)
+  expect_identical(conversions(tl_tune_random(
+    mtcars, am ~ wt + hp, method = "logistic",
+    param_space = list(maxit = c(25, 50)), n_iter = 2, folds = 3,
+    verbose = FALSE, seed = 1
+  )), 1L)
+
+  # Building each model already warned, so the refits say nothing
+  m1 <- suppressWarnings(tl_model(mtcars, am ~ wt, method = "logistic"))
+  m2 <- suppressWarnings(tl_model(mtcars, am ~ wt + hp, method = "logistic"))
+  set.seed(1)
+  expect_identical(conversions(tl_compare_cv(
+    mtcars, list(a = m1, b = m2), folds = 3, metrics = "accuracy"
+  )), 0L)
+
+  # Other warnings from the fits still come through
+  set.seed(1)
+  run <- collect_warnings(tl_tune_grid(
+    mtcars, am ~ wt + hp, method = "logistic",
+    param_grid = list(maxit = 1), folds = 3, verbose = FALSE
+  ))
+  expect_true(any(grepl("did not converge", run$warnings)))
 })
 
 test_that("a parameter set that failed a fold cannot win", {
@@ -758,6 +1284,151 @@ test_that("when no set completes every fold the most complete one is used", {
   ))
   expect_true(any(grepl("No parameter set completed all 2 folds",
                         run$warnings)))
+})
+
+test_that("a metric undefined on a fold is not reported as a failed fit", {
+  # precision is undefined on a fold where nothing is predicted positive.
+  # No fit failed, yet the warning said no set "completed all 10 folds" and
+  # pointed at errors from failed fits
+  d <- mtcars
+  d$am <- factor(d$am, labels = c("auto", "manual"))
+  set.seed(1)
+  splits <- rsample::vfold_cv(d, v = 10)$splits
+  predicts_positive <- vapply(splits, function(split) {
+    fit <- rpart::rpart(am ~ wt + hp, data = rsample::analysis(split),
+                        method = "class")
+    any(predict(fit, rsample::assessment(split), type = "class") == "manual")
+  }, logical(1))
+  expect_false(all(predicts_positive))
+
+  set.seed(1)
+  run <- collect_warnings(tl_tune_grid(
+    d, am ~ wt + hp, method = "tree", param_grid = list(cp = c(0.01, 0.1)),
+    folds = 10, metric = "precision", verbose = FALSE
+  ))
+  tuning <- attr(run$value, "tuning_results")
+  expect_identical(tuning$results$n_folds_ok[1], sum(predicts_positive))
+  expect_false(any(grepl("Error fitting model", run$warnings)))
+  fallback <- grep("No parameter set", run$warnings, value = TRUE)
+  expect_length(fallback, 1)
+  expect_match(fallback, "No parameter set was scored on all 10 folds")
+  expect_match(fallback, "No fit failed: \"precision\" could not be computed")
+  expect_false(grepl("failed fit", fallback))
+
+  # Both causes at once are both named
+  results <- data.frame(mean_metric = c(0.5, 0.6), n_folds_ok = c(2L, 2L))
+  expect_warning(
+    tl_tune_select_best(results, TRUE, 3, c("a", "b"), n_failed = c(1L, 0L),
+                        metric = "precision"),
+    "On some folds the fit failed and on others \"precision\" could not"
+  )
+
+  # With nothing scored, the stop says which of the two happened
+  results <- data.frame(mean_metric = c(NA_real_, NA_real_),
+                        n_folds_ok = c(0L, 0L))
+  expect_error(
+    tl_tune_select_best(results, TRUE, 3, c("a", "b"), n_failed = c(0L, 0L),
+                        metric = "precision"),
+    "every fit succeeded, but \"precision\" could not be computed on any fold"
+  )
+  expect_error(
+    tl_tune_select_best(results, TRUE, 3, c("a", "b"), n_failed = c(3L, 1L),
+                        metric = "precision"),
+    "some fits failed, and on the other folds \"precision\" could not"
+  )
+  expect_error(
+    tl_tune_select_best(results, TRUE, 3, c("a", "b"), n_failed = c(3L, 3L),
+                        metric = "precision"),
+    "Every parameter set failed in every fold"
+  )
+})
+
+test_that("a fold where auc is undefined is left out of the tuners' scores", {
+  # A fold holding one class stopped the search with ROCR's "Number of
+  # classes is not equal to 2"
+  d <- mtcars
+  d$am <- factor(d$am, labels = c("auto", "manual"))
+  set.seed(1)
+  one_class <- vapply(rsample::vfold_cv(d, v = 10)$splits, function(split) {
+    length(unique(rsample::assessment(split)$am)) == 1L
+  }, logical(1))
+  expect_true(any(one_class))
+
+  for (tuner in c("grid", "random")) {
+    set.seed(1)
+    run <- collect_warnings(
+      if (tuner == "grid") {
+        tl_tune_grid(d, am ~ wt + hp, method = "tree",
+                     param_grid = list(cp = c(0.01, 0.1)), folds = 10,
+                     metric = "auc", verbose = FALSE)
+      } else {
+        tl_tune_random(d, am ~ wt + hp, method = "tree",
+                       param_space = list(cp = c(0.01, 0.1)), n_iter = 2,
+                       folds = 10, metric = "auc", verbose = FALSE)
+      }
+    )
+    tuning <- attr(run$value, "tuning_results")
+    expect_identical(tuning$results$n_folds_ok, rep(sum(!one_class), 2),
+                     info = tuner)
+    expect_true(any(grepl("No fit failed: \"auc\" could not be computed",
+                          run$warnings)), info = tuner)
+  }
+})
+
+# Every predictor missing on the rows of one assessment fold. vfold_cv()
+# assigns rows from the seed and the row count alone, so the fold's rows can
+# be found first and blanked.
+blank_one_fold <- function(seed = 1, folds = 4) {
+  data <- mtcars[, c("mpg", "wt", "hp")]
+  set.seed(seed)
+  rows <- rsample::complement(rsample::vfold_cv(data, v = folds)$splits[[2]])
+  data$wt[rows] <- NA
+  data$hp[rows] <- NA
+  data
+}
+
+test_that("a fold with no row to score is left out of the tuners' scores", {
+  # tl_evaluate() refuses a fold on which no row can be scored, and the
+  # refusal stopped the whole search
+  d <- blank_one_fold()
+  for (tuner in c("grid", "random")) {
+    set.seed(1)
+    run <- collect_warnings(
+      if (tuner == "grid") {
+        tl_tune_grid(d, mpg ~ wt + hp, method = "svm",
+                     param_grid = list(cost = c(0.5, 1)), folds = 4,
+                     verbose = FALSE)
+      } else {
+        tl_tune_random(d, mpg ~ wt + hp, method = "svm",
+                       param_space = list(cost = c(0.5, 1)), n_iter = 2,
+                       folds = 4, verbose = FALSE)
+      }
+    )
+    tuning <- attr(run$value, "tuning_results")
+    expect_identical(tuning$results$n_folds_ok, c(3L, 3L), info = tuner)
+    expect_true(any(grepl(
+      "Fold 2 is left out of the score for cost=.*none of its 8 rows can be",
+      run$warnings
+    )), info = tuner)
+    expect_true(any(grepl("No fit failed: \"rmse\" could not be computed",
+                          run$warnings)), info = tuner)
+  }
+
+  # The score is the mean over the other three folds, as e1071 fits them
+  set.seed(1)
+  splits <- rsample::vfold_cv(d, v = 4)$splits
+  rmse <- vapply(splits[-2], function(split) {
+    fit <- e1071::svm(mpg ~ wt + hp, data = rsample::analysis(split),
+                      type = "eps-regression", kernel = "radial", cost = 0.5)
+    test <- rsample::assessment(split)
+    sqrt(mean((predict(fit, test) - test$mpg)^2))
+  }, numeric(1))
+  set.seed(1)
+  tuned <- suppressWarnings(tl_tune_grid(
+    d, mpg ~ wt + hp, method = "svm", param_grid = list(cost = 0.5),
+    folds = 4, verbose = FALSE
+  ))
+  expect_equal(attr(tuned, "tuning_results")$results$mean_metric, mean(rmse))
 })
 
 test_that("tl_tune_random keeps a single value as given", {
@@ -845,6 +1516,81 @@ test_that("a forest mtry above the predictor count is capped", {
   expect_true(any(grepl("mtry = 9 exceeds the 4 predictors", run$warnings)))
   expect_false(any(grepl("invalid mtry", run$warnings)))
   expect_equal(attr(run$value, "tuning_results")$best_params$mtry, 4)
+})
+
+test_that("the mtry cap counts predictors as randomForest does", {
+  skip_if_not_installed("randomForest")
+
+  # mpg ~ . - id has three predictors, but its model frame keeps the id
+  # column, so four were counted: mtry = 4 went uncapped, randomForest reset
+  # it to 3 in every fold, and best_params reported 4 for a fit using 3
+  d <- mtcars[, c("mpg", "wt", "hp", "qsec")]
+  d$id <- seq_len(nrow(d))
+  set.seed(1)
+  run <- collect_warnings(tl_tune_grid(
+    d, mpg ~ . - id, method = "forest",
+    param_grid = list(mtry = c(3, 4), ntree = 20), folds = 3, verbose = FALSE
+  ))
+  expect_true(any(grepl("mtry = 4 exceeds the 3 predictors", run$warnings)))
+  expect_false(any(grepl("invalid mtry", run$warnings)))
+  tuning <- attr(run$value, "tuning_results")
+  expect_identical(tuning$results$mtry, 3)
+  expect_equal(tuning$best_params$mtry, run$value$fit$mtry)
+
+  # randomForest's own count, read off the importance table it fits
+  for (formula in list(mpg ~ . - id, mpg ~ wt * hp, mpg ~ log(wt) + wt)) {
+    set.seed(1)
+    forest <- randomForest::randomForest(formula, data = d, ntree = 5)
+    capped <- suppressWarnings(
+      tl_tune_cap_mtry(list(list(mtry = 99)), "forest", formula, d)
+    )
+    expect_equal(capped[[1]]$mtry, nrow(forest$importance),
+                 info = deparse(formula))
+  }
+})
+
+test_that("the mtry cap counts each column of a matrix-valued term", {
+  skip_if_not_installed("randomForest")
+
+  # poly(hp, 2) is one variable of the formula holding two columns, and the
+  # forest is fitted on both, so mpg ~ poly(hp, 2) + wt has three
+  # predictors. The variables were counted: mtry = 3 was capped at 2 with a
+  # warning, and never tried.
+  set.seed(1)
+  run <- collect_warnings(tl_tune_grid(
+    mtcars, mpg ~ poly(hp, 2) + wt, method = "forest",
+    param_grid = list(mtry = c(2, 3), ntree = 30), folds = 2, verbose = FALSE
+  ))
+  expect_false(any(grepl("mtry = 3 exceeds", run$warnings, fixed = TRUE)))
+  tuning <- attr(run$value, "tuning_results")
+  expect_setequal(tuning$results$mtry, c(2, 3))
+  expect_equal(tuning$best_params$mtry, run$value$fit$mtry)
+
+  # Above the column count it is still capped, at that count
+  set.seed(1)
+  run <- collect_warnings(tl_tune_grid(
+    mtcars, mpg ~ poly(hp, 2) + wt, method = "forest",
+    param_grid = list(mtry = c(2, 5), ntree = 30), folds = 2, verbose = FALSE
+  ))
+  expect_true(any(grepl("mtry = 5 exceeds the 3 predictors", run$warnings,
+                        fixed = TRUE)))
+  expect_setequal(attr(run$value, "tuning_results")$results$mtry, c(2, 3))
+
+  # The forest's own column count, read off the importance table of a fit
+  # with the formula, for matrix-valued terms and ordinary ones alike
+  formulas <- list(
+    mpg ~ poly(hp, 2) + wt, mpg ~ poly(hp, 3) * wt,
+    mpg ~ factor(cyl) + poly(wt, 2), mpg ~ log(hp) + wt, mpg ~ wt + hp
+  )
+  for (formula in formulas) {
+    set.seed(1)
+    forest <- tl_model(mtcars, formula, method = "forest", ntree = 5)
+    capped <- suppressWarnings(
+      tl_tune_cap_mtry(list(list(mtry = 99)), "forest", formula, mtcars)
+    )
+    expect_equal(capped[[1]]$mtry, nrow(forest$fit$importance),
+                 info = deparse(formula))
+  }
 })
 
 test_that("list-valued grid cells reach the model unwrapped", {
@@ -952,6 +1698,23 @@ test_that("a search where every fit fails says so", {
   expect_identical(best, 2L)
 })
 
+test_that("stepwise selection refuses a categorical response by name", {
+  # The task was read from the raw column, and lm() fitted a factor
+  # response's codes until step() stopped with "AIC is -infinity for this
+  # model, so 'step' cannot proceed"
+  expect_error(
+    tl_step_selection(mtcars, factor(am) ~ wt + hp),
+    "needs a numeric response, but 'factor\\(am\\)' is a factor"
+  )
+  expect_error(
+    tl_step_selection(iris, Species ~ ., direction = "forward"),
+    "needs a numeric response, but 'Species' is a factor"
+  )
+  # A numeric response the formula computes is still selected on
+  model <- tl_step_selection(mtcars, log(mpg) ~ wt + hp + qsec)
+  expect_false(model$spec$is_classification)
+})
+
 test_that("forward selection keeps a transformed response", {
   model <- tl_step_selection(mtcars, log(mpg) ~ wt + hp + qsec,
                              direction = "forward")
@@ -972,6 +1735,231 @@ test_that("tl_compare_cv keeps every model under its own name", {
   expect_setequal(cv$summary$model, c("a", "Model_2"))
 })
 
+test_that("tl_compare_cv names a bad model list, fold count or metric", {
+  m <- tl_model(mtcars, mpg ~ wt, method = "linear")
+  # list() failed with "argument is not interpretable as logical", and a
+  # bare model was read as the list of its own components
+  expect_error(tl_compare_cv(mtcars, list(), folds = 3),
+               "'models' must be a non-empty list of tidylearn models")
+  expect_error(tl_compare_cv(mtcars, m, folds = 3), "wrap it in list\\(\\)")
+  km <- tl_model(iris[, 1:4], method = "kmeans", k = 3)
+  expect_error(tl_compare_cv(iris, list(km = km), folds = 3),
+               "compares supervised models; 'km' is an unsupervised model")
+  expect_error(tl_compare_cv(mtcars, list(m = m), folds = 2.5),
+               "'folds' must be a whole number between 2 and nrow\\(data\\)")
+
+  # A misspelt metric was dropped without a word, and a metric of the other
+  # task returned an empty summary
+  tree <- tl_model(iris, Species ~ ., method = "tree")
+  expect_error(
+    tl_compare_cv(iris, list(tree = tree), folds = 3,
+                  metrics = c("accuracy", "acuracy")),
+    "Unknown classification metric\\(s\\) in 'metrics': \"acuracy\""
+  )
+  expect_error(
+    tl_compare_cv(iris, list(tree = tree), folds = 3, metrics = "rmse"),
+    "Unknown classification metric\\(s\\) in 'metrics': \"rmse\""
+  )
+  expect_error(
+    tl_compare_cv(iris, list(tree = tree), folds = 3, metrics = character()),
+    "'metrics' is empty. Name at least one of: accuracy"
+  )
+  set.seed(1)
+  cv <- tl_compare_cv(iris, list(tree = tree), folds = 3,
+                      metrics = c("accuracy", "f1"))
+  expect_setequal(cv$summary$metric, c("accuracy", "f1"))
+})
+
+test_that("tl_compare_cv refuses a model a refit would not reproduce", {
+  # A refit from formula, method and arguments scored a semi-supervised
+  # model as a tree trained on every training-fold label, and failed on the
+  # is_anomaly column an anomaly-aware model is fitted with
+  set.seed(1)
+  semi <- suppressWarnings(tl_semisupervised(
+    iris, Species ~ ., labeled_indices = c(1:5, 51:55, 101:105)
+  ))
+  expect_error(
+    tl_compare_cv(iris, list(semi = semi), folds = 3, metrics = "accuracy"),
+    "cannot refit 'semi': tl_semisupervised\\(\\)"
+  )
+  flag <- tl_anomaly_aware(iris, Species ~ ., response = "Species",
+                           action = "flag")
+  expect_error(
+    tl_compare_cv(iris, list(flag = flag), folds = 3, metrics = "accuracy"),
+    "cannot refit 'flag': tl_anomaly_aware\\(\\)"
+  )
+
+  # tl_auto_ml() marks a model fitted on features it engineered, PCA scores
+  # or cluster labels, with $feature_transform
+  engineered <- tl_model(iris, Species ~ ., method = "tree")
+  engineered$feature_transform <- list(kind = "cluster")
+  plain <- tl_model(iris, Species ~ ., method = "tree")
+  expect_error(
+    tl_compare_cv(iris, list(plain = plain, engineered = engineered),
+                  folds = 3, metrics = "accuracy"),
+    "cannot refit 'engineered': tl_auto_ml\\(\\)"
+  )
+
+  # A model tl_model() built is refitted as before
+  set.seed(1)
+  cv <- tl_compare_cv(iris, list(plain = plain), folds = 3,
+                      metrics = "accuracy")
+  expect_identical(nrow(cv$fold_metrics), 3L)
+})
+
+test_that("a fold on which auc is undefined is left out of tl_compare_cv()", {
+  # A fold holding one class stopped the whole comparison with ROCR's
+  # "Number of classes is not equal to 2"
+  d <- mtcars
+  d$am <- factor(d$am, labels = c("auto", "manual"))
+  m1 <- tl_model(d, am ~ wt, method = "tree")
+  m2 <- tl_model(d, am ~ wt + hp, method = "tree")
+  set.seed(2)
+  one_class <- vapply(rsample::vfold_cv(d, v = 5)$splits, function(split) {
+    length(unique(rsample::assessment(split)$am)) == 1L
+  }, logical(1))
+  expect_true(any(one_class))
+
+  set.seed(2)
+  cv <- suppressWarnings(tl_compare_cv(d, list(a = m1, b = m2), folds = 5))
+  auc <- cv$fold_metrics[cv$fold_metrics$metric == "auc", ]
+  for (name in c("a", "b")) {
+    values <- auc$value[auc$model == name]
+    expect_identical(is.na(values), one_class, info = name)
+    in_summary <- cv$summary$model == name & cv$summary$metric == "auc"
+    expect_equal(cv$summary$mean_value[in_summary],
+                 mean(values[!one_class]), info = name)
+  }
+})
+
+test_that("a fold with no row to score is left out of tl_compare_cv()", {
+  # tl_evaluate() refuses a fold on which no row can be scored, and the
+  # refusal stopped the whole comparison
+  d <- blank_one_fold()
+  simple <- tl_model(d, mpg ~ wt, method = "linear")
+  full <- tl_model(d, mpg ~ wt + hp, method = "linear")
+  set.seed(1)
+  run <- collect_warnings(tl_compare_cv(
+    d, list(simple = simple, full = full), folds = 4,
+    metrics = c("rmse", "mae")
+  ))
+  folds <- run$value$fold_metrics
+  expect_true(all(is.na(folds$value[folds$fold == 2])))
+  expect_false(anyNA(folds$value[folds$fold != 2]))
+  expect_setequal(folds$metric[folds$fold == 2], c("rmse", "mae"))
+  for (name in c("simple", "full")) {
+    expect_true(any(grepl(
+      paste0("Fold 2 is left out of the summary for '", name, "'"),
+      run$warnings
+    )), info = name)
+  }
+
+  # The summary is over the other three folds, as lm() fits them
+  set.seed(1)
+  splits <- rsample::vfold_cv(d, v = 4)$splits
+  rmse <- vapply(splits[-2], function(split) {
+    fit <- lm(mpg ~ wt, rsample::analysis(split))
+    test <- rsample::assessment(split)
+    sqrt(mean((predict(fit, test) - test$mpg)^2))
+  }, numeric(1))
+  summary <- run$value$summary
+  expect_equal(
+    summary$mean_value[summary$model == "simple" & summary$metric == "rmse"],
+    mean(rmse)
+  )
+
+  # and the paired test uses the three folds both models were scored on
+  test <- tl_test_model_difference(run$value, baseline_model = "simple",
+                                   metric = "rmse")
+  values <- split(folds$value[folds$metric == "rmse"],
+                  folds$model[folds$metric == "rmse"])
+  expect_equal(
+    test$p_value,
+    stats::t.test(values$full[-2], values$simple[-2], paired = TRUE)$p.value
+  )
+})
+
+test_that("a metric undefined on every fold summarises as NA", {
+  # min() and max() over no values returned Inf and -Inf, each with a
+  # warning, and mean() returned NaN
+  rare <- data.frame(x = seq_len(30),
+                     y = factor(rep(c("neg", "pos"), c(26, 4))))
+  # minsplit above the row count leaves the root alone, so "neg" is
+  # predicted everywhere and precision has no predicted positives
+  stump <- tl_model(rare, y ~ x, method = "tree", minsplit = 100)
+  set.seed(1)
+  splits <- rsample::vfold_cv(rare, v = 3)$splits
+  set.seed(1)
+  run <- collect_warnings(tl_compare_cv(
+    rare, list(stump = stump), folds = 3,
+    metrics = c("accuracy", "precision")
+  ))
+  expect_false(any(grepl("no non-missing arguments", run$warnings)))
+  summary <- run$value$summary
+  precision <- summary[summary$metric == "precision", ]
+  for (column in c("mean_value", "sd_value", "min_value", "max_value")) {
+    expect_identical(precision[[column]], NA_real_, info = column)
+  }
+  accuracy <- vapply(splits, function(split) {
+    mean(rsample::assessment(split)$y == "neg")
+  }, numeric(1))
+  expect_equal(summary$mean_value[summary$metric == "accuracy"],
+               mean(accuracy))
+})
+
+test_that("tl_test_model_difference reads \"wilcox.test\" as \"wilcox\"", {
+  # The diagnostics vignette wrote "wilcox.test", which match.arg() refused
+  m1 <- tl_model(mtcars, mpg ~ wt, method = "linear")
+  m2 <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
+  set.seed(1)
+  cv <- tl_compare_cv(mtcars, list(simple = m1, full = m2), folds = 6,
+                      metrics = "rmse")
+  alias <- tl_test_model_difference(cv, baseline_model = "simple",
+                                    metric = "rmse", test = "wilcox.test")
+  expect_identical(
+    alias,
+    tl_test_model_difference(cv, baseline_model = "simple", metric = "rmse",
+                             test = "wilcox")
+  )
+  rmse <- split(cv$fold_metrics$value, cv$fold_metrics$model)
+  direct <- stats::wilcox.test(rmse$full, rmse$simple, paired = TRUE)
+  expect_equal(alias$p_value, direct$p.value)
+  expect_error(tl_test_model_difference(cv, test = "wilcoxon"),
+               "'test' must be \"t.test\" or \"wilcox\"")
+})
+
+test_that("tl_test_model_difference compares the folds both models scored", {
+  # The mean difference was taken over each model's own scored folds, so a
+  # fold one model could not be scored on shifted it away from the paired
+  # test beside it
+  a <- c(0.5, 0.6, NA, 0.8)
+  b <- c(0.4, 0.7, 0.9, 0.6)
+  cv <- list(fold_metrics = data.frame(
+    metric = "precision", value = c(a, b), fold = rep(1:4, 2),
+    model = rep(c("a", "b"), each = 4)
+  ))
+  result <- tl_test_model_difference(cv, baseline_model = "a",
+                                     metric = "precision")
+  both <- !is.na(a) & !is.na(b)
+  expect_equal(result$mean_diff, mean(b[both] - a[both]))
+  expect_equal(result$p_value,
+               stats::t.test(b[both], a[both], paired = TRUE)$p.value)
+
+  # Fewer than two scored pairs cannot be tested; that comparison is NA
+  # rather than an error that discards every other metric's result
+  cv$fold_metrics$value[cv$fold_metrics$model == "a"] <- c(NA, NA, NA, 0.8)
+  cv$fold_metrics <- rbind(cv$fold_metrics, data.frame(
+    metric = "accuracy", value = c(0.7, 0.8, 0.75, 0.9, 0.8, 0.85, 0.8, 0.95),
+    fold = rep(1:4, 2), model = rep(c("a", "b"), each = 4)
+  ))
+  expect_warning(
+    result <- tl_test_model_difference(cv, baseline_model = "a"),
+    "1 fold scored for both"
+  )
+  expect_true(is.na(result$p_value[result$metric == "precision"]))
+  expect_false(is.na(result$p_value[result$metric == "accuracy"]))
+})
+
 test_that("BIC selection penalises by the rows the model used", {
   set.seed(4)
   n <- 60
@@ -983,6 +1971,81 @@ test_that("BIC selection penalises by the rows the model used", {
   reference <- step(lm(y ~ x1 + x2 + x3, d), k = log(20), trace = 0)
   expect_setequal(attr(terms(model$spec$formula), "term.labels"),
                   attr(terms(formula(reference)), "term.labels"))
+})
+
+test_that("stepwise selection fits every candidate on the same rows", {
+  # Each candidate was fitted on the rows it could use, so a variable with
+  # missing values changed the row count as it entered or left, and step()
+  # stopped with "number of rows in use has changed"
+  complete <- stats::na.omit(airquality)
+  upper <- formula(lm(Ozone ~ ., complete))
+  by_name <- function(x) x[order(names(x))]
+  for (direction in c("forward", "backward", "both")) {
+    expect_message(
+      model <- tl_step_selection(airquality, Ozone ~ ., direction = direction,
+                                 criterion = "BIC"),
+      "111 of 153 rows"
+    )
+    start <- if (direction == "backward") {
+      lm(Ozone ~ ., complete)
+    } else {
+      lm(Ozone ~ 1, complete)
+    }
+    scope <- if (direction == "backward") {
+      upper
+    } else {
+      list(lower = ~ 1, upper = upper)
+    }
+    reference <- step(start, scope = scope, direction = direction,
+                      k = log(nrow(complete)), trace = 0)
+    expect_equal(by_name(coef(model$fit)), by_name(coef(reference)),
+                 info = direction)
+    # The rows left out are recorded where lm() records its own, so the
+    # fit still lines up with the data the caller passed
+    expect_identical(nrow(model$data), nrow(airquality))
+    expect_identical(sort(tl_fitted_rows(model)),
+                     which(stats::complete.cases(airquality)))
+  }
+
+  # Backward selection dropping the one column with missing values
+  set.seed(1)
+  d <- mtcars[, c("mpg", "wt", "hp", "qsec")]
+  d$noise <- stats::rnorm(nrow(d))
+  d$noise[1:3] <- NA
+  expect_message(
+    model <- tl_step_selection(d, mpg ~ ., direction = "backward"),
+    "29 of 32 rows"
+  )
+  reference <- step(lm(mpg ~ ., stats::na.omit(d)), trace = 0)
+  expect_equal(coef(model$fit), coef(reference))
+
+  # A variable from the caller's frame stays aligned with the data's rows
+  d$hp[4] <- NA
+  select_with_local <- function() {
+    trend <- seq_len(nrow(d))
+    tl_step_selection(d, mpg ~ wt + hp + trend, direction = "forward")
+  }
+  expect_message(model <- select_with_local(), "31 of 32 rows")
+  trend <- seq_len(nrow(d))
+  rows <- -4
+  reference <- step(
+    lm(mpg ~ 1, d[rows, ]),
+    scope = list(lower = ~ 1, upper = ~ wt + hp + trend[rows]),
+    direction = "forward", trace = 0
+  )
+  expect_equal(unname(coef(model$fit)), unname(coef(reference)))
+
+  # Complete data is left as it is, without a message, and so are rows
+  # missing only the response, which every candidate drops alike
+  expect_no_message(
+    tl_step_selection(mtcars, mpg ~ wt + hp, direction = "backward")
+  )
+  d <- mtcars
+  d$mpg[1:3] <- NA
+  expect_no_message(
+    model <- tl_step_selection(d, mpg ~ wt + hp, direction = "forward")
+  )
+  expect_identical(stats::nobs(model$fit), 29L)
 })
 
 test_that("a generated model name does not collide with a chosen one", {
@@ -1017,6 +2080,75 @@ test_that("linear and polynomial get grids that say what they are", {
   model <- tl_model(mtcars, mpg ~ wt, method = "polynomial",
                     degree = max(poly$degree))
   expect_s3_class(model, "tidylearn_model")
+})
+
+test_that("tl_default_param_grid gives xgboost a grid tl_model() can fit", {
+  # xgboost is a supported method, and the grid warned "Unknown method"
+  for (size in c("small", "medium", "large")) {
+    expect_no_warning(grid <- tl_default_param_grid("xgboost", size = size))
+    expect_gt(length(grid), 0)
+    expect_true(all(names(grid) %in% names(formals(tl_fit_xgboost))),
+                info = size)
+  }
+
+  # The values tl_tune_xgboost() searches by default, plus nrounds, which
+  # that function chooses by early stopping and tl_tune_grid() has to tune
+  large <- tl_default_param_grid("xgboost", size = "large")
+  expect_identical(
+    large[setdiff(names(large), "nrounds")],
+    list(max_depth = c(3, 6, 9), eta = c(0.01, 0.1, 0.3),
+         subsample = c(0.7, 1.0), colsample_bytree = c(0.7, 1.0),
+         min_child_weight = c(1, 3, 5), gamma = c(0, 0.1, 0.2))
+  )
+  for (size in c("small", "medium")) {
+    grid <- tl_default_param_grid("xgboost", size = size)
+    for (param in setdiff(names(grid), "nrounds")) {
+      expect_true(all(grid[[param]] %in% large[[param]]),
+                  info = paste(size, param))
+    }
+  }
+
+  # The search itself fits 17 xgboost models, a third of this file's time
+  skip_on_cran()
+  skip_if_not_installed("xgboost")
+  set.seed(1)
+  tuned <- tl_tune_grid(mtcars, mpg ~ ., method = "xgboost",
+                        param_grid = tl_default_param_grid("xgboost", "small"),
+                        folds = 2, verbose = FALSE)
+  results <- attr(tuned, "tuning_results")$results
+  expect_true(all(results$n_folds_ok == 2))
+  expect_identical(tuned$spec$args$nrounds,
+                   attr(tuned, "tuning_results")$best_params$nrounds)
+})
+
+test_that("is_classification fits the grid to the task", {
+  # The argument was documented and never read
+  classify <- tl_default_param_grid("svm", "medium", is_classification = TRUE)
+  regress <- tl_default_param_grid("svm", "medium", is_classification = FALSE)
+  # epsilon is the width of the regression SVM's insensitive band; a
+  # classifier has no use for it
+  expect_false("epsilon" %in% names(classify))
+  expect_true("epsilon" %in% names(regress))
+  expect_identical(regress[names(classify)], classify)
+  expect_identical(tl_default_param_grid("svm", "medium"), classify)
+  fit <- tl_model(mtcars, mpg ~ wt + hp, method = "svm",
+                  epsilon = regress$epsilon[1])
+  expect_identical(fit$fit$epsilon, regress$epsilon[1])
+
+  # randomForest's default nodesize is 1 for classification and 5 for
+  # regression, and each grid is built around its own
+  forest_classify <- tl_default_param_grid("forest", "large", TRUE)
+  forest_regress <- tl_default_param_grid("forest", "large", FALSE)
+  expect_identical(min(forest_classify$nodesize), 1)
+  expect_true(5 %in% forest_regress$nodesize)
+  expect_gt(min(forest_regress$nodesize), 1)
+  expect_identical(forest_regress[c("mtry", "ntree")],
+                   forest_classify[c("mtry", "ntree")])
+
+  expect_error(tl_default_param_grid("svm", is_classification = NA),
+               "'is_classification' must be TRUE or FALSE")
+  expect_error(tl_default_param_grid(c("tree", "forest")),
+               "'method' must be a single method name")
 })
 
 test_that("a one-parameter search says why the default plot is unavailable", {

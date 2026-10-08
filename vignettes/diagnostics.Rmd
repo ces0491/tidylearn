@@ -178,7 +178,7 @@ outliers$outlier_counts$by_variable
 mtcars[outliers$outlier_indices, c("mpg", "hp", "wt")]
 ```
 
-`method` also takes `"zscore"` and `"mahalanobis"`. The first two treat each
+`method` also takes `"z-score"` and `"mahalanobis"`. The first two treat each
 variable separately; Mahalanobis distance accounts for the correlation
 between them, so it finds points that are unremarkable on every single axis
 and unusual in combination.
@@ -242,8 +242,21 @@ tl_test_model_difference(
 
 With five folds this has very little power, so treat a non-significant result
 as "these folds do not separate the models" rather than as evidence they are
-equivalent. `test = "wilcox.test"` drops the normality assumption, which
-matters more at small fold counts than the loss of power costs you.
+equivalent.
+
+`test = "wilcox"` runs the signed-rank test instead, which drops the
+normality assumption but needs at least six folds to return a p-value below
+0.05. On five pairs of fold scores the smallest two-sided p-value it can give
+is 0.0625, and only when one model wins every fold:
+
+```{r}
+tl_test_model_difference(
+  cv,
+  baseline_model = "simple",
+  metric = "rmse",
+  test = "wilcox"
+)
+```
 
 ## Interactions
 

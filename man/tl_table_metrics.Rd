@@ -16,15 +16,18 @@ tl_table_metrics(model, new_data = NULL, digits = 4, ...)
 \item{...}{Additional arguments passed to \code{tl_evaluate}}
 }
 \value{
-A \code{\link[gt]{gt}} table object.
+A \code{\link[gt]{gt}} table object. Its source note counts the
+rows scored.
 }
 \description{
 Produces a styled gt table of model evaluation metrics from
 \code{\link{tl_evaluate}}.
 }
 \examples{
+\dontshow{if (requireNamespace("gt", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \donttest{
 model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
 tl_table_metrics(model)
 }
+\dontshow{\}) # examplesIf}
 }

@@ -32,7 +32,8 @@ columns of the design matrix.}
 
 \item{importance}{Whether to compute variable importance (default: TRUE)}
 
-\item{...}{Additional arguments to pass to randomForest()}
+\item{...}{Additional arguments to pass to randomForest(). An offset is
+refused: randomForest leaves it out of the fit.}
 }
 \value{
 A fitted random forest model

@@ -23,8 +23,10 @@ Produces a styled gt table of variance explained by each principal component,
 with a colour gradient on cumulative variance.
 }
 \examples{
+\dontshow{if (requireNamespace("gt", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \donttest{
 model <- tl_model(iris[, 1:4], method = "pca")
 tl_table_variance(model)
 }
+\dontshow{\}) # examplesIf}
 }

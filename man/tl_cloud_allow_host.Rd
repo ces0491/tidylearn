@@ -8,8 +8,8 @@ tl_cloud_allow_host(host)
 }
 \arguments{
 \item{host}{A character vector of host names to allow, or \code{NULL} to
-clear every host added this session. Bare host names only — not
-URLs, ports, paths or wildcards.}
+clear every host added this session. Bare host names of at least
+three labels only — not URLs, ports, paths or wildcards.}
 }
 \value{
 The full allowlist after the change, invisibly.
@@ -29,6 +29,11 @@ Additions are never persisted and are forgotten when the session ends.
 Hosts match themselves and their subdomains. Adding
 \code{"fits.example.com"} accepts \verb{https://fits.example.com} and
 \verb{https://a.fits.example.com}, and nothing else.
+
+Give the endpoint's full host name. A name of fewer than three labels,
+such as \code{"example.com"} or \code{"co.uk"}, is refused: two labels can be a
+public suffix, under which anyone can register a site, and allowing
+one would admit all of them.
 }
 \examples{
 tl_cloud_allow_host("fits.example.com")

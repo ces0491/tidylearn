@@ -22,8 +22,9 @@ Reads a CSV file into a \code{tidylearn_data} object. Uses \pkg{readr} when
 available for faster parsing, with a base R fallback.
 }
 \examples{
-\donttest{
-# data <- tl_read_csv("path/to/data.csv")
-}
+path <- tempfile(fileext = ".csv")
+write.csv(mtcars, path, row.names = FALSE)
+tl_read_csv(path)
+unlink(path)
 
 }

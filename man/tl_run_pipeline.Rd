@@ -21,6 +21,11 @@ learned from the training data, replayed by
 list of per-model fits and metrics), \code{$best_model_name},
 \code{$best_model} (the winning \code{tidylearn_model}), and
 \code{$metric_values}.
+
+The training data is every row when \code{validation = "cv"}: each
+model is scored across the folds and then refitted on all of them.
+With \code{validation = "split"} it is the training split alone, since
+the models kept are the ones fitted there and scored on the test rows.
 }
 \description{
 Run a tidylearn pipeline
