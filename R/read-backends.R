@@ -54,7 +54,7 @@ tl_read_db <- function(conn, query, ...) {
          call. = FALSE)
   }
 
-  if (!is.character(query) || length(query) != 1 || !nzchar(query)) {
+  if (!tl_is_single_string(query)) {
     stop("'query' must be a non-empty SQL string.", call. = FALSE)
   }
 
@@ -95,7 +95,7 @@ tl_read_sqlite <- function(path, query, ...) {
   tl_validate_file_path(path)
   tl_check_packages("DBI", "RSQLite")
 
-  if (missing(query) || !is.character(query) || !nzchar(query)) {
+  if (missing(query) || !tl_is_single_string(query)) {
     stop("'query' is required. Provide a SQL string, e.g., ",
          "'SELECT * FROM my_table'.",
          call. = FALSE)
@@ -156,12 +156,18 @@ tl_read_sqlite <- function(path, query, ...) {
 #' @export
 tl_read_postgres <- function(dsn, query, dbname = NULL, user = NULL,
                              password = NULL, port = 5432, ...) {
-  tl_check_packages("DBI", "RPostgres")
-
-  if (missing(query) || !is.character(query) || !nzchar(query)) {
+  # Before anything connects. A NULL dsn failed inside grepl() with
+  # "argument is of length zero", and an NA dsn or query reached the
+  # server. An empty host is libpq's default one, so it is accepted.
+  if (missing(dsn) || !tl_is_single_string(dsn, allow_empty = TRUE)) {
+    stop("'dsn' must be a single string: a postgres:// connection string ",
+         "or the database host.", call. = FALSE)
+  }
+  if (missing(query) || !tl_is_single_string(query)) {
     stop("'query' is required. Provide a SQL string.",
          call. = FALSE)
   }
+  tl_check_packages("DBI", "RPostgres")
 
   conn <- NULL
   on.exit({
@@ -268,12 +274,17 @@ tl_read_postgres <- function(dsn, query, dbname = NULL, user = NULL,
 #' @export
 tl_read_mysql <- function(dsn, query, dbname = NULL, user = NULL,
                           password = NULL, port = 3306, ...) {
-  tl_check_packages("DBI", "RMariaDB")
-
-  if (missing(query) || !is.character(query) || !nzchar(query)) {
+  # Before anything connects, as in tl_read_postgres(). An empty host is
+  # passed on as it always was, for RMariaDB to resolve.
+  if (missing(dsn) || !tl_is_single_string(dsn, allow_empty = TRUE)) {
+    stop("'dsn' must be a single string: a mysql:// connection string ",
+         "or the database host.", call. = FALSE)
+  }
+  if (missing(query) || !tl_is_single_string(query)) {
     stop("'query' is required. Provide a SQL string.",
          call. = FALSE)
   }
+  tl_check_packages("DBI", "RMariaDB")
 
   conn <- NULL
   on.exit({
@@ -354,7 +365,9 @@ tl_read_mysql <- function(dsn, query, dbname = NULL, user = NULL,
 #' \code{tidylearn_data} object. Requires the \pkg{bigrquery} package and
 #' valid Google Cloud authentication.
 #'
-#' @param project Google Cloud project ID.
+#' @param project Google Cloud project ID, or a
+#'   \code{bigquery://project/dataset} URI, whose dataset is used when
+#'   \code{dataset} is not given.
 #' @param query A SQL query string (Standard SQL).
 #' @param dataset Optional default dataset for unqualified table names,
 #'   in \code{project}.
@@ -381,27 +394,40 @@ tl_read_mysql <- function(dsn, query, dbname = NULL, user = NULL,
 #'
 #' @export
 tl_read_bigquery <- function(project, query, dataset = NULL, ...) {
-  tl_check_packages("bigrquery")
-
-  if (missing(query) || !is.character(query) || !nzchar(query)) {
+  # Before anything else runs. A NULL project failed inside grepl() with
+  # "argument is of length zero", and an empty project or an NA query
+  # went on to BigQuery, which asks for credentials before refusing them.
+  if (missing(project) || !tl_is_single_string(project)) {
+    stop("'project' must be a single Google Cloud project ID, such as ",
+         "\"my-project\", or a bigquery://project/dataset URI.",
+         call. = FALSE)
+  }
+  if (missing(query) || !tl_is_single_string(query)) {
     stop("'query' is required. Provide a SQL string.", call. = FALSE)
   }
+  if (!is.null(dataset) && !tl_is_single_string(dataset)) {
+    stop("'dataset' must be a single dataset name.", call. = FALSE)
+  }
+  tl_check_packages("bigrquery")
 
   # Handle bigquery:// URI format from dispatcher, whose schemes match in
   # any case
   if (grepl("^bigquery://", project, ignore.case = TRUE)) {
+    uri <- project
     parts <- strsplit(
-      sub("^bigquery://", "", project, ignore.case = TRUE), "/"
+      sub("^bigquery://", "", uri, ignore.case = TRUE), "/", fixed = TRUE
     )[[1]]
     project <- parts[1]
     if (length(parts) > 1 && is.null(dataset)) {
       dataset <- parts[2]
     }
-  }
-
-  if (!is.null(dataset) && (!is.character(dataset) || length(dataset) != 1L ||
-                              is.na(dataset) || !nzchar(dataset))) {
-    stop("'dataset' must be a single dataset name.", call. = FALSE)
+    # "bigquery://" leaves no project at all, and "bigquery:///d" an
+    # empty one, which would go to BigQuery as the project ID
+    if (is.na(project) || !nzchar(project) || identical(dataset, "")) {
+      stop("'", uri, "' is not a BigQuery URI. Expected ",
+           "bigquery://<project> or bigquery://<project>/<dataset>.",
+           call. = FALSE)
+    }
   }
 
   # bq_project_query() passes its dots to bq_perform_query(), whose
@@ -848,6 +874,22 @@ tl_read_kaggle <- function(source, file = NULL, dest = NULL,
 }
 
 # ---- Internal helpers ----
+
+#' Is an argument a single string, neither NA nor (unless allowed) empty?
+#'
+#' \code{!is.character(x) || !nzchar(x)} lets \code{NA} through, since
+#' \code{nzchar(NA)} is \code{TRUE}, and stops on two strings with R's own
+#' "'length = 2' in coercion to 'logical(1)'".
+#'
+#' @param x The argument.
+#' @param allow_empty Accept \code{""}?
+#' @return A single logical.
+#' @keywords internal
+#' @noRd
+tl_is_single_string <- function(x, allow_empty = FALSE) {
+  is.character(x) && length(x) == 1L && !is.na(x) &&
+    (allow_empty || nzchar(x))
+}
 
 #' Download a URL to a local file
 #'

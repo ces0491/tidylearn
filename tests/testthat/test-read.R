@@ -769,6 +769,15 @@ test_that("tl_read_sqlite errors without query", {
   DBI::dbDisconnect(conn)
 
   expect_error(tl_read_sqlite(tmp_db), "query.*required")
+
+  # NA went to SQLite as the query text ('near "NA": syntax error'), and
+  # two queries failed in R's own coercion to logical(1)
+  for (query in list(NA_character_, c("SELECT 1", "SELECT 2"))) {
+    expect_error(
+      tl_read_sqlite(tmp_db, query), "'query' is required. Provide a SQL",
+      fixed = TRUE, info = deparse(query)
+    )
+  }
 })
 
 test_that("tl_read auto-detects sqlite format", {
@@ -833,6 +842,11 @@ test_that("tl_read_db errors on empty query", {
   on.exit(DBI::dbDisconnect(conn), add = TRUE)
 
   expect_error(tl_read_db(conn, ""), "non-empty SQL")
+  # NA passed the check and went to the database as the query text
+  expect_error(
+    tl_read_db(conn, NA_character_),
+    "'query' must be a non-empty SQL string.", fixed = TRUE
+  )
 })
 
 # ---- tl_read_postgres (error path only) ----
@@ -995,6 +1009,52 @@ test_that("tl_read_mysql() refuses query parameters it would drop", {
   expect_null(seen$args)
 })
 
+test_that("the server readers check dsn and query before connecting", {
+  skip_if_not_installed("DBI")
+  # A NULL dsn failed inside grepl() with "argument is of length zero",
+  # an NA dsn or query was sent on, so a server was contacted before the
+  # call failed, and two queries failed in R's own coercion to logical(1)
+  seen <- local_recorded_dbconnect()
+  readers <- list(postgres = tl_read_postgres, mysql = tl_read_mysql)
+
+  for (name in names(readers)) {
+    for (dsn in list(NULL, NA_character_, c("a", "b"), 42)) {
+      expect_error(
+        readers[[name]](dsn, "SELECT 1"),
+        "'dsn' must be a single string", fixed = TRUE,
+        info = paste(name, deparse(dsn))
+      )
+    }
+    for (query in list(NA_character_, c("SELECT 1", "SELECT 2"))) {
+      expect_error(
+        readers[[name]]("localhost", query),
+        "'query' is required. Provide a SQL string.", fixed = TRUE,
+        info = paste(name, deparse(query))
+      )
+    }
+  }
+  expect_null(seen$args)
+})
+
+test_that("the server readers still connect with an empty host", {
+  skip_if_not_installed("DBI")
+  skip_if_not_installed("RPostgres")
+  skip_if_not_installed("RMariaDB")
+  # An empty host is passed on: libpq reads it as its default host
+  seen <- local_recorded_dbconnect()
+  expect_error(
+    tl_read_postgres("", "SELECT 1", dbname = "sales"),
+    "Failed to connect to PostgreSQL"
+  )
+  expect_identical(seen$args$host, "")
+  seen$args <- NULL
+  expect_error(
+    tl_read_mysql("", "SELECT 1", dbname = "sales"),
+    "Failed to connect to MySQL"
+  )
+  expect_identical(seen$args$host, "")
+})
+
 # ---- tl_read_bigquery (error path only) ----
 
 test_that("tl_read_bigquery requires query", {
@@ -1035,6 +1095,52 @@ test_that("tl_read_bigquery() gives the query its default dataset", {
   # No dataset, no default
   tl_read_bigquery("my-project", "SELECT 1")
   expect_null(seen$args$default_dataset)
+})
+
+test_that("tl_read_bigquery() checks project, query and dataset first", {
+  skip_if_not_installed("bigrquery")
+  # A NULL project failed inside grepl() with "argument is of length
+  # zero", and an empty project or an NA query went on to BigQuery, which
+  # asks for credentials before it can refuse them
+  reached <- FALSE
+  local_mocked_bindings(
+    bq_project_query = function(x, query, ...) {
+      reached <<- TRUE
+      "job-table"
+    },
+    bq_table_download = function(x, ...) data.frame(n = 1L),
+    .package = "bigrquery"
+  )
+
+  for (project in list(NULL, NA_character_, "", c("a", "b"), 42)) {
+    expect_error(
+      tl_read_bigquery(project, "SELECT 1"),
+      "'project' must be a single Google Cloud project ID", fixed = TRUE,
+      info = deparse(project)
+    )
+  }
+  for (uri in c("bigquery://", "bigquery:///my_dataset", "bigquery://p//d")) {
+    expect_error(
+      tl_read_bigquery(uri, "SELECT 1"),
+      paste0("'", uri, "' is not a BigQuery URI"), fixed = TRUE
+    )
+  }
+  for (query in list(NA_character_, "", c("SELECT 1", "SELECT 2"))) {
+    expect_error(
+      tl_read_bigquery("my-project", query),
+      "'query' is required. Provide a SQL string.", fixed = TRUE,
+      info = deparse(query)
+    )
+  }
+  expect_error(
+    tl_read_bigquery("my-project", "SELECT 1", dataset = NA_character_),
+    "'dataset' must be a single dataset name.", fixed = TRUE
+  )
+  expect_false(reached)
+
+  # A well-formed call still reaches BigQuery
+  tl_read_bigquery("bigquery://my-project/my_dataset", "SELECT 1")
+  expect_true(reached)
 })
 
 # ---- tl_read_github ----
