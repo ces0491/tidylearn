@@ -32,11 +32,12 @@ tl_fit_linear <- function(data, formula, ...) {
 #' @keywords internal
 tl_fit_polynomial <- function(data, formula, degree = 2, ...) {
   # Fit the polynomial model
+  expansion <- tl_polynomial_formula(formula, data, degree)
   poly_model <- tl_fit_by_value(
     stats::lm, "lm",
-    list(formula = tl_polynomial_formula(formula, data, degree),
-         data = data, ...)
+    list(formula = expansion$formula, data = data, ...)
   )
+  poly_model <- tl_polynomial_predvars(poly_model, expansion$predict_as)
 
   # Store original formula and degree for future reference
   attr(poly_model, "original_formula") <- formula
@@ -65,7 +66,11 @@ tl_fit_polynomial <- function(data, formula, degree = 2, ...) {
 #' @param data The training data, to expand a \code{.} and to tell which
 #'   terms are numeric.
 #' @param degree The polynomial degree.
-#' @return The edited formula, in the original formula's environment.
+#' @return A list: \code{formula}, the edited formula in the original
+#'   formula's environment, and \code{predict_as}, for each added variable
+#'   whose term depends on the training data, the variable as fitted and
+#'   the same variable with the term as \code{stats::makepredictcall()}
+#'   recomputes it, for \code{tl_polynomial_predvars()}.
 #' @keywords internal
 #' @noRd
 tl_polynomial_formula <- function(formula, data, degree) {
@@ -76,21 +81,24 @@ tl_polynomial_formula <- function(formula, data, degree) {
 
   order <- attr(model_terms, "order")
   main_effects <- attr(model_terms, "term.labels")[order == 1L]
-  numeric_terms <- Filter(function(label) {
+  values <- lapply(main_effects, function(label) {
     term <- str2lang(label)
     if (is.call(term) && identical(term[[1]], as.name("I"))) {
-      return(FALSE)
+      return(NULL)
     }
-    value <- tryCatch(eval(term, data, env), error = function(e) NULL)
+    tryCatch(eval(term, data, env), error = function(e) NULL)
+  })
+  names(values) <- main_effects
+  numeric_terms <- main_effects[vapply(values, function(value) {
     # A one-column matrix such as scale(wt) is a numeric term too. A
     # basis -- poly(), or a spline's -- already is the expansion.
     is.numeric(value) &&
       (is.null(dim(value)) ||
          (NCOL(value) == 1L && !inherits(value, c("poly", "basis"))))
-  }, main_effects)
+  }, logical(1))]
 
   if (length(numeric_terms) == 0L) {
-    return(expanded)
+    return(list(formula = expanded, predict_as = list()))
   }
 
   # A term that is also part of an interaction keeps its own column, and
@@ -103,6 +111,19 @@ tl_polynomial_formula <- function(formula, data, degree) {
     any(factors[label, order > 1L] != 0)
   }, logical(1))
 
+  # The variables a term adds: its raw polynomial, or the powers above it
+  # when it keeps its own column
+  added <- function(term, label) {
+    if (in_interaction[[label]]) {
+      # As doubles, so the term reads wt^2 rather than wt^2L
+      lapply(as.numeric(seq_len(degree)[-1]), function(power) {
+        call("I", call("^", term, power))
+      })
+    } else {
+      list(call("poly", term, degree = degree, raw = TRUE))
+    }
+  }
+
   # One update() for every term: done one term at a time, update() put the
   # variables of an interaction such as wt:hp in a new order and renamed
   # its coefficient
@@ -110,21 +131,76 @@ tl_polynomial_formula <- function(formula, data, degree) {
   for (label in numeric_terms[!in_interaction]) {
     edit <- call("-", edit, str2lang(label))
   }
+  predict_as <- list()
   for (label in numeric_terms) {
     term <- str2lang(label)
-    edit <- if (in_interaction[[label]]) {
-      Reduce(
-        function(lhs, power) call("+", lhs, call("I", call("^", term, power))),
-        # As doubles, so the term reads wt^2 rather than wt^2L
-        as.numeric(seq_len(degree)[-1]), edit
-      )
-    } else {
-      call("+", edit, call("poly", term, degree = degree, raw = TRUE))
+    fitted_as <- added(term, label)
+    for (variable in fitted_as) {
+      edit <- call("+", edit, variable)
+    }
+
+    # makepredictcall() gives the call that computes a data-dependent term
+    # on new rows as it was computed on these: scale(wt) becomes
+    # scale(wt, center = 3.217, scale = 0.978). model.frame() records that
+    # for a variable it is handed, which here is the poly() or I() around
+    # the term, and not for the term inside it.
+    at_predict <- stats::makepredictcall(values[[label]], term)
+    if (!identical(at_predict, term)) {
+      predicted_as <- added(at_predict, label)
+      for (k in seq_along(fitted_as)) {
+        predict_as[[length(predict_as) + 1L]] <- list(
+          fitted = fitted_as[[k]], predicted = predicted_as[[k]]
+        )
+      }
     }
   }
   edited <- stats::update(expanded, call("~", edit))
   environment(edited) <- env
-  edited
+  list(formula = edited, predict_as = predict_as)
+}
+
+#' Recompute an expanded term on new data as it was in training
+#'
+#' \code{predict.lm()} evaluates each variable through the predvars the
+#' fit's terms carry. For \code{poly(scale(wt), degree = 2, raw = TRUE)}
+#' those held the variable as written, so \code{scale()} centred and
+#' scaled whatever rows \code{predict()} was handed: one row predicted
+#' \code{NaN}, and five rows predicted differently from the same rows
+#' among the training data. Each such variable's predvars entry is
+#' replaced by the one \code{tl_polynomial_formula()} built around the
+#' training-time term. The variables keep their names, so the
+#' coefficients do too.
+#'
+#' @param fit The lm fit of the edited formula.
+#' @param predict_as The \code{predict_as} list from
+#'   \code{tl_polynomial_formula()}.
+#' @return \code{fit}, its terms and its model frame's terms patched.
+#' @keywords internal
+#' @noRd
+tl_polynomial_predvars <- function(fit, predict_as) {
+  if (length(predict_as) == 0L) {
+    return(fit)
+  }
+
+  model_terms <- fit$terms
+  variables <- as.list(attr(model_terms, "variables"))[-1L]
+  predvars <- attr(model_terms, "predvars")
+  for (swap in predict_as) {
+    # A raw poly() and an I() have nothing of their own to record, so the
+    # entry model.frame() wrote is the variable as fitted
+    at <- which(vapply(variables, identical, logical(1), swap$fitted))
+    for (i in at) {
+      predvars[[i + 1L]] <- swap$predicted
+    }
+  }
+  attr(model_terms, "predvars") <- predvars
+
+  fit$terms <- model_terms
+  # model = FALSE leaves no frame to patch
+  if (!is.null(fit$model)) {
+    attr(fit$model, "terms") <- model_terms
+  }
+  fit
 }
 
 

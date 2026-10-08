@@ -277,6 +277,50 @@ test_that("polynomial expands a one-column matrix term such as scale()", {
   expect_equal(stats::coef(basis$fit), stats::coef(reference))
 })
 
+test_that("polynomial predicts a scale() term with the training centre", {
+  # predict.lm() keeps the centre and scale of a scale() term it fits, but
+  # not of one inside poly() or I(), so new rows were scaled on their own:
+  # one row predicted NaN, and mtcars[1:5, ] gave 20.48 for its second row
+  # against a fitted 21.71
+  for (formula in list(mpg ~ scale(wt) + hp, mpg ~ scale(wt) * hp)) {
+    model <- tl_model(mtcars, formula, method = "polynomial")
+    fitted_values <- unname(stats::fitted(model$fit))
+    expect_equal(unname(predict(model, mtcars[1, ])$.pred), fitted_values[1],
+                 info = deparse(formula))
+    expect_equal(unname(predict(model, mtcars[1:5, ])$.pred),
+                 fitted_values[1:5], info = deparse(formula))
+  }
+
+  # Held-out rows are scaled on the rows the model was fitted on, as the
+  # same model written out with that centre and scale predicts them
+  train <- mtcars[1:24, ]
+  test <- mtcars[25:32, ]
+  centre <- mean(train$wt)
+  spread <- stats::sd(train$wt)
+  train$z <- (train$wt - centre) / spread
+  test$z <- (test$wt - centre) / spread
+  cases <- list(
+    list(mpg ~ scale(wt) + hp,
+         mpg ~ poly(z, degree = 2, raw = TRUE) +
+           poly(hp, degree = 2, raw = TRUE)),
+    list(mpg ~ scale(wt) * hp, mpg ~ z * hp + I(z^2) + I(hp^2))
+  )
+  for (case in cases) {
+    model <- tl_model(train, case[[1]], method = "polynomial")
+    expected <- unname(stats::predict(stats::lm(case[[2]], data = train),
+                                      test))
+    expect_equal(unname(predict(model, test)$.pred), expected,
+                 info = deparse(case[[1]]))
+    expect_equal(unname(predict(model, test[1, ])$.pred), expected[1],
+                 info = deparse(case[[1]]))
+  }
+
+  # The terms keep the names they were fitted under
+  model <- tl_model(mtcars, mpg ~ scale(wt) + hp, method = "polynomial")
+  expect_identical(names(stats::coef(model$fit))[2:3],
+                   paste0("poly(scale(wt), degree = 2, raw = TRUE)", 1:2))
+})
+
 test_that("polynomial keeps a numeric term that is part of an interaction", {
   # wt was replaced by poly(wt), which left cyl_f:wt with no wt main
   # effect. model.matrix() then coded it with every level of cyl_f, and one
@@ -1143,36 +1187,44 @@ test_that("classification plots read classes from the model, not the data", {
   # iris[iris$Species != "setosa", ] still declaring setosa made the binary
   # model look multiclass, and a test factor with its levels reordered
   # switched the class the plots treated as positive
+  skip_if_not_installed("glmnet")
+  skip_if_not_installed("randomForest")
   iris2 <- iris[iris$Species != "setosa", ]
   split <- tl_split(iris2, prop = 0.7, seed = 1)
-  model <- tl_model(split$train, Species ~ Sepal.Length + Sepal.Width,
-                    method = "logistic")
   dropped <- droplevels(split$test)
   reordered <- dropped
   reordered$Species <- factor(as.character(dropped$Species),
                               levels = c("virginica", "versicolor"))
 
-  for (type in c("roc", "precision_recall", "calibration", "confusion")) {
-    expected <- plot(model, type = type, new_data = dropped)
-    expect_equal(plot(model, type = type, new_data = split$test)$data,
-                 expected$data, info = type)
-    expect_equal(plot(model, type = type, new_data = reordered)$data,
-                 expected$data, info = type)
-  }
+  for (method in c("logistic", "lasso", "forest")) {
+    set.seed(1)
+    model <- tl_model(split$train, Species ~ Sepal.Length + Sepal.Width,
+                      method = method)
 
-  # virginica, the model's second class, is the positive one. By hand: the
-  # AUC is the chance a virginica row outscores a versicolor row.
-  prob <- predict(model, dropped, type = "prob")$virginica
-  pos <- prob[dropped$Species == "virginica"]
-  neg <- prob[dropped$Species == "versicolor"]
-  auc <- mean(outer(pos, neg, ">") + 0.5 * outer(pos, neg, "=="))
-  expect_identical(
-    plot(model, type = "roc", new_data = split$test)$labels$subtitle,
-    paste0("AUC = ", round(auc, 3))
-  )
-  calibration <- plot(model, type = "calibration", new_data = reordered)$data
-  expect_equal(sum(calibration$frac_pos * calibration$n),
-               sum(dropped$Species == "virginica"))
+    for (type in c("roc", "precision_recall", "calibration", "confusion")) {
+      expected <- plot(model, type = type, new_data = dropped)
+      expect_equal(plot(model, type = type, new_data = split$test)$data,
+                   expected$data, info = paste(method, type))
+      expect_equal(plot(model, type = type, new_data = reordered)$data,
+                   expected$data, info = paste(method, type))
+    }
+
+    # virginica, the model's second class, is the positive one. By hand:
+    # the AUC is the chance a virginica row outscores a versicolor row.
+    prob <- predict(model, dropped, type = "prob")$virginica
+    pos <- prob[dropped$Species == "virginica"]
+    neg <- prob[dropped$Species == "versicolor"]
+    auc <- mean(outer(pos, neg, ">") + 0.5 * outer(pos, neg, "=="))
+    expect_identical(
+      plot(model, type = "roc", new_data = split$test)$labels$subtitle,
+      paste0("AUC = ", round(auc, 3)),
+      info = method
+    )
+    calibration <- plot(model, type = "calibration",
+                        new_data = reordered)$data
+    expect_equal(sum(calibration$frac_pos * calibration$n),
+                 sum(dropped$Species == "virginica"), info = method)
+  }
 })
 
 test_that("ROC and precision-recall need both classes among the rows", {

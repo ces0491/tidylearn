@@ -266,7 +266,8 @@ tl_resolve_lambda <- function(fit, lambda) {
   # coef(fit, s = NULL) returns the whole penalty path rather than failing,
   # and one column per lambda flattens into a vector of the wrong length
   # against the term names. Refuse instead of returning that. A model
-  # fitted with lambda = c(1, 0.1) stores both as its "1se" penalty.
+  # saved by tidylearn 0.5.0 or earlier, fitted at several penalties before
+  # they were cross-validated, stores all of them as its "1se" penalty.
   if (is.null(lambda_val) || !is.numeric(lambda_val) ||
         length(lambda_val) != 1L || is.na(lambda_val)) {
     stop(
