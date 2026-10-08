@@ -61,6 +61,7 @@ get_formula_vars <- function(formula, data) {
   if (is.null(formula)) {
     return(names(data)[sapply(data, is.numeric)])
   }
+  tl_check_subtracted(formula, data)
 
   # Check if it's a one-sided formula (unsupervised)
   if (length(formula) == 2) {
@@ -379,7 +380,7 @@ tl_complete_predictor_rows <- function(formula, new_data) {
   # it leaves the row usable.
   predictors <- tryCatch(
     all.vars(stats::delete.response(stats::terms(
-      tl_fit_formula(formula, new_data),
+      tl_fit_formula(formula, new_data, predicting = TRUE),
       data = new_data
     ))),
     error = function(e) all.vars(formula[[length(formula)]])
@@ -450,16 +451,27 @@ tl_realign_prob_matrix <- function(probs, keep) {
 #'
 #' @param formula The model formula
 #' @param new_data Data to predict on
-#' @param xlev Factor levels recorded at fit time (may be NULL)
+#' @param xlev Factor levels recorded at fit time (may be NULL). Its
+#'   \code{"terms"} attribute, when \code{tl_model()} set one, is the
+#'   training predictor terms the matrix is built from.
 #' @return A model matrix with the intercept column dropped
 #' @keywords internal
 #' @noRd
 tl_predictor_matrix <- function(formula, new_data, xlev = NULL) {
-  # Without a column the formula subtracts, which the matrix never uses
-  rhs_terms <- stats::delete.response(stats::terms(
-    tl_fit_formula(formula, new_data),
-    data = new_data
-  ))
+  # The training terms, which tl_model() keeps with the levels, carry the
+  # values a data-dependent term was computed with -- the centre and scale
+  # of scale(hp), the knots of a spline -- as predict.lm() uses them.
+  # Rebuilt from the formula, such a term was recomputed on the rows
+  # predicted, so a row scored alone differed from the same row in the
+  # full frame. A model without them is rebuilt from the formula, less any
+  # column it subtracts, which the matrix never uses.
+  rhs_terms <- attr(xlev, "terms")
+  if (!inherits(rhs_terms, "terms")) {
+    rhs_terms <- stats::delete.response(stats::terms(
+      tl_fit_formula(formula, new_data, predicting = TRUE),
+      data = new_data
+    ))
+  }
 
   # xlev is keyed by column, and model.frame() applies it to the frame's
   # variables. For a computed term such as relevel(f, "b") the variable is
@@ -518,20 +530,36 @@ tl_model_columns <- function(formula, data) {
 #' model uses. Any other formula is returned as it is: written out, a dot
 #' would list every column in the fit's printed call.
 #'
+#' At fit time a subtracted name that is not a column is refused: it is
+#' almost always a misspelling, and written out, the column the caller
+#' meant to drop would be fitted. At prediction new data may lack a
+#' subtracted column, since the model never uses it.
+#'
 #' @param formula A model formula
 #' @param data The data its dot expands against
+#' @param predicting TRUE when \code{data} is new data rather than the
+#'   training data
 #' @return \code{formula}, written out without its subtracted columns when
 #'   it has any
 #' @keywords internal
 #' @noRd
-tl_fit_formula <- function(formula, data) {
-  # The dot is expanded against the column names only. A variable the
-  # formula names but the data lacks -- new data without the column the
-  # formula subtracts -- is added as an empty column: terms() warned
-  # "'varlist' has changed ... should no longer happen!" without it, and a
-  # variable named in the formula is never part of the dot.
+tl_fit_formula <- function(formula, data, predicting = FALSE) {
+  subtracted <- tl_subtracted_vars(formula)
+  if (length(subtracted) == 0L) {
+    return(formula)
+  }
+  absent <- setdiff(subtracted, names(data))
+  if (!predicting) {
+    tl_check_subtracted(formula, data)
+  }
+
+  # The dot is expanded against the data's own columns. Only a subtracted
+  # column the new data lacks is added, empty: terms() warns "'varlist' has
+  # changed ... should no longer happen!" without it. Anything else the
+  # formula names but the data lacks -- a vector or scalar in the formula's
+  # environment -- stays out, or it would join the dot as a column.
   columns <- data[0, , drop = FALSE]
-  for (variable in setdiff(all.vars(formula), c(".", names(data)))) {
+  for (variable in absent) {
     columns[[variable]] <- logical(0)
   }
 
@@ -557,6 +585,65 @@ tl_fit_formula <- function(formula, data) {
     return(formula)
   }
   stats::formula(stats::terms(formula, data = columns, simplify = TRUE))
+}
+
+#' The variables a formula's right-hand side subtracts
+#'
+#' Read off the formula as written, through its chain of \code{+} and
+#' \code{-}, so it needs no \code{terms()} call and no data.
+#'
+#' @param formula A model formula
+#' @return Variable names, without the dot
+#' @keywords internal
+#' @noRd
+tl_subtracted_vars <- function(formula) {
+  subtracted <- character(0)
+  walk <- function(expr) {
+    if (!is.call(expr)) {
+      return(invisible(NULL))
+    }
+    head <- expr[[1L]]
+    if (identical(head, as.name("-"))) {
+      if (length(expr) == 3L) {
+        walk(expr[[2L]])
+        subtracted <<- c(subtracted, all.vars(expr[[3L]]))
+      } else {
+        subtracted <<- c(subtracted, all.vars(expr[[2L]]))
+      }
+    } else if (identical(head, as.name("+")) ||
+                 identical(head, as.name("("))) {
+      for (operand in as.list(expr)[-1L]) walk(operand)
+    }
+  }
+  walk(formula[[length(formula)]])
+  setdiff(unique(subtracted), ".")
+}
+
+#' Refuse a subtracted name the data does not have
+#'
+#' \code{terms()} subtracts a name that is not a column without complaint,
+#' so \code{mpg ~ . - qsce} kept qsec in a fit written out from it, where
+#' \code{lm()} on the formula itself stopped with "object 'qsce' not
+#' found".
+#'
+#' @param formula A model formula
+#' @param data The training data
+#' @return \code{TRUE}, invisibly, when every subtracted name is a column
+#' @keywords internal
+#' @noRd
+tl_check_subtracted <- function(formula, data) {
+  absent <- setdiff(tl_subtracted_vars(formula), names(data))
+  if (length(absent) > 0L) {
+    one <- length(absent) == 1L
+    stop(
+      "The formula subtracts ", paste0("'", absent, "'", collapse = ", "),
+      if (one) ", which is not a column" else ", which are not columns",
+      " of the data. Check the spelling: subtracting a name the data does ",
+      "not have drops nothing.",
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
 }
 
 #' Categorical columns a formula uses as they are
@@ -945,12 +1032,16 @@ tl_spec_methods <- function(models) {
 #'
 #' @param fit A fitted model that stores its call as \code{$call}.
 #' @return \code{fit}, its call referring to the data through
-#'   \code{tl_hold_call_args()}.
+#'   \code{tl_hold_call_args()} and naming its function through
+#'   \code{tl_call_head()}.
 #' @keywords internal
 #' @noRd
 tl_restore_call_data <- function(fit) {
   if (!is.null(fit$call) && is.call(fit$call) && !is.null(fit$call$data)) {
     fit <- tl_hold_call_args(fit, c("data", "weights", "subset"))
+    if (is.name(fit$call[[1]])) {
+      fit$call[[1]] <- tl_call_head(as.character(fit$call[[1]]))
+    }
   }
   fit
 }
@@ -992,6 +1083,40 @@ tl_hold_call_args <- function(fit, args) {
     fit$call[[arg]] <- call("$", store, as.name(arg))
   }
   fit
+}
+
+#' The head of a stored call, with the package it comes from
+#'
+#' \code{update()} evaluates a fit's call in the caller's environment, and
+#' a session that has loaded tidylearn has not attached rpart,
+#' randomForest, e1071, nnet or gbm: a bare \code{rpart(...)} head failed
+#' with "could not find function \"rpart\"". Heads from those packages are
+#' written \code{pkg::fun}. \code{lm()} and \code{glm()} stay bare, since
+#' stats is attached in every session.
+#'
+#' @param name The function's name, as tidylearn calls it.
+#' @param fun The function, or NULL to look the name up as tidylearn sees
+#'   it, through its imports.
+#' @return A name, or a \code{pkg::fun} call.
+#' @keywords internal
+#' @noRd
+tl_call_head <- function(name, fun = NULL) {
+  if (is.null(fun)) {
+    fun <- tryCatch(
+      get(name, envir = environment(tl_call_head), mode = "function"),
+      error = function(e) NULL
+    )
+  }
+  package <- if (is.function(fun) && !is.null(environment(fun))) {
+    environmentName(environment(fun))
+  } else {
+    ""
+  }
+  if (!nzchar(package) ||
+        package %in% c("base", "stats", "R_GlobalEnv", "tidylearn")) {
+    return(as.name(name))
+  }
+  call("::", as.name(package), as.name(name))
 }
 
 #' The rows a subset argument selects
@@ -1131,7 +1256,7 @@ tl_fit_by_value <- function(fun, fun_name, args) {
 
   fit <- do.call(fun, args)
   if (is.list(fit) && is.call(fit$call)) {
-    fit$call[[1]] <- as.name(fun_name)
+    fit$call[[1]] <- tl_call_head(fun_name, fun)
     fit <- tl_hold_call_args(fit, c("data", "weights", "subset", "control"))
   }
   fit

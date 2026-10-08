@@ -61,7 +61,10 @@ NULL
 #'
 #' Whether a supervised model is a classification or a regression is
 #' decided by the response the formula computes, so \code{factor(cyl) ~ wt}
-#' is a classification even though \code{cyl} is numeric.
+#' is a classification even though \code{cyl} is numeric. A factor or text
+#' response is a classification. A logical response is a regression for
+#' every method but \code{"logistic"} -- with \code{"linear"}, a linear
+#' probability model -- so write \code{factor(y) ~ ...} to classify it.
 #'
 #' A categorical predictor stored as text, as \code{tl_read()} returns it,
 #' is made a factor before the fit and stored as one in \code{$data}, so
@@ -105,7 +108,11 @@ NULL
 #'   \item{\code{"kmeans"}, \code{"pam"}, \code{"clara"}}{\code{k}, the
 #'     number of clusters (default 3); for \code{"pam"}, \code{metric}
 #'     as well (default \code{"euclidean"}).}
-#'   \item{\code{"hclust"}}{\code{distance} (default \code{"euclidean"}).}
+#'   \item{\code{"hclust"}}{\code{hclust_method}, the linkage:
+#'     \code{"average"} (the default), \code{"ward.D"}, \code{"ward.D2"},
+#'     \code{"single"}, \code{"complete"}, \code{"mcquitty"},
+#'     \code{"median"} or \code{"centroid"}; and \code{distance} (default
+#'     \code{"euclidean"}).}
 #'   \item{\code{"dbscan"}}{\code{eps} (default 0.5), \code{minPts}
 #'     (default 5) and \code{distance} (default \code{"euclidean"}).}
 #' }
@@ -244,6 +251,7 @@ tl_model_supervised <- function(data, formula, method, ..., compute = "cpu") {
       call. = FALSE
     )
   }
+  tl_check_subtracted(formula, data)
 
   # A subset is applied to the data before anything else reads it, so the
   # model stores the rows it was fitted on. Passed through to the fit, it
@@ -355,12 +363,10 @@ tl_model_supervised <- function(data, formula, method, ..., compute = "cpu") {
   # Forward the caller's runtime-relevant hyperparameters (nrounds,
   # ntree, epochs, ...) so "auto" estimates the job actually being run.
   # Without this the advisor sizes a default job and can be out by the
-  # ratio of requested to default.
-  hyperparams <- dots[vapply(
-    dots,
-    function(value) is.numeric(value) && length(value) == 1L,
-    logical(1)
-  )]
+  # ratio of requested to default. Every fit argument goes, whatever its
+  # length -- hidden_layers is a vector -- and the advisor reads and checks
+  # the ones its estimate uses.
+  hyperparams <- dots
 
   effective_compute <- tl_resolve_compute(
     method, data, formula,
@@ -383,6 +389,23 @@ tl_model_supervised <- function(data, formula, method, ..., compute = "cpu") {
   # the stored terms do not ask predict() for a column the model never
   # uses; the spec keeps the formula as the caller wrote it.
   fit_formula <- tl_fit_formula(formula, data)
+
+  # The predictor terms of the training data travel with the levels: their
+  # predvars hold what a data-dependent term such as scale(hp) was computed
+  # with, and tl_predictor_matrix() builds new data's design from them
+  # rather than recomputing the term on the rows predicted.
+  attr(xlev, "terms") <- tryCatch(
+    {
+      predictor_terms <- stats::delete.response(
+        stats::terms(fit_formula, data = data)
+      )
+      attr(
+        stats::model.frame(predictor_terms, data, na.action = stats::na.pass),
+        "terms"
+      )
+    },
+    error = function(e) NULL
+  )
 
   # The classes are those of the rows the fit uses. Most methods leave out
   # a row with a missing value, and a class whose every row has one is not

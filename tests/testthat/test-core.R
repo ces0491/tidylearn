@@ -285,6 +285,49 @@ test_that("a column the formula subtracts is not needed to predict", {
   expect_false(anyNA(predict(svm, new_data = noted)$.pred))
 })
 
+test_that("writing out a subtracted formula keeps what the formula means", {
+  # Writing y ~ . - x out added an empty column for every variable the
+  # data lacked: a global vector became an extra main effect, a local
+  # scalar in an offset failed with "variable lengths differ", and a
+  # misspelt subtracted column was fitted as if it had been dropped
+  expo <- mtcars$wt
+  k <- 0.01
+  global <- tl_model(mtcars, mpg ~ . - qsec + I(expo^2), method = "linear")
+  expect_equal(
+    coef(global$fit), coef(lm(mpg ~ . - qsec + I(expo^2), data = mtcars))
+  )
+  offset <- tl_model(mtcars, mpg ~ . - qsec + offset(k * disp),
+                     method = "linear")
+  expect_equal(
+    coef(offset$fit),
+    coef(lm(mpg ~ . - qsec + offset(k * disp), data = mtcars))
+  )
+
+  expect_error(
+    tl_model(mtcars, mpg ~ . - qsce, method = "linear"),
+    "The formula subtracts 'qsce', which is not a column of the data"
+  )
+  expect_error(
+    tl_model(iris, ~ . - Sepal.Widht, method = "kmeans", k = 3),
+    "The formula subtracts 'Sepal.Widht', which is not a column of the data"
+  )
+})
+
+test_that("a data-dependent term is computed with the training values", {
+  skip_if_not_installed("xgboost")
+  # The design was rebuilt from the formula on the rows predicted, so
+  # scale(hp) was centred on whatever was scored: a row predicted
+  # differently alone than inside mtcars, and a single row was NA
+  model <- tl_model(mtcars, mpg ~ scale(hp) + wt, method = "xgboost",
+                    nrounds = 20)
+  within <- predict(model, new_data = mtcars)$.pred
+
+  alone <- predict(model, new_data = mtcars[5, ])$.pred
+  expect_false(is.na(alone))
+  expect_equal(alone, within[5])
+  expect_equal(predict(model, new_data = mtcars[1:3, ])$.pred, within[1:3])
+})
+
 test_that("an extra column does not reach xgboost's design matrix", {
   skip_if_not_installed("xgboost")
   set.seed(3)
@@ -334,6 +377,31 @@ test_that("update() and step() on model$fit refit on the training rows", {
   expect_lt(nchar(paste(deparse(weighted$fit$call), collapse = "")), 150)
 })
 
+test_that("update() on a fit finds its fitting function outside tidylearn", {
+  # The stored call named the function bare, which a session that has not
+  # attached rpart, randomForest, e1071, nnet or gbm cannot find: update()
+  # failed with "could not find function \"rpart\""
+  d <- mtcars[rep(seq_len(nrow(mtcars)), 2), ]
+  fits <- list(
+    tree = tl_model(d, mpg ~ wt + hp, method = "tree")$fit,
+    forest = tl_model(d, mpg ~ wt + hp, method = "forest", ntree = 5)$fit,
+    svm = tl_model(d, mpg ~ wt + hp, method = "svm")$fit,
+    nn = tl_model(d, mpg ~ wt + hp, method = "nn", size = 2,
+                  trace = FALSE)$fit,
+    boost = tl_model(d, mpg ~ wt + hp, method = "boost", n.trees = 10)$fit
+  )
+
+  # load_all() puts tidylearn's imports on the search path, so the call is
+  # run where only R's default packages are attached, as in a session that
+  # has loaded tidylearn and nothing else
+  outside <- new.env(parent = as.environment("package:stats"))
+  for (name in names(fits)) {
+    outside$fit <- fits[[name]]
+    refit <- eval(quote(stats::update(fit)), outside)
+    expect_s3_class(refit, class(fits[[name]])[1])
+  }
+})
+
 test_that("update() on model$fit needs no `data` in scope", {
   # With nothing called `data` in scope it found utils::data() and failed
   # with "'data' must be a data.frame"
@@ -366,9 +434,10 @@ test_that("a subset fit keeps only the rows it was fitted on", {
   # model$data kept all 32 rows of an 11-row fit, so the influence
   # measures failed with "differing number of rows: 32, 11" and
   # tl_evaluate() reported an rmse of 3.24 over rows the model never saw
+  # The 11 rows hold few distinct values of mpg, which tl_model() notes
+  fit <- function(...) suppressMessages(tl_model(...))
   four <- mtcars[mtcars$cyl == 4, ]
-  model <- tl_model(mtcars, mpg ~ wt, method = "linear",
-                    subset = mtcars$cyl == 4)
+  model <- fit(mtcars, mpg ~ wt, method = "linear", subset = mtcars$cyl == 4)
 
   expect_identical(rownames(model$data), rownames(four))
   expect_equal(coef(model$fit), coef(lm(mpg ~ wt, data = four)))
@@ -382,20 +451,20 @@ test_that("a subset fit keeps only the rows it was fitted on", {
 
   # The other per-row arguments follow the same rows
   w <- seq_len(32)
-  weighted <- tl_model(mtcars, mpg ~ wt, method = "linear",
-                       subset = mtcars$cyl == 4, weights = w)
+  weighted <- fit(mtcars, mpg ~ wt, method = "linear",
+                  subset = mtcars$cyl == 4, weights = w)
   expect_equal(
     coef(weighted$fit),
     coef(lm(mpg ~ wt, data = mtcars, subset = cyl == 4, weights = w))
   )
 
   # glmnet has no subset argument and used to fit every row
-  ridge <- tl_model(mtcars, mpg ~ wt + hp, method = "ridge",
-                    subset = mtcars$cyl != 8, lambda = 0.1)
+  ridge <- fit(mtcars, mpg ~ wt + hp, method = "ridge",
+               subset = mtcars$cyl != 8, lambda = 0.1)
   expect_equal(ridge$fit$nobs, sum(mtcars$cyl != 8))
 
   expect_error(
-    tl_model(mtcars, mpg ~ wt, method = "linear", subset = mtcars$cyl > 10),
+    fit(mtcars, mpg ~ wt, method = "linear", subset = mtcars$cyl > 10),
     "'subset' selects none of the 32 rows"
   )
 })
@@ -585,6 +654,26 @@ test_that("the logistic conversion warning has a class of its own", {
     "Converting response variable to factor for logistic regression",
     class = "tidylearn_response_conversion"
   )
+})
+
+test_that("compute = \"auto\" hands the advisor the hyperparameters it reads", {
+  # Only numeric scalars were forwarded, so hidden_layers = c(512, 512)
+  # was dropped and the advisor sized the default c(32, 16)
+  seen <- NULL
+  local_mocked_bindings(
+    tl_resolve_compute = function(method, data, formula, compute = "cpu",
+                                  hyperparams = list()) {
+      seen <<- hyperparams
+      stop("resolved")
+    }
+  )
+  expect_error(
+    tl_model(mtcars, mpg ~ wt + hp, method = "deep", compute = "auto",
+             hidden_layers = c(512, 512), epochs = 3, verbose = 0),
+    "resolved"
+  )
+  expect_identical(seen$hidden_layers, c(512, 512))
+  expect_identical(seen$epochs, 3)
 })
 
 # ---- predict() types ----
