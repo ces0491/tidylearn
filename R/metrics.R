@@ -323,15 +323,19 @@ tl_ranking_metrics <- function(actuals, probs, wanted) {
   named <- paste(wanted, collapse = " and ")
 
   # tl_calc_classification_metrics() refuses rows that hold no class at
-  # all, so an undefined area here means exactly one class
+  # all, so an undefined area here means exactly one class. The class lets
+  # a leave-one-out run, which has said why once, drop the repeat from
+  # every fold.
   if (undefined) {
     one <- length(wanted) == 1L
-    warning(
-      named, if (one) " is" else " are", " undefined when the scored rows ",
-      "hold a single class (\"", present, "\"), so ",
-      if (one) "it is" else "they are", " NA.",
-      call. = FALSE
-    )
+    warning(warningCondition(
+      paste0(
+        named, if (one) " is" else " are", " undefined when the scored ",
+        "rows hold a single class (\"", present, "\"), so ",
+        if (one) "it is" else "they are", " NA."
+      ),
+      class = "tidylearn_ranking_undefined"
+    ))
   }
 
   # For two classes the curve is the positive class's, the second level.
@@ -906,7 +910,15 @@ tl_evaluate <- function(object, new_data = NULL, metrics = NULL, ...) {
 #' @param formula Model formula
 #' @param method Modeling method
 #' @param folds Number of cross-validation folds, a whole number between 2
-#'   and \code{nrow(data)}
+#'   and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn,
+#'   and each fold then scores a single prediction. \code{"accuracy"},
+#'   \code{"mae"}, \code{"mse"} and \code{"mape"} average to their values
+#'   over the left-out predictions. The average \code{"rmse"} is the mean
+#'   absolute error; \code{"precision"}, \code{"recall"},
+#'   \code{"sensitivity"}, \code{"specificity"} and \code{"f1"} are
+#'   undefined on the folds whose one row gives them nothing to divide by;
+#'   and \code{"rsq"}, \code{"auc"} and \code{"pr_auc"} are undefined on
+#'   every fold. A run scoring any of these warns once.
 #' @param metrics Character vector of metrics to compute on each fold,
 #'   passed to \code{\link{tl_evaluate}}. If \code{NULL} (the default),
 #'   \code{tl_evaluate}'s per-task defaults are used.
@@ -983,6 +995,8 @@ tl_cv <- function(data, formula, method, folds = 5, metrics = NULL,
   test_sizes <- integer(folds)
   # Set once for the run: see the tl_model() call below
   warned <- FALSE
+  # Set on the first fold: see tl_warn_loo_metrics() below
+  loo_warned <- NULL
 
   for (i in 1:folds) {
     # Create fold indices
@@ -1022,12 +1036,29 @@ tl_cv <- function(data, formula, method, folds = 5, metrics = NULL,
       }
     )
 
+    # Leave-one-out is warned about once, before the first fold is scored.
+    # With no metrics named, they are the defaults tl_evaluate() takes
+    # from the model's task, which only a fitted model gives.
+    if (is.null(loo_warned)) {
+      loo_warned <- if (inherits(model, "tidylearn_supervised")) {
+        tl_warn_loo_metrics(
+          folds, n,
+          metrics %||% tl_default_metrics(isTRUE(model$spec$is_classification))
+        )
+      } else {
+        character()
+      }
+    }
+
     # Evaluate. tl_evaluate() refuses a fold with no row it can score --
     # every predictor missing, say -- and one such fold is no reason to
     # stop the run, so it is left out of the summary like any undefined
     # score.
     eval_result <- tryCatch(
-      tl_evaluate(model, new_data = test_data, metrics = metrics),
+      withCallingHandlers(
+        tl_evaluate(model, new_data = test_data, metrics = metrics),
+        warning = tl_loo_fold_muffler(length(loo_warned) > 0)
+      ),
       tidylearn_no_scored_rows = function(e) {
         warning(
           "Fold ", i, " is left out of the summary, since ",
@@ -1062,9 +1093,12 @@ tl_cv <- function(data, formula, method, folds = 5, metrics = NULL,
   # A metric that is NA in every fold reaches the summary as NaN, from
   # mean() over nothing. That is arithmetically right and reads as a
   # malfunction: rsq needs variation in the truth, so it is undefined
-  # whenever a fold holds one observation -- which is exactly what
-  # folds = nrow(data) asks for. Say so once rather than leave a bare NaN.
-  undefined <- summary_results$metric[!is.finite(summary_results$mean)]
+  # whenever a fold holds one observation. Say so once rather than leave a
+  # bare NaN. A metric the leave-one-out warning named has been explained
+  # already.
+  undefined <- setdiff(
+    summary_results$metric[!is.finite(summary_results$mean)], loo_warned
+  )
   if (length(undefined) > 0) {
     fold_sizes <- test_sizes
     message(

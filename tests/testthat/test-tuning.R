@@ -999,23 +999,33 @@ test_that("folds = nrow(data) is leave-one-out", {
   loo_error <- vapply(seq_len(nrow(d)), function(i) {
     abs(d$mpg[i] - mean(d$mpg[-i]))
   }, numeric(1))
-  tuned <- suppressMessages(tl_tune_grid(
-    d, mpg ~ wt, method = "tree", param_grid = list(cp = 0.01),
-    folds = nrow(d), verbose = FALSE
-  ))
+  loo <- "each fold holds one row (leave-one-out)"
+  expect_warning(
+    tuned <- suppressMessages(tl_tune_grid(
+      d, mpg ~ wt, method = "tree", param_grid = list(cp = 0.01),
+      folds = nrow(d), verbose = FALSE
+    )),
+    loo, fixed = TRUE
+  )
   results <- attr(tuned, "tuning_results")$results
   expect_identical(results$n_folds_ok, 10L)
   expect_equal(results$mean_metric, mean(loo_error))
-  tuned <- suppressMessages(tl_tune_random(
-    d, mpg ~ wt, method = "tree", param_space = list(cp = 0.01),
-    n_iter = 1, folds = nrow(d), verbose = FALSE, seed = 1
-  ))
+  expect_warning(
+    tuned <- suppressMessages(tl_tune_random(
+      d, mpg ~ wt, method = "tree", param_space = list(cp = 0.01),
+      n_iter = 1, folds = nrow(d), verbose = FALSE, seed = 1
+    )),
+    loo, fixed = TRUE
+  )
   expect_identical(attr(tuned, "tuning_results")$results$n_folds_ok, 10L)
 
   # tl_compare_cv() leaves each row out in turn as well
   linear <- suppressMessages(tl_model(d, mpg ~ wt, method = "linear"))
-  cv <- suppressMessages(
-    tl_compare_cv(d, list(linear = linear), folds = nrow(d), metrics = "rmse")
+  expect_warning(
+    cv <- suppressMessages(tl_compare_cv(
+      d, list(linear = linear), folds = nrow(d), metrics = "rmse"
+    )),
+    loo, fixed = TRUE
   )
   loo_lm <- vapply(seq_len(nrow(d)), function(i) {
     fit <- lm(mpg ~ wt, d[-i, ])
@@ -1023,6 +1033,109 @@ test_that("folds = nrow(data) is leave-one-out", {
   }, numeric(1))
   expect_identical(nrow(cv$fold_metrics), 10L)
   expect_equal(cv$summary$mean_value, mean(loo_lm))
+})
+
+test_that("a leave-one-out search warns once that each fold scores one row", {
+  # rmse on a one-row fold is that row's absolute error, so a leave-one-out
+  # search on rmse averaged the mean absolute error under rmse's name, and
+  # nothing said so
+  d <- mtcars[1:10, c("mpg", "wt")]
+  loo <- "each fold holds one row (leave-one-out)"
+  count_loo <- function(run) sum(grepl(loo, run$warnings, fixed = TRUE))
+
+  run <- collect_warnings(suppressMessages(tl_tune_grid(
+    d, mpg ~ wt, method = "tree", param_grid = list(cp = c(0.01, 0.1)),
+    folds = nrow(d), verbose = FALSE
+  )))
+  expect_identical(count_loo(run), 1L)
+  expect_match(
+    run$warnings[grepl(loo, run$warnings, fixed = TRUE)],
+    paste0("With 10 folds for 10 rows, each fold holds one row ",
+           "(leave-one-out) and is scored on that row's prediction alone. ",
+           "rmse on one row is the absolute error, so its average over the ",
+           "folds is the mean absolute error"),
+    fixed = TRUE
+  )
+
+  run <- collect_warnings(suppressMessages(tl_tune_random(
+    d, mpg ~ wt, method = "tree", param_space = list(cp = c(0.01, 0.1)),
+    n_iter = 3, folds = nrow(d), verbose = FALSE, seed = 1
+  )))
+  expect_identical(count_loo(run), 1L)
+
+  # Ordinary k-fold folds hold several rows each, and say nothing of it
+  set.seed(1)
+  run <- collect_warnings(suppressMessages(tl_tune_grid(
+    d, mpg ~ wt, method = "tree", param_grid = list(cp = c(0.01, 0.1)),
+    folds = 5, verbose = FALSE
+  )))
+  expect_identical(count_loo(run), 0L)
+
+  # mae averages to the mean absolute error of the left-out predictions,
+  # so a leave-one-out search on it has nothing to be warned about
+  run <- collect_warnings(suppressMessages(tl_tune_grid(
+    d, mpg ~ wt, method = "tree", param_grid = list(cp = c(0.01, 0.1)),
+    folds = nrow(d), metric = "mae", verbose = FALSE
+  )))
+  expect_identical(count_loo(run), 0L)
+  expect_equal(
+    attr(run$value, "tuning_results")$results$mean_metric,
+    rep(mean(abs(d$mpg - vapply(seq_len(10), function(i) {
+      mean(d$mpg[-i])
+    }, numeric(1)))), 2)
+  )
+})
+
+test_that("a leave-one-out comparison warns once, not once per fold", {
+  # Each one-row fold left precision or recall undefined, and auc with a
+  # single class, and comparing two classifiers over mtcars' 32 rows gave
+  # over 200 warnings from yardstick and tidylearn, none saying why
+  dm <- mtcars
+  dm$am <- factor(dm$am, labels = c("auto", "manual"))
+  m1 <- tl_model(dm, am ~ wt, method = "tree")
+  m2 <- suppressWarnings(tl_model(dm, am ~ wt + hp, method = "logistic"))
+
+  classes <- character()
+  messages <- character()
+  cv <- withCallingHandlers(
+    tl_compare_cv(dm, list(a = m1, b = m2), folds = nrow(dm)),
+    warning = function(w) {
+      classes <<- c(classes, class(w)[1])
+      messages <<- c(messages, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  loo <- grepl("each fold holds one row (leave-one-out)", messages,
+               fixed = TRUE)
+  # Once, and before any fold is scored
+  expect_identical(which(loo), 1L)
+  expect_match(
+    messages[loo],
+    paste0("precision, recall and f1 are undefined on the folds where that ",
+           "one row leaves nothing to divide by; auc needs more than one ",
+           "row and is NA on every fold. accuracy averages to its value ",
+           "over the left-out predictions."),
+    fixed = TRUE
+  )
+  expect_false(any(startsWith(classes, "yardstick_warning")))
+  expect_false(any(grepl("undefined when the scored rows hold a single class",
+                         messages, fixed = TRUE)))
+  # A warning the one-row folds do not explain still comes through:
+  # glm() fitted the logistic model to perfectly separated rows in some
+  # of the folds
+  expect_true(any(startsWith(messages[!loo], "glm.fit:")))
+
+  # The scores are unchanged: accuracy is the leave-one-out accuracy, and
+  # auc is NA
+  hits <- vapply(seq_len(nrow(dm)), function(i) {
+    fit <- tl_model(dm[-i, ], am ~ wt, method = "tree")
+    as.character(predict(fit, dm[i, ], type = "class")$.pred) ==
+      as.character(dm$am[i])
+  }, logical(1))
+  summary_a <- cv$summary[cv$summary$model == "a", ]
+  expect_equal(summary_a$mean_value[summary_a$metric == "accuracy"],
+               mean(hits))
+  expect_true(is.na(summary_a$mean_value[summary_a$metric == "auc"]))
 })
 
 test_that("the response note is given once per search, not once per fold", {
@@ -1432,6 +1545,50 @@ test_that("the mtry cap counts predictors as randomForest does", {
       tl_tune_cap_mtry(list(list(mtry = 99)), "forest", formula, d)
     )
     expect_equal(capped[[1]]$mtry, nrow(forest$importance),
+                 info = deparse(formula))
+  }
+})
+
+test_that("the mtry cap counts each column of a matrix-valued term", {
+  skip_if_not_installed("randomForest")
+
+  # poly(hp, 2) is one variable of the formula holding two columns, and the
+  # forest is fitted on both, so mpg ~ poly(hp, 2) + wt has three
+  # predictors. The variables were counted: mtry = 3 was capped at 2 with a
+  # warning, and never tried.
+  set.seed(1)
+  run <- collect_warnings(tl_tune_grid(
+    mtcars, mpg ~ poly(hp, 2) + wt, method = "forest",
+    param_grid = list(mtry = c(2, 3), ntree = 30), folds = 2, verbose = FALSE
+  ))
+  expect_false(any(grepl("mtry = 3 exceeds", run$warnings, fixed = TRUE)))
+  tuning <- attr(run$value, "tuning_results")
+  expect_setequal(tuning$results$mtry, c(2, 3))
+  expect_equal(tuning$best_params$mtry, run$value$fit$mtry)
+
+  # Above the column count it is still capped, at that count
+  set.seed(1)
+  run <- collect_warnings(tl_tune_grid(
+    mtcars, mpg ~ poly(hp, 2) + wt, method = "forest",
+    param_grid = list(mtry = c(2, 5), ntree = 30), folds = 2, verbose = FALSE
+  ))
+  expect_true(any(grepl("mtry = 5 exceeds the 3 predictors", run$warnings,
+                        fixed = TRUE)))
+  expect_setequal(attr(run$value, "tuning_results")$results$mtry, c(2, 3))
+
+  # The forest's own column count, read off the importance table of a fit
+  # with the formula, for matrix-valued terms and ordinary ones alike
+  formulas <- list(
+    mpg ~ poly(hp, 2) + wt, mpg ~ poly(hp, 3) * wt,
+    mpg ~ factor(cyl) + poly(wt, 2), mpg ~ log(hp) + wt, mpg ~ wt + hp
+  )
+  for (formula in formulas) {
+    set.seed(1)
+    forest <- tl_model(mtcars, formula, method = "forest", ntree = 5)
+    capped <- suppressWarnings(
+      tl_tune_cap_mtry(list(list(mtry = 99)), "forest", formula, mtcars)
+    )
+    expect_equal(capped[[1]]$mtry, nrow(forest$fit$importance),
                  info = deparse(formula))
   }
 })

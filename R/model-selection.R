@@ -239,7 +239,15 @@ tl_step_null_formula <- function(formula) {
 #'   classification or all regression. An unnamed model is named
 #'   \code{Model_<position>}.
 #' @param folds Number of cross-validation folds, a whole number between 2
-#'   and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn.
+#'   and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn,
+#'   and each fold then scores a single prediction. \code{"accuracy"},
+#'   \code{"mae"}, \code{"mse"} and \code{"mape"} average to their values
+#'   over the left-out predictions. The average \code{"rmse"} is the mean
+#'   absolute error; \code{"precision"}, \code{"recall"},
+#'   \code{"sensitivity"}, \code{"specificity"} and \code{"f1"} are
+#'   undefined on the folds whose one row gives them nothing to divide by;
+#'   and \code{"rsq"}, \code{"auc"} and \code{"pr_auc"} are undefined on
+#'   every fold. A run scoring any of these warns once.
 #' @param metrics Character vector of metrics to compute, from those
 #'   \code{\link{tl_evaluate}} computes for the task. Defaults to
 #'   \code{c("accuracy", "precision", "recall", "f1", "auc")} for
@@ -415,6 +423,8 @@ tl_compare_cv <- function(data, models, folds = 5, metrics = NULL, ...) {
 
   # Create cross-validation splits
   cv_splits <- tl_resample_folds(data, folds)
+  loo_warned <- tl_warn_loo_metrics(folds, nrow(data), metrics)
+  loo_muffler <- tl_loo_fold_muffler(length(loo_warned) > 0)
 
   # For each model, perform cross-validation
   cv_results <- lapply(seq_along(models), function(i) {
@@ -453,7 +463,10 @@ tl_compare_cv <- function(data, models, folds = 5, metrics = NULL, ...) {
       # such fold is no reason to stop the comparison, so its values are
       # NA and the summary leaves it out.
       fold_metrics <- tryCatch(
-        tl_evaluate(fold_model, test_data, metrics = metrics),
+        withCallingHandlers(
+          tl_evaluate(fold_model, test_data, metrics = metrics),
+          warning = loo_muffler
+        ),
         tidylearn_no_scored_rows = function(e) {
           warning(
             "Fold ", j, " is left out of the summary for '", model_name,

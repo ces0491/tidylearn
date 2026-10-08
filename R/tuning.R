@@ -44,7 +44,15 @@ tl_metric_maximize <- function(metric) {
 #' @param param_grid A named list of candidate values, one element for each
 #'   \code{\link{tl_model}} argument to tune, named after it
 #' @param folds Number of cross-validation folds, a whole number between 2
-#'   and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn.
+#'   and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn,
+#'   and each fold then scores a single prediction. \code{"accuracy"},
+#'   \code{"mae"}, \code{"mse"} and \code{"mape"} average to their values
+#'   over the left-out predictions. The average \code{"rmse"} is the mean
+#'   absolute error; \code{"precision"}, \code{"recall"},
+#'   \code{"sensitivity"}, \code{"specificity"} and \code{"f1"} are
+#'   undefined on the folds whose one row gives them nothing to divide by;
+#'   and \code{"rsq"}, \code{"auc"} and \code{"pr_auc"} are undefined on
+#'   every fold. A run scoring any of these warns once.
 #' @param metric Metric to optimize: one of the names
 #'   \code{\link{tl_evaluate}} computes for the task. Defaults to
 #'   \code{"accuracy"} for classification and \code{"rmse"} for regression.
@@ -84,8 +92,9 @@ tl_metric_maximize <- function(metric) {
 #'   For \code{method = "forest"}, an \code{mtry} above the number of
 #'   predictors is capped at that number, with a warning, and duplicate
 #'   combinations that result are evaluated once. Predictors are counted as
-#'   randomForest counts them, so a column removed with \code{- id} is not
-#'   one.
+#'   the forest is fitted on them, so a column removed with \code{- id} is
+#'   not one, and a matrix-valued term such as \code{poly(hp, 2)} is one per
+#'   column.
 #' @examples
 #' \donttest{
 #' model <- tl_tune_grid(iris, Species ~ ., method = "tree",
@@ -166,6 +175,7 @@ tl_tune_grid <- function(data, formula, method,
 
   # Create cross-validation splits
   cv_splits <- tl_resample_folds(data, folds)
+  loo_warned <- length(tl_warn_loo_metrics(folds, nrow(data), metric)) > 0
 
   # Initialize results storage
   tuning_results <- list()
@@ -186,7 +196,8 @@ tl_tune_grid <- function(data, formula, method,
     }
 
     tuning_results[[i]] <- tl_tune_score_set(
-      params, cv_splits, formula, method, metric, dots, conversion
+      params, cv_splits, formula, method, metric, dots, conversion,
+      loo_warned
     )
 
     if (verbose) {
@@ -449,6 +460,127 @@ tl_resample_folds <- function(data, folds) {
   }
 }
 
+#' Warn that leave-one-out folds score one prediction each
+#'
+#' The resampling functions score each fold and average the scores. With
+#' one row per fold, the average of accuracy, mae, mse or mape is that
+#' metric over the left-out predictions, and the average of the others is
+#' not. rmse on one row is the absolute error, so its average is the mean
+#' absolute error. precision, recall, specificity and f1 are undefined on
+#' the folds whose one row gives them nothing to divide by, and rsq, auc
+#' and pr_auc on every fold. None of this was said, and the warnings
+#' yardstick and \code{tl_ranking_metrics()} gave for each undefined fold
+#' ran to hundreds per run without saying why. \code{tl_cv()},
+#' \code{tl_compare_cv()} and the tuners all warn through this function,
+#' once per run and before scoring, so that they say the same thing.
+#'
+#' @param n_folds The number of folds
+#' @param n_rows The number of rows the folds split
+#' @param metrics The names of the metrics averaged over the folds, with
+#'   any default already applied
+#' @return The metrics warned about, invisibly: empty when a fold holds more
+#'   than one row or no metric named is affected. A caller passes
+#'   \code{length(result) > 0} to \code{tl_loo_fold_muffler()}.
+#' @keywords internal
+#' @noRd
+tl_warn_loo_metrics <- function(n_folds, n_rows, metrics) {
+  if (n_folds != n_rows) {
+    return(invisible(character()))
+  }
+  rmse <- intersect("rmse", metrics)
+  by_class <- intersect(
+    c("precision", "recall", "sensitivity", "specificity", "f1"), metrics
+  )
+  need_rows <- intersect(c("rsq", "auc", "pr_auc"), metrics)
+  affected <- c(rmse, by_class, need_rows)
+  if (length(affected) == 0L) {
+    return(invisible(character()))
+  }
+  meaningful <- intersect(c("accuracy", "mae", "mse", "mape"), metrics)
+
+  enumerate <- function(x) {
+    if (length(x) <= 2L) {
+      paste(x, collapse = " and ")
+    } else {
+      paste0(paste(x[-length(x)], collapse = ", "), " and ", x[length(x)])
+    }
+  }
+  one <- function(x) length(x) == 1L
+
+  clauses <- c(
+    if (length(rmse) > 0L) {
+      paste0(
+        "rmse on one row is the absolute error, so its average over the ",
+        "folds is the mean absolute error, and the leave-one-out rmse is ",
+        "the square root of the mse average"
+      )
+    },
+    if (length(by_class) > 0L) {
+      paste0(
+        enumerate(by_class), if (one(by_class)) " is" else " are",
+        " undefined on the folds where that one row leaves nothing to ",
+        "divide by"
+      )
+    },
+    if (length(need_rows) > 0L) {
+      paste0(
+        enumerate(need_rows), if (one(need_rows)) " needs" else " need",
+        " more than one row and ", if (one(need_rows)) "is" else "are",
+        " NA on every fold"
+      )
+    }
+  )
+
+  warning(
+    "With ", n_folds, " folds for ", n_rows, " rows, each fold holds one ",
+    "row (leave-one-out) and is scored on that row's prediction alone. ",
+    paste(clauses, collapse = "; "), ". ",
+    if (length(meaningful) > 0L) {
+      paste0(
+        enumerate(meaningful),
+        if (one(meaningful)) {
+          " averages to its value"
+        } else {
+          " average to their values"
+        },
+        " over the left-out predictions. "
+      )
+    },
+    "Use fewer folds to score ", enumerate(affected), ".",
+    call. = FALSE
+  )
+  invisible(affected)
+}
+
+#' A warning handler for the folds of a leave-one-out run
+#'
+#' Once \code{tl_warn_loo_metrics()} has said why one-row folds leave
+#' metrics undefined, the warnings yardstick and \code{tl_ranking_metrics()}
+#' give for each such fold only repeat it. They are muffled by class, so a
+#' warning with any other cause still comes through.
+#'
+#' @param active Whether the run's leave-one-out warning was given
+#' @return A function for \code{withCallingHandlers(warning = )}
+#' @keywords internal
+#' @noRd
+tl_loo_fold_muffler <- function(active) {
+  # Left as a promise, an argument that gives the leave-one-out warning
+  # gave it when the first fold warning arrived, after scoring had begun,
+  # and never on a run whose folds gave none
+  force(active)
+  explained <- c(
+    "yardstick_warning_precision_undefined",
+    "yardstick_warning_recall_undefined",
+    "yardstick_warning_spec_undefined",
+    "tidylearn_ranking_undefined"
+  )
+  function(w) {
+    if (active && inherits(w, explained)) {
+      invokeRestart("muffleWarning")
+    }
+  }
+}
+
 #' Refuse a fold count that cannot split the data
 #'
 #' @param folds The number of folds
@@ -515,12 +647,16 @@ tl_check_per_row_args <- function(arg_names, caller) {
 #' @param conversion Handler for \code{tl_model()}'s response-conversion
 #'   warning, shared by every fit of one search; see
 #'   \code{tl_warn_once()}
+#' @param loo_warned Whether the search has given its leave-one-out
+#'   warning, which explains the per-fold warnings of undefined metrics;
+#'   see \code{tl_loo_fold_muffler()}
 #' @return A list: \code{mean_metric} over the scored folds,
 #'   \code{n_folds_ok}, \code{n_fit_failed} and \code{fold_metrics}
 #' @keywords internal
 #' @noRd
 tl_tune_score_set <- function(params, cv_splits, formula, method, metric,
-                              dots, conversion = tl_warn_once()) {
+                              dots, conversion = tl_warn_once(),
+                              loo_warned = FALSE) {
   n_folds <- length(cv_splits$splits)
   fold_metrics <- rep(NA_real_, n_folds)
   fit_failed <- logical(n_folds)
@@ -566,7 +702,10 @@ tl_tune_score_set <- function(params, cv_splits, formula, method, metric,
     # metric is undefined.
     valid_fold <- rsample::assessment(split)
     eval_metrics <- tryCatch(
-      tl_evaluate(fold_model, valid_fold, metrics = metric),
+      withCallingHandlers(
+        tl_evaluate(fold_model, valid_fold, metrics = metric),
+        warning = tl_loo_fold_muffler(loo_warned)
+      ),
       tidylearn_no_scored_rows = function(e) {
         warning(
           "Fold ", j, " is left out of the score for ",
@@ -1007,14 +1146,8 @@ tl_tune_select_best <- function(results_df, maximize, folds, labels,
 #' both overshoot are the same model scored twice. Capping here instead of
 #' dropping the values keeps the all-predictors candidate the caller asked
 #' for, and the results record the value each model was actually fitted
-#' with.
-#'
-#' The count is the one randomForest's formula method makes. It rebuilds
-#' the model frame from the formula's term labels and samples from the
-#' variables in it: a factor counts once, \code{y ~ x1 * x2} has two
-#' predictors, not three, and \code{y ~ . - id} does not count \code{id}.
-#' The formula's own model frame keeps a column that \code{- id} removed
-#' from the terms, so counting its columns overstated the predictors.
+#' with. The count is the forest's own; see
+#' \code{tl_forest_predictor_count()}.
 #'
 #' @param param_combinations Per-set lists of parameter values
 #' @param method The model method
@@ -1039,11 +1172,7 @@ tl_tune_cap_mtry <- function(param_combinations, method, formula, data) {
   # own message, which says more than a terms() error would here, and a
   # formula with no predictors fails the same way
   n_predictors <- tryCatch(
-    {
-      labels <- attr(stats::terms(formula, data = data), "term.labels")
-      variables <- attr(stats::terms(stats::reformulate(labels)), "variables")
-      length(variables) - 1L
-    },
+    tl_forest_predictor_count(formula, data),
     error = function(e) NULL
   )
   if (is.null(n_predictors) || n_predictors < 1L) {
@@ -1097,6 +1226,46 @@ tl_tune_cap_mtry <- function(param_combinations, method, formula, data) {
   })
 }
 
+#' The number of predictors a random forest samples mtry from
+#'
+#' A formula of bare columns is fitted through randomForest's formula
+#' method, which rebuilds the model frame from the formula's term labels
+#' and samples from the variables in it: a factor counts once,
+#' \code{y ~ x1 * x2} has two predictors and \code{y ~ . - id} does not
+#' count \code{id}. The formula's own model frame keeps a column that
+#' \code{- id} removed from the terms, so counting its columns overstated
+#' the predictors.
+#'
+#' A formula with a transformed term is fitted from a predictor frame
+#' instead (\code{tl_fit_forest_frame()}), in which a matrix-valued term
+#' such as \code{poly(hp, 2)} is one column per column of its matrix.
+#' Counting its variables took \code{mpg ~ poly(hp, 2) + wt} for two
+#' predictors when the forest has three, and capped \code{mtry = 3} at 2.
+#' The frame is built here as that function builds it, and its columns are
+#' counted.
+#'
+#' @param formula The model formula
+#' @param data The training data
+#' @return The number of predictors
+#' @keywords internal
+#' @noRd
+tl_forest_predictor_count <- function(formula, data) {
+  if (!tl_forest_has_transformed_term(formula, data)) {
+    labels <- attr(stats::terms(formula, data = data), "term.labels")
+    variables <- attr(stats::terms(stats::reformulate(labels)), "variables")
+    return(length(variables) - 1L)
+  }
+
+  # Missing values decide which rows are fitted, and only the columns are
+  # counted, so they are kept
+  frame <- stats::model.frame(formula, data = data, na.action = stats::na.pass)
+  model_terms <- attr(frame, "terms")
+  factors <- attr(stats::delete.response(model_terms), "factors")
+  used <- which(rowSums(factors) > 0)
+  predictors <- setdiff(seq_along(frame), attr(model_terms, "response"))
+  ncol(tl_forest_flatten(frame[, predictors[used], drop = FALSE]))
+}
+
 #' Tune hyperparameters using random search
 #'
 #' @param data A data frame containing the training
@@ -1126,7 +1295,15 @@ tl_tune_cap_mtry <- function(param_combinations, method, formula, data) {
 #' @param n_iter Number of random parameter
 #'   combinations to try, a whole number of at least 1
 #' @param folds Number of cross-validation folds, a whole number between 2
-#'   and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn.
+#'   and \code{nrow(data)}. \code{nrow(data)} leaves each row out in turn,
+#'   and each fold then scores a single prediction. \code{"accuracy"},
+#'   \code{"mae"}, \code{"mse"} and \code{"mape"} average to their values
+#'   over the left-out predictions. The average \code{"rmse"} is the mean
+#'   absolute error; \code{"precision"}, \code{"recall"},
+#'   \code{"sensitivity"}, \code{"specificity"} and \code{"f1"} are
+#'   undefined on the folds whose one row gives them nothing to divide by;
+#'   and \code{"rsq"}, \code{"auc"} and \code{"pr_auc"} are undefined on
+#'   every fold. A run scoring any of these warns once.
 #' @param metric Metric to optimize, as for \code{\link{tl_tune_grid}}
 #' @param maximize Logical; whether to maximize (TRUE)
 #'   or minimize (FALSE) the metric. \code{NULL}, the default, follows the
@@ -1225,6 +1402,7 @@ tl_tune_random <- function(data, formula, method,
 
   # Create cross-validation splits
   cv_splits <- tl_resample_folds(data, folds)
+  loo_warned <- length(tl_warn_loo_metrics(folds, nrow(data), metric)) > 0
 
   # Initialize results storage
   tuning_results <- list()
@@ -1259,7 +1437,8 @@ tl_tune_random <- function(data, formula, method,
     }
 
     tuning_results[[i]] <- tl_tune_score_set(
-      params, cv_splits, formula, method, metric, dots, conversion
+      params, cv_splits, formula, method, metric, dots, conversion,
+      loo_warned
     )
 
     if (verbose) {

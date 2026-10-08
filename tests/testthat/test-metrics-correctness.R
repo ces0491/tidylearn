@@ -555,31 +555,107 @@ test_that("tl_cv accepts a per-row argument set to NULL", {
 # ---- cross-validation on folds too small for a metric ----------------
 
 test_that("tl_cv explains a metric that no fold could compute", {
-  # folds = nrow(data) is leave-one-out, so every test fold holds one
-  # observation and rsq -- which needs variation in the truth -- is
-  # undefined. mean() over nothing then put a bare NaN in the summary,
-  # which reads as a malfunction rather than as a property of the request.
+  # rsq needs variation in the truth, and a constant response has none in
+  # any fold. mean() over nothing then put a bare NaN in the summary, which
+  # reads as a malfunction rather than as a property of the request.
+  d <- data.frame(x = seq_len(10), y = 3)
+  set.seed(1)
+  expect_message(
+    suppressWarnings(tl_cv(d, y ~ x, method = "linear", folds = 5)),
+    "rsq could not be computed for any fold"
+  )
+})
+
+test_that("tl_cv warns once that a leave-one-out fold scores one row", {
+  # folds = nrow(data) is leave-one-out. rmse on one row is that row's
+  # absolute error, so the summary's rmse was the mean absolute error, and
+  # rsq was NA with only a note after the run, which said nothing of rmse
   set.seed(1)
   n <- 10
   d <- data.frame(x = stats::rnorm(n))
   d$y <- d$x * 2 + stats::rnorm(n, sd = 0.2)
+  loo <- "each fold holds one row (leave-one-out)"
 
-  expect_message(
-    suppressWarnings(tl_cv(d, y ~ x, method = "linear", folds = n)),
-    "rsq could not be computed for any fold"
+  warnings <- character()
+  notes <- character()
+  set.seed(1)
+  cv <- withCallingHandlers(
+    tl_cv(d, y ~ x, method = "linear", folds = n),
+    warning = function(w) {
+      warnings <<- c(warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    },
+    message = function(m) {
+      notes <<- c(notes, conditionMessage(m))
+      invokeRestart("muffleMessage")
+    }
   )
-  expect_message(
-    suppressWarnings(tl_cv(d, y ~ x, method = "linear", folds = n)),
-    "smallest fold holds 1 observation"
-  )
-
-  # rmse and mae are defined for a single observation and still are
-  cv <- suppressWarnings(suppressMessages(
-    tl_cv(d, y ~ x, method = "linear", folds = n)
+  expect_identical(warnings, paste0(
+    "With 10 folds for 10 rows, each fold holds one row (leave-one-out) and ",
+    "is scored on that row's prediction alone. rmse on one row is the ",
+    "absolute error, so its average over the folds is the mean absolute ",
+    "error, and the leave-one-out rmse is the square root of the mse ",
+    "average; rsq needs more than one row and is NA on every fold. mae ",
+    "averages to its value over the left-out predictions. Use fewer folds ",
+    "to score rmse and rsq."
   ))
-  defined <- cv$summary[cv$summary$metric %in% c("rmse", "mae"), ]
-  expect_equal(nrow(defined), 2L)
-  expect_true(all(is.finite(defined$mean)))
+  # The note after the run does not say it again
+  expect_false(any(grepl("rsq could not be computed", notes, fixed = TRUE)))
+
+  # The averages are the ones the warning describes
+  errors <- vapply(seq_len(n), function(i) {
+    fit <- stats::lm(y ~ x, data = d[-i, ])
+    d$y[i] - stats::predict(fit, d[i, ])
+  }, numeric(1))
+  value_of <- function(name) cv$summary$mean[cv$summary$metric == name]
+  expect_equal(value_of("rmse"), mean(abs(errors)))
+  expect_equal(value_of("mae"), mean(abs(errors)))
+
+  cv <- suppressWarnings(tl_cv(d, y ~ x, method = "linear", folds = n,
+                               metrics = c("mse", "rmse")))
+  expect_equal(sqrt(cv$summary$mean[cv$summary$metric == "mse"]),
+               sqrt(mean(errors^2)))
+
+  # Metrics that average to their leave-one-out values are not warned
+  # about, and neither is an ordinary k-fold run
+  set.seed(1)
+  expect_no_warning(tl_cv(d, y ~ x, method = "linear", folds = n,
+                          metrics = c("mae", "mse", "mape")))
+  set.seed(1)
+  expect_no_warning(tl_cv(d, y ~ x, method = "linear", folds = 5))
+})
+
+test_that("leave-one-out tl_cv drops the per-fold undefined-metric warnings", {
+  # Each one-row fold left precision or recall undefined, and auc with a
+  # single class, and yardstick and tidylearn warned on every fold
+  dm <- mtcars
+  dm$am <- factor(dm$am, labels = c("auto", "manual"))
+  warnings <- character()
+  set.seed(1)
+  cv <- withCallingHandlers(
+    tl_cv(dm, am ~ wt, method = "tree", folds = nrow(dm),
+          metrics = c("accuracy", "precision", "recall", "auc")),
+    warning = function(w) {
+      warnings <<- c(warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  expect_length(warnings, 1L)
+  expect_match(warnings, "each fold holds one row (leave-one-out)",
+               fixed = TRUE)
+  expect_match(warnings, paste0(
+    "precision and recall are undefined on the folds where that one row ",
+    "leaves nothing to divide by; auc needs more than one row and is NA on ",
+    "every fold. accuracy averages to its value over the left-out ",
+    "predictions."
+  ), fixed = TRUE)
+
+  # Over a fold of several rows the same warnings are still given
+  model <- tl_model(dm, am ~ wt, method = "tree")
+  expect_warning(
+    tl_evaluate(model, dm[dm$am == "auto", ], metrics = "auc"),
+    "auc is undefined when the scored rows hold a single class"
+  )
 })
 
 test_that("a fold count that leaves room for every metric says nothing", {
