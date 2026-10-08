@@ -89,8 +89,10 @@ tl_check_gpu <- function(verbose = FALSE) {
 #' absent, errors, produces no output, or does not answer within
 #' `timeout` seconds (with a warning in that case). Does not load Python.
 #'
-#' @param timeout Seconds to wait for `nvidia-smi`. A hung driver
-#'   otherwise held up every `compute = "auto"` fit for as long as it hung.
+#' @param timeout Seconds to wait for `nvidia-smi`. Without a limit, a hung
+#'   driver holds up `tl_check_gpu()`, `tl_compute_advisor()` and every
+#'   xgboost or deep fit with `compute = "auto"` or `"gpu"` for as long as
+#'   it hangs.
 #' @keywords internal
 #' @noRd
 tl_detect_cuda_internal <- function(timeout = 10) {
@@ -101,7 +103,8 @@ tl_detect_cuda_internal <- function(timeout = 10) {
     driver_version = NA_character_
   )
 
-  smi_path <- Sys.which("nvidia-smi")
+  # The program found is the one run, so the check and the call agree
+  smi_path <- Sys.which(tl_nvidia_smi_command())
   if (!nzchar(smi_path)) {
     return(na_result)
   }
@@ -109,7 +112,7 @@ tl_detect_cuda_internal <- function(timeout = 10) {
   out <- tryCatch(
     suppressWarnings(
       system2(
-        "nvidia-smi",
+        smi_path,
         args = c(
           "--query-gpu=name,driver_version",
           "--format=csv,noheader"
@@ -163,6 +166,19 @@ tl_detect_cuda_internal <- function(timeout = 10) {
   )
 }
 
+#' The command that runs nvidia-smi
+#'
+#' One place for the name, so tests can run a stand-in by its full path.
+#' A stand-in first on PATH is not enough on Windows, which searches
+#' System32, where the NVIDIA driver installs nvidia-smi.exe, before PATH.
+#'
+#' @return The command to look up with \code{Sys.which()}.
+#' @keywords internal
+#' @noRd
+tl_nvidia_smi_command <- function() {
+  "nvidia-smi"
+}
+
 #' Heuristic per-backend GPU check
 #'
 #' Returns `installed` + `gpu_likely_works` for a single backend package.
@@ -174,8 +190,9 @@ tl_detect_cuda_internal <- function(timeout = 10) {
 #' @noRd
 tl_check_backend_gpu <- function(pkg, cuda) {
   # Read from the library rather than by loading the namespace:
-  # requireNamespace() took seconds for xgboost, and loading keras ran its
-  # .onLoad, which sets TF_USE_LEGACY_KERAS for the rest of the session.
+  # requireNamespace() would load the backend, which takes seconds for
+  # xgboost and runs keras's .onLoad, which sets TF_USE_LEGACY_KERAS for
+  # the rest of the session.
   # Keep this function free of tidylearn internals: a test runs its source
   # in a fresh R session to check that it loads nothing.
   installed <- nzchar(system.file(package = pkg))

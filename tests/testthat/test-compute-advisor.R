@@ -351,7 +351,7 @@ test_that("the advisor sizes inputs past the integer limit", {
 
 test_that("the advice writes large sizes out in full", {
   # format() writes a round number in scientific notation when that is
-  # shorter, so a 40,000,000 MB peak printed as "4e+07" in the table, the
+  # shorter, so a 100,000 MB peak printed as "1e+05" in the table, the
   # reasoning and the notes
   advice <- tl_compute_advisor("xgboost", fake_frame(1e9, 1250), y ~ .,
                                gpu_check = fake_gpu_off)

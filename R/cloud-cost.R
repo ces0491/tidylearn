@@ -63,7 +63,7 @@ tl_cloud_timeout_seconds <- function(est_seconds,
 #' Infinite is refused along with zero and negatives: the cap is what
 #' keeps the timeout below Modal's own 24-hour ceiling. A cap below the
 #' timeout floor is refused too, rather than letting either give way:
-#' honouring it set a timeout under the floor, which kills every job
+#' honouring it would set a timeout under the floor, which kills every job
 #' during cold start, and raising it to the floor would bill past the
 #' bound the caller set.
 #'
@@ -139,8 +139,8 @@ tl_cloud_check_budget <- function(advice,
     stop("'max_cost' must be a single positive number of dollars.",
          call. = FALSE)
   }
-  # Checked before the comparison below, which NA reached as an if()
-  # condition and -1 passed as if it were a cap
+  # Checked before the comparison below, which an NA cap would reach as an
+  # if() condition and a negative one would pass as a cap
   tl_cloud_check_timeout_cap(timeout_cap)
 
   cloud <- advice$cloud
@@ -166,7 +166,7 @@ tl_cloud_check_budget <- function(advice,
 
   timeout_seconds <- tl_cloud_timeout_seconds(est_seconds, timeout_cap)
 
-  # A 3599 s estimate under the 3600 s default cap got one second of
+  # Under the 3600 s default cap a 3599 s estimate gets one second of
   # headroom on an order-of-magnitude estimate. The ratio is rounded down
   # so that 2.998x never reads as the full 3x.
   if (timeout_seconds < ceiling(est_seconds * .tl_cloud_timeout_factor)) {
@@ -213,8 +213,7 @@ tl_cloud_check_budget <- function(advice,
 #' @keywords internal
 #' @noRd
 tl_cloud_format_duration <- function(seconds) {
-  # In full, as tl_format_number() writes it: paste0() gave a million
-  # hours as "1e+06 h"
+  # Through tl_format_number(), so large values print in full
   if (seconds < 60) {
     return(paste0(tl_format_number(seconds), "s"))
   }

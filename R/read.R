@@ -165,8 +165,9 @@ tl_is_web_url <- function(source) {
 
 #' The host a URL points at
 #'
-#' Matching a host name anywhere in the string let
-#' "https://mirror.example.org/github.com/data.csv" pass for GitHub.
+#' The host is parsed out of the URL rather than searched for in the
+#' string, where "https://mirror.example.org/github.com/data.csv" would
+#' pass for GitHub.
 #'
 #' @param url A single URL string.
 #' @return The host, lower case, without user info or port; \code{""} when
@@ -448,9 +449,9 @@ tl_read_multi <- function(paths, ..., format = NULL, .quiet = FALSE,
     tl_read(p, ..., format = format, .quiet = TRUE)
   })
 
-  # One column for every file's label. Choosing per file put the labels of
-  # a file holding its own source_file column in tl_source_file and the
-  # rest in that file's column, mixed in with its data.
+  # One column for every file's label, chosen once. Chosen per file, the
+  # labels of a file holding its own source_file column would go to
+  # tl_source_file and the rest into that file's column, among its data.
   col <- "source_file"
   if (any(vapply(results, function(df) col %in% names(df), logical(1)))) {
     col <- "tl_source_file"
@@ -480,9 +481,9 @@ tl_read_multi <- function(paths, ..., format = NULL, .quiet = FALSE,
 
 #' Label paths read together by their part below a shared folder
 #'
-#' Base names alone made 2023/sales.csv and 2024/sales.csv the same
-#' label. Each path is shown relative to the deepest folder all of them
-#' share, so files in one folder keep their bare names.
+#' Base names alone would label 2023/sales.csv and 2024/sales.csv alike.
+#' Each path is shown relative to the deepest folder all of them share, so
+#' files in one folder keep their bare names.
 #'
 #' @param paths Character vector of paths or URIs.
 #' @return A character vector the length of \code{paths}.
@@ -577,7 +578,7 @@ tl_read_dir <- function(path, pattern = NULL, format = NULL,
                         recursive = recursive, ignore.case = TRUE)
   }
   # Without recursion list.files() returns folders too, and a folder named
-  # like a data file (old.csv) was read as a directory into the result
+  # like a data file (old.csv) would be read as a directory into the result
   found <- found[!dir.exists(file.path(path, found))]
   files <- file.path(path, found)
 
@@ -603,9 +604,9 @@ tl_read_dir <- function(path, pattern = NULL, format = NULL,
 #' column. Use the \code{file} argument to select a specific file from
 #' the archive.
 #'
-#' An archive with a member that would be written outside the extraction
-#' directory -- an absolute path, or one climbing out with \code{..} -- is
-#' refused before anything is extracted.
+#' An archive with a member whose name could reach outside the extraction
+#' directory -- an absolute path, a drive letter on Windows, or any
+#' \code{..} component -- is refused before anything is extracted.
 #'
 #' @param path Path to a zip file.
 #' @param file Optional name of a specific file within the archive to read:
@@ -717,9 +718,9 @@ tl_read_zip <- function(path, file = NULL, format = NULL,
 #' Pick the archive member a caller named
 #'
 #' An exact path wins, then an exact file name, then a part of the path.
-#' Several matches at the step that decides are an error: settling them by
-#' file order read "full_train.csv" when "train.csv" was asked for, without
-#' a word under \code{.quiet = TRUE}.
+#' Several matches at the step that decides are an error. Settled by file
+#' order, "train" would read "full_train.csv" where the archive also holds
+#' "train.csv", without a word under \code{.quiet = TRUE}.
 #'
 #' @param file The name the caller gave.
 #' @param members Member paths, relative to the extraction directory.
@@ -757,8 +758,12 @@ tl_match_zip_member <- function(file, members) {
 #' \code{unzip()} before R 4.5.1 extracts a member named \code{"../x"} or
 #' \code{"/x"} as written, so a crafted archive could plant a file
 #' anywhere the user can write -- an \code{.Rprofile}, say, which runs at
-#' the next R start. Names are split on both separators because Windows
-#' accepts either.
+#' the next R start. Any \code{..} component is refused, including one
+#' that resolves inside, so the check needs no path arithmetic. Names are
+#' split on both separators, since archives made on Windows use either and
+#' some extractors treat a backslash as one. A drive letter
+#' (\code{"C:x"}) is refused only on Windows: elsewhere a colon is an
+#' ordinary character in a file name.
 #'
 #' @param path The archive, named in the message.
 #' @param members Member names, as listed by \code{unzip(list = TRUE)}.
@@ -766,20 +771,28 @@ tl_match_zip_member <- function(file, members) {
 #' @keywords internal
 #' @noRd
 tl_refuse_unsafe_zip <- function(path, members) {
-  absolute <- grepl("^([A-Za-z]:|[/\\\\])", members)
+  reason <- rep(NA_character_, length(members))
+
   climbing <- vapply(
     strsplit(members, "[/\\\\]"),
     function(parts) any(parts == ".."),
     logical(1)
   )
-  unsafe <- members[absolute | climbing]
+  reason[climbing] <- "has a '..' component"
+  reason[grepl("^[/\\\\]", members)] <- "is an absolute path"
+  if (.Platform$OS.type == "windows") {
+    reason[grepl("^[A-Za-z]:", members)] <- "names a drive"
+  }
 
-  if (length(unsafe) > 0L) {
+  unsafe <- !is.na(reason)
+  if (any(unsafe)) {
     stop(
       "Refusing to unpack '", basename(path), "': ",
-      paste0("'", unsafe, "'", collapse = ", "),
-      " would be written outside the directory it is unpacked into. ",
-      "Extract it by hand only if you trust where it came from.",
+      paste0("'", members[unsafe], "' ", reason[unsafe], collapse = "; "),
+      ". tidylearn does not extract a member that is an absolute path, ",
+      "names a drive or has a '..' component, since such a name can reach ",
+      "outside the folder an archive is unpacked into. Extract it by hand ",
+      "only if you trust where it came from.",
       call. = FALSE
     )
   }
@@ -1098,8 +1111,8 @@ tl_read_json <- function(path, flatten = TRUE, ...) {
   tl_validate_file_path(path)
   tl_check_packages("jsonlite")
 
-  # fromJSON() reads a file as one document, so newline-delimited JSON
-  # failed at the end of its first record with "trailing garbage"
+  # fromJSON() reads a file as one document, and stops newline-delimited
+  # JSON at the end of its first record ("trailing garbage")
   read_lines <- function() {
     lines <- jsonlite::stream_in(file(path), verbose = FALSE, ...)
     if (isTRUE(flatten)) jsonlite::flatten(lines) else lines

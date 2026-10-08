@@ -48,14 +48,20 @@ write_test_zip <- function(path, members) {
   invisible(path)
 }
 
-# A stand-in for the Kaggle CLI, first on PATH for the rest of the calling
-# test. It answers --version. A competition download copies `archive`
-# into the -p directory as competition.zip. A dataset download writes
-# `dataset_lines` there, as the real CLI's --unzip would: to
-# `dataset_file`, or, given -f, to that file's base name, which is where
-# the real CLI saves a single file. Every call is appended to the log
-# file it returns. It is an R script behind a one-line launcher, so it
-# behaves the same on every platform.
+# A stand-in for the Kaggle CLI for the rest of the calling test. It
+# answers --version. A competition download copies `archive` into the -p
+# directory as competition.zip. A dataset download writes `dataset_lines`
+# there, as the real CLI's --unzip would: to `dataset_file`, or, given -f,
+# to that file's base name, which is where the real CLI saves a single
+# file. Every call is appended to the log file it returns. It is an R
+# script behind a one-line launcher, so it behaves the same on every
+# platform.
+#
+# tidylearn is pointed at the launcher by its full path. Placing it first
+# on PATH is not enough: Windows prefers a kaggle.exe anywhere on PATH to
+# the launcher ahead of it, and a real CLI would then download with the
+# user's credentials. The download folders tidylearn keeps under
+# tempdir() for the session are removed when the test ends.
 local_fake_kaggle <- function(archive = NULL,
                               dataset_file = "downloaded.csv",
                               dataset_lines = c("who", "fresh_download"),
@@ -86,9 +92,10 @@ local_fake_kaggle <- function(archive = NULL,
 
   if (.Platform$OS.type == "windows") {
     rscript <- normalizePath(file.path(R.home("bin"), "Rscript.exe"))
+    launcher <- file.path(bin, "kaggle.bat")
     writeLines(
       c("@echo off", sprintf('"%s" --vanilla "%s" %%*', rscript, script)),
-      file.path(bin, "kaggle.bat")
+      launcher
     )
   } else {
     launcher <- file.path(bin, "kaggle")
@@ -100,7 +107,23 @@ local_fake_kaggle <- function(archive = NULL,
     Sys.chmod(launcher, "0755")
   }
 
-  withr::local_path(bin, action = "prefix", .local_envir = env)
+  testthat::local_mocked_bindings(
+    tl_kaggle_command = function() launcher,
+    .env = env
+  )
+  resolved <- Sys.which(tl_kaggle_command())
+  if (!nzchar(resolved) ||
+        normalizePath(resolved) != normalizePath(launcher)) {
+    stop("The Kaggle command resolves to '", resolved, "', not the fake.",
+         call. = FALSE)
+  }
+
+  before <- list.files(tempdir(), pattern = "^tl_kaggle_")
+  withr::defer({
+    made <- setdiff(list.files(tempdir(), pattern = "^tl_kaggle_"), before)
+    unlink(file.path(tempdir(), made), recursive = TRUE)
+  }, envir = env)
+
   # R CMD check points R_TESTS at a startup file the child R must not run
   withr::local_envvar(R_TESTS = NA, .local_envir = env)
   log
@@ -893,6 +916,14 @@ test_that("GitHub file links resolve to the raw file they name", {
     seen$urls[5],
     "https://raw.githubusercontent.com/owner/repo/main/f.csv?token=abc"
   )
+
+  # A link with the ref straight after the repository, and no /blob/, was
+  # refused as not a file link, where 0.5.0 read it
+  tl_read_github("https://github.com/owner/repo/main/data/x.csv")
+  expect_equal(
+    seen$urls[6],
+    "https://raw.githubusercontent.com/owner/repo/main/data/x.csv"
+  )
 })
 
 test_that("tl_read_github() names what is wrong with a link it cannot use", {
@@ -1163,9 +1194,53 @@ test_that("tl_read_kaggle refuses a download whose members escape", {
 
   expect_error(
     tl_read_kaggle("titanic", type = "competition"),
-    "outside the directory it is unpacked into"
+    "'../escaped_kaggle.csv' has a '..' component",
+    fixed = TRUE
   )
   expect_false(file.exists(file.path(tempdir(), "escaped_kaggle.csv")))
+})
+
+test_that("the fake Kaggle CLI runs even with another one installed", {
+  skip_on_cran()
+  skip_if(.Platform$OS.type != "windows", "Windows command lookup")
+  # Windows looks for kaggle.exe along the whole PATH before kaggle.bat,
+  # so a real CLI later on PATH ran in place of the fake, with the user's
+  # credentials and the network
+  decoy <- withr::local_tempdir("decoy_")
+  file.copy(file.path(Sys.getenv("SystemRoot"), "System32", "hostname.exe"),
+            file.path(decoy, "kaggle.exe"))
+  withr::local_path(decoy, action = "suffix")
+
+  log <- local_fake_kaggle()
+  result <- suppressMessages(tl_read_kaggle("owner/data-set"))
+  expect_equal(result$who, "fresh_download")
+  expect_true(any(grepl("^datasets download", readLines(log))))
+})
+
+test_that("the fake Kaggle CLI removes the downloads it served", {
+  skip_on_cran()
+  # Downloads without a dest are kept under tempdir() for the session,
+  # so each test left a tl_kaggle_<slug> folder behind
+  before <- list.files(tempdir(), pattern = "^tl_kaggle_")
+  local({
+    local_fake_kaggle()
+    suppressMessages(tl_read_kaggle("owner/clean-up"))
+  })
+  expect_equal(list.files(tempdir(), pattern = "^tl_kaggle_"), before)
+})
+
+test_that("tl_read_kaggle(dest =) can be the per-dataset default folder", {
+  skip_on_cran()
+  # The download was staged in tempdir()/tl_kaggle_<slug>, emptied first,
+  # so naming that folder as dest -- earlier versions' default -- deleted
+  # it and then failed copying it onto itself
+  local_fake_kaggle()
+  dest <- file.path(tempdir(), "tl_kaggle_owner_data-set")
+  withr::defer(unlink(dest, recursive = TRUE))
+
+  result <- suppressMessages(tl_read_kaggle("owner/data-set", dest = dest))
+  expect_equal(result$who, "fresh_download")
+  expect_true(file.exists(file.path(dest, "downloaded.csv")))
 })
 
 test_that("tl_read_kaggle(file =) finds a file saved under its base name", {
@@ -1677,13 +1752,20 @@ test_that("tl_read_zip(file =) selects a member by its path", {
                c("2023/sales.csv", "2024/sales.csv"))
 })
 
-test_that("tl_read_zip refuses members that would land outside its folder", {
+test_that("tl_read_zip refuses absolute member names and '..' components", {
   # R before 4.5.1 extracts "../" and absolute member names as written, so
   # a crafted archive could plant a file anywhere the user can write
   withr::defer(unlink(file.path(tempdir(), "escaped.csv")))
-  unsafe <- c("../escaped.csv", "sub/../../escaped.csv", "/escaped.csv",
-              "..\\escaped.csv", "C:/escaped.csv")
-  for (name in unsafe) {
+  unsafe <- c(
+    "../escaped.csv"        = "has a '..' component",
+    "sub/../../escaped.csv" = "has a '..' component",
+    "..\\escaped.csv"       = "has a '..' component",
+    "/escaped.csv"          = "is an absolute path"
+  )
+  if (.Platform$OS.type == "windows") {
+    unsafe <- c(unsafe, "C:/escaped.csv" = "names a drive")
+  }
+  for (name in names(unsafe)) {
     archive <- withr::local_tempfile(fileext = ".zip")
     members <- list("data.csv" = "a\n1\n", "a\n2\n")
     names(members)[2] <- name
@@ -1691,11 +1773,37 @@ test_that("tl_read_zip refuses members that would land outside its folder", {
 
     expect_error(
       tl_read_zip(archive, .quiet = TRUE),
-      "outside the directory it is unpacked into",
+      paste0("'", name, "' ", unsafe[[name]]),
+      fixed = TRUE,
       info = name
     )
   }
   expect_false(file.exists(file.path(tempdir(), "escaped.csv")))
+})
+
+test_that("a '..' component is refused even where it stays inside", {
+  # The message said such a member would be written outside the folder,
+  # which a/../b.csv is not; tidylearn refuses every '..' component
+  archive <- withr::local_tempfile(fileext = ".zip")
+  write_test_zip(archive, list("a/../b.csv" = "a\n1\n"))
+  expect_error(
+    tl_read_zip(archive, .quiet = TRUE),
+    "'a/../b.csv' has a '..' component. tidylearn does not extract",
+    fixed = TRUE
+  )
+})
+
+test_that("a drive-letter member name is refused only on Windows", {
+  # "a:b.csv" names drive A: on Windows, and is an ordinary file name on
+  # Linux and macOS, where it was refused too
+  archive <- withr::local_tempfile(fileext = ".zip")
+  write_test_zip(archive, list("a:b.csv" = "a\n1\n"))
+  if (.Platform$OS.type == "windows") {
+    expect_error(tl_read_zip(archive, .quiet = TRUE), "'a:b.csv' names a drive",
+                 fixed = TRUE)
+  } else {
+    expect_equal(tl_read_zip(archive, .quiet = TRUE)$a, 1)
+  }
 })
 
 test_that("tl_read_zip still reads members with dots and folders", {

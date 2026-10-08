@@ -163,21 +163,33 @@ test_that("print.tidylearn_gpu_check renders driver details when present", {
 
 # ---- nvidia-smi probe ----
 
-# A stand-in nvidia-smi, first on PATH for the rest of the calling test,
-# that prints `lines` after waiting `wait` seconds
+# A stand-in nvidia-smi for the rest of the calling test, that prints
+# `lines` after waiting `wait` seconds. tidylearn is pointed at it by its
+# full path: Windows searches System32, where the NVIDIA driver installs
+# nvidia-smi.exe, before PATH, so a stand-in on PATH would lose to it.
 local_fake_smi <- function(lines, wait = 0, env = parent.frame()) {
   bin <- withr::local_tempdir("fake_smi_", .local_envir = env)
   if (.Platform$OS.type == "windows") {
+    smi <- file.path(bin, "nvidia-smi.bat")
     pause <- if (wait > 0) sprintf("ping -n %d 127.0.0.1 > nul", wait + 1)
-    writeLines(c("@echo off", pause, paste("echo", lines)),
-               file.path(bin, "nvidia-smi.bat"))
+    writeLines(c("@echo off", pause, paste("echo", lines)), smi)
   } else {
     smi <- file.path(bin, "nvidia-smi")
     pause <- if (wait > 0) paste("sleep", wait)
     writeLines(c("#!/bin/sh", pause, paste0("echo '", lines, "'")), smi)
     Sys.chmod(smi, "0755")
   }
-  withr::local_path(bin, action = "prefix", .local_envir = env)
+
+  testthat::local_mocked_bindings(
+    tl_nvidia_smi_command = function() smi,
+    .env = env
+  )
+  resolved <- Sys.which(tl_nvidia_smi_command())
+  if (!nzchar(resolved) || normalizePath(resolved) != normalizePath(smi)) {
+    stop("nvidia-smi resolves to '", resolved, "', not the fake.",
+         call. = FALSE)
+  }
+  invisible(smi)
 }
 
 test_that("nvidia-smi output is parsed into devices", {
@@ -193,10 +205,27 @@ test_that("nvidia-smi output is parsed into devices", {
   expect_equal(cuda$driver_version, "560.94")
 })
 
+test_that("the fake nvidia-smi runs even with another one installed", {
+  skip_on_cran()
+  skip_if(.Platform$OS.type != "windows", "Windows command lookup")
+  # Windows looks for nvidia-smi.exe along the whole PATH, and in System32
+  # before PATH, ahead of the fake's nvidia-smi.bat
+  decoy <- withr::local_tempdir("decoy_")
+  file.copy(file.path(Sys.getenv("SystemRoot"), "System32", "hostname.exe"),
+            file.path(decoy, "nvidia-smi.exe"))
+  withr::local_path(decoy, action = "suffix")
+
+  local_fake_smi("NVIDIA GeForce RTX 4090, 560.94")
+  cuda <- tl_detect_cuda_internal()
+  expect_true(cuda$driver_present)
+  expect_equal(cuda$device_names, "NVIDIA GeForce RTX 4090")
+})
+
 test_that("a hung nvidia-smi is abandoned after the timeout", {
   skip_on_cran()
   # The probe waited for nvidia-smi however long it took, so a hung driver
-  # held up tl_check_gpu() and every tl_model(compute = "auto") call
+  # held up tl_check_gpu(), tl_compute_advisor() and every xgboost or deep
+  # fit with compute = "auto" or "gpu"
   local_fake_smi("NVIDIA GeForce RTX 4090, 560.94", wait = 5)
 
   started <- Sys.time()

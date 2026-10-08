@@ -402,8 +402,7 @@ tl_read_bigquery <- function(project, query, dataset = NULL, ...) {
   }
 
   # bq_project_query() passes its dots to bq_perform_query(), whose
-  # default_dataset is what unqualified table names resolve against. The
-  # dataset used to label the result and nothing else.
+  # default_dataset is what unqualified table names resolve against
   query_args <- list(...)
   if (!is.null(dataset) && is.null(query_args[["default_dataset"]])) {
     query_args$default_dataset <- bigrquery::bq_dataset(project, dataset)
@@ -574,7 +573,8 @@ tl_read_s3 <- function(source, format = NULL, region = NULL, ...,
 #'
 #' @param source A GitHub URL or \code{"owner/repo"} string. A URL is either
 #'   a file page (\code{https://github.com/<owner>/<repo>/blob/<ref>/<path>},
-#'   with or without \code{www.} and a query such as \code{?raw=true}) or a
+#'   with \code{raw} in place of \code{blob} or with neither, and with or
+#'   without \code{www.} and a query such as \code{?raw=true}) or a
 #'   raw file (\code{https://raw.githubusercontent.com/...}), whose query is
 #'   kept for the download. Zip archives are not read from GitHub: download
 #'   the file and read it with \code{tl_read_zip()}.
@@ -706,9 +706,9 @@ tl_read_kaggle <- function(source, file = NULL, dest = NULL,
     stop("'type' must be \"dataset\" or \"competition\".", call. = FALSE)
   }
 
-  # A pasted URL names its own kind. The slug was the URL's last two path
-  # segments, so a link copied from a tab such as /data named another
-  # owner's dataset, and a competition link failed as a dataset slug.
+  # A pasted URL names its own kind, and its slug is taken from the
+  # segments after /datasets/ or /competitions/: a link copied from a tab
+  # such as /data ends in the tab's name.
   if (tl_is_kaggle_url(source)) {
     parsed <- tl_parse_kaggle_url(source)
     if (missing(type)) {
@@ -737,19 +737,21 @@ tl_read_kaggle <- function(source, file = NULL, dest = NULL,
   # Check Kaggle CLI is installed
   tl_check_kaggle_cli()
 
-  # Download into a directory of our own, emptied first, even when the
-  # caller names one. Sharing tempdir() across calls let list.files()
-  # below return a file an earlier download left behind as this dataset.
-  # Sharing the caller's folder unpacked every zip in it -- an unrelated
-  # archive overwrote the user's files -- and a stale archive's members,
-  # re-extracted and so the newest files, were returned in place of this
-  # download.
-  staging <- file.path(tempdir(), paste0("tl_kaggle_", tl_slug_key(source)))
-  unlink(staging, recursive = TRUE, force = TRUE)
-  dir.create(staging, recursive = TRUE, showWarnings = FALSE)
-  if (!is.null(dest)) {
+  # Download into an empty directory of our own, even when the caller
+  # names one. In a folder shared with anything else, the search below
+  # would find files other downloads left there, and unpacking would
+  # extract every zip in it, an unrelated archive's included. Without a
+  # dest the download stays in a per-dataset folder for the session. With
+  # one it is staged in a fresh tempfile(), which can never be dest itself,
+  # whatever folder the caller names.
+  if (is.null(dest)) {
+    staging <- file.path(tempdir(), paste0("tl_kaggle_", tl_slug_key(source)))
+    unlink(staging, recursive = TRUE, force = TRUE)
+  } else {
+    staging <- tempfile("tl_kaggle_")
     on.exit(unlink(staging, recursive = TRUE, force = TRUE), add = TRUE)
   }
+  dir.create(staging, recursive = TRUE, showWarnings = FALSE)
 
   # Download the dataset. Quote the caller-derived values: a slug is
   # already restricted to safe characters by the checks above, but a
@@ -765,7 +767,7 @@ tl_read_kaggle <- function(source, file = NULL, dest = NULL,
   }
 
   result <- tryCatch(
-    system2("kaggle", args, stdout = TRUE, stderr = TRUE),
+    system2(tl_kaggle_command(), args, stdout = TRUE, stderr = TRUE),
     error = function(e) {
       stop("Kaggle CLI failed: ", e$message, call. = FALSE)
     }
@@ -805,8 +807,7 @@ tl_read_kaggle <- function(source, file = NULL, dest = NULL,
     }
   } else {
     # The extensions the readers below handle, from the table the
-    # directory and archive scans use: a list of its own here missed
-    # .ndjson, .xlsm and compressed CSV
+    # directory and archive scans use, so the two cannot disagree
     candidates <- list.files(
       staging, pattern = tl_scan_pattern(kaggle_formats), full.names = TRUE,
       recursive = TRUE, ignore.case = TRUE
@@ -909,9 +910,9 @@ tl_check_remote_rds <- function(format, where, trust_rds) {
 #' The raw-file URL for a GitHub source
 #'
 #' The host is read from the parsed URL, and the owner and repository from
-#' the path's segments. A rewrite by substitution took "www.github.com"
-#' for owner/repo shorthand and, for an owner called "blob", removed the
-#' owner's name in place of the /blob/ segment.
+#' the path's segments. Substituting text instead would take
+#' "www.github.com" for owner/repo shorthand, and remove an owner called
+#' "blob" in place of the /blob/ segment.
 #'
 #' @param source A GitHub URL or "owner/repo" string.
 #' @param path,ref As for tl_read_github().
@@ -946,20 +947,26 @@ tl_github_raw_url <- function(source, path, ref) {
          call. = FALSE)
   }
 
-  # github.com/<owner>/<repo>/blob/<ref>/<path>, or raw in place of blob.
-  # The query (?raw=true, ?plain=1) only steers GitHub's page.
+  # github.com/<owner>/<repo>/blob/<ref>/<path>, or raw in place of blob,
+  # or the ref straight after the repository. The query (?raw=true,
+  # ?plain=1) only steers GitHub's page.
   page <- sub("^[A-Za-z][A-Za-z0-9+.-]*://[^/]*", "", source)
   page <- sub("[?#].*$", "", page)
   segments <- strsplit(page, "/", fixed = TRUE)[[1]]
   segments <- segments[nzchar(segments)]
-  if (length(segments) < 5L || !segments[3] %in% c("blob", "raw")) {
-    stop("'", source, "' is not a link to a file on GitHub. Expected ",
-         "https://github.com/<owner>/<repo>/blob/<ref>/<path>.",
-         call. = FALSE)
+
+  raw_host <- "https://raw.githubusercontent.com/"
+  if (length(segments) >= 5L && segments[3] %in% c("blob", "raw")) {
+    return(paste0(raw_host, paste(segments[-3], collapse = "/")))
+  }
+  # A /tree/ link is a folder, so it is no file to read
+  if (length(segments) >= 4L && !segments[3] %in% c("blob", "raw", "tree")) {
+    return(paste0(raw_host, paste(segments, collapse = "/")))
   }
 
-  paste0("https://raw.githubusercontent.com/",
-         paste(segments[-3], collapse = "/"))
+  stop("'", source, "' is not a link to a file on GitHub. Expected ",
+       "https://github.com/<owner>/<repo>/blob/<ref>/<path>.",
+       call. = FALSE)
 }
 
 #' Refuse a Kaggle slug that is not one
@@ -1121,12 +1128,25 @@ tl_keep_kaggle_download <- function(staging, dest) {
   invisible(targets)
 }
 
+#' The command that runs the Kaggle CLI
+#'
+#' One place for the name, so tests can run a stand-in by its full path.
+#' Putting the stand-in first on PATH is not enough on Windows, which
+#' prefers kaggle.exe anywhere on PATH to a kaggle.bat ahead of it.
+#'
+#' @return The command to pass to \code{system2()}.
+#' @keywords internal
+#' @noRd
+tl_kaggle_command <- function() {
+  "kaggle"
+}
+
 #' Check that the Kaggle CLI is installed
 #' @keywords internal
 #' @noRd
 tl_check_kaggle_cli <- function() {
   result <- tryCatch(
-    system2("kaggle", "--version", stdout = TRUE, stderr = TRUE),
+    system2(tl_kaggle_command(), "--version", stdout = TRUE, stderr = TRUE),
     error = function(e) NULL,
     warning = function(w) NULL
   )
@@ -1142,8 +1162,8 @@ tl_check_kaggle_cli <- function() {
 
 #' Is a source a Kaggle URL rather than a slug?
 #'
-#' A link pasted without its scheme ("www.kaggle.com/datasets/...") counts:
-#' it was read as a URL before, and a slug cannot contain "kaggle.com/".
+#' A link pasted without its scheme ("www.kaggle.com/datasets/...") counts,
+#' since a slug cannot contain "kaggle.com/".
 #'
 #' @param source The source as given.
 #' @return A single logical.
@@ -1240,8 +1260,8 @@ tl_redact_db_url <- function(url) {
 #' Parse a database connection URL
 #'
 #' The query string is split off first, since a parameter such as
-#' \code{?ssl-mode=REQUIRED} was otherwise read as part of the database
-#' name. Credentials and the database name are percent-decoded.
+#' \code{?ssl-mode=REQUIRED} would otherwise be read as part of the
+#' database name. Credentials and the database name are percent-decoded.
 #'
 #' @param url A URL such as \code{postgres://user:password@@host:port/dbname}.
 #' @return A list with \code{user}, \code{password}, \code{host}, \code{port}

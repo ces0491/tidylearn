@@ -100,9 +100,9 @@ tl_compute_advisor.character <- function(x,
   n_rows <- nrow(data)
   n_cols <- tl_effective_p_internal(data, formula)
 
-  # Doubles from here on. Rows times predictors is an integer product,
-  # which overflowed to NA past 2^31 - 1 (1e7 rows by 250 predictors) and
-  # failed the advisor on exactly the inputs it exists to size.
+  # Doubles from here on: as an integer product, rows times predictors
+  # overflows to NA past 2^31 - 1 cells, such as 1e7 rows by 250
+  # predictors.
   rows_num <- as.numeric(n_rows)
   cols_num <- as.numeric(n_cols)
   est_size_mb <- (rows_num * cols_num * 8) / 1e6
@@ -209,9 +209,9 @@ tl_compute_advisor.default <- function(x, ...) {
   deep       = c("epochs", "hidden_layers")
 )
 
-# Refuse a runtime hyperparameter that is not a positive number. NA made
-# every estimate NA and failed far from the cause ("attempt to select
-# less than one element"), and a negative value gave a negative runtime.
+# Refuse a runtime hyperparameter that is not a positive number. NA would
+# make every estimate NA and fail far from the cause ("attempt to select
+# less than one element"), and a negative value gives a negative runtime.
 # Only the names the method's estimate reads are checked: tl_model()
 # forwards every fit argument here.
 tl_check_advisor_hyperparams <- function(method, hyp) {
@@ -239,10 +239,8 @@ tl_check_advisor_hyperparams <- function(method, hyp) {
 }
 
 # A runtime hyperparameter: the caller's value, or the default of the
-# tl_fit_*() function that would run. Read from its formals so the two
-# cannot drift apart, as they had for "deep" (10 epochs of 128 units
-# against tl_fit_deep()'s 30 epochs through layers of 32 and 16) and
-# "nn" (a layer of 10 against tl_fit_nn()'s 5).
+# tl_fit_*() function that would run, read from its formals so the
+# estimate follows the fit function's defaults when they change.
 tl_advisor_param <- function(method, name, hyp) {
   value <- hyp[[name]]
   if (!is.null(value)) {
@@ -288,8 +286,7 @@ tl_method_complexity_internal <- function(method, n_rows, n_cols, hyp) {
 
 # Number of effective predictors for runtime estimation: the terms the
 # formula expands to against the data. all.vars() on the right-hand side
-# read y ~ . - id as two predictors, "." and id, and y ~ 1 as every
-# column but one.
+# would read y ~ . - id as two predictors, "." and id.
 tl_effective_p_internal <- function(data, formula) {
   if (is.null(formula)) {
     return(max(ncol(data) - 1L, 1L))
@@ -667,8 +664,8 @@ is_finite_num <- function(x) {
 }
 
 # A number for a message or printout, written out in full with thousands
-# separators. format() switches to scientific notation when that is
-# shorter, so a 40,000,000 MB peak printed as "4e+07".
+# separators: scientific = FALSE, since format() otherwise switches to
+# scientific notation whenever that is shorter (100000 as "1e+05").
 tl_format_number <- function(x, digits = 0, nsmall = digits) {
   format(round(x, digits), nsmall = nsmall, big.mark = ",",
          scientific = FALSE, trim = TRUE)

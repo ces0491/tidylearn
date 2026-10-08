@@ -25,7 +25,7 @@ NULL
 #'
 #' The trailing dot of a fully qualified name (`"fits.example.com."`) is
 #' dropped: an endpoint's host never carries it, so a host stored with it
-#' matched nothing.
+#' would match nothing.
 #'
 #' @param host A character vector of candidate host names.
 #' @return The hosts, lower-cased and without a trailing dot. Errors if any
@@ -63,7 +63,8 @@ tl_validate_host_name <- function(host) {
       )
     }
 
-    # Two labels passed, so allowing co.uk let attacker.co.uk through
+    # Two labels can be a public suffix: allowing co.uk would let
+    # attacker.co.uk through
     if (length(labels) < 3L) {
       stop(
         "'", h, "' is too broad to allow: a name with fewer than three ",
