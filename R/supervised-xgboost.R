@@ -84,6 +84,39 @@ tl_xgb_dmatrix <- function(x, label, weights = NULL, nthread = NULL) {
   do.call(xgboost::xgb.DMatrix, args)
 }
 
+#' Store xgboost's record of its call without the data it was handed
+#'
+#' \code{do.call()} puts every argument's value in the call that
+#' \code{xgb.train()} and \code{xgb.cv()} record, so a booster kept its
+#' training \code{xgb.DMatrix}, and any evaluation sets, alive for as long
+#' as it lived: a five-round fit on 20,000 rows of 10 columns serialised at
+#' twice the size of its training data. Its head was the function itself,
+#' so \code{print()} showed \code{xgb.train()}'s whole source. Nothing
+#' re-runs the call -- \code{update()} refuses a booster -- so the data
+#' arguments are dropped and the head names the function.
+#'
+#' @param object A booster, which holds the call as an attribute from
+#'   xgboost 3.0 and as an element before it, or an \code{xgb.cv()} result
+#' @param fun_name The xgboost function that recorded the call
+#' @return \code{object}, its call slimmed
+#' @keywords internal
+#' @noRd
+tl_xgb_slim_call <- function(object, fun_name) {
+  slim <- function(stored) {
+    for (arg in intersect(names(stored), c("data", "evals", "watchlist"))) {
+      stored[[arg]] <- NULL
+    }
+    stored[[1L]] <- call("::", as.name("xgboost"), as.name(fun_name))
+    stored
+  }
+  if (is.call(attr(object, "call"))) {
+    attr(object, "call") <- slim(attr(object, "call"))
+  } else if (is.list(object) && is.call(object$call)) {
+    object$call <- slim(object$call)
+  }
+  object
+}
+
 #' Give evaluation sets the name the installed xgboost takes
 #'
 #' xgboost 3.0 renamed \code{xgb.train()}'s \code{watchlist} to
@@ -279,10 +312,13 @@ tl_fit_xgboost <- function(data, formula, is_classification = FALSE,
     )
   )
 
-  # Store additional information for later use
+  # Store additional information for later use. The number of rows trained
+  # on is recorded, since the call no longer holds the training matrix.
+  xgb_model <- tl_xgb_slim_call(xgb_model, "xgb.train")
   attr(xgb_model, "feature_names") <- colnames(x_mat)
   attr(xgb_model, "response_var") <- response_var
   attr(xgb_model, "is_classification") <- is_classification
+  attr(xgb_model, "training_rows") <- nrow(x_mat)
 
   if (is_classification) {
     attr(xgb_model, "response_levels") <- levels(y)
@@ -369,8 +405,11 @@ tl_predict_xgboost <- function(model, new_data,
   # Build the design matrix from the predictors only, pinned to the
   # training factor levels. Using the full two-sided formula would demand
   # the response column, which unlabelled data does not have, and letting
-  # new data supply its own levels would change the contrast coding.
+  # new data supply its own levels would change the contrast coding. A
+  # missing training column is refused first: model.frame() would take it
+  # from a same-named object in scope.
   formula <- model$spec$formula
+  tl_refuse_missing_predictors(model, new_data)
   x_new <- tl_predictor_matrix(formula, new_data, xlev = model$spec$xlev)
 
   # Check column names match
@@ -748,7 +787,7 @@ tl_tune_xgboost <- function(data, formula, is_classification = NULL,
 
   # Parse formula, and settle the task from the response
   formula <- tl_as_formula(formula)
-  task <- tl_tuner_task(data, formula, is_classification)
+  task <- tl_tuner_task(data, formula, is_classification, "xgboost")
   data <- task$data
   is_classification <- task$is_classification
 
@@ -890,12 +929,12 @@ tl_tune_xgboost <- function(data, formula, is_classification = NULL,
       best_iteration,
     ][[metric_col]]
 
-    # Store results
+    # Store results, the cross-validation's call without the training matrix
     results[[i]] <- list(
       params = params,
       best_iteration = best_iteration,
       best_score = best_score,
-      cv_result = cv_result
+      cv_result = tl_xgb_slim_call(cv_result, "xgb.cv")
     )
 
     if (verbose) {
@@ -994,6 +1033,10 @@ tl_xgb_contributions <- function(model, data, trees_idx = NULL) {
   xgb_model <- model$fit
   feature_names <- attr(xgb_model, "feature_names")
 
+  # Checked on the raw columns before the matrix is built. Checked on the
+  # matrix, a missing hp had already been taken from an hp in scope, and
+  # the SHAP values were computed from it.
+  tl_refuse_missing_predictors(model, data, "Data")
   x <- tl_predictor_matrix(model$spec$formula, data, xlev = model$spec$xlev)
   missing_cols <- setdiff(feature_names, colnames(x))
   if (length(missing_cols) > 0) {

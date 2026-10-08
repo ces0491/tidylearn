@@ -80,6 +80,103 @@ test_that("the backends refuse an offset they cannot apply at predict()", {
                   "tidylearn_tree")
 })
 
+test_that("a dot formula naming an outside variable warns as lm() does", {
+  skip_if_not_installed("xgboost")
+
+  # terms() warns "'varlist' has changed ... should no longer happen!" for a
+  # dot formula that names a variable the data lacks. lm() gives it once;
+  # the backends' own terms() and model.frame() reads passed it on once or
+  # twice more
+  varlist_warnings <- function(expr) {
+    n <- 0L
+    withCallingHandlers(expr, warning = function(w) {
+      if (grepl("'varlist' has changed", conditionMessage(w), fixed = TRUE)) {
+        n <<- n + 1L
+        invokeRestart("muffleWarning")
+      }
+    })
+    n
+  }
+  cars <- rbind(mtcars, mtcars)
+  z <- sin(seq_len(nrow(cars)))
+  expect_identical(varlist_warnings(lm(mpg ~ . + z, data = cars)), 1L)
+
+  settings <- list(tree = list(), forest = list(ntree = 10), svm = list(),
+                   nn = list(size = 2, trace = FALSE),
+                   xgboost = list(nrounds = 2))
+  for (method in names(settings)) {
+    set.seed(1)
+    expect_identical(
+      varlist_warnings(do.call(tl_model, c(
+        list(cars, mpg ~ . + z, method = method), settings[[method]]
+      ))),
+      1L,
+      info = method
+    )
+  }
+
+  # A forest grown from its own predictor frame warns from that frame
+  expect_identical(
+    varlist_warnings(tl_model(cars, mpg ~ . + z + log(hp), method = "forest",
+                              ntree = 10)),
+    1L
+  )
+
+  # gbm rebuilds its predictors from their labels in an environment that
+  # reaches the global one and not this test's, so boost is handed a
+  # variable it can find there
+  assign(".tl_outside", z, envir = globalenv())
+  withr::defer(rm(".tl_outside", envir = globalenv()))
+  set.seed(1)
+  expect_identical(
+    varlist_warnings(tl_model(cars, mpg ~ . + .tl_outside, method = "boost",
+                              n.trees = 10)),
+    1L
+  )
+})
+
+test_that("forest and svm classify a response computed as text", {
+  skip_if_not_installed("randomForest")
+  skip_if_not_installed("e1071")
+
+  # Both read a computed character response as numbers: the forest was
+  # grown as a regression and failed with "non-numeric argument to binary
+  # operator", and svm stopped with "missing value where TRUE/FALSE
+  # needed". nn is tested with its tuner, under neural networks.
+  cars <- rbind(mtcars, mtcars)
+  rows <- cars[c(1, 3, 15), ]
+
+  set.seed(1)
+  forest <- tl_model(cars, ifelse(mpg > 20, "hi", "lo") ~ wt + hp,
+                     method = "forest", ntree = 50)
+  set.seed(1)
+  direct <- randomForest::randomForest(
+    factor(ifelse(mpg > 20, "hi", "lo")) ~ wt + hp, data = cars,
+    ntree = 50, importance = TRUE
+  )
+  expect_identical(forest$spec$response_levels, c("hi", "lo"))
+  expect_equal(unname(as.matrix(predict(forest, rows, type = "prob"))),
+               unname(unclass(stats::predict(direct, rows, type = "prob"))))
+
+  # And through the predictor frame a transformed term takes
+  set.seed(1)
+  logged <- tl_model(cars, ifelse(mpg > 20, "hi", "lo") ~ log(hp) + wt,
+                     method = "forest", ntree = 50)
+  expect_identical(levels(predict(logged, rows)$.pred), c("hi", "lo"))
+
+  set.seed(1)
+  svm <- tl_model(cars, ifelse(mpg > 20, "hi", "lo") ~ wt + hp,
+                  method = "svm")
+  set.seed(1)
+  direct <- e1071::svm(factor(ifelse(mpg > 20, "hi", "lo")) ~ wt + hp,
+                       data = cars, type = "C-classification",
+                       kernel = "radial", cost = 1, degree = 3,
+                       probability = TRUE)
+  expect_identical(svm$spec$response_levels, c("hi", "lo"))
+  expect_identical(as.character(predict(svm, rows)$.pred),
+                   as.character(stats::predict(direct, newdata = rows)))
+})
+
 # ---- tree ------------------------------------------------------------
 
 test_that("a tree refuses an argument rpart() and rpart.control() lack", {
@@ -145,8 +242,8 @@ test_that("an explicit minsplit re-derives minbucket over a control list", {
 test_that("tl_plot_importance refuses a tree with no splits", {
   skip_if_not_installed("rpart")
 
-  # tl_extract_importance() returns no rows for a tree with no splits,
-  # and the plot drew an empty chart
+  # A tree with no splits has no importance, and the plot failed with
+  # "Column `importance` not found in `.data`", which did not say why
   stump <- tl_model(mtcars, mpg ~ wt + hp, method = "tree", cp = 1)
   expect_equal(nrow(stump$fit$frame), 1L)
   expect_error(
@@ -252,6 +349,30 @@ test_that("a forest's computed terms reuse what training computed", {
                predict(curved, mtcars)$.pred[3])
 })
 
+test_that("update() refits a forest fitted with a transformed term", {
+  skip_if_not_installed("randomForest")
+
+  # The stored call named x and y, which update() looked up in its
+  # caller's frame -- "object 'x' not found" -- under a bare randomForest
+  # head that a session without randomForest attached could not find
+  model <- tl_model(mtcars[1:20, ], mpg ~ log(hp) + wt, method = "forest",
+                    ntree = 10)
+
+  # Run where only R's default packages are attached, as in "update() on a
+  # fit finds its fitting function outside tidylearn"
+  outside <- new.env(parent = as.environment("package:stats"))
+  outside$fit <- model$fit
+  refit <- eval(quote(stats::update(fit, ntree = 5)), outside)
+  expect_s3_class(refit, "randomForest")
+  expect_equal(refit$ntree, 5)
+  expect_equal(unname(refit$y), mtcars$mpg[1:20])
+  expect_identical(rownames(randomForest::importance(refit)),
+                   c("log(hp)", "wt"))
+
+  # The call still prints in a line rather than spelling out the frame
+  expect_lt(nchar(paste(deparse(model$fit$call), collapse = "")), 150)
+})
+
 # ---- partial dependence ----------------------------------------------
 
 test_that("partial dependence averages the predictions at each grid value", {
@@ -342,6 +463,27 @@ test_that("partial dependence draws every class of a multiclass model", {
   pa <- tl_plot_partial_dependence(above, var = "wt", n.pts = 3)
   expect_identical(levels(pa$data$class), c("FALSE", "TRUE"))
   expect_false(anyNA(pa$data$y))
+})
+
+test_that("a multiclass partial dependence plot labels only what it maps", {
+  skip_if_not_installed("rpart")
+
+  # Both colour and fill were labelled "Class", and each plot maps one, so
+  # drawing either reported "Ignoring unknown labels" for the other
+  model <- tl_model(iris, Species ~ ., method = "tree")
+  lines <- tl_plot_partial_dependence(model, var = "Petal.Length", n.pts = 4)
+  expect_no_message(print(lines))
+  expect_identical(lines$labels$colour, "Class")
+
+  # A categorical variable draws bars, filled by class
+  flowers <- iris
+  flowers$grp <- factor(rep(c("a", "b", "c"), 50))
+  bars <- tl_plot_partial_dependence(
+    tl_model(flowers, Species ~ ., method = "tree"), var = "grp"
+  )
+  expect_true("GeomCol" %in% geoms_of(bars))
+  expect_no_message(print(bars))
+  expect_identical(bars$labels$fill, "Class")
 })
 
 # ---- boost -------------------------------------------------------------
@@ -463,6 +605,88 @@ test_that("boost takes the caller's verbose and regression distribution", {
   )
 })
 
+test_that("boost computes a data-dependent term as training computed it", {
+  skip_if_not_installed("gbm")
+
+  # gbm rebuilds each term from its label on the rows it predicts, so
+  # scale(hp) took the centre and scale of whichever rows arrived: with
+  # set.seed(1), row 5 predicted 14.72 alone and 17.28 inside the frame.
+  # poly(wt, 2) failed at predict() with "number of items to replace is not
+  # a multiple of replacement length".
+  b <- mtcars[rep(1:32, 2), ]
+  gbm_on <- function(x) {
+    set.seed(1)
+    gbm::gbm(mpg ~ ., data = cbind(x, mpg = b$mpg), distribution = "gaussian",
+             n.trees = 50, interaction.depth = 3, shrinkage = 0.1,
+             n.minobsinnode = 10, cv.folds = 0, verbose = FALSE)
+  }
+
+  set.seed(1)
+  scaled <- tl_model(b, mpg ~ scale(hp) + wt, method = "boost", n.trees = 50)
+  full <- predict(scaled, b)$.pred
+  expect_equal(predict(scaled, b[5, ])$.pred, full[5])
+  expect_equal(predict(scaled, b[1:3, ])$.pred, full[1:3])
+
+  # The model gbm fits on the training values of the term, which its
+  # importance names as written
+  x <- data.frame(as.vector(scale(b$hp)), b$wt)
+  names(x) <- c("scale(hp)", "wt")
+  expect_equal(full,
+               gbm::predict.gbm(gbm_on(x), newdata = x, n.trees = 50))
+  expect_setequal(summary(scaled$fit, plotit = FALSE)$var,
+                  c("scale(hp)", "wt"))
+
+  # A matrix-valued term enters as one column per basis function. New data
+  # is put through the training coefficients, as predict.poly() does.
+  set.seed(1)
+  curved <- tl_model(b, mpg ~ poly(wt, 2) + hp, method = "boost",
+                     n.trees = 50)
+  as_frame <- function(basis) {
+    x <- data.frame(basis[, 1], basis[, 2], b$hp)
+    names(x) <- c("poly(wt, 2)1", "poly(wt, 2)2", "hp")
+    x
+  }
+  basis <- stats::poly(b$wt, 2)
+  expect_equal(
+    predict(curved, b)$.pred,
+    gbm::predict.gbm(gbm_on(as_frame(basis)),
+                     newdata = as_frame(stats::predict(basis, b$wt)),
+                     n.trees = 50)
+  )
+  expect_equal(predict(curved, b[3, ])$.pred, predict(curved, b)$.pred[3])
+
+  # Its importance names each basis column, which would not parse as a
+  # term label, with gbm's own relative influence
+  influence <- gbm::relative.influence(curved$fit, n.trees = 50)
+  importance <- tl_extract_importance(curved)
+  expect_setequal(importance$feature,
+                  c("poly(wt, 2)1", "poly(wt, 2)2", "hp"))
+  expect_equal(
+    importance$importance,
+    unname(100 * influence[importance$feature] / max(influence))
+  )
+
+  # A classifier takes the same path, its 0/1 response coded as before
+  set.seed(1)
+  classes <- tl_model(b, factor(am) ~ scale(hp) + wt, method = "boost",
+                      n.trees = 30)
+  probs <- predict(classes, b, type = "prob")
+  expect_named(probs, c("0", "1"))
+  expect_equal(predict(classes, b[5, ], type = "prob"), probs[5, ])
+
+  # A transform that needs nothing from training is still fitted through
+  # gbm's own formula interface
+  set.seed(1)
+  logged <- tl_model(b, mpg ~ log(hp) + wt, method = "boost", n.trees = 50)
+  set.seed(1)
+  direct <- gbm::gbm(mpg ~ log(hp) + wt, data = b, distribution = "gaussian",
+                     n.trees = 50, interaction.depth = 3, shrinkage = 0.1,
+                     n.minobsinnode = 10, cv.folds = 0, verbose = FALSE)
+  expect_equal(predict(logged, b[5, ])$.pred,
+               gbm::predict.gbm(direct, newdata = b[5, ], n.trees = 50))
+  expect_identical(logged$fit$var.names, c("log(hp)", "wt"))
+})
+
 # ---- svm -------------------------------------------------------------
 
 test_that("svm predicts every row, whatever the unused columns hold", {
@@ -503,6 +727,30 @@ test_that("svm predicts every row, whatever the unused columns hold", {
   expect_true(is.na(with_gap$.pred[10]))
   expect_identical(as.character(with_gap$.pred[-10]),
                    as.character(classes$.pred[-10]))
+})
+
+test_that("svm predicts with a variable from the formula's environment", {
+  skip_if_not_installed("e1071")
+
+  # predict() required every variable of the fitted terms to be a column of
+  # new data, so a formula reading expo from its environment, which no data
+  # frame held, failed with "New data is missing predictors used at fit
+  # time: expo", on the training rows as much as on new ones
+  expo <- mtcars$drat
+  model <- tl_model(mtcars, mpg ~ wt + I(expo^2), method = "svm")
+  direct <- e1071::svm(mpg ~ wt + I(expo^2), data = mtcars,
+                       type = "eps-regression", kernel = "radial", cost = 1,
+                       degree = 3, probability = FALSE)
+  expect_equal(predict(model)$.pred,
+               unname(stats::predict(direct, newdata = mtcars)))
+  expect_equal(predict(model, mtcars)$.pred, predict(model)$.pred)
+
+  # A training column is still required, by svm's own predict method as
+  # well as by predict() itself
+  expect_error(
+    tl_predict_svm(model, mtcars[, c("mpg", "drat")]),
+    "New data is missing predictors used at fit time: wt$"
+  )
 })
 
 test_that("svm refuses case weights, which e1071 does not have", {
@@ -691,6 +939,38 @@ test_that("a neural network applies case weights as nnet does", {
   expect_gt(max(predict(model, mtcars)$.pred), 1)
 })
 
+test_that("a neural network classifies a response computed as text", {
+  skip_if_not_installed("nnet")
+  skip_if_not_installed("rsample")
+
+  # nnet read the computed character response as numbers, every one NA,
+  # and stopped with "NA/NaN/Inf in foreign function call (arg 2)", where
+  # deep, boost and xgboost fitted the same formula
+  cars <- rbind(mtcars, mtcars)
+  set.seed(1)
+  model <- tl_model(cars, ifelse(mpg > 20, "hi", "lo") ~ wt + hp,
+                    method = "nn", size = 2, trace = FALSE)
+  expect_identical(model$spec$response_levels, c("hi", "lo"))
+  expect_identical(model$fit$lev, c("hi", "lo"))
+
+  # The network nnet fits to the factor of those classes, whose one output
+  # is the probability of the second
+  set.seed(1)
+  direct <- nnet::nnet(factor(ifelse(mpg > 20, "hi", "lo")) ~ wt + hp,
+                       data = cars, size = 2, decay = 0, maxit = 100,
+                       trace = FALSE)
+  probs <- predict(model, cars[1:5, ], type = "prob")
+  expect_equal(probs$lo, as.vector(stats::predict(direct, newdata = cars[1:5, ],
+                                                  type = "raw")))
+
+  # The tuner fits it in every fold, and refits it
+  set.seed(1)
+  tuned <- tl_tune_nn(cars, ifelse(mpg > 20, "hi", "lo") ~ wt + hp,
+                      sizes = 2, decays = 0, folds = 2)
+  expect_identical(tuned$model$lev, c("hi", "lo"))
+  expect_true(is.finite(tuned$tuning_results$error))
+})
+
 test_that("tl_tune_nn scores a two-class candidate by its own predictions", {
   skip_if_not_installed("nnet")
   skip_if_not_installed("rsample")
@@ -869,6 +1149,40 @@ test_that("xgboost applies case weights through its DMatrix", {
                          nrounds = 20)
   expect_false(isTRUE(all.equal(predict(model, mtcars)$.pred,
                                 predict(unweighted, mtcars)$.pred)))
+})
+
+test_that("an xgboost model does not keep its training data in its call", {
+  skip_if_not_installed("xgboost")
+
+  # do.call() put the training xgb.DMatrix in the call xgb.train() records,
+  # so every booster kept it alive, and its print() showed xgb.train()'s
+  # whole source as the call's head. A five-round fit on 20,000 rows of 10
+  # columns serialised at twice the size of its training data.
+  set.seed(1)
+  big <- data.frame(matrix(stats::rnorm(20000 * 10), ncol = 10))
+  big$y <- big$X1 + stats::rnorm(20000)
+  model <- tl_model(big, y ~ ., method = "xgboost", nrounds = 5, nthread = 1)
+  stored <- attr(model$fit, "call") %||% model$fit$call
+  expect_false(any(vapply(as.list(stored), inherits, logical(1),
+                          what = "xgb.DMatrix")))
+  expect_identical(stored[[1L]], quote(xgboost::xgb.train))
+  expect_lt(length(serialize(model$fit, NULL)),
+            length(serialize(model$data, NULL)) / 10)
+
+  # The rows it was trained on are recorded instead: a missing response
+  # leaves its row out
+  gappy <- mtcars
+  gappy$mpg[5] <- NA
+  dropped <- tl_model(gappy, mpg ~ wt + hp, method = "xgboost", nrounds = 2)
+  expect_identical(attr(dropped$fit, "training_rows"), 31L)
+  expect_identical(tl_xgb_fit_rows(dropped), 31L)
+
+  # The tuner keeps each parameter set's xgb.cv() result without it too
+  tuned <- tl_tune_xgboost(mtcars, mpg ~ wt + hp, cv_folds = 2, nrounds = 2,
+                           param_grid = list(max_depth = 2), verbose = FALSE)
+  cv_call <- attr(tuned, "tuning_results")$results[[1]]$cv_result$call
+  expect_null(cv_call$data)
+  expect_identical(cv_call[[1L]], quote(xgboost::xgb.cv))
 })
 
 test_that("an unweighted xgboost fit hands xgb.DMatrix() no weight", {
@@ -1086,6 +1400,65 @@ test_that("predict()'s iterationrange follows the installed xgboost", {
   )
 })
 
+test_that("predict()'s deprecated ntreelimit predicts from the first rounds", {
+  skip_if_not_installed("xgboost")
+
+  # ntreelimit = n is the first n rounds, iterations 1 through n
+  model <- tl_model(mtcars, mpg ~ wt + hp, method = "xgboost", nrounds = 20)
+  five <- tl_model(mtcars, mpg ~ wt + hp, method = "xgboost", nrounds = 5)
+  expect_warning(
+    preds <- predict(model, mtcars, ntreelimit = 5),
+    "'ntreelimit' is deprecated; use iterationrange = c\\(1, 5\\) instead"
+  )
+  expect_equal(preds$.pred, predict(five, mtcars)$.pred)
+})
+
+test_that("xgboost refuses data without a predictor column", {
+  skip_if_not_installed("xgboost")
+
+  # The check on the design matrix came after model.frame() had built it,
+  # and model.frame() looks a missing column up in the formula's
+  # environment: with an hp in scope, SHAP values and predictions for five
+  # rows were computed from it, and without one the call failed with
+  # "object 'hp' not found". The check was never reached.
+  model <- tl_model(mtcars, mpg ~ wt + hp, method = "xgboost", nrounds = 5)
+  hp <- mtcars$hp[1:5] + 100
+  no_hp <- mtcars[1:5, c("wt", "mpg")]
+  missing_hp <- "Data is missing predictors used at fit time: hp$"
+  expect_error(tl_xgboost_shap(model, data = no_hp, n_samples = NULL),
+               missing_hp)
+  expect_error(
+    tl_plot_xgboost_shap_summary(model, data = no_hp, n_samples = NULL),
+    missing_hp
+  )
+  expect_error(
+    tl_plot_xgboost_shap_dependence(model, feature = "wt", data = no_hp,
+                                    n_samples = NULL),
+    missing_hp
+  )
+  expect_error(tl_predict_xgboost(model, no_hp),
+               "New data is missing predictors used at fit time: hp$")
+
+  # A variable the formula took from its environment at fit time is not a
+  # column new data has to carry
+  expo <- mtcars$drat
+  from_env <- tl_model(mtcars, mpg ~ wt + I(expo^2), method = "xgboost",
+                       nrounds = 5)
+  x <- cbind(wt = mtcars$wt, `I(expo^2)` = expo^2)
+  direct <- xgboost::xgb.train(
+    params = xgb_params("reg:squarederror", "rmse"),
+    data = xgboost::xgb.DMatrix(x, label = mtcars$mpg),
+    nrounds = 5, verbose = 0
+  )
+  expect_equal(tl_predict_xgboost(from_env, mtcars[, c("mpg", "wt")]),
+               stats::predict(direct, xgboost::xgb.DMatrix(x)))
+  shap <- tl_xgboost_shap(from_env, data = mtcars[, "wt", drop = FALSE],
+                          n_samples = NULL)
+  expect_equal(unname(as.matrix(shap[c("wt", "I(expo^2)")])),
+               unname(stats::predict(direct, xgboost::xgb.DMatrix(x),
+                                     predcontrib = TRUE)[, 1:2]))
+})
+
 test_that("the extra-columns warning in xgboost predict has no call", {
   skip_if_not_installed("xgboost")
 
@@ -1277,6 +1650,16 @@ test_that("tl_tune_xgboost reads the task from the response", {
   expect_identical(attr(coded, "tuning_results")$best_params$objective,
                    "binary:logistic")
   expect_true(coded$spec$is_classification)
+
+  # TRUE is refused for a computed response that is not a factor, as in
+  # tl_tune_nn(): the folds would classify it while the refit through
+  # tl_model() fitted a regression
+  expect_error(
+    tl_tune_xgboost(rbind(mtcars, mtcars), I(mpg > 20) ~ wt + hp,
+                    is_classification = TRUE, cv_folds = 3, nrounds = 5,
+                    param_grid = list(max_depth = 2), verbose = FALSE),
+    "is_classification = TRUE, but 'I\\(mpg > 20\\)' is computed as logical"
+  )
 })
 
 test_that("tl_tune_xgboost's default grid is tl_default_param_grid()'s", {
@@ -1531,6 +1914,32 @@ test_that("deep predict scores unlabelled data, keeps NA rows, pins levels", {
   full <- short
   full$g <- factor(full$g, levels = c("a", "b", "c"))
   expect_equal(predict(grouped, short), predict(grouped, full))
+})
+
+test_that("deep predict refuses data without a predictor column", {
+  skip_on_cran()
+  skip_if_no_tensorflow()
+
+  # The check on the design matrix came after model.frame() had built it,
+  # from an hp in scope when new data had none
+  tensorflow::set_random_seed(1)
+  model <- tl_model(mtcars, mpg ~ wt + hp, method = "deep", epochs = 1,
+                    hidden_layers = 2, verbose = 0)
+  hp <- mtcars$hp
+  expect_error(tl_predict_deep(model, mtcars[, c("mpg", "wt")]),
+               "New data is missing predictors used at fit time: hp$")
+
+  # A variable the formula took from its environment at fit time is not a
+  # column new data has to carry
+  expo <- mtcars$drat
+  tensorflow::set_random_seed(1)
+  from_env <- tl_model(mtcars, mpg ~ wt + I(expo^2), method = "deep",
+                       epochs = 1, hidden_layers = 2, verbose = 0)
+  x <- scale(cbind(wt = mtcars$wt, `I(expo^2)` = expo^2),
+             center = from_env$fit$x_means, scale = from_env$fit$x_sds)
+  expect_equal(tl_predict_deep(from_env, mtcars[, c("mpg", "wt")]),
+               as.vector(stats::predict(from_env$fit$model, x, verbose = 0)),
+               tolerance = 1e-6)
 })
 
 test_that("a deep fit drops an incomplete row from x and y together", {

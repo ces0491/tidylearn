@@ -62,6 +62,12 @@ tl_fit_svm <- function(data, formula,
   # mtcars got a kernel width of 1/10 instead of 1/2, with nothing said.
   # Below, gamma is passed on only when the caller or the tuner set one.
 
+  # A computed classification response that is not a factor is fitted as
+  # the factor it encodes; e1071 read text as numbers
+  if (is_classification) {
+    formula <- tl_factor_response_formula(formula, data)
+  }
+
   # The SVM type follows the task unless the caller names one
   svm_type <- if (!is.null(dots$type)) {
     dots$type
@@ -160,15 +166,14 @@ tl_predict_svm <- function(model, new_data,
   # dropped the row as well, and the shorter result stopped lining up with
   # new_data: airquality's Ozone ~ Temp + Wind returned 111 predictions
   # for 153 rows. Handed these columns alone, it has nothing else to drop.
-  predictors <- all.vars(stats::delete.response(fit$terms))
-  missing_cols <- setdiff(predictors, names(new_data))
-  if (length(missing_cols) > 0) {
-    stop(
-      "New data is missing predictors used at fit time: ",
-      paste(missing_cols, collapse = ", "),
-      call. = FALSE
-    )
-  }
+  #
+  # Only a training column is required. A variable the formula took from
+  # its environment at fit time, such as expo in I(expo^2), was not a
+  # column then either, and predict.svm() finds it there again; required
+  # of new_data, it was refused on the training rows themselves.
+  tl_refuse_missing_predictors(model, new_data)
+  predictors <- intersect(all.vars(stats::delete.response(fit$terms)),
+                          names(new_data))
   predictor_data <- new_data[, predictors, drop = FALSE]
 
   # Incomplete rows are dropped here and put back as NA afterwards, so

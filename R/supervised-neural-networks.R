@@ -32,12 +32,15 @@ tl_fit_nn <- function(data, formula, is_classification = FALSE,
   # Get response variable
   response_var <- all.vars(formula)[1]
 
-  # For classification, ensure response is a factor. Only a bare column is
-  # converted: a computed response such as cut(mpg, 3) reads its column,
-  # and handed a factor, it failed.
-  if (is_classification && is.name(formula[[2L]]) &&
-        !is.factor(data[[response_var]])) {
-    data[[response_var]] <- factor(data[[response_var]])
+  # For classification, ensure response is a factor. A bare column is
+  # converted in place. A computed one cannot be: cut(mpg, 3) reads its
+  # column, and handed a factor, it failed. It is wrapped in factor()
+  # instead.
+  if (is_classification) {
+    if (is.name(formula[[2L]]) && !is.factor(data[[response_var]])) {
+      data[[response_var]] <- factor(data[[response_var]])
+    }
+    formula <- tl_factor_response_formula(formula, data)
   }
 
   args <- list(
@@ -136,25 +139,27 @@ tl_class_from_probs <- function(probs) {
 #' declared a class it no longer held was tuned with that class as well.
 #'
 #' The response is the one the formula computes, so \code{factor(am) ~ .}
-#' is a classification although \code{am} is numeric.
+#' is a classification although \code{am} is numeric. The rule is
+#' \code{tl_tuning_task()}'s, which the grid searches use.
 #'
 #' @param data Training data
 #' @param formula The model formula
 #' @param is_classification The caller's flag: \code{NULL} to read the task
 #'   from the response, or \code{TRUE} or \code{FALSE}
+#' @param method The method tuned
 #' @return A list: \code{data}, whose classification response, when it is
 #'   a column of its own, is a factor of the classes it holds; and
 #'   \code{is_classification}
 #' @keywords internal
 #' @noRd
-tl_tuner_task <- function(data, formula, is_classification) {
+tl_tuner_task <- function(data, formula, is_classification, method) {
   lhs <- formula[[2L]]
   response_label <- if (is.name(lhs)) as.character(lhs) else deparse1(lhs)
   y <- tl_formula_response(formula, data)
-  categorical <- is.factor(y) || is.character(y)
+  classifies <- tl_tuning_task(formula, data, method)
 
   if (is.null(is_classification)) {
-    is_classification <- categorical
+    is_classification <- classifies
   } else if (!is.logical(is_classification) ||
                length(is_classification) != 1L ||
                is.na(is_classification)) {
@@ -165,7 +170,7 @@ tl_tuner_task <- function(data, formula, is_classification) {
     )
   }
 
-  if (!is_classification && categorical) {
+  if (!is_classification && classifies) {
     stop(
       "is_classification = FALSE, but '", response_label, "' is a ",
       if (is.factor(y)) "factor" else "character vector",
@@ -180,7 +185,7 @@ tl_tuner_task <- function(data, formula, is_classification) {
   # factor here, and a computed one that is not already a factor would be
   # classified in the folds and refitted as a regression by tl_model(),
   # where nnet scoring failed on "level sets of factors are different".
-  if (is_classification && !categorical && !is.name(lhs)) {
+  if (is_classification && !classifies && !is.name(lhs)) {
     stop(
       "is_classification = TRUE, but '", response_label, "' is computed ",
       "as ", class(unclass(y))[1], ". To classify it, write factor() ",
@@ -327,7 +332,7 @@ tl_tune_nn <- function(data, formula, is_classification = NULL,
   tl_check_packages("nnet")
 
   formula <- tl_as_formula(formula)
-  task <- tl_tuner_task(data, formula, is_classification)
+  task <- tl_tuner_task(data, formula, is_classification, "nn")
   data <- task$data
   is_classification <- task$is_classification
 

@@ -50,7 +50,7 @@ tl_override_args <- function(defaults, overrides) {
 #' @noRd
 tl_refuse_offset <- function(formula, data, dots, method, fitter) {
   model_terms <- tryCatch(
-    stats::terms(formula, data = data),
+    tl_terms(formula, data = data),
     error = function(e) NULL
   )
   offsets <- attr(model_terms, "offset")
@@ -72,6 +72,62 @@ tl_refuse_offset <- function(formula, data, dots, method, fitter) {
     "offset(<column>) in the formula.",
     call. = FALSE
   )
+}
+
+#' A classification formula whose computed response is a factor
+#'
+#' tl_model() makes a bare response column a factor, but a computed one is
+#' left to the formula: writing it back over its column would change what
+#' the formula computes. randomForest, e1071 and nnet read a computed
+#' character response such as \code{ifelse(mpg > 20, "hi", "lo")} as
+#' numbers: the forest was grown as a regression and failed with
+#' "non-numeric argument to binary operator", svm stopped with "missing
+#' value where TRUE/FALSE needed", and nnet with "NA/NaN/Inf in foreign
+#' function call (arg 2)". Such a response is wrapped in \code{factor()},
+#' as \code{tl_fit_logistic()} does, whose levels are the classes
+#' \code{tl_normalise_response()} reads off it.
+#'
+#' @param formula The model formula
+#' @param data The training data
+#' @return \code{formula}, its left-hand side in \code{factor()} when it
+#'   is computed and not already a factor
+#' @keywords internal
+#' @noRd
+tl_factor_response_formula <- function(formula, data) {
+  if (!is.name(formula[[2L]]) &&
+        !is.factor(tl_formula_response(formula, data))) {
+    formula[[2L]] <- call("factor", formula[[2L]])
+  }
+  formula
+}
+
+#' Refuse data without a training column the model's predictors read
+#'
+#' \code{model.frame()} looks a variable up in the data and then in the
+#' formula's environment, so a predictor column missing from the data was
+#' taken from a same-named object in the caller's session, and the result
+#' built from it; with none in scope the call failed with "object 'hp' not
+#' found". A check on the design matrix comes too late to catch either.
+#' Only training columns are required: a variable the formula took from its
+#' environment at fit time, such as \code{expo} in \code{I(expo^2)}, is
+#' found there again.
+#'
+#' @param model A supervised tidylearn model
+#' @param data The data about to be scored
+#' @param what How the message names \code{data}
+#' @return \code{TRUE}, invisibly, when no training column is missing
+#' @keywords internal
+#' @noRd
+tl_refuse_missing_predictors <- function(model, data, what = "New data") {
+  missing_cols <- setdiff(tl_predictor_columns(model), names(data))
+  if (length(missing_cols) > 0) {
+    stop(
+      what, " is missing predictors used at fit time: ",
+      paste(missing_cols, collapse = ", "),
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
 }
 
 #' Fit a decision tree model
@@ -241,6 +297,7 @@ tl_fit_forest <- function(data, formula, is_classification = FALSE,
   # predictor can produce a split, and the loop is uninterruptible
   if (is_classification) {
     tl_check_predictor_variance(data, formula, "forest")
+    formula <- tl_factor_response_formula(formula, data)
   }
 
   # No default mtry. randomForest's own is floor(sqrt(p)) for
@@ -285,7 +342,7 @@ tl_fit_forest <- function(data, formula, is_classification = FALSE,
 #' @keywords internal
 #' @noRd
 tl_forest_has_transformed_term <- function(formula, data) {
-  labels <- attr(stats::terms(formula, data = data), "term.labels")
+  labels <- attr(tl_terms(formula, data = data), "term.labels")
   parts_of <- function(expr) {
     if (is.call(expr) && identical(expr[[1L]], as.name(":"))) {
       c(parts_of(expr[[2L]]), parts_of(expr[[3L]]))
@@ -318,7 +375,45 @@ tl_fit_forest_frame <- function(formula, data, args) {
   na_action <- if (is.null(dots$na.action)) stats::na.fail else dots$na.action
   dots$na.action <- NULL
 
-  frame <- stats::model.frame(formula, data = data, na.action = na_action)
+  built <- tl_predictor_frame(
+    stats::model.frame(formula, data = data, na.action = na_action)
+  )
+
+  fit <- do.call(randomForest::randomForest,
+                 c(list(x = built$x, y = built$y), dots))
+
+  # update() re-runs the stored call in its caller's frame. Written back as
+  # their names, x and y were looked up there and not found, under a bare
+  # randomForest head that a session without randomForest attached could
+  # not find either. Held, they are the rows the forest was grown on, and
+  # the call still prints in a line rather than spelling out the frame.
+  fit <- tl_hold_call_args(fit, c("x", "y", "weights"))
+  fit$call[[1L]] <- tl_call_head("randomForest")
+
+  fit$terms <- built$terms
+  fit <- tl_keep_predictor_frame(fit, built)
+  if (!is.null(built$na_action)) {
+    fit$na.action <- built$na_action
+  }
+  fit
+}
+
+#' The predictors of a model frame, as a frame of plain columns
+#'
+#' Each variable a term uses is a predictor, as randomForest's and gbm's
+#' formula interfaces read them: an interaction as its parts. A variable
+#' only a subtracted term names is not. Both callers come here only for a
+#' formula with a computed term, so there is always a term.
+#'
+#' @param frame The training model frame
+#' @return A list: \code{x}, the predictors through
+#'   \code{tl_forest_flatten()}; \code{y}, the response; \code{terms}, the
+#'   frame's terms; \code{predictor_terms}, \code{columns} and
+#'   \code{xlevels}, which \code{tl_rebuild_predictor_frame()} reads; and
+#'   \code{na_action}, the rows the frame left out, if any
+#' @keywords internal
+#' @noRd
+tl_predictor_frame <- function(frame) {
   model_terms <- attr(frame, "terms")
 
   # The terms keep the predvars model.frame() recorded: the training centre
@@ -330,41 +425,63 @@ tl_fit_forest_frame <- function(formula, data, args) {
   # caller defined is still found at predict().
   predictor_terms <- stats::delete.response(model_terms)
 
-  # Each variable a term uses is a predictor, as randomForest's formula
-  # interface reads them: an interaction as its parts. A variable only a
-  # subtracted term names is not. This path runs only for a formula with a
-  # transformed term, so there is always a term.
   used <- which(rowSums(attr(predictor_terms, "factors")) > 0)
   response <- attr(model_terms, "response")
-  x <- tl_forest_flatten(
-    frame[, setdiff(seq_along(frame), response)[used], drop = FALSE]
+  list(
+    x = tl_forest_flatten(
+      frame[, setdiff(seq_along(frame), response)[used], drop = FALSE]
+    ),
+    y = stats::model.response(frame),
+    terms = model_terms,
+    predictor_terms = predictor_terms,
+    columns = used,
+    xlevels = stats::.getXlevels(model_terms, frame),
+    na_action = attr(frame, "na.action")
   )
-  y <- stats::model.response(frame)
+}
 
-  # The stored call names its values rather than spelling out the frame,
-  # as print() would
-  fit <- do.call(randomForest::randomForest, c(list(x = x, y = y), dots))
-  for (arg in intersect(names(fit$call), c("x", "y", "weights"))) {
-    fit$call[[arg]] <- as.name(arg)
-  }
-  fit$terms <- model_terms
-  fit$tl_predictor_terms <- predictor_terms
-  fit$tl_predictor_columns <- used
-  fit$tl_xlevels <- stats::.getXlevels(model_terms, frame)
-  if (!is.null(attr(frame, "na.action"))) {
-    fit$na.action <- attr(frame, "na.action")
-  }
+#' Keep on a fit what rebuilding its predictor frame needs
+#'
+#' @param fit The fitted model
+#' @param built The list \code{tl_predictor_frame()} returned
+#' @return \code{fit}, carrying the predictor terms, columns and levels
+#' @keywords internal
+#' @noRd
+tl_keep_predictor_frame <- function(fit, built) {
+  fit$tl_predictor_terms <- built$predictor_terms
+  fit$tl_predictor_columns <- built$columns
+  fit$tl_xlevels <- built$xlevels
   fit
 }
 
-#' A predictor frame randomForest can take
+#' Build a fit's predictor frame from new data
+#'
+#' Evaluated through the stored predvars, so each term is computed as it
+#' was in training, whatever rows arrive. Rows with a missing value are
+#' kept.
+#'
+#' @param fit A fit that \code{tl_keep_predictor_frame()} annotated
+#' @param new_data Data holding the formula's raw columns
+#' @return A data frame of vector columns, one row per row of
+#'   \code{new_data}
+#' @keywords internal
+#' @noRd
+tl_rebuild_predictor_frame <- function(fit, new_data) {
+  frame <- stats::model.frame(
+    fit$tl_predictor_terms, new_data,
+    na.action = stats::na.pass, xlev = fit$tl_xlevels
+  )
+  tl_forest_flatten(frame[, fit$tl_predictor_columns, drop = FALSE])
+}
+
+#' A predictor frame randomForest and gbm can take
 #'
 #' A matrix-valued term -- poly(hp, 2), ns(), bs() -- is one column of the
-#' model frame holding a matrix, which randomForest cannot read, and the
-#' fit failed with "number of items to replace is not a multiple of
-#' replacement length". Each of its columns becomes a predictor, named as
-#' model.matrix() names them. A one-column matrix, such as scale(hp)
-#' returns, keeps the term's name.
+#' model frame holding a matrix, which neither randomForest nor gbm can
+#' read, and the fit failed with "number of items to replace is not a
+#' multiple of replacement length". Each of its columns becomes a
+#' predictor, named as model.matrix() names them. A one-column matrix, such
+#' as scale(hp) returns, keeps the term's name.
 #'
 #' @param frame Model-frame columns, one per variable
 #' @return A data frame of vector columns
@@ -403,13 +520,7 @@ tl_forest_flatten <- function(frame) {
 #' @keywords internal
 #' @noRd
 tl_forest_frame_predict <- function(fit, new_data, type) {
-  # Evaluated through the stored predvars, so each term is computed as it
-  # was in training, whatever rows arrive
-  frame <- stats::model.frame(
-    fit$tl_predictor_terms, new_data,
-    na.action = stats::na.pass, xlev = fit$tl_xlevels
-  )
-  x <- tl_forest_flatten(frame[, fit$tl_predictor_columns, drop = FALSE])
+  x <- tl_rebuild_predictor_frame(fit, new_data)
   keep <- stats::complete.cases(x)
   rows <- x[keep, , drop = FALSE]
 
@@ -608,7 +719,7 @@ tl_fit_boost <- function(
     if (is.name(formula[[2L]])) {
       data[[as.character(formula[[2L]])]] <- recoded
     } else {
-      formula <- stats::formula(stats::terms(formula, data = data))
+      formula <- stats::formula(tl_terms(formula, data = data))
       data[[".tl_response"]] <- recoded
       formula[[2L]] <- as.name(".tl_response")
     }
@@ -647,7 +758,92 @@ tl_fit_boost <- function(
   # context". So the call is built from values. The caller's verbose and
   # regression distribution replace the defaults above rather than
   # colliding with them as duplicate arguments.
-  tl_fit_by_value(gbm::gbm, "gbm", tl_override_args(args, dots))
+  args <- tl_override_args(args, dots)
+
+  # gbm rebuilds each term from its label on the rows it predicts, so a
+  # term computed from the training rows was computed afresh: scale(hp)
+  # took the centre and scale of whichever rows arrived, and a row
+  # predicted alone differed from the same row in a larger frame. A
+  # matrix-valued term such as poly(wt, 2) failed at predict(). Such a
+  # formula is fitted, as the forest's is, from a predictor frame of the
+  # training values. The rest keep gbm's formula interface, whose own
+  # model frame gives R's varlist warning for a dot formula once, as lm()
+  # does; this read of the formula does not repeat it.
+  frame <- withCallingHandlers(
+    stats::model.frame(formula, data = data, na.action = stats::na.pass),
+    warning = tl_muffle_varlist
+  )
+  if (tl_has_trained_term(frame)) {
+    return(tl_fit_boost_frame(args, tl_predictor_frame(frame)))
+  }
+
+  tl_fit_by_value(gbm::gbm, "gbm", args)
+}
+
+#' Whether a model frame holds a predictor computed from training values
+#'
+#' \code{makepredictcall()} records in a frame's predvars what a term such
+#' as \code{scale(hp)}, \code{poly()}, \code{ns()} or \code{bs()} computed
+#' from the training rows -- the centre and scale, the coefficients, the
+#' knots -- so a predict method that rebuilds the variable from its label
+#' computes it afresh. A matrix-valued variable is one column holding a
+#' matrix. A transform such as \code{log(hp)} is neither.
+#'
+#' @param frame A model frame without weights or offset columns
+#' @return A single logical
+#' @keywords internal
+#' @noRd
+tl_has_trained_term <- function(frame) {
+  model_terms <- attr(frame, "terms")
+  variables <- as.list(attr(model_terms, "variables"))[-1L]
+  predvars <- as.list(attr(model_terms, "predvars"))[-1L]
+  if (length(predvars) != length(variables)) {
+    predvars <- variables
+  }
+  predictors <- setdiff(seq_along(variables), attr(model_terms, "response"))
+  any(vapply(predictors, function(i) {
+    !identical(predvars[[i]], variables[[i]]) || is.matrix(frame[[i]])
+  }, logical(1)))
+}
+
+#' Fit gbm from a predictor frame built from the formula
+#'
+#' gbm is fitted on the frame's columns by name, against its response,
+#' and \code{tl_predict_boost()} hands it the same frame built from new
+#' data.
+#'
+#' @param args The arguments for \code{gbm()}, as \code{tl_fit_boost()}
+#'   assembled them
+#' @param built The training predictors, from \code{tl_predictor_frame()}
+#' @return A \code{gbm} object carrying the predictor terms and factor
+#'   levels
+#' @keywords internal
+#' @noRd
+tl_fit_boost_frame <- function(args, built) {
+  lhs <- args$formula[[2L]]
+  response <- if (is.name(lhs)) as.character(lhs) else ".tl_response"
+  fit_data <- built$x
+  fit_data[[response]] <- built$y
+  args$formula <- stats::reformulate(
+    vapply(names(built$x), function(name) {
+      deparse1(as.name(name), backtick = TRUE)
+    }, character(1)),
+    response = as.name(response),
+    env = environment(args$formula) %||% baseenv()
+  )
+  args$data <- fit_data
+
+  fit <- tl_fit_by_value(gbm::gbm, "gbm", args)
+
+  # gbm names a predictor by its term label, which quotes these names in
+  # backticks, and summary() and the importance plots reported
+  # `scale(hp)`. Named as written, the predictors would be rebuilt by
+  # predict.gbm() from their names -- scale(hp) computed afresh -- unless
+  # the fit holds no terms, when it reads the columns it is handed, in
+  # order. tl_predict_boost() hands it exactly those.
+  fit$var.names <- names(built$x)
+  fit$Terms <- NULL
+  tl_keep_predictor_frame(fit, built)
 }
 
 #' Predict using a gradient boosting model
@@ -668,6 +864,13 @@ tl_predict_boost <- function(
   # Get the boosting model
   fit <- model$fit
   is_classification <- model$spec$is_classification
+
+  # A boost fitted from a predictor frame is handed the same frame, built
+  # from new_data as training built it. gbm routes a missing value itself,
+  # so incomplete rows stay.
+  if (!is.null(fit$tl_predictor_terms)) {
+    new_data <- tl_rebuild_predictor_frame(fit, new_data)
+  }
 
   # Determine the number of trees to use
   if (is.null(n.trees)) {
@@ -796,8 +999,9 @@ tl_plot_importance <- function(model, top_n = 20, ...) {
   }
   importance_df <- tl_extract_importance(model)
 
-  # A tree with no splits has no importance to draw, and an empty chart
-  # said nothing about why
+  # A tree with no splits has no importance to draw. The plot failed on
+  # the empty table with "Column `importance` not found in `.data`", which
+  # did not say why.
   if (nrow(importance_df) == 0) {
     stop("No feature has non-zero importance: ",
          tl_no_importance_reason(model), ".", call. = FALSE)
@@ -963,12 +1167,10 @@ tl_plot_partial_dependence <- function(model, var, n.pts = 20, ...) {
     x = var,
     y = y_lab
   )
-  # Only a multiclass plot maps the class; a label for an unmapped
-  # aesthetic draws a message every time the plot is printed
-  class_labs <- if (multiclass) {
-    ggplot2::labs(colour = "Class", fill = "Class")
-  }
-
+  # Only a multiclass plot maps the class, to fill for its bars and to
+  # colour for its lines, and each labels only the one it maps: a label for
+  # an aesthetic the plot does not map draws a message every time the plot
+  # is printed.
   if (categorical) {
     # Bar plot for categorical variables
     p <- if (multiclass) {
@@ -976,7 +1178,8 @@ tl_plot_partial_dependence <- function(model, var, n.pts = 20, ...) {
         pred_data,
         ggplot2::aes(x = .data$var_value, y = .data$y, fill = .data$class)
       ) +
-        ggplot2::geom_col(position = "dodge")
+        ggplot2::geom_col(position = "dodge") +
+        ggplot2::labs(fill = "Class")
     } else {
       ggplot2::ggplot(
         pred_data,
@@ -986,7 +1189,6 @@ tl_plot_partial_dependence <- function(model, var, n.pts = 20, ...) {
     }
     p <- p +
       plot_labs +
-      class_labs +
       ggplot2::theme_minimal() +
       ggplot2::theme(
         axis.text.x = ggplot2::element_text(
@@ -1002,7 +1204,8 @@ tl_plot_partial_dependence <- function(model, var, n.pts = 20, ...) {
                      colour = .data$class, group = .data$class)
       ) +
         ggplot2::geom_line() +
-        ggplot2::geom_point()
+        ggplot2::geom_point() +
+        ggplot2::labs(colour = "Class")
     } else {
       ggplot2::ggplot(
         pred_data,
@@ -1013,7 +1216,6 @@ tl_plot_partial_dependence <- function(model, var, n.pts = 20, ...) {
     }
     p <- p +
       plot_labs +
-      class_labs +
       ggplot2::theme_minimal()
   }
 

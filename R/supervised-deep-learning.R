@@ -259,6 +259,9 @@ tl_predict_deep <- function(model, new_data,
   # matrix demanded the response column, which unlabelled data does not
   # have; dropped incomplete rows, so three rows in came back as two; and
   # took its factor levels from the new data, which changed the columns.
+  # A missing training column is refused first: model.frame() would take
+  # it from a same-named object in scope.
+  tl_refuse_missing_predictors(model, new_data)
   x_new <- tl_predictor_matrix(
     model$spec$formula, new_data, xlev = model$spec$xlev
   )
@@ -493,7 +496,7 @@ tl_tune_deep <- function(data, formula,
   tl_check_packages(c("keras", "tensorflow"))
 
   formula <- tl_as_formula(formula)
-  task <- tl_tuner_task(data, formula, is_classification)
+  task <- tl_tuner_task(data, formula, is_classification, "deep")
   data <- task$data
   is_classification <- task$is_classification
   dots <- list(...)
