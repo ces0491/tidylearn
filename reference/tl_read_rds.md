@@ -41,9 +41,9 @@ path <- tempfile(fileext = ".rds")
 saveRDS(mtcars, path)
 tl_read_rds(path)
 #> -- tidylearn data ---------
-#> Source: /tmp/RtmpK94WAU/file1cba74907f7b.rds 
+#> Source: /tmp/Rtmp5pHJ7J/file1ab32c7d9bcc.rds 
 #> Format: rds 
-#> Read at: 2026-10-08 17:59:46 
+#> Read at: 2026-10-09 07:12:12 
 #> 
 #> # A tibble: 32 × 11
 #>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb

@@ -1,6 +1,12 @@
 # Changelog
 
+## tidylearn 0.6.0.9000
+
+(Development version.)
+
 ## tidylearn 0.6.0
+
+CRAN release: 2026-10-08
 
 ### Breaking Changes
 

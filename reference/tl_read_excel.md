@@ -40,7 +40,7 @@ tl_read_excel(path)
 #> -- tidylearn data ---------
 #> Source: /home/runner/work/_temp/Library/readxl/extdata/datasets.xlsx 
 #> Format: excel 
-#> Read at: 2026-10-08 17:59:44 
+#> Read at: 2026-10-09 07:12:09 
 #> 
 #> # A tibble: 32 × 11
 #>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb
@@ -60,7 +60,7 @@ tl_read_excel(path, sheet = "mtcars")
 #> -- tidylearn data ---------
 #> Source: /home/runner/work/_temp/Library/readxl/extdata/datasets.xlsx 
 #> Format: excel 
-#> Read at: 2026-10-08 17:59:44 
+#> Read at: 2026-10-09 07:12:09 
 #> 
 #> # A tibble: 32 × 11
 #>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb

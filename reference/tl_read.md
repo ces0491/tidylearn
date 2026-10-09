@@ -66,12 +66,12 @@ When `source` is a local `.zip` file, it is equivalent to calling
 csv <- tempfile(fileext = ".csv")
 write.csv(mtcars, csv, row.names = FALSE)
 tl_read(csv)
-#> Reading csv data from: /tmp/RtmpK94WAU/file1cba22c41714.csv
+#> Reading csv data from: /tmp/Rtmp5pHJ7J/file1ab3363aa564.csv
 #> Returned: 32 rows x 11 columns
 #> -- tidylearn data ---------
-#> Source: /tmp/RtmpK94WAU/file1cba22c41714.csv 
+#> Source: /tmp/Rtmp5pHJ7J/file1ab3363aa564.csv 
 #> Format: csv 
-#> Read at: 2026-10-08 17:59:41 
+#> Read at: 2026-10-09 07:12:06 
 #> 
 #> # A tibble: 32 × 11
 #>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb
@@ -96,17 +96,17 @@ write.csv(mtcars[17:32, ], feb, row.names = FALSE)
 both <- tl_read(c(jan, feb), .quiet = TRUE)
 table(both$source_file)
 #> 
-#> file1cba2bb8c609.csv file1cba70fdc3eb.csv 
-#>                   16                   16 
+#> file1ab32d687d1.csv file1ab34d2e0af.csv 
+#>                  16                  16 
 
 # A .txt file is read as CSV unless told otherwise
 txt <- tempfile(fileext = ".txt")
 write.table(mtcars, txt, sep = "\t", row.names = FALSE)
 tl_read(txt, format = "tsv", .quiet = TRUE)
 #> -- tidylearn data ---------
-#> Source: /tmp/RtmpK94WAU/file1cba7f592c28.txt 
+#> Source: /tmp/Rtmp5pHJ7J/file1ab31d0940fd.txt 
 #> Format: tsv 
-#> Read at: 2026-10-08 17:59:41 
+#> Read at: 2026-10-09 07:12:06 
 #> 
 #> # A tibble: 32 × 11
 #>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb

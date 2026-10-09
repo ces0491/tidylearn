@@ -225,7 +225,7 @@ do.call(rbind, sweep)
 #> 1      2     0.0      1         1 baseline_tree
 #> 2      5     0.0      1         1 baseline_tree
 #> 3     10     0.2      3         3 baseline_tree
-#> 4     30     0.7      8         8  advanced_svm
+#> 4     30     0.8      8         8  advanced_svm
 ```
 
 iris is 150 rows, so everything here is quick and the budget is barely

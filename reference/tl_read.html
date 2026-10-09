@@ -15,7 +15,7 @@ source."><meta property="og:image" content="https://tidylearn.sheetsolved.com/lo
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -118,12 +118,12 @@ is equivalent to calling <code><a href="tl_read_zip.html">tl_read_zip()</a></cod
 <span class="r-in"><span><span class="va">csv</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".csv"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/write.table.html" class="external-link">write.csv</a></span><span class="op">(</span><span class="va">mtcars</span>, <span class="va">csv</span>, row.names <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">tl_read</span><span class="op">(</span><span class="va">csv</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Reading csv data from: /tmp/RtmpK94WAU/file1cba22c41714.csv</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Reading csv data from: /tmp/Rtmp5pHJ7J/file1ab3363aa564.csv</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Returned: 32 rows x 11 columns</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> -- tidylearn data ---------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Source: /tmp/RtmpK94WAU/file1cba22c41714.csv </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Source: /tmp/Rtmp5pHJ7J/file1ab3363aa564.csv </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Format: csv </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Read at: 2026-10-08 17:59:41 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Read at: 2026-10-09 07:12:06 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 32 × 11</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb</span>
@@ -148,17 +148,17 @@ is equivalent to calling <code><a href="tl_read_zip.html">tl_read_zip()</a></cod
 <span class="r-in"><span><span class="va">both</span> <span class="op">&lt;-</span> <span class="fu">tl_read</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">jan</span>, <span class="va">feb</span><span class="op">)</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">both</span><span class="op">$</span><span class="va">source_file</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> file1cba2bb8c609.csv file1cba70fdc3eb.csv </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                   16                   16 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> file1ab32d687d1.csv file1ab34d2e0af.csv </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                  16                  16 </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># A .txt file is read as CSV unless told otherwise</span></span></span>
 <span class="r-in"><span><span class="va">txt</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".txt"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/write.table.html" class="external-link">write.table</a></span><span class="op">(</span><span class="va">mtcars</span>, <span class="va">txt</span>, sep <span class="op">=</span> <span class="st">"\t"</span>, row.names <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">tl_read</span><span class="op">(</span><span class="va">txt</span>, format <span class="op">=</span> <span class="st">"tsv"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> -- tidylearn data ---------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Source: /tmp/RtmpK94WAU/file1cba7f592c28.txt </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Source: /tmp/Rtmp5pHJ7J/file1ab31d0940fd.txt </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Format: tsv </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Read at: 2026-10-08 17:59:41 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Read at: 2026-10-09 07:12:06 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 32 × 11</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb</span>

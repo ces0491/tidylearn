@@ -40,9 +40,9 @@ DBI::dbDisconnect(conn)
 
 tl_read_sqlite(path, "SELECT mpg, cyl, hp FROM cars WHERE cyl = 6")
 #> -- tidylearn data ---------
-#> Source: /tmp/RtmpK94WAU/file1cba67e403c2.sqlite 
+#> Source: /tmp/Rtmp5pHJ7J/file1ab363729.sqlite 
 #> Format: sqlite 
-#> Read at: 2026-10-08 17:59:47 
+#> Read at: 2026-10-09 07:12:12 
 #> 
 #> # A tibble: 7 × 3
 #>     mpg   cyl    hp
