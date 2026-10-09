@@ -1,3 +1,7 @@
+# tidylearn 0.6.0.9000
+
+(Development version.)
+
 # tidylearn 0.6.0
 
 ## Breaking Changes
