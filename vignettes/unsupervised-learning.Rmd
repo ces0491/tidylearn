@@ -311,7 +311,7 @@ sapply(linkages, function(m) {
 
 Single linkage chains: its largest cluster takes 98 of the 150 rows, all of
 *versicolor* and nearly all of *virginica*, and leaves two rows as a cluster
-of their own. That is a property of the linkage, not a finding about irises.
+of their own. The linkage causes that, and it says nothing about irises.
 
 ## DBSCAN
 
@@ -343,7 +343,7 @@ db_data <- augment_dbscan(db, iris)
 table(Cluster = db_data$cluster, Species = db_data$Species)
 ```
 
-Cluster 0 is noise, not a cluster.
+Cluster 0 holds the noise points.
 
 `explore_dbscan_params()` sweeps the two parameters together, which is more
 informative than tuning either alone:

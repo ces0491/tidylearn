@@ -1,7 +1,6 @@
 #' Integration Functions: Combining Supervised and Unsupervised Learning
 #'
-#' These functions demonstrate the power of tidylearn's unified approach by
-#' seamlessly integrating supervised and unsupervised learning techniques.
+#' These functions combine supervised and unsupervised learning techniques.
 #' @noRd
 NULL
 
@@ -587,8 +586,8 @@ tl_semisupervised <- function(data, formula, labeled_indices,
   }
 
   # A cluster where no labelled observation carries a label has nothing to
-  # propagate. Its rows used to become NA and vanish at fit time without a
-  # word, so the model trained on a fraction of the data it appeared to use.
+  # propagate. Left alone, its rows become NA and vanish at fit time without
+  # a word, so the model trains on a fraction of the data it appears to use.
   if (any(unlabelled)) {
     is_labelled <- pseudo_labeled$obs_id %in% labeled_indices
     orphaned <- unlabelled & !is_labelled
@@ -678,7 +677,7 @@ tl_anomaly_aware <- function(data, formula, response,
                              ...) {
   formula <- tl_as_formula(formula)
 
-  # An action outside the three used to fall through every branch and fail
+  # An action outside the three would fall through every branch and fail
   # later with "object 'model' not found"
   actions <- c("remove", "flag", "downweight")
   if (!is.character(action) || length(action) != 1L ||
@@ -849,7 +848,7 @@ tl_stratified_models <- function(data, formula, cluster_method = "kmeans",
 
   # Train a model for each cluster. One whose rows all hold a single class
   # gives a classifier nothing to separate, and every method refuses it,
-  # which used to fail the whole call: k-means puts iris's 50 setosa rows
+  # which would fail the whole call: k-means puts iris's 50 setosa rows
   # in a cluster of their own. Its rows are predicted as that class.
   cluster_models <- list()
   single_class <- character()

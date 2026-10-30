@@ -73,7 +73,8 @@ test_that("tl_model_has_keras is false for pure-R models", {
 # ---- 'deep' needs a TensorFlow backend, which CI does not provide ----
 
 skip_if_no_tensorflow <- function() {
-  testthat::skip_if_not_installed("keras")
+  testthat::skip_on_cran()
+  testthat::skip_if_not_installed("keras3")
   testthat::skip_if_not_installed("tensorflow")
   ok <- tryCatch(
     !is.null(tensorflow::tf_version()),

@@ -34,7 +34,7 @@ A list with class \code{"tidylearn_eda"} containing:
 }
 }
 \description{
-Comprehensive EDA combining unsupervised learning techniques
+EDA combining unsupervised learning techniques
 to understand data structure before modeling
 }
 \examples{

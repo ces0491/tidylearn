@@ -314,14 +314,14 @@ tl_pipeline <- function(data, formula,
   formula <- tl_as_formula(formula)
 
   # Fill in whichever preprocessing steps the caller left unnamed. A
-  # partial list used to reach `if (preprocessing$standardize)` as NULL
+  # partial list would reach `if (preprocessing$standardize)` as NULL
   # and fail with "argument is of length zero" inside tl_run_pipeline(),
   # long after the mistake was made.
   preprocessing <- merge_preprocessing_spec(preprocessing)
 
-  # A response that is not a column of `data` used to reach the default
+  # A response that is not a column of `data` would reach the default
   # models and the evaluation spec as NULL, which reads as regression.
-  # The pipeline then failed inside rpart with "object 'Speces' not
+  # The pipeline would then fail inside rpart with "object 'Speces' not
   # found", naming a typo but not where it was made.
   response_var <- all.vars(formula)[1]
   if (!response_var %in% names(data)) {

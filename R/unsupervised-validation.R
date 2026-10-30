@@ -439,7 +439,7 @@ plot_gap_stat <- function(gap_obj, show_methods = FALSE) {
 
 #' Calculate Cluster Validation Metrics
 #'
-#' Comprehensive validation metrics for a clustering result
+#' Validation metrics for a clustering result
 #'
 #' @param clusters Vector of cluster assignments: numeric, factor or
 #'   character. A label of 0 marks noise, as \code{\link{tidy_dbscan}}

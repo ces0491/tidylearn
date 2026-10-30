@@ -49,8 +49,7 @@ tl_plot_importance_comparison <- function(..., top_n = 10, names = NULL) {
   # Extract importance for each model
   all_importance <- purrr::map2_dfr(models, names, tl_comparison_importance)
 
-  # This used to evaluate NULL without returning it, so the function
-  # carried on and failed inside dplyr with "object 'feature' not found"
+  # Carrying on would fail inside dplyr with "object 'feature' not found"
   if (is.null(all_importance) || nrow(all_importance) == 0) {
     stop(
       "None of the models has feature importance to compare. Supported ",
@@ -151,8 +150,7 @@ tl_comparison_importance <- function(model, name) {
     return(NULL)
   }
 
-  # An empty importance used to drop the model from the comparison with
-  # nothing to say why
+  # An empty importance drops the model from the comparison, so say why
   if (nrow(imp) == 0) {
     warning(
       "Model '", name, "' has no feature with non-zero importance: ",
@@ -998,6 +996,8 @@ tl_dashboard <- function(model, new_data = NULL, ...) {
 
     # Performance metrics
     output$metrics_table <- DT::renderDT({
+      # tl_evaluate() refuses an unsupervised model, which has no response
+      shiny::req(inherits(model, "tidylearn_supervised"))
       metrics <- tl_evaluate(model, new_data)
       DT::datatable(metrics,
                     options = list(pageLength = 10),
@@ -1239,8 +1239,8 @@ tl_bin_index <- function(n, bins) {
 #' of its tie group -- the value any tie-breaking would give on average --
 #' so a bin boundary falling inside a group takes its share of that group.
 #'
-#' A row missing its response or its probability used to turn every
-#' cumulative total into NA and empty the chart. Those rows are left out,
+#' A row missing its response or its probability would turn every
+#' cumulative total into NA and empty the chart, so those rows are left out,
 #' with a warning giving the count.
 #'
 #' The observed classes are read against the model's, so the positive
@@ -1889,8 +1889,8 @@ create_cluster_dashboard <- function(data,
   plots <- list()
 
   # 1. Cluster scatter plot (first two numeric columns besides the
-  # clusters). Skipped, it used to leave a NULL in the list that
-  # grid.arrange() could not draw.
+  # clusters). A skipped plot must leave no NULL in the list, since
+  # grid.arrange() cannot draw one.
   numeric_cols <- setdiff(
     names(data)[vapply(data, is.numeric, logical(1))], cluster_col
   )

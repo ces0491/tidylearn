@@ -2,6 +2,74 @@
 
 (Development version.)
 
+## Breaking Changes
+
+* `tl_evaluate()` on an unsupervised model is an error. It returned the
+  single row `metric = "completed"`, `value = 1`, whatever `new_data` and
+  `metrics` held, and `tl_table_metrics()` printed that row as a result.
+  `calc_validation_metrics()` and `tidy_silhouette()` assess a clustering.
+
+* `"deep"`, `tl_tune_deep()` and the deep plots use keras3 in place of keras,
+  which reports itself as deprecated when loaded. Install keras3 and a Python
+  with Keras 3. `tl_check_gpu()` reports the backend as `$backends$keras3`.
+
+* `tl_compute_advisor()` refuses an argument it does not know. `...` took a
+  misspelt `hyperparms =` without a word, and the estimate used the default
+  hyperparameters.
+
+* `plot()` on an unsupervised model refuses a `type` other than `"auto"`.
+  Each method has one plot, and `type` was ignored.
+
+## Bug Fixes
+
+* **`tl_compute_advisor()` gives different runtimes.** It divided every
+  estimate by the machine's physical cores, although timing the fits found
+  only xgboost and `"deep"` using more than one. On a 16-core laptop that
+  left forest and tree estimates 19x and 21x under the fit's measured time.
+  The division is gone, the `cores_used` field and the core count in the
+  printout with it, and each method's runtime constant comes from fits timed
+  by `data-raw/calibrate-advisor.R`. The estimates land within a factor of 3
+  of those fits on that one machine, and other hardware or data shapes can be
+  further off.
+
+* **`tl_compute_advisor()` gives different cloud costs.** Modal's rates are
+  its list prices of 2026-10-30, built from the CPU, memory and GPU each
+  tier uses. The CPU and A100 tiers were 1.4x to 2.3x over list. The T4 and
+  A10G tiers matched the GPU price alone, leaving out the CPU and memory a
+  GPU container also bills. Expected cost covers the load time and idle
+  window Modal bills, in place of a flat $0.01.
+
+* The worst-case cost that the cloud budget check gates on adds that load
+  and idle time to the timeout, since it stated less than a job can bill.
+
+* A CPU tier on Modal is no longer assumed to run a fit faster for having
+  more cores. Only the memory of a CPU tier now affects which one is chosen.
+
+## Documentation
+
+* The README and `vignette("compute-backends")` described the job timeout,
+  the worker's retry setting and cancel-on-interrupt as being in place. They
+  are the design for a submission path that does not exist yet, and both now
+  say so.
+
+* The threat model drops its revision history and references to the design
+  it replaced, and states the design as it stands.
+
+* `PACKAGE_ARCHITECTURE.md` covers `coefficients.R` and points to where the
+  method lists live. `CONTRIBUTING.md` explains versions without naming a
+  release, so it does not go stale.
+
+## Internal
+
+* `parallel` leaves Imports: the core count was its only use.
+
+* `later` joins Suggests. The dashboard server test runs on a private event
+  loop, because `shiny::testServer()` otherwise hangs in a terminal attached to
+  the VS Code R extension.
+
+* The CI workflows use `actions/checkout@v7` and
+  `JamesIves/github-pages-deploy-action@v4.9.0`, which run on Node 24.
+
 # tidylearn 0.6.0
 
 ## Breaking Changes

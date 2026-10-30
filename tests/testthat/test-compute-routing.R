@@ -13,7 +13,7 @@ fake_gpu_off <- structure(
     backends = list(
       xgboost    = list(installed = FALSE, gpu_likely_works = FALSE),
       tensorflow = list(installed = FALSE, gpu_likely_works = FALSE),
-      keras      = list(installed = FALSE, gpu_likely_works = FALSE)
+      keras3     = list(installed = FALSE, gpu_likely_works = FALSE)
     ),
     messages = character(0)
   ),
@@ -32,7 +32,7 @@ fake_gpu_xgb <- structure(
     backends = list(
       xgboost    = list(installed = TRUE,  gpu_likely_works = TRUE),
       tensorflow = list(installed = FALSE, gpu_likely_works = FALSE),
-      keras      = list(installed = FALSE, gpu_likely_works = FALSE)
+      keras3     = list(installed = FALSE, gpu_likely_works = FALSE)
     ),
     messages = character(0)
   ),
@@ -153,7 +153,6 @@ test_that("tl_resolve_compute('auto') picks gpu for long GPU-capable job", {
       list(
         est_seconds     = 1200,
         est_peak_ram_mb = 400,
-        cores_used      = 4L,
         feasible        = TRUE,
         notes           = character(0)
       )

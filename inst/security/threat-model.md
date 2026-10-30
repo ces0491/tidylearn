@@ -2,15 +2,13 @@
 
 **Status:** DRAFT — describes the commitments tidylearn's cloud-compute
 integration will meet when the Modal-backed `compute = "cloud"` path lands.
-**Last updated:** 2026-08-06
 **Scope:** the cloud-compute paths in tidylearn (`tl_compute_advisor()`'s
 cloud-tier estimates, `tl_resolve_compute()`'s `"cloud"` branch, and the
 forthcoming `tl_model(..., compute = "cloud")` submission to Modal).
 
-**API names below are provisional.** `confirm_upload`, `dry_run` and
-`tl_cloud_consent()` describe the intended design and do not exist yet;
-`tl_model()` is the existing entry point they would attach to. The
-commitments are binding, the spellings are not.
+**API names below are provisional.** The `confirm_upload` and `dry_run`
+arguments describe the intended design and `tl_model()` does not take them
+yet. The commitments are binding, the spellings are not.
 
 **Transport.** tidylearn talks to Modal over plain HTTPS from R, using
 `httr2` against a Modal Web Function the user has deployed to their own
@@ -81,9 +79,8 @@ Boundaries:
   R (see [T1](#t1-token-handling-in-tidylearn)).
 - **User's Modal proxy token** — a distinct, endpoint-scoped credential
   (`wk-…` ID plus `ws-…` secret) that tidylearn *does* handle, because it
-  must set the `Modal-Key` / `Modal-Secret` request headers itself. This
-  is the significant change from the reticulate-based design and is
-  covered by [T1](#t1-token-handling-in-tidylearn).
+  must set the `Modal-Key` / `Modal-Secret` request headers itself. See
+  [T1](#t1-token-handling-in-tidylearn).
 
 ## 2. Assets
 
@@ -92,7 +89,7 @@ Boundaries:
 | Modal account API token | High | `~/.modal.toml` (user OS), used only by the Python CLI at deploy time | Until revoked |
 | Modal proxy token (`wk-` / `ws-`) | High — endpoint-scoped | User environment; read into the R process per request, never persisted | Until revoked |
 | Training data (rows × cols) | User-determined; may contain PII | In-memory in R, transmitted to Modal during fit | Ephemeral on Modal — destroyed with container |
-| Fitted model artifacts | Medium — may memorize training data | Returned to R session as raw bytes; not persisted on Modal. Keras models travel as a separate hdf5 payload, since they cannot cross a process boundary through base R serialisation | Lives in user's R session |
+| Fitted model artifacts | Medium — may memorize training data | Returned to R session as raw bytes; not persisted on Modal. Keras models travel as a separate `.keras` archive, since they cannot cross a process boundary through base R serialisation | Lives in user's R session |
 | Hyperparameters / model spec | Low | In-memory in R, transmitted to Modal | Ephemeral |
 | Job stdout / logs | Low — should contain no row-level data | Modal log retention (per Modal's policy) | Per Modal |
 
@@ -111,14 +108,13 @@ but still material for the proxy token, which is scoped to invoking
 deployed endpoints — a leak means an attacker can run fits on the user's
 account and see their results.
 
-The reticulate design could promise that no token material entered R at
-all. The HTTPS design cannot: tidylearn sets the auth headers itself, so
-the proxy token is necessarily in the R process. The two credentials are
+tidylearn sets the auth headers itself, so the proxy token is necessarily
+in the R process, and the account token never is. The two credentials are
 therefore treated differently.
 
 **Mitigation.**
 
-Account API token — unchanged, still never touched:
+Account API token — never touched:
 
 - tidylearn R code MUST NOT read `~/.modal.toml`, `~/.config/modal/`,
   `~/.modal/`, or any Modal token environment variable. The account token
@@ -221,9 +217,8 @@ without the user actively choosing to store it there.
 Modal intercepts the upload, captures training data, or tampers with the
 returned model.
 
-**Risk.** Low (Modal endpoints are HTTPS-only) but worth naming. Higher
-than under the reticulate design, because tidylearn now owns the transport
-rather than delegating it.
+**Risk.** Low, since Modal endpoints are HTTPS-only. tidylearn owns the
+transport, so nothing else enforces the rules below.
 
 **Mitigation.**
 
@@ -238,9 +233,8 @@ rather than delegating it.
 
 **Verification.**
 
-- The earlier form of this check — "no `httr*` in cloud paths" — no longer
-  applies; `httr2` *is* the transport. The check is now about destination
-  and TLS posture, not about the presence of an HTTP client.
+- `httr2` is the transport, so these checks cover its destination and TLS
+  posture.
 - `grep -rn 'ssl_verify\|req_options' R/` shows no TLS downgrades.
 - `grep -rn 'request(' R/` — every request base URL traces back to the
   validated endpoint from [T9](#t9-egress-to-a-non-modal-host), not to a
@@ -310,9 +304,7 @@ dependency surface is `httr2` on the client side, and the R packages
 baked into the worker image on the remote side.
 
 **Risk.** Low-to-medium. Hard to fully defend against, but the impact
-surface can be limited. Smaller than under the reticulate design, which
-put a Python interpreter and the Modal SDK's transitive tree inside the
-user's session.
+surface can be limited.
 
 **Mitigation.**
 
@@ -322,14 +314,14 @@ user's session.
   to the repo.
 - Because `method = "deep"` ships in the first cloud release, the worker
   image also carries a Python runtime with TensorFlow and keras, and
-  **those are pinned too**. The R `keras` package and the Python keras it
-  binds to must be a matched pair; an unpinned image would drift into the
-  Keras 2 / Keras 3 split and fail at deserialisation rather than at
-  build time. This is the cost of shipping `deep`: the other twelve
-  methods need only R and CRAN packages.
+  **those are pinned too**. The R `keras3` package and the Python Keras it
+  binds to must be a matched pair; an unpinned image can drift to a Keras
+  release that fails on the saved `.keras` archive at deserialisation
+  rather than at build time. This is the cost of shipping `deep`: the
+  other twelve methods need only R and CRAN packages.
 - R-side cloud deps live in `Suggests:` so the install footprint is
   minimal. `httr2` is the only addition for the twelve pure-R methods.
-  The `deep` path additionally calls `keras`, which tidylearn already
+  The `deep` path additionally calls `keras3`, which tidylearn already
   suggests for local deep fits — it adds no new dependency, but it does
   mean reticulate and a Python runtime are present on the client for
   that one method.
@@ -345,11 +337,11 @@ user's session.
 - The image build is reproducible from the committed manifest.
 - `grep -rn 'reticulate::\|library(reticulate)\|require(reticulate)' R/`
   returns nothing — tidylearn never drives reticulate directly, even on
-  the `deep` path, where it calls `keras::serialize_model()` and lets
-  keras own the Python boundary. (Match on calls, not on the word: the
+  the `deep` path, where it calls `keras3::save_model()` and lets
+  keras3 own the Python boundary. (Match on calls, not on the word: the
   source explains in comments why `python.builtin.object` is the right
   class to detect.)
-- Cloud paths import only `httr2` and, for `deep`, `keras`.
+- Cloud paths import only `httr2` and, for `deep`, `keras3`.
 
 ### T8: Multi-tenant data leakage on Modal
 
@@ -384,10 +376,8 @@ sends training data to a host that is not Modal — while every consent gate
 in [T2](#t2-silent-data-upload-without-user-knowledge) is satisfied and the
 upload summary still reads as expected.
 
-**Risk.** Medium-to-high. This threat did not exist under the reticulate
-design, where the SDK resolved the destination from the user's Modal
-account and tidylearn never named a host. Owning the transport means owning
-the destination.
+**Risk.** Medium-to-high. tidylearn owns the transport, so it owns the
+destination too.
 
 **Mitigation.**
 
@@ -457,14 +447,12 @@ expected. The ways this happens are mostly not adversarial:
 - The advisor's estimate is optimistic and the real fit costs more.
 
 **Risk.** High, and the consequence is financial rather than
-informational. It was previously listed as out of scope on the grounds
-that quota exhaustion is a usability concern; that was wrong. A library
-that spends a user's money on their behalf owns this.
+informational. A library that spends a user's money on their behalf owns
+this.
 
 **Mitigation.**
 
-The controls split into two groups, and the distinction matters more
-than any individual control:
+The controls split by whether they survive the client dying:
 
 *Survives the client dying* — the only real guarantees:
 
@@ -472,8 +460,8 @@ than any individual control:
   estimate with headroom and capped well below Modal's 24-hour maximum.
   tidylearn MUST NOT inherit Modal's default timeout, and MUST NOT
   submit a job with no timeout.
-- Retries are off by default on the tidylearn worker function. A failed
-  fit is the user's decision to repeat, not a silent cost multiplier.
+- Retries are off by default on the tidylearn worker function. Repeating
+  a failed fit is the user's decision.
 - `tl_cloud_setup()` directs the user to set a spend budget on their
   Modal workspace. That budget is the only true hard cap, and it is not
   tidylearn's to set.
@@ -483,9 +471,9 @@ than any individual control:
 - A fit whose own estimate exceeds the timeout cap is refused before
   submission. Such a job would bill the full timeout and then be killed
   before producing anything.
-- The user is shown, and gated on, the **worst-case** cost — timeout
-  multiplied by the tier rate — not the expected cost. The estimate is
-  order-of-magnitude; the timeout is the actual bound.
+- The user is shown, and gated on, the **worst-case** cost: the timeout
+  plus the load and idle time Modal also bills, at the tier rate. The
+  estimate is order-of-magnitude; the timeout is the actual bound.
 - A worst-case cost above `max_cost` is refused. Raising it is explicit.
 - The submitted call id is recorded and printed, and in-flight jobs are
   listable, so a job is never invisible.
@@ -533,9 +521,9 @@ Uploading to Modal:
   Rows x cols:      1,500,000 x 47
   Estimated MB:     564
   Modal tier:       A10G (24 GB VRAM / 24 GB RAM)
-  Estimated:        14 min, $0.43
+  Estimated:        14 min, $0.35
   Timeout:          42 min (job is killed at this point)
-  Most it can bill: $0.77
+  Most it can bill: $1.08
 ```
 
 The destination line is part of the mitigation for
@@ -584,8 +572,8 @@ Before the Modal-integration PR is merged, reviewers must confirm:
 - [ ] No telemetry / analytics / pingback calls in cloud paths.
 - [ ] The worker image's R dependency manifest is pinned and committed,
       and the build is reproducible from it. For the `deep` variant, the
-      Python/TensorFlow/keras stack is pinned as a matched pair with the
-      R `keras` package.
+      Python/TensorFlow/Keras stack is pinned as a matched pair with the
+      R `keras3` package.
 - [ ] Every request is built through the URL-validating helper; scheme is
       `https` and host is on the allowlist, enforced as an error.
 - [ ] The allowlist is extensible only by an explicit per-session call,
@@ -644,40 +632,3 @@ These are commitments deferred to the Modal-integration PR:
   matches every workspace's endpoints, so the host check in
   [T9](#t9-egress-to-a-non-modal-host) does not stop data going to an
   endpoint in someone else's workspace.
-
-Two questions listed here previously are now settled and described above:
-the endpoint is read from the `TIDYLEARN_MODAL_ENDPOINT` environment
-variable rather than an R option, and the host allowlist is extensible
-via `tl_cloud_allow_host()` under the constraints in
-[T9](#t9-egress-to-a-non-modal-host).
-
-## 8. Revision history
-
-- **2026-10-05** — [T9](#t9-egress-to-a-non-modal-host): an added host
-  needs at least three labels, because a two-label public suffix such as
-  `co.uk` admitted every site registered under it. Recorded that
-  `*.modal.run` matches every Modal workspace, and added binding to the
-  user's own workspace to [Section 7](#7-open-questions).
-- **2026-08-06** — added [T10](#t10-runaway-spend-and-orphaned-jobs),
-  runaway spend and orphaned jobs, and removed the out-of-scope line that
-  dismissed quota exhaustion as a usability concern. A submitted Modal
-  job runs to completion regardless of what the R session does, so a
-  closed session leaves a job billing invisibly; the mandatory
-  submission timeout, not any client-side handler, is what bounds that.
-  Section 4's summary now shows the timeout and the worst-case cost, and
-  the gate refuses on worst case rather than on the estimate.
-- **2026-08-06** — revised for the HTTPS + R-worker architecture. Modal has
-  no R SDK and no general REST API for invoking Functions, so tidylearn
-  calls a user-deployed Web Function over HTTPS with `httr2` instead of
-  driving the Python SDK through reticulate, and the worker container runs
-  R rather than Python. Consequences: T1 rewritten (tidylearn now handles a
-  proxy token, so the "no token material in R" commitment is replaced by
-  containment rules); T4 rewritten (the ban on `httr*` in cloud paths
-  became a destination-and-TLS check); T7 now pins the worker's R
-  dependencies rather than Python ones; T9 added for egress to a non-Modal
-  host, a threat introduced by owning the transport. Sections 1, 4 and 5
-  updated to match.
-- **2026-05-22** — initial draft. Written alongside slice 4 of the
-  compute-backends initiative (post local-GPU routing + advisor reframe;
-  pre Modal-integration code). All mitigations described as commitments
-  to be verified when Modal code lands.

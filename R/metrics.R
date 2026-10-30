@@ -795,8 +795,8 @@ tl_observed_response <- function(object, new_data) {
 #'   and \code{value} (numeric), containing one row per requested metric,
 #'   and for \code{"auc"} on more than two classes an \code{auc_<class>}
 #'   row per class as well. An unsupervised model has no response to score
-#'   against and returns the single row \code{metric = "completed"},
-#'   \code{value = 1}.
+#'   against, so it is an error: \code{\link{calc_validation_metrics}} and
+#'   \code{\link{tidy_silhouette}} assess a clustering.
 #' @examples
 #' \donttest{
 #' model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")
@@ -806,8 +806,12 @@ tl_observed_response <- function(object, new_data) {
 #' @export
 tl_evaluate <- function(object, new_data = NULL, metrics = NULL, ...) {
   if (!inherits(object, "tidylearn_supervised")) {
-    # Unsupervised evaluation (placeholder)
-    return(tibble::tibble(metric = "completed", value = 1))
+    stop(
+      "tl_evaluate() scores predictions against a response, and an ",
+      "unsupervised model has none. To assess a clustering, see ",
+      "calc_validation_metrics() and tidy_silhouette().",
+      call. = FALSE
+    )
   }
 
   is_classification <- isTRUE(object$spec$is_classification)

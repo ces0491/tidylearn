@@ -1040,6 +1040,7 @@ test_that("the dashboard server draws its regression panels", {
   skip_if_not_installed("shinydashboard")
   skip_if_not_installed("DT")
   skip_if_not_installed("gridExtra")
+  skip_if_not_installed("later")
   # testServer() attaches shiny. Later test files ran with it on the search
   # path, so it is detached again unless it was attached already.
   shiny_attached <- "package:shiny" %in% search()
@@ -1050,12 +1051,18 @@ test_that("the dashboard server draws its regression panels", {
   )
 
   model <- tl_model(mtcars, log(mpg) ~ wt + hp, method = "linear")
+  # testServer() waits for the later event loop to empty. The VS Code R
+  # extension keeps a callback rescheduling itself on that loop, so it never
+  # does, and a run from that terminal hangs here. A private loop holds only
+  # this test's work.
   # The diagnostics plots report their loess formula as a message
-  suppressMessages(shiny::testServer(tl_dashboard(model), {
-    expect_no_error(output$residuals_plot)
-    expect_no_error(output$predictions_table)
-    expect_no_error(output$diagnostics_plot)
-  }))
+  later::with_temp_loop(suppressMessages(
+    shiny::testServer(tl_dashboard(model), {
+      expect_no_error(output$residuals_plot)
+      expect_no_error(output$predictions_table)
+      expect_no_error(output$diagnostics_plot)
+    })
+  ))
 })
 
 # -- Cross-validation plot --

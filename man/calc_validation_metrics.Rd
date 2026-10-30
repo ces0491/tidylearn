@@ -25,7 +25,7 @@ provided; \code{NA} for a single cluster), and \code{total_wss} (if
 \code{data} provided).
 }
 \description{
-Comprehensive validation metrics for a clustering result
+Validation metrics for a clustering result
 }
 \examples{
 \donttest{

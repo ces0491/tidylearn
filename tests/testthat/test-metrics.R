@@ -458,3 +458,13 @@ test_that("tl_calc_regression_metrics handles degenerate inputs", {
   res <- tl_calc_regression_metrics(c(1, NA, 3), c(1, 5, 3), metrics = "mae")
   expect_equal(res$value, 0)
 })
+
+test_that("tl_evaluate refuses an unsupervised model", {
+  # It returned metric = "completed", value = 1 for any arguments at all,
+  # which read as a score
+  model <- tl_model(iris[, 1:4], method = "kmeans", k = 3)
+
+  expect_error(tl_evaluate(model), "an unsupervised model has none")
+  expect_error(tl_evaluate(model, metrics = "not_a_metric"),
+               "an unsupervised model has none")
+})

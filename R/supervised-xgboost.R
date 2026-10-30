@@ -793,10 +793,10 @@ tl_tune_xgboost <- function(data, formula, is_classification = NULL,
 
   # xgb.cv()'s own arguments go to it alone. Everything else in ... is a
   # booster parameter, which belongs in params, for the cross-validation
-  # and the final fit alike. All of ... used to reach both calls, so an
-  # xgb.cv() argument such as showsd reached xgb.train(), which warned
-  # that it did not recognise it, and a booster parameter reached each as
-  # an argument, which xgboost 3.x warns will become an error.
+  # and the final fit alike. All of ... reaching both calls would send an
+  # xgb.cv() argument such as showsd to xgb.train(), which warns that it
+  # does not recognise it, and a booster parameter to each as an argument,
+  # which xgboost 3.x warns will become an error.
   dots <- list(...)
   weights <- dots$weights
   dots$weights <- NULL

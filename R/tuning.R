@@ -138,9 +138,8 @@ tl_tune_grid <- function(data, formula, method,
   tl_check_tuning_metric(metric, is_classification)
 
   # Optimisation direction. Derived from the metric itself, not from
-  # whether the caller supplied one -- naming a metric while leaving
-  # `maximize` at its NULL default previously left it NULL, and the
-  # `if (maximize)` below then failed with "argument is of length zero".
+  # whether the caller supplied one: naming a metric leaves `maximize` at
+  # its NULL default, and the `if (maximize)` below needs a value.
   if (is.null(maximize)) {
     maximize <- tl_metric_maximize(metric)
   }
@@ -308,10 +307,9 @@ tl_check_metric_available <- function(metric, eval_metrics,
 
 #' Refuse a metric argument the tuners cannot optimise
 #'
-#' The name is checked before anything is fitted. \code{metric =
-#' c("rmse", "mae")} used to reach the first fold and fail there with "the
-#' condition has length > 1", and an unknown name failed with whatever
-#' \code{tl_evaluate()} said about it.
+#' The name is checked before anything is fitted, so \code{metric =
+#' c("rmse", "mae")} stops here rather than in the first fold with "the
+#' condition has length > 1", and an unknown name gets a tuner's message.
 #'
 #' @param metric The requested metric
 #' @param is_classification Whether the task is classification
@@ -1043,7 +1041,7 @@ tl_tune_results_frame <- function(tuning_results, param_combinations,
 #' A fold without a score either failed to fit or fitted and left the
 #' metric undefined. The remedies differ -- fix the candidate values, or
 #' choose a metric these folds define -- so the messages say which
-#' happened. The warning used to blame failed fits in both cases.
+#' happened.
 #'
 #' @param results_df The results frame, with \code{mean_metric} and
 #'   \code{n_folds_ok}

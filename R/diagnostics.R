@@ -864,7 +864,7 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
   assumptions
 }
 
-#' Create a comprehensive diagnostic dashboard
+#' Create a diagnostic dashboard
 #'
 #' @param model A tidylearn model object whose fit is an \code{lm} or
 #'   \code{glm}: method \code{"linear"}, \code{"polynomial"} or

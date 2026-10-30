@@ -878,9 +878,9 @@ tl_model_frame_columns <- function(formula, data) {
 
 #' Whether the interaction functions treat a variable as categorical
 #'
-#' A logical used to count as numeric, so the grid ran from 0 to 1 and
-#' predict() refused it: "variable 'x' was fitted with type "logical" but
-#' type "numeric" was supplied".
+#' A logical counts as categorical. As numeric, the grid would run from 0
+#' to 1 and predict() would refuse it: "variable 'x' was fitted with type
+#' "logical" but type "numeric" was supplied".
 #'
 #' @param x A column of the model's data
 #' @return TRUE for a factor, character or logical column

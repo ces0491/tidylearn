@@ -298,10 +298,10 @@ tl_plot_svm_boundary <- function(model,
   # The legend names the response as the formula writes it
   response_label <- deparse1(formula[[2L]])
 
-  # The predictors the model was fitted on. The axes used to default to
-  # the first two numeric columns of the data, so Species ~ Petal.Length +
-  # Petal.Width was drawn over the sepal columns the model never saw, with
-  # one predicted class across the whole grid.
+  # The predictors the model was fitted on. The first two numeric columns
+  # of the data would draw Species ~ Petal.Length + Petal.Width over the
+  # sepal columns the model never saw, with one predicted class across the
+  # whole grid.
   predictor_vars <- intersect(get_formula_vars(formula, data), names(data))
 
   # Fill in whichever axis was not named, from the numeric predictors

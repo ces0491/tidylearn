@@ -9,7 +9,8 @@
 \arguments{
 \item{x}{A tidylearn model object}
 
-\item{type}{Plot type (default: "auto")}
+\item{type}{Plot type (default: "auto"). An unsupervised model takes only
+\code{"auto"}.}
 
 \item{...}{Additional arguments passed to plotting functions}
 }

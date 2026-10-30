@@ -22,7 +22,7 @@ Plot deep learning model training history
 }
 \examples{
 \dontrun{
-if (requireNamespace("keras", quietly = TRUE)) {
+if (requireNamespace("keras3", quietly = TRUE)) {
   model <- tl_model(iris, Species ~ ., method = "deep", epochs = 5)
   tl_plot_deep_history(model)
 }

@@ -476,7 +476,7 @@ test_that("a data-dependent term is computed with the training values", {
 
 test_that("deep computes a data-dependent term with the training values", {
   skip_on_cran()
-  skip_if_not_installed("keras")
+  skip_if_not_installed("keras3")
   skip_if_not_installed("tensorflow")
   has_backend <- tryCatch(
     !is.null(tensorflow::tf_version()),
@@ -488,7 +488,7 @@ test_that("deep computes a data-dependent term with the training values", {
 
   # The design was rebuilt from the formula on the rows predicted, as for
   # xgboost: scale(hp) of a single row is NaN, so the row predicted NA
-  tensorflow::set_random_seed(1)
+  keras3::set_random_seed(1)
   model <- tl_model(mtcars, mpg ~ scale(hp) + wt, method = "deep",
                     epochs = 2, hidden_layers = 4, verbose = 0)
   within <- predict(model, new_data = mtcars)$.pred
@@ -973,4 +973,13 @@ test_that("magrittr's %>% stays exported for existing user code", {
     predict(new_data = mtcars[1:3, ])
   # nolint end
   expect_equal(nrow(pred), 3)
+})
+
+test_that("plot() refuses a type an unsupervised model does not have", {
+  # type was ignored, so a typo drew the one plot and said nothing
+  model <- tl_model(iris[, 1:4], method = "kmeans", k = 3)
+
+  expect_error(plot(model, type = "no_such_type"), "takes only \"auto\"")
+  expect_s3_class(plot(model), "ggplot")
+  expect_s3_class(plot(model, type = "auto"), "ggplot")
 })

@@ -59,7 +59,7 @@ supervised and unsupervised workflows
 Prepare Data for Machine Learning
 }
 \details{
-Comprehensive preprocessing pipeline including imputation, scaling,
+Preprocessing pipeline covering imputation, scaling,
 encoding, and feature engineering
 
 The statistics are learned from, and applied to, the data passed in.

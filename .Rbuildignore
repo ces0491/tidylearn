@@ -1,6 +1,5 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
-^README\.Rmd$
 ^LICENSE\.md$
 ^\.github$
 ^_pkgdown\.yml$
@@ -15,7 +14,7 @@
 ^Meta$
 ^CRAN-SUBMISSION$
 ^\.Rhistory$
-^CRAN_SUBMISSION_GUIDE\.md$
+^data-raw$
 ^\.lintr$
 ^tidylearn\.Rcheck$
 (^|/)Rplots\.pdf$

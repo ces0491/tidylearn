@@ -19,7 +19,7 @@ names columns, and \code{~ . - x} means every numeric column but
 "logistic" (stats::glm), "tree" (rpart),
 "forest" (randomForest), "boost" (gbm),
 "ridge"/"lasso"/"elastic_net" (glmnet), "svm" (e1071),
-"nn" (nnet), "deep" (keras), "xgboost" (xgboost).
+"nn" (nnet), "deep" (keras3), "xgboost" (xgboost).
 The method and the response have to agree, and a mismatch is an
 error rather than a meaningless fit: \code{"linear"} and
 \code{"polynomial"} need a numeric response, \code{"logistic"}

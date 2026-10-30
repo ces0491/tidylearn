@@ -146,7 +146,7 @@ NULL
 #'   "logistic" (stats::glm), "tree" (rpart),
 #'   "forest" (randomForest), "boost" (gbm),
 #'   "ridge"/"lasso"/"elastic_net" (glmnet), "svm" (e1071),
-#'   "nn" (nnet), "deep" (keras), "xgboost" (xgboost).
+#'   "nn" (nnet), "deep" (keras3), "xgboost" (xgboost).
 #'   The method and the response have to agree, and a mismatch is an
 #'   error rather than a meaningless fit: \code{"linear"} and
 #'   \code{"polynomial"} need a numeric response, \code{"logistic"}
@@ -246,8 +246,8 @@ tl_model_supervised <- function(data, formula, method, ..., compute = "cpu") {
     formula <- as.formula(formula)
   }
 
-  # A one-sided formula used to have its first variable read as the
-  # response, and failed inside the backend with "incompatible dimensions"
+  # A one-sided formula would have its first variable read as the
+  # response, and fail inside the backend with "incompatible dimensions"
   if (is.null(formula) || length(formula) != 3L) {
     stop(
       "Method \"", method, "\" is supervised and needs a two-sided formula ",
@@ -679,7 +679,7 @@ apply_feature_transform <- function(object, new_data) {
 #'
 #' Every method that takes either a numeric or a categorical response,
 #' less the two whose packages are only suggested. \code{"deep"} needs
-#' keras and a Python backend and \code{"xgboost"} needs xgboost, so
+#' keras3 and a Python backend and \code{"xgboost"} needs xgboost, so
 #' naming them here would answer one error with another on the machines
 #' that do not have them. Both still work when installed; they are absent
 #' from the advice, not from the package.
@@ -693,12 +693,12 @@ tl_dual_task_suggestions <- function() {
 
 #' Refuse a method that cannot fit the response it was handed
 #'
-#' Both directions of the mismatch used to be accepted.
+#' Both directions of the mismatch are refused.
 #' \code{lm()} on a factor estimates from the underlying integer codes, so
-#' \code{tl_model(iris, Species ~ ., method = "linear")} returned numbers on
-#' a scale where setosa is 1 and virginica is 3 -- and never failed, at any
-#' point, so nothing told the caller. Checking here keeps the complaint next
-#' to the decision that caused it.
+#' \code{tl_model(iris, Species ~ ., method = "linear")} would return numbers
+#' on a scale where setosa is 1 and virginica is 3 -- and never fail, at any
+#' point, so nothing would tell the caller. Checking here keeps the complaint
+#' next to the decision that caused it.
 #'
 #' @param method The requested method
 #' @param y The response, as supplied
@@ -924,14 +924,14 @@ tl_check_predict_type <- function(object, type) {
 
 #' Hand a method's predict only the columns and levels it was fitted on
 #'
-#' Two things about new data used to change predictions without changing
-#' anything the model uses. A column the model never saw counted wherever
-#' a method expanded the formula's dot over new_data: a mostly-missing
-#' notes column turned 27 of 30 svm predictions NA, and gave xgboost a
-#' design matrix wider than its features. And a categorical column was read
-#' by the levels new_data declared, not the training levels. The columns
-#' are cut down to those the formula reads, and the categorical ones put on
-#' their training levels, before any method's predict sees them.
+#' Two things about new data would change predictions without changing
+#' anything the model uses. A column the model never saw counts wherever
+#' a method expands the formula's dot over new_data: a mostly-missing
+#' notes column can turn most svm predictions NA, and gives xgboost a
+#' design matrix wider than its features. And a categorical column is read
+#' by the levels new_data declares rather than the training levels. So the
+#' columns are cut down to those the formula reads, and the categorical ones
+#' put on their training levels, before any method's predict sees them.
 #'
 #' A predictor missing from new_data is refused first. model.frame() looks
 #' a variable up in the data and then in the formula's environment, so a
@@ -1346,12 +1346,20 @@ tl_plot_model <- function(model, type = "auto", ...) {
 #' model method.
 #'
 #' @param model A tidylearn unsupervised model object
-#' @param type Plot type (default: "auto"). Currently unused; reserved for
-#'   future sub-type selection.
+#' @param type Plot type. Each unsupervised method has one plot, so
+#'   \code{"auto"} is the only value, and anything else is an error.
 #' @param ... Additional arguments passed to the underlying plot function
 #' @return A ggplot2 object or invisible result
 #' @keywords internal
 tl_plot_unsupervised <- function(model, type = "auto", ...) {
+  if (!identical(type, "auto")) {
+    stop(
+      "An unsupervised model has one plot, so 'type' takes only \"auto\"; ",
+      "got ", paste(deparse(type), collapse = ""), ".",
+      call. = FALSE
+    )
+  }
+
   method <- model$spec$method
 
   # The tl_fit_* wrappers unpack the tidy_* objects into plain lists, so
@@ -1401,7 +1409,8 @@ tl_plot_unsupervised <- function(model, type = "auto", ...) {
 
 #' Plot method for tidylearn models
 #' @param x A tidylearn model object
-#' @param type Plot type (default: "auto")
+#' @param type Plot type (default: "auto"). An unsupervised model takes only
+#'   \code{"auto"}.
 #' @param ... Additional arguments passed to plotting functions
 #' @return A \code{\link[ggplot2]{ggplot}} object. The specific plot depends
 #'   on the model paradigm and \code{type} argument.
