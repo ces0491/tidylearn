@@ -4,6 +4,6 @@
 \alias{tidylearn-workflows}
 \title{High-Level Workflows for Common Machine Learning Patterns}
 \description{
-Functions providing end-to-end workflows that showcase
-tidylearn's ability to seamlessly combine multiple learning paradigms
+End-to-end workflows that combine supervised and
+unsupervised learning.
 }

@@ -64,8 +64,8 @@ assumptions$overall
 ```
 
 Each entry carries the test that was run, the verdict, and what to do about
-it. Nothing here is a pass/fail gate — the recommendation is a prompt, not an
-instruction.
+it. The recommendation is a prompt to look closer, and nothing here is a
+pass/fail gate.
 
 ```{r, eval = has_assumption_pkgs}
 assumptions$normality
@@ -313,8 +313,8 @@ auto$spec$formula
 ## Exploring Before Modelling
 
 `tl_explore()` runs PCA, picks a cluster count, clusters, and computes a
-distance summary in one call. It is a first look at a dataset, not a
-diagnostic of a fit.
+distance summary in one call. It looks at the dataset and says nothing about
+a fit.
 
 ```{r}
 eda <- tl_explore(iris, response = "Species", max_components = 4, k_range = 2:5)

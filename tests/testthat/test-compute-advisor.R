@@ -14,7 +14,7 @@ fake_gpu_off <- structure(
     backends = list(
       xgboost    = list(installed = FALSE, gpu_likely_works = FALSE),
       tensorflow = list(installed = FALSE, gpu_likely_works = FALSE),
-      keras      = list(installed = FALSE, gpu_likely_works = FALSE)
+      keras3     = list(installed = FALSE, gpu_likely_works = FALSE)
     ),
     messages = character(0)
   ),
@@ -33,7 +33,7 @@ fake_gpu_xgb <- structure(
     backends = list(
       xgboost    = list(installed = TRUE,  gpu_likely_works = TRUE),
       tensorflow = list(installed = FALSE, gpu_likely_works = FALSE),
-      keras      = list(installed = FALSE, gpu_likely_works = FALSE)
+      keras3     = list(installed = FALSE, gpu_likely_works = FALSE)
     ),
     messages = character(0)
   ),
@@ -187,12 +187,9 @@ test_that("cloud tier is reported as not configured in this slice", {
   expect_match(result$cloud$notes, "not yet configured")
 })
 
-# The real CPU estimate divides by parallel::detectCores(), so on a
-# many-core machine a "long job" drops under the 60s threshold and the
-# recommendation flips. Pin it instead of allocating a large matrix and
-# hoping the host has few enough cores. Every estimator (GPU, cloud)
-# derives from this one, so mocking it makes the whole advisor
-# deterministic.
+# Pin the CPU estimate rather than allocate a large matrix to reach a
+# "long job". Every estimator (GPU, cloud) derives from this one, so
+# mocking it makes the whole advisor deterministic.
 local_pinned_cpu <- function(seconds = 1200, peak_ram_mb = 400,
                              env = parent.frame()) {
   testthat::local_mocked_bindings(
@@ -200,7 +197,6 @@ local_pinned_cpu <- function(seconds = 1200, peak_ram_mb = 400,
       list(
         est_seconds     = seconds,
         est_peak_ram_mb = peak_ram_mb,
-        cores_used      = 4L,
         feasible        = peak_ram_mb < 16384,
         notes           = character(0)
       )
@@ -504,7 +500,6 @@ test_that("RAM-infeasible workload triggers cloud regardless of GPU", {
   ram_bound_cpu <- list(
     est_seconds     = 600,
     est_peak_ram_mb = 32000,
-    cores_used      = 4L,
     feasible        = FALSE,
     notes           = "exceeds heuristic"
   )
@@ -538,7 +533,6 @@ test_that("RAM-infeasible workload returns infeasible when no cloud estimate", {
   ram_bound_cpu <- list(
     est_seconds     = 600,
     est_peak_ram_mb = 32000,
-    cores_used      = 4L,
     feasible        = FALSE,
     notes           = "exceeds heuristic"
   )
@@ -563,14 +557,15 @@ test_that("RAM-infeasible workload returns infeasible when no cloud estimate", {
 })
 
 test_that("tl_pick_modal_tier picks the cheapest viable GPU tier", {
-  # Small RAM need + GPU-eligible method -> T4 (cheapest GPU tier)
+  # Small RAM need + GPU-eligible method. The A10G costs more per second
+  # than the T4 but finishes sooner, so the job costs less on it.
   pick <- tl_pick_modal_tier_internal(
     method_has_gpu_path = TRUE,
     cpu_seconds         = 100,
     method_speedup      = 5,
     ram_needed_gb       = 4
   )
-  expect_equal(pick$name, "t4")
+  expect_equal(pick$name, "a10g")
   expect_true(pick$has_gpu)
   expect_true(pick$fits_ram_need)
 })
@@ -625,4 +620,78 @@ test_that("recommendation no longer gated on cloud$configured", {
   expect_false(result$cloud$configured)
   # And that cloud estimate is populated (not NA) for this CPU-only fit.
   expect_true(is_finite_num(result$cloud$est_seconds))
+})
+
+# ---- Arguments ----
+
+test_that("a misspelt argument is an error", {
+  # ... took it without a word, and the estimate used the default
+  # hyperparameters: 50x low for this call
+  expect_error(
+    tl_compute_advisor("xgboost", mtcars, mpg ~ .,
+                       hyperparms = list(nrounds = 5000),
+                       gpu_check = fake_gpu_off),
+    "hyperparms"
+  )
+
+  model <- tl_model(mtcars, mpg ~ wt, method = "linear")
+  expect_error(
+    tl_compute_advisor(model, hyperparms = list(), gpu_check = fake_gpu_off),
+    "hyperparms"
+  )
+})
+
+# ---- Local estimate ----
+
+test_that("the local estimate does not divide by the machine's cores", {
+  # On 16 cores that made forest and tree estimates about 20x short, since
+  # both fit on one core
+  est <- tl_estimate_local_cpu_internal("forest", 1e4, 10, list())
+  expect_equal(
+    est$est_seconds,
+    .tl_method_profiles$forest$cpu_const *
+      tl_method_complexity_internal("forest", 1e4, 10, list())
+  )
+  expect_null(est$cores_used)
+})
+
+# ---- Cloud tiers ----
+
+test_that("a tier's rate sums what its container bills", {
+  prices <- .tl_modal_prices
+
+  cpu <- .tl_modal_tiers[["cpu-large"]]
+  expect_equal(cpu$rate_per_sec, 8 * prices$core + 64 * prices$gib)
+
+  # A GPU container bills for its CPU and memory as well
+  gpu <- .tl_modal_tiers[["t4"]]
+  expect_equal(gpu$rate_per_sec,
+               4 * prices$core + 16 * prices$gib + prices$gpu$t4)
+  expect_true(gpu$has_gpu)
+  expect_false(cpu$has_gpu)
+})
+
+test_that("a larger CPU tier is not assumed to run a fit faster", {
+  # CPU-only methods fit on one core, so more cores buy RAM alone
+  expect_equal(tl_modal_tier_speedup(.tl_modal_tiers[["cpu-small"]]), 1)
+  expect_equal(tl_modal_tier_speedup(.tl_modal_tiers[["cpu-xlarge"]]), 1)
+  expect_equal(tl_modal_tier_speedup(.tl_modal_tiers[["a100-40gb"]]), 2)
+
+  pick <- tl_pick_modal_tier_internal(
+    method_has_gpu_path = FALSE,
+    cpu_seconds         = 3600,
+    method_speedup      = 1,
+    ram_needed_gb       = 4
+  )
+  expect_equal(pick$name, "cpu-small")
+})
+
+test_that("the expected cost bills load and idle time", {
+  cloud <- tl_estimate_cloud_internal("linear", 150, 4, list(), 0.01)
+  rate <- .tl_modal_tiers[["cpu-small"]]$rate_per_sec
+  compute <- tl_estimate_local_cpu_internal("linear", 150, 4, list())
+
+  expect_equal(cloud$tier_name, "cpu-small")
+  expect_equal(cloud$est_cost_usd,
+               rate * (compute$est_seconds + tl_modal_overhead()))
 })

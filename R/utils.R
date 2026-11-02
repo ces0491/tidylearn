@@ -1,6 +1,6 @@
 #' Utility functions for tidylearn
 #' @keywords internal
-#' @importFrom stats aov coef cor fitted median qqnorm
+#' @importFrom stats coef cor fitted median qqnorm
 #'   reorder residuals runif sd setNames terms update var
 #' @importFrom utils combn getFromNamespace head packageVersion
 #' @noRd

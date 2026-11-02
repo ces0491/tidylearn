@@ -152,10 +152,9 @@ tl_fit_tree <- function(data, formula, is_classification = FALSE,
   # Determine method based on problem type
   method <- if (is_classification) "class" else "anova"
 
-  # Everything in ... used to go to rpart.control(), which takes its own
-  # ... and discards what it does not recognise -- so weights, cost and
-  # parms were accepted and silently had no effect. Send rpart()'s own
-  # arguments to rpart().
+  # rpart.control() takes its own ... and discards what it does not
+  # recognise, so rpart()'s own arguments, such as weights, cost and parms,
+  # go to rpart() or they silently have no effect.
   dots <- list(...)
   tl_refuse_offset(formula, data, dots, "tree", "rpart()")
   dot_names <- names2(dots)
@@ -671,11 +670,9 @@ tl_gbm_multinomial_matrix <- function(probs, model) {
 #' @return A fitted gradient boosting model
 #' @details The distribution follows the response: \code{"gaussian"} for
 #'   regression, \code{"bernoulli"} for two classes and
-#'   \code{"multinomial"} for more. gbm describes its multinomial
-#'   distribution as currently broken, kept only for backwards
-#'   compatibility, and warns to that effect on every multiclass fit. For
-#'   three or more classes, \code{method = "forest"} or
-#'   \code{method = "xgboost"} are the better supported choices.
+#'   \code{"multinomial"} for more. gbm fixed its multinomial distribution
+#'   in version 2.3.0. Earlier versions describe it as broken and warn on
+#'   every multiclass fit.
 #' @keywords internal
 tl_fit_boost <- function(
     data, formula,
@@ -1155,7 +1152,7 @@ tl_plot_partial_dependence <- function(model, var, n.pts = 20, ...) {
       )
     } else {
       # predict() returns a tibble, and mean() of the tibble itself is NA
-      # with a warning -- which every regression curve used to be
+      # with a warning
       preds <- predict(model, new_data, type = "response")
       tibble::tibble(
         var_value = grid_values[i],

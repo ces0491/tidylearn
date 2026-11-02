@@ -19,8 +19,9 @@ The method-to-package mapping is maintained in one place, the
 document links to it rather than adding a fourth.
 
 `tl_model()` dispatches on 20 methods: 13 supervised and 7 unsupervised. The
-authoritative list is `supervised_methods` and `unsupervised_methods` in
-`R/core.R`, which is what the error message for an unknown method prints.
+authoritative lists are `tl_supervised_methods()` and
+`tl_unsupervised_methods()` in `R/utils.R`, which is what the error message
+for an unknown method prints.
 
 ## Package Structure
 
@@ -106,7 +107,7 @@ Each module wraps a specific package:
 - `supervised-trees.R`: Wraps rpart, randomForest, gbm
 - `supervised-svm.R`: Wraps e1071::svm
 - `supervised-neural-networks.R`: Wraps nnet
-- `supervised-deep-learning.R`: Wraps keras (optional)
+- `supervised-deep-learning.R`: Wraps keras3 (optional)
 - `supervised-xgboost.R`: Wraps xgboost (optional)
 
 ### Unsupervised Learning Modules
@@ -142,7 +143,8 @@ method too large for the local machine, have a documented route.
   fitting anything
 - `compute-advisor.R`: `tl_compute_advisor()` — estimates runtime, peak
   RAM and cost across local CPU, local GPU and cloud tiers. Holds the
-  method profile table and the Modal instance tier table
+  method profile table, Modal's prices and the instance tier table built
+  from them. `data-raw/calibrate-advisor.R` measures the runtime constants
 - `compute-routing.R`: `tl_resolve_compute()` — validates the `compute`
   argument, consults the advisor for `"auto"`, and applies the fallback
   rules
@@ -180,6 +182,7 @@ shipped with the package.
 - `interactions.R`: Interaction effects analysis
 - `diagnostics.R`: Model diagnostics
 - `metrics.R`: Evaluation metrics
+- `coefficients.R`: `tl_coefficients()`, coefficients and confidence intervals as a tibble
 - `utils.R`: Helper functions
 
 ## Function Naming Convention
@@ -246,6 +249,7 @@ tidylearn/
 ├── PACKAGE_ARCHITECTURE.md  # This file
 ├── .lintr                        # Lintr configuration
 ├── R/
+│   ├── tidylearn-package.R       # Package documentation
 │   ├── utils.R                   # Utilities
 │   ├── read.R                    # Data ingestion dispatcher
 │   ├── read-backends.R           # Database/cloud readers
@@ -268,8 +272,10 @@ tidylearn/
 │   ├── interactions.R            # Interaction effects
 │   ├── diagnostics.R             # Model diagnostics
 │   ├── metrics.R                 # Evaluation metrics
+│   ├── coefficients.R            # Tidy coefficients
 │   ├── visualization.R           # Unified plotting
 │   └── tables.R                  # Formatted gt tables
+├── data-raw/                     # Advisor calibration script and results
 ├── inst/
 │   └── security/
 │       └── threat-model.md       # Cloud compute contract
@@ -295,7 +301,7 @@ tidylearn/
 - **Data ingestion**: readr, readxl, nanoparquet, jsonlite, DBI, RSQLite,
   RPostgres, RMariaDB, bigrquery, paws.storage
 - **Tables**: gt
-- **Deep learning**: keras, tensorflow
+- **Deep learning**: keras3, tensorflow
 - **Gradient boosting**: xgboost
 - **Cloud compute**: httr2
 - **Market basket**: arules, arulesViz

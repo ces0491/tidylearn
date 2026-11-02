@@ -524,17 +524,17 @@ test_that("neural network tuning runs for every response type", {
 
 test_that("tl_fit_deep(learning_rate=) sets the optimizer's learning rate", {
   skip_on_cran()
-  skip_if_not_installed("keras")
+  skip_if_not_installed("keras3")
   skip_if_not_installed("tensorflow")
   usable <- tryCatch({
-    keras::keras_model_sequential()
+    keras3::keras_model_sequential()
     TRUE
   }, error = function(e) FALSE)
   skip_if_not(usable, "No TensorFlow backend available")
 
   # tl_tune_deep() passed optimizer = optimizer_adam(learning_rate = lr)
   # into tl_fit_deep(), which has no such formal, so it landed in ... and
-  # went to keras::fit(). The model is already compiled by then, and
+  # went to keras3::fit(). The model is already compiled by then, and
   # compile() is what sets the optimizer -- so the whole learning_rates
   # grid searched over a value that never changed anything.
   set.seed(1)
@@ -547,7 +547,7 @@ test_that("tl_fit_deep(learning_rate=) sets the optimizer's learning rate", {
                   hidden_layers = c(4), epochs = 1, verbose = 0,
                   learning_rate = lr)
     ))
-    as.numeric(keras::k_get_value(fit$model$optimizer$learning_rate))
+    as.numeric(keras3::op_convert_to_numpy(fit$model$optimizer$learning_rate))
   }
 
   expect_equal(rate_of(0.5), 0.5, tolerance = 1e-6)
@@ -559,10 +559,10 @@ test_that("tl_fit_deep(learning_rate=) sets the optimizer's learning rate", {
 
 test_that("tl_tune_deep actually searches over the learning rate", {
   skip_on_cran()
-  skip_if_not_installed("keras")
+  skip_if_not_installed("keras3")
   skip_if_not_installed("tensorflow")
   usable <- tryCatch({
-    keras::keras_model_sequential()
+    keras3::keras_model_sequential()
     TRUE
   }, error = function(e) FALSE)
   skip_if_not(usable, "No TensorFlow backend available")
@@ -592,7 +592,7 @@ test_that("tl_tune_deep actually searches over the learning rate", {
   # refit routed it through optimizer = too. The returned model is a
   # tidylearn_model, so the keras model is at $fit$model.
   final_rate <- as.numeric(
-    keras::k_get_value(tuned$model$fit$model$optimizer$learning_rate)
+    keras3::op_convert_to_numpy(tuned$model$fit$model$optimizer$learning_rate)
   )
   expect_equal(final_rate, tuned$best_learning_rate, tolerance = 1e-6)
 })

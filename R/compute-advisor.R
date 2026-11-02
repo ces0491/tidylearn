@@ -1,15 +1,17 @@
 #' Advise on the best compute tier for a tidylearn fit
 #'
 #' Estimates runtime and feasibility on local CPU, local GPU (when
-#' available and applicable), and cloud GPU (stubbed until cloud
-#' integration lands), then returns a structured recommendation. Useful
-#' before kicking off a long fit — call this first to see whether the
+#' available and applicable), and cloud (planning figures only, since cloud
+#' submission does not exist yet), then returns a structured recommendation.
+#' Useful before kicking off a long fit — call this first to see whether the
 #' problem is laptop-sized, GPU-sized, or cloud-sized.
 #'
-#' Estimates are deliberately rough — order-of-magnitude, not bills.
-#' Per-method scaling constants are calibrated against typical hardware
-#' and will be off by 2-3x in either direction for any individual job.
-#' Treat the recommendation as a starting point, not gospel.
+#' Estimates are deliberately rough. Each method's runtime constant comes
+#' from timing fits of three sizes on one laptop, where the estimates land
+#' within about a factor of 3 of those fits. Two runs on that laptop differed
+#' by up to 2.5x, and other hardware or differently shaped data can be further
+#' off, so treat the recommendation as a starting point. The memory multiples
+#' and GPU speedups are assumptions with no measurement behind them.
 #'
 #' @param x Either a method name (character scalar — same names as
 #'   accepted by [tl_model()], supervised methods only) or a fitted
@@ -34,7 +36,7 @@
 #'   ignored.
 #' @param gpu_check Optional `tidylearn_gpu_check` object. If omitted,
 #'   `tl_check_gpu()` is called once internally.
-#' @param ... Unused, reserved for method-specific extensions.
+#' @param ... Must be empty: a misspelt argument is an error.
 #'
 #' @return An object of class `tidylearn_compute_advice` containing
 #'   `problem`, `local_cpu`, `local_gpu`, `cloud`, `recommendation`,
@@ -69,6 +71,8 @@ tl_compute_advisor.character <- function(x,
                                          hyperparams = list(),
                                          gpu_check = NULL,
                                          ...) {
+  rlang::check_dots_empty()
+
   method <- x
   if (length(method) != 1L || !nzchar(method)) {
     stop("'x' must be a single non-empty method name.", call. = FALSE)
@@ -178,25 +182,47 @@ tl_compute_advisor.default <- function(x, ...) {
 
 # ---- internal helpers -------------------------------------------------
 
-# Per-method runtime profile. cpu_const is seconds-per-complexity-unit,
-# calibrated for a roughly 4-core modern laptop CPU. ram_mult is the
-# expected peak memory as a multiple of the raw dataset size.
-# gpu_speedup is the typical local-GPU vs CPU speedup for the method;
-# 1 means no upstream GPU path.
+# Per-method runtime profile. cpu_const is elapsed seconds per complexity
+# unit, as printed by data-raw/calibrate-advisor.R from fits timed on an
+# Intel Core Ultra 7 255H with R 4.5.2 on 2026-10-30. Those timings are in
+# data-raw/advisor-calibration.csv, and two runs differed by up to 2.5x.
+# Each fit ran at its default threading, so the constant already allows for
+# it: only xgboost and deep used more than one core, and xgboost ran at most
+# 1.5x faster than on one thread.
+#
+# ram_mult, the peak memory as a multiple of the raw dataset size, and
+# gpu_speedup, the local-GPU vs CPU speedup, are assumptions with no
+# measurement behind them. A gpu_speedup of 1 means no upstream GPU path.
 .tl_method_profiles <- list(
-  linear      = list(cpu_const = 5e-9,  ram_mult = 2, gpu_speedup = 1),
-  polynomial  = list(cpu_const = 8e-9,  ram_mult = 2, gpu_speedup = 1),
-  logistic    = list(cpu_const = 3e-8,  ram_mult = 2, gpu_speedup = 1),
-  ridge       = list(cpu_const = 2e-8,  ram_mult = 3, gpu_speedup = 1),
-  lasso       = list(cpu_const = 2e-8,  ram_mult = 3, gpu_speedup = 1),
-  elastic_net = list(cpu_const = 2e-8,  ram_mult = 3, gpu_speedup = 1),
-  tree        = list(cpu_const = 5e-8,  ram_mult = 3, gpu_speedup = 1),
-  forest      = list(cpu_const = 1e-7,  ram_mult = 4, gpu_speedup = 1),
-  boost       = list(cpu_const = 2e-7,  ram_mult = 4, gpu_speedup = 1),
-  xgboost     = list(cpu_const = 1e-7,  ram_mult = 4, gpu_speedup = 5),
-  nn          = list(cpu_const = 5e-7,  ram_mult = 3, gpu_speedup = 1),
-  deep        = list(cpu_const = 2e-6,  ram_mult = 5, gpu_speedup = 15),
-  svm         = list(cpu_const = 5e-7,  ram_mult = 6, gpu_speedup = 1)
+  linear      = list(cpu_const = 2.7e-9, ram_mult = 2, gpu_speedup = 1),
+  polynomial  = list(cpu_const = 3.4e-9, ram_mult = 2, gpu_speedup = 1),
+  logistic    = list(cpu_const = 3.2e-9, ram_mult = 2, gpu_speedup = 1),
+  ridge       = list(cpu_const = 6.9e-9, ram_mult = 3, gpu_speedup = 1),
+  lasso       = list(cpu_const = 4.4e-9, ram_mult = 3, gpu_speedup = 1),
+  elastic_net = list(cpu_const = 4.9e-9, ram_mult = 3, gpu_speedup = 1),
+  tree        = list(cpu_const = 7.3e-8, ram_mult = 3, gpu_speedup = 1),
+  forest      = list(cpu_const = 1.2e-7, ram_mult = 4, gpu_speedup = 1),
+  boost       = list(cpu_const = 3.1e-8, ram_mult = 4, gpu_speedup = 1),
+  xgboost     = list(cpu_const = 8.0e-9, ram_mult = 4, gpu_speedup = 5),
+  nn          = list(cpu_const = 1.3e-8, ram_mult = 3, gpu_speedup = 1),
+  deep        = list(cpu_const = 6.8e-8, ram_mult = 5, gpu_speedup = 15),
+  svm         = list(cpu_const = 7.7e-9, ram_mult = 6, gpu_speedup = 1)
+)
+
+# Inputs to the estimates that no measurement backs, since no Modal worker
+# exists to time: seconds of load time before a job starts, and the uplink
+# in Mbps. The rest are judgement calls: the RAM headroom on a cloud tier,
+# the local RAM that counts as a typical laptop's, the runtime below which
+# cold start makes cloud pointless, and the speedup that justifies moving
+# a fit. scaledown_seconds is Modal's default idle window, which it bills.
+.tl_advisor_assumptions <- list(
+  cold_start_seconds      = 45,
+  upload_mbps             = 100,
+  ram_headroom            = 1.5,
+  local_ram_ceiling_mb    = 16384,
+  run_local_below_seconds = 60,
+  worthwhile_speedup      = 3,
+  scaledown_seconds       = 60
 )
 
 # The hyperparameters each method's runtime estimate reads
@@ -305,22 +331,17 @@ tl_estimate_local_cpu_internal <- function(method, n_rows, n_cols, hyp) {
   n_cols <- as.numeric(n_cols)
   profile <- .tl_method_profiles[[method]]
   complexity <- tl_method_complexity_internal(method, n_rows, n_cols, hyp)
-  cores_raw <- parallel::detectCores(logical = FALSE)
-  cores <- if (is.null(cores_raw) || is.na(cores_raw)) {
-    1L
-  } else {
-    max(cores_raw, 1L)
-  }
-  est_seconds <- profile$cpu_const * complexity / cores
+  est_seconds <- profile$cpu_const * complexity
   est_peak_ram_mb <- (n_rows * n_cols * 8 / 1e6) * profile$ram_mult
 
-  feasible <- est_peak_ram_mb < 16384  # heuristic ceiling: 16 GB laptop
+  ceiling_mb <- .tl_advisor_assumptions$local_ram_ceiling_mb
+  feasible <- est_peak_ram_mb < ceiling_mb
   notes <- if (!feasible) {
     paste0(
       "Estimated peak RAM (~",
       tl_format_number(est_peak_ram_mb),
-      " MB) exceeds the 16 GB heuristic ceiling. May not fit on a ",
-      "typical laptop."
+      " MB) exceeds the ", tl_format_number(ceiling_mb / 1024),
+      " GB heuristic ceiling. May not fit on a typical laptop."
     )
   } else {
     character(0)
@@ -329,7 +350,6 @@ tl_estimate_local_cpu_internal <- function(method, n_rows, n_cols, hyp) {
   list(
     est_seconds     = est_seconds,
     est_peak_ram_mb = est_peak_ram_mb,
-    cores_used      = cores,
     feasible        = feasible,
     notes           = notes
   )
@@ -381,56 +401,68 @@ tl_estimate_local_gpu_internal <- function(method, n_rows, n_cols, hyp,
   )
 }
 
-# Modal instance tier reference table. Pricing is approximate as of
-# early 2026 (modal.com); revise if it drifts. `cpu_speedup` and
-# `gpu_speedup` are speedups vs. the locally-calibrated CPU baseline in
-# `.tl_method_profiles` -- not vs. each other. The GPU tiers list system
-# RAM available alongside the GPU, not VRAM (which is reflected in the
-# label).
-.tl_modal_tiers <- list(
-  "cpu-small" = list(
-    cpus = 2L,  ram_gb = 8L,   has_gpu = FALSE,
-    cpu_speedup = 0.5, gpu_speedup = NA_real_,
-    rate_per_sec = 0.000076,
-    label = "cpu-small (2 CPU / 8 GB)"
-  ),
-  "cpu-large" = list(
-    cpus = 8L,  ram_gb = 64L,  has_gpu = FALSE,
-    cpu_speedup = 2.0, gpu_speedup = NA_real_,
-    rate_per_sec = 0.000336,
-    label = "cpu-large (8 CPU / 64 GB)"
-  ),
-  "cpu-xlarge" = list(
-    cpus = 32L, ram_gb = 128L, has_gpu = FALSE,
-    cpu_speedup = 8.0, gpu_speedup = NA_real_,
-    rate_per_sec = 0.001280,
-    label = "cpu-xlarge (32 CPU / 128 GB)"
-  ),
-  "t4" = list(
-    cpus = 4L,  ram_gb = 16L,  has_gpu = TRUE,
-    cpu_speedup = 1.0, gpu_speedup = 0.6,
-    rate_per_sec = 0.000164,
-    label = "T4 (16 GB VRAM / 16 GB RAM)"
-  ),
-  "a10g" = list(
-    cpus = 4L,  ram_gb = 24L,  has_gpu = TRUE,
-    cpu_speedup = 1.0, gpu_speedup = 1.0,
-    rate_per_sec = 0.000306,
-    label = "A10G (24 GB VRAM / 24 GB RAM)"
-  ),
-  "a100-40gb" = list(
-    cpus = 8L,  ram_gb = 80L,  has_gpu = TRUE,
-    cpu_speedup = 2.0, gpu_speedup = 2.0,
-    rate_per_sec = 0.001097,
-    label = "A100-40GB (40 GB VRAM / 80 GB RAM)"
-  ),
-  "a100-80gb" = list(
-    cpus = 8L,  ram_gb = 160L, has_gpu = TRUE,
-    cpu_speedup = 2.0, gpu_speedup = 2.0,
-    rate_per_sec = 0.001583,
-    label = "A100-80GB (80 GB VRAM / 160 GB RAM)"
+# Modal's list prices in USD per second, read from
+# https://modal.com/pricing on 2026-10-30. A CPU unit is a physical core.
+.tl_modal_prices <- list(
+  core = 0.0000131,
+  gib  = 0.00000222,
+  gpu  = list(
+    t4        = 0.000164,
+    a10g      = 0.000306,
+    a100_40gb = 0.000583,
+    a100_80gb = 0.000694
   )
 )
+
+# A Modal instance tier. Its rate sums what the container bills, since a GPU
+# container pays for its CPU and memory as well as the GPU. gpu_speedup is
+# an assumption, relative to the `gpu_speedup` of the method in
+# `.tl_method_profiles`. ram_gb is system RAM alongside the GPU, and the
+# label gives the VRAM.
+tl_modal_tier <- function(cpus, ram_gb, label, gpu_price = 0,
+                          gpu_speedup = NA_real_) {
+  list(
+    cpus         = cpus,
+    ram_gb       = ram_gb,
+    has_gpu      = gpu_price > 0,
+    gpu_speedup  = gpu_speedup,
+    rate_per_sec = cpus * .tl_modal_prices$core +
+      ram_gb * .tl_modal_prices$gib + gpu_price,
+    label        = label
+  )
+}
+
+.tl_modal_tiers <- list(
+  "cpu-small"  = tl_modal_tier(2L, 8L, "cpu-small (2 CPU / 8 GB)"),
+  "cpu-large"  = tl_modal_tier(8L, 64L, "cpu-large (8 CPU / 64 GB)"),
+  "cpu-xlarge" = tl_modal_tier(32L, 128L, "cpu-xlarge (32 CPU / 128 GB)"),
+  "t4" = tl_modal_tier(
+    4L, 16L, "T4 (16 GB VRAM / 16 GB RAM)",
+    gpu_price = .tl_modal_prices$gpu$t4, gpu_speedup = 0.6
+  ),
+  "a10g" = tl_modal_tier(
+    4L, 24L, "A10G (24 GB VRAM / 24 GB RAM)",
+    gpu_price = .tl_modal_prices$gpu$a10g, gpu_speedup = 1.0
+  ),
+  "a100-40gb" = tl_modal_tier(
+    8L, 80L, "A100-40GB (40 GB VRAM / 80 GB RAM)",
+    gpu_price = .tl_modal_prices$gpu$a100_40gb, gpu_speedup = 2.0
+  ),
+  "a100-80gb" = tl_modal_tier(
+    8L, 160L, "A100-80GB (80 GB VRAM / 160 GB RAM)",
+    gpu_price = .tl_modal_prices$gpu$a100_80gb, gpu_speedup = 2.0
+  )
+)
+
+# How much faster a tier runs a fit than the method's baseline. A CPU tier
+# has no speedup: the fits timed for `.tl_method_profiles` barely use a
+# second core, so a larger tier buys RAM rather than speed.
+tl_modal_tier_speedup <- function(tier) {
+  if (is.na(tier$gpu_speedup) || tier$gpu_speedup <= 0) {
+    return(1)
+  }
+  tier$gpu_speedup
+}
 
 # Pick the cheapest viable Modal tier for the workload. Filters by:
 # (a) GPU class matching method's GPU eligibility, (b) tier RAM >=
@@ -457,24 +489,13 @@ tl_pick_modal_tier_internal <- function(method_has_gpu_path, cpu_seconds,
 
   # Cost = compute seconds on this tier x rate. Pick min-cost.
   costs <- vapply(fits, function(tier) {
-    tier_speedup <- if (isTRUE(method_has_gpu_path)) {
-      tier$gpu_speedup
-    } else {
-      tier$cpu_speedup
-    }
-    if (is.na(tier_speedup) || tier_speedup <= 0) tier_speedup <- 1
-    tier_seconds <- cpu_seconds / (method_speedup * tier_speedup)
+    tier_seconds <- cpu_seconds /
+      (method_speedup * tl_modal_tier_speedup(tier))
     tier_seconds * tier$rate_per_sec
   }, numeric(1))
 
   picked_name <- names(fits)[which.min(costs)]
   picked <- fits[[picked_name]]
-  picked_speedup <- if (isTRUE(method_has_gpu_path)) {
-    picked$gpu_speedup
-  } else {
-    picked$cpu_speedup
-  }
-  if (is.na(picked_speedup) || picked_speedup <= 0) picked_speedup <- 1
 
   list(
     name           = picked_name,
@@ -482,7 +503,7 @@ tl_pick_modal_tier_internal <- function(method_has_gpu_path, cpu_seconds,
     rate_per_sec   = picked$rate_per_sec,
     ram_gb         = picked$ram_gb,
     has_gpu        = picked$has_gpu,
-    tier_speedup   = picked_speedup,
+    tier_speedup   = tl_modal_tier_speedup(picked),
     fits_ram_need  = picked$ram_gb >= ram_needed_gb
   )
 }
@@ -498,11 +519,11 @@ tl_estimate_cloud_internal <- function(method, n_rows, n_cols, hyp,
   method_has_gpu_path <- isTRUE(profile$gpu_speedup > 1)
   method_speedup <- if (method_has_gpu_path) profile$gpu_speedup else 1
 
+  assumed <- .tl_advisor_assumptions
   cpu_est <- tl_estimate_local_cpu_internal(method, n_rows, n_cols, hyp)
-  # Safety margin on top of estimated peak RAM. The 1.5x is a heuristic
-  # for transient buffers, working memory, etc. -- adjust later if
-  # real Modal runs disagree.
-  ram_needed_gb <- (cpu_est$est_peak_ram_mb / 1024) * 1.5
+  # Safety margin on top of estimated peak RAM, for transient buffers and
+  # working memory
+  ram_needed_gb <- (cpu_est$est_peak_ram_mb / 1024) * assumed$ram_headroom
 
   pick <- tl_pick_modal_tier_internal(
     method_has_gpu_path = method_has_gpu_path,
@@ -513,12 +534,12 @@ tl_estimate_cloud_internal <- function(method, n_rows, n_cols, hyp,
 
   compute_seconds <- cpu_est$est_seconds /
     (method_speedup * pick$tier_speedup)
-  cold_start_seconds <- 45
-  upload_mbps <- 100 / 8  # 100 Mbps -> MB/s
-  upload_seconds <- est_size_mb / upload_mbps
+  upload_seconds <- est_size_mb / (assumed$upload_mbps / 8)
 
-  total_seconds <- cold_start_seconds + upload_seconds + compute_seconds
-  est_cost_usd <- compute_seconds * pick$rate_per_sec + 0.01
+  total_seconds <- assumed$cold_start_seconds + upload_seconds +
+    compute_seconds
+  # Modal bills load time and its idle window as well as the fit
+  est_cost_usd <- pick$rate_per_sec * (compute_seconds + tl_modal_overhead())
 
   caveats <- character(0)
   if (!isTRUE(pick$fits_ram_need)) {
@@ -552,6 +573,13 @@ tl_estimate_cloud_internal <- function(method, n_rows, n_cols, hyp,
   )
 }
 
+# Seconds Modal bills around a fit: load time before it and the idle
+# window after it.
+tl_modal_overhead <- function() {
+  .tl_advisor_assumptions$cold_start_seconds +
+    .tl_advisor_assumptions$scaledown_seconds
+}
+
 # Pick a recommendation given the three tier estimates. Cloud is now
 # the primary answer when local CPU is RAM-infeasible -- regardless of
 # whether the method has an upstream GPU path. A method that doesn't
@@ -561,6 +589,7 @@ tl_estimate_cloud_internal <- function(method, n_rows, n_cols, hyp,
 # (tl_resolve_compute) decides whether to act on a cloud recommendation
 # when cloud isn't yet wired up.
 tl_recommend_internal <- function(cpu, gpu, cloud) {
+  assumed <- .tl_advisor_assumptions
   reasoning <- character(0)
 
   # Case 1: Local CPU infeasible (RAM-bound). Cloud is the right answer
@@ -601,23 +630,24 @@ tl_recommend_internal <- function(cpu, gpu, cloud) {
 
   # Case 2: Tiny job — just run locally; cloud cold-start would dominate.
   cpu_seconds <- cpu$est_seconds
-  if (cpu_seconds < 60) {
+  if (cpu_seconds < assumed$run_local_below_seconds) {
     return(list(
       recommendation = "cpu",
       reasoning = paste0(
         "Estimated local CPU runtime ~",
         tl_format_number(cpu_seconds, 1),
-        "s. Cloud cold-start (~45s) would dominate; just run it locally."
+        "s. Cloud cold-start (~", assumed$cold_start_seconds,
+        "s) would dominate; just run it locally."
       )
     ))
   }
 
   # Case 3: Local GPU clearly faster — use it. No floor on the GPU
   # estimate: Case 2 has already sent every sub-60s job to the CPU, so a
-  # GPU that finishes in seconds is the point, not a reason to skip it.
+  # GPU that finishes in seconds is the point of having one.
   if (isTRUE(gpu$available) && is_finite_num(gpu$est_seconds)) {
     speedup <- cpu_seconds / gpu$est_seconds
-    if (speedup >= 3) {
+    if (speedup >= assumed$worthwhile_speedup) {
       return(list(
         recommendation = "gpu",
         reasoning = paste0(
@@ -632,7 +662,7 @@ tl_recommend_internal <- function(cpu, gpu, cloud) {
   # Case 4: Cloud meaningfully faster than local CPU.
   if (is_finite_num(cloud$est_seconds)) {
     cloud_speedup <- cpu_seconds / cloud$est_seconds
-    if (cloud_speedup >= 3) {
+    if (cloud_speedup >= assumed$worthwhile_speedup) {
       return(list(
         recommendation = "cloud",
         reasoning = paste0(
@@ -701,10 +731,9 @@ print.tidylearn_compute_advice <- function(x, ...) {
   }
 
   cat(sprintf(
-    "  Local CPU:    %s   (peak RAM ~%s MB, %d cores)%s\n",
+    "  Local CPU:    %s   (peak RAM ~%s MB)%s\n",
     fmt_seconds(x$local_cpu$est_seconds),
     tl_format_number(x$local_cpu$est_peak_ram_mb),
-    x$local_cpu$cores_used,
     if (!isTRUE(x$local_cpu$feasible)) "  [infeasible]" else ""
   ))
   cat(sprintf(

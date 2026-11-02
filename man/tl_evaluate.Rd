@@ -28,8 +28,8 @@ A \link[tibble]{tibble} with columns \code{metric} (character)
 and \code{value} (numeric), containing one row per requested metric,
 and for \code{"auc"} on more than two classes an \code{auc_<class>}
 row per class as well. An unsupervised model has no response to score
-against and returns the single row \code{metric = "completed"},
-\code{value = 1}.
+against, so it is an error: \code{\link{calc_validation_metrics}} and
+\code{\link{tidy_silhouette}} assess a clustering.
 }
 \description{
 Scores a supervised model's predictions against the observed response.

@@ -142,7 +142,7 @@ The fit on the full data is fine:
 tl_model(iris_binary, Species ~ ., method = "logistic")$spec$method
 ```
 
-It is the folds, not the dataset. Seeing this on your own data means the
+The folds cause this. Seeing it on your own data means the
 classes are close to separable at that sample size — a reason to prefer a
 regularised method, which is what `ridge` and `lasso` are doing in phase 4 of
 the regression search.

@@ -65,7 +65,7 @@ tl_fit_deep <- function(data, formula,
   }
 
   # Check if keras is installed
-  tl_check_packages(c("keras", "tensorflow"))
+  tl_check_packages(c("keras3", "tensorflow"))
 
   # One model frame supplies both x and y, so a row dropped for a missing
   # value leaves both. model.matrix() applied na.omit by itself while the
@@ -109,7 +109,7 @@ tl_fit_deep <- function(data, formula,
     } else {
       # Multiclass classification. One-hot encode the response, with a
       # column for every class even if no complete row holds one.
-      y_numeric <- keras::to_categorical(
+      y_numeric <- keras3::to_categorical(
         as.integer(y) - 1,
         num_classes = length(levels(y))
       )
@@ -127,19 +127,19 @@ tl_fit_deep <- function(data, formula,
     metrics <- c("mae")
   }
 
-  # Create sequential model
-  model <- keras::keras_model_sequential()
+  # Create sequential model. The input shape goes on the model: Keras 3
+  # warns when a layer carries it.
+  model <- keras3::keras_model_sequential(input_shape = ncol(x_scaled))
 
-  # Add input layer with appropriate shape
-  model |> keras::layer_dense(
+  # Add the first hidden layer
+  model |> keras3::layer_dense(
     units = hidden_layers[1],
-    activation = activation,
-    input_shape = ncol(x_scaled)
+    activation = activation
   )
 
   # Add dropout for regularization
   if (dropout > 0) {
-    model |> keras::layer_dropout(rate = dropout)
+    model |> keras3::layer_dropout(rate = dropout)
   }
 
   # Add the remaining hidden layers. seq_len() rather than 2:length():
@@ -147,18 +147,18 @@ tl_fit_deep <- function(data, formula,
   # with units = hidden_layers[1] followed by units = NA. The default
   # tuning grid includes single-layer candidates, so this was reachable.
   for (i in seq_len(length(hidden_layers) - 1L) + 1L) {
-    model |> keras::layer_dense(
+    model |> keras3::layer_dense(
       units = hidden_layers[i],
       activation = activation
     )
 
     if (dropout > 0) {
-      model |> keras::layer_dropout(rate = dropout)
+      model |> keras3::layer_dropout(rate = dropout)
     }
   }
 
   # Add output layer
-  model |> keras::layer_dense(
+  model |> keras3::layer_dense(
     units = output_units,
     activation = output_activation
   )
@@ -169,10 +169,10 @@ tl_fit_deep <- function(data, formula,
   optimizer <- if (is.null(learning_rate)) {
     "adam"
   } else {
-    keras::optimizer_adam(learning_rate = learning_rate)
+    keras3::optimizer_adam(learning_rate = learning_rate)
   }
 
-  model |> keras::compile(
+  model |> keras3::compile(
     optimizer = optimizer,
     loss = loss,
     metrics = metrics
@@ -211,7 +211,7 @@ tl_fit_deep <- function(data, formula,
 
   # Fit the model
   history <- do.call(
-    keras::fit,
+    keras3::fit,
     c(list(object = model), tl_override_args(fit_args, dots))
   )
 
@@ -314,7 +314,7 @@ tl_predict_deep <- function(model, new_data,
 #' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @examples
 #' \dontrun{
-#' if (requireNamespace("keras", quietly = TRUE)) {
+#' if (requireNamespace("keras3", quietly = TRUE)) {
 #'   model <- tl_model(iris, Species ~ ., method = "deep", epochs = 5)
 #'   tl_plot_deep_history(model)
 #' }
@@ -405,7 +405,7 @@ tl_plot_deep_history <- function(model,
 #'   not installed.
 #' @examples
 #' \dontrun{
-#' if (requireNamespace("keras", quietly = TRUE)) {
+#' if (requireNamespace("keras3", quietly = TRUE)) {
 #'   model <- tl_model(iris, Species ~ ., method = "deep", epochs = 5)
 #'   tl_plot_deep_architecture(model)
 #' }
@@ -421,11 +421,10 @@ tl_plot_deep_architecture <- function(model, ...) {
   }
 
   # Check if keras is installed
-  tl_check_packages("keras")
+  tl_check_packages("keras3")
 
-  # keras 2.x draws a model through the plot() method it registers for its
-  # model class. It has no plot_model() function, so the lookup that was
-  # here failed on every call with "object 'plot_model' not found".
+  # keras3 draws a model through the plot() method it registers for its
+  # model class. It exports no plot_model() function.
   args <- tl_override_args(
     list(show_shapes = TRUE, show_layer_names = TRUE),
     list(...)
@@ -466,7 +465,7 @@ tl_plot_deep_architecture <- function(model, ...) {
 #'   and their validation losses).
 #' @examples
 #' \dontrun{
-#' if (requireNamespace("keras", quietly = TRUE)) {
+#' if (requireNamespace("keras3", quietly = TRUE)) {
 #'   result <- tl_tune_deep(iris, Species ~ .,
 #'     hidden_layers_options = list(c(10), c(10, 5)),
 #'     learning_rates = c(0.01, 0.001), batch_sizes = c(32),
@@ -493,7 +492,7 @@ tl_tune_deep <- function(data, formula,
   tl_check_per_row_args(names2(list(...)), "tl_tune_deep()")
 
   # Check if keras is installed
-  tl_check_packages(c("keras", "tensorflow"))
+  tl_check_packages(c("keras3", "tensorflow"))
 
   formula <- tl_as_formula(formula)
   task <- tl_tuner_task(data, formula, is_classification, "deep")
@@ -566,7 +565,7 @@ tl_tune_deep <- function(data, formula,
 
   # Find best hyperparameters (minimizing validation loss)
   # Every configuration can fail -- a bad argument forwarded through ...
-  # reaches keras::fit() and each fit is caught individually, leaving
+  # reaches keras3::fit() and each fit is caught individually, leaving
   # val_loss all NA. which.min() then returns integer(0) and the indexing
   # below failed with "attempt to select less than one element in
   # get1index", which says nothing about what went wrong.

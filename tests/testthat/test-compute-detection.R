@@ -14,7 +14,7 @@ test_that("tl_check_gpu returns expected structure", {
   expect_type(result$backends, "list")
   # torch is not a tidylearn backend and is not in Suggests, so it is not
   # probed
-  expect_named(result$backends, c("xgboost", "tensorflow", "keras"))
+  expect_named(result$backends, c("xgboost", "tensorflow", "keras3"))
 })
 
 test_that("tl_check_gpu reports CPU-only when CUDA absent (mocked)", {
@@ -99,7 +99,7 @@ test_that("tl_gpu_capable_methods filters by gpu_check", {
       backends = list(
         xgboost    = list(installed = TRUE,  gpu_likely_works = TRUE),
         tensorflow = list(installed = FALSE, gpu_likely_works = FALSE),
-        keras      = list(installed = FALSE, gpu_likely_works = FALSE)
+        keras3     = list(installed = FALSE, gpu_likely_works = FALSE)
       )
     ),
     class = "tidylearn_gpu_check"
@@ -116,7 +116,7 @@ test_that("tl_gpu_capable_methods returns empty when no GPU-capable backend", {
       backends = list(
         xgboost    = list(installed = FALSE, gpu_likely_works = FALSE),
         tensorflow = list(installed = FALSE, gpu_likely_works = FALSE),
-        keras      = list(installed = FALSE, gpu_likely_works = FALSE)
+        keras3     = list(installed = FALSE, gpu_likely_works = FALSE)
       )
     ),
     class = "tidylearn_gpu_check"
@@ -150,7 +150,7 @@ test_that("print.tidylearn_gpu_check renders driver details when present", {
       backends = list(
         xgboost    = list(installed = TRUE,  gpu_likely_works = TRUE),
         tensorflow = list(installed = FALSE, gpu_likely_works = FALSE),
-        keras      = list(installed = FALSE, gpu_likely_works = FALSE)
+        keras3     = list(installed = FALSE, gpu_likely_works = FALSE)
       ),
       messages = character(0)
     ),
@@ -239,11 +239,11 @@ test_that("a hung nvidia-smi is abandoned after the timeout", {
 
 test_that("backend detection reads the library without loading packages", {
   skip_on_cran()
-  # requireNamespace() loaded each backend to learn it was installed:
-  # seconds for xgboost, and keras's .onLoad set TF_USE_LEGACY_KERAS in
+  # requireNamespace() would load each backend to learn it was installed:
+  # seconds for xgboost, and the .onLoad of keras3 configures Python for
   # the session. The check runs in a fresh R, since earlier tests may have
   # loaded the backends in this one.
-  backends <- c("xgboost", "tensorflow", "keras")
+  backends <- c("xgboost", "tensorflow", "keras3")
   installed <- backends[nzchar(vapply(
     backends, function(pkg) system.file(package = pkg), character(1)
   ))]
@@ -258,18 +258,15 @@ test_that("backend detection reads the library without loading packages", {
     paste0("for (pkg in ", paste(deparse(installed), collapse = ""), ") {"),
     "  check(pkg, list(driver_present = TRUE))",
     "}",
-    "backends <- c('xgboost', 'tensorflow', 'keras', 'reticulate')",
-    "cat('loaded:', intersect(backends, loadedNamespaces()), '\\n')",
-    "cat('legacy:', Sys.getenv('TF_USE_LEGACY_KERAS', unset = '-'), '\\n')"
+    "backends <- c('xgboost', 'tensorflow', 'keras3', 'reticulate')",
+    "cat('loaded:', intersect(backends, loadedNamespaces()), '\\n')"
   ), script)
-  withr::local_envvar(TF_USE_LEGACY_KERAS = NA, R_TESTS = NA)
+  withr::local_envvar(R_TESTS = NA)
 
   out <- system2(file.path(R.home("bin"), "Rscript"),
                  c("--vanilla", shQuote(script)),
                  stdout = TRUE, stderr = TRUE)
   report <- paste(out, collapse = "\n")
   expect_equal(trimws(grep("^loaded:", out, value = TRUE)), "loaded:",
-               info = report)
-  expect_equal(trimws(grep("^legacy:", out, value = TRUE)), "legacy: -",
                info = report)
 })

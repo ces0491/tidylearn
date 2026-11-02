@@ -2,7 +2,7 @@
 % Please edit documentation in R/diagnostics.R
 \name{tl_diagnostic_dashboard}
 \alias{tl_diagnostic_dashboard}
-\title{Create a comprehensive diagnostic dashboard}
+\title{Create a diagnostic dashboard}
 \usage{
 tl_diagnostic_dashboard(
   model,
@@ -30,7 +30,7 @@ A \code{\link[gridExtra]{grid.arrange}} object (a
 \code{\link[grid]{grob}}) containing the arranged diagnostic plots.
 }
 \description{
-Create a comprehensive diagnostic dashboard
+Create a diagnostic dashboard
 }
 \examples{
 \donttest{

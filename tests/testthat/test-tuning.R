@@ -462,8 +462,94 @@ test_that("tuning plots draw list-valued parameters", {
                0.2)
 })
 
+test_that("a parameter that explains the score exactly has importance 1", {
+  # From R 4.6, summary() of an aov() warns of a perfect fit on these scores
+  importance_for <- function(scores) {
+    combinations <- list(
+      list(hidden_layers = 10, activation = "relu"),
+      list(hidden_layers = c(10, 5), activation = "relu"),
+      list(hidden_layers = 10, activation = "tanh"),
+      list(hidden_layers = c(10, 5), activation = "tanh")
+    )
+    results <- tl_tune_results_frame(
+      lapply(scores, function(s) list(mean_metric = s, n_folds_ok = 2L)),
+      combinations, c("hidden_layers", "activation")
+    )
+    tuned <- structure(list(), tuning_results = list(
+      results = results, metric = "accuracy", maximize = TRUE
+    ))
+    expect_no_warning(
+      plot <- tl_plot_tuning_results(tuned, plot_type = "importance")
+    )
+    importance <- plot$data$importance
+    names(importance) <- plot$data$parameter
+    importance
+  }
+
+  exact <- importance_for(c(0.3, 0.5, 0.3, 0.5))
+  expect_equal(exact[["hidden_layers"]], 1)
+  expect_equal(exact[["activation"]], 0)
+
+  flat <- importance_for(rep(0.4, 4))
+  expect_identical(flat[["hidden_layers"]], 0)
+  expect_identical(flat[["activation"]], 0)
+
+  # Scores apart by their last bits explain nothing either, and the ratio of
+  # their rounding error can pass 1
+  close <- importance_for(0.4 * (1 + c(0, 2, 1, 3) * .Machine$double.eps))
+  expect_identical(close[["hidden_layers"]], 0)
+
+  # A set with no score drops out, leaving group means 0.3 and 0.55 around
+  # 1.4 / 3: 0.0417 of a total 0.0467
+  partial <- importance_for(c(0.3, 0.5, NA, 0.6))
+  expect_equal(partial[["hidden_layers"]], 25 / 28)
+
+  # An infinite score has no size to compare, and aov() stopped on it
+  infinite <- importance_for(c(0.3, Inf, 0.31, 0.52))
+  finite <- c(0.3, 0.31, 0.52)
+  group_means <- c(0.305, 0.305, 0.52)
+  expect_equal(
+    infinite[["hidden_layers"]],
+    sum((group_means - mean(finite))^2) / sum((finite - mean(finite))^2)
+  )
+})
+
+test_that("a numeric parameter's importance reads only finite pairs", {
+  # has_spread() took sd() of the Inf and stopped at if (NaN > 0)
+  importance_of <- function(values, scores) {
+    results <- tl_tune_results_frame(
+      lapply(scores, function(s) list(mean_metric = s, n_folds_ok = 2L)),
+      lapply(values, function(v) list(cp = v)), "cp"
+    )
+    tuned <- structure(list(), tuning_results = list(
+      results = results, metric = "rmse", maximize = FALSE
+    ))
+    tl_plot_tuning_results(tuned, plot_type = "importance")$data$importance
+  }
+
+  values <- c(0.1, 0.2, 0.3, 0.4)
+  scores <- c(0.3, 0.45, 0.31, 0.52)
+  expected <- abs(stats::cor(values[-2], scores[-2]))
+  expect_equal(importance_of(values, replace(scores, 2, Inf)), expected)
+  expect_equal(importance_of(replace(values, 2, Inf), scores), expected)
+})
+
+test_that("a set missing a parameter's value drops out of its importance", {
+  results <- data.frame(
+    kernel = c("a", "a", "b", NA),
+    mean_metric = c(0.1, 0.2, 0.3, 0.9),
+    n_folds_ok = 2L
+  )
+  tuned <- structure(list(), tuning_results = list(
+    results = results, metric = "rmse", maximize = FALSE
+  ))
+  importance <- tl_plot_tuning_results(tuned, plot_type = "importance")$data
+  # Group means 0.15 and 0.3 around 0.2 over the three rows with a kernel
+  expect_equal(importance$importance, 0.015 / 0.02)
+})
+
 test_that("a categorical parameter with one observed value has importance 0", {
-  # aov() needs two levels, so a kernel fixed at "radial" -- or one whose
+  # An ANOVA needs two levels, so a kernel fixed at "radial" -- or one whose
   # other value failed every fold -- stopped the plot with "contrasts can
   # be applied only to factors with 2 or more levels"
   tuned <- tl_tune_random(

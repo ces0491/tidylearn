@@ -4,7 +4,8 @@
 # it forwards, the values it fixes, and the helpers built on one backend.
 
 skip_if_no_tensorflow <- function() {
-  testthat::skip_if_not_installed("keras")
+  testthat::skip_on_cran()
+  testthat::skip_if_not_installed("keras3")
   testthat::skip_if_not_installed("tensorflow")
   ok <- tryCatch(
     !is.null(tensorflow::tf_version()),
@@ -1910,7 +1911,7 @@ test_that("deep predict scores unlabelled data, keeps NA rows, pins levels", {
   # response failed with "object 'Species' not found"; model.matrix()
   # dropped a row with a missing predictor, so three rows came back as
   # two; and new data with fewer factor levels changed the columns
-  tensorflow::set_random_seed(1)
+  keras3::set_random_seed(1)
   model <- tl_model(iris, Species ~ ., method = "deep", epochs = 2,
                     hidden_layers = 8, verbose = 0)
   rows <- iris[c(1, 51, 101), ]
@@ -1937,7 +1938,7 @@ test_that("deep predict scores unlabelled data, keeps NA rows, pins levels", {
   d <- data.frame(g = factor(rep(c("a", "b", "c"), 40)),
                   x = stats::rnorm(120))
   d$y <- d$x + c(a = 0, b = 5, c = -5)[as.character(d$g)]
-  tensorflow::set_random_seed(1)
+  keras3::set_random_seed(1)
   grouped <- tl_model(d, y ~ g + x, method = "deep", epochs = 2,
                       hidden_layers = 4, verbose = 0)
   short <- data.frame(g = factor(c("b", "c")), x = c(0, 0), y = c(5, -5))
@@ -1952,7 +1953,7 @@ test_that("deep predict refuses data without a predictor column", {
 
   # The check on the design matrix came after model.frame() had built it,
   # from an hp in scope when new data had none
-  tensorflow::set_random_seed(1)
+  keras3::set_random_seed(1)
   model <- tl_model(mtcars, mpg ~ wt + hp, method = "deep", epochs = 1,
                     hidden_layers = 2, verbose = 0)
   hp <- mtcars$hp
@@ -1962,7 +1963,7 @@ test_that("deep predict refuses data without a predictor column", {
   # A variable the formula took from its environment at fit time is not a
   # column new data has to carry
   expo <- mtcars$drat
-  tensorflow::set_random_seed(1)
+  keras3::set_random_seed(1)
   from_env <- tl_model(mtcars, mpg ~ wt + I(expo^2), method = "deep",
                        epochs = 1, hidden_layers = 2, verbose = 0)
   x <- scale(cbind(wt = mtcars$wt, `I(expo^2)` = expo^2),
@@ -1985,7 +1986,7 @@ test_that("a deep fit drops an incomplete row from x and y together", {
   gappy$x[1] <- NA
 
   fit_on <- function(data) {
-    tensorflow::set_random_seed(1)
+    keras3::set_random_seed(1)
     tl_model(data, y ~ x, method = "deep", epochs = 3, hidden_layers = 4,
              dropout = 0, verbose = 0)
   }
@@ -2003,7 +2004,7 @@ test_that("a deep fit holds out a random set of rows for validation", {
   # shuffling. iris is sorted by species, so the default 0.2 held out rows
   # 121 to 150, 30 of the 50 virginica rows, and validated on virginica
   # alone.
-  tensorflow::set_random_seed(1)
+  keras3::set_random_seed(1)
   model <- tl_model(iris, Species ~ ., method = "deep", epochs = 1,
                     hidden_layers = 8, dropout = 0, verbose = 0)
   held_out <- model$fit$validation_rows
@@ -2013,9 +2014,9 @@ test_that("a deep fit holds out a random set of rows for validation", {
   # The val_loss keras reports is the loss on exactly those rows
   x <- scale(stats::model.matrix(Species ~ ., iris)[, -1],
              center = model$fit$x_means, scale = model$fit$x_sds)
-  y <- keras::to_categorical(as.integer(iris$Species) - 1, num_classes = 3)
-  loss <- keras::evaluate(model$fit$model, x[held_out, ], y[held_out, ],
-                          verbose = 0)
+  y <- keras3::to_categorical(as.integer(iris$Species) - 1, num_classes = 3)
+  loss <- keras3::evaluate(model$fit$model, x[held_out, ], y[held_out, ],
+                           verbose = 0)
   expect_equal(utils::tail(model$fit$history$metrics$val_loss, 1),
                unname(loss[["loss"]]), tolerance = 1e-5)
 })
@@ -2028,7 +2029,7 @@ test_that("a deep fit carries a constant predictor without NaN", {
   # prediction was the same value and the loss never moved
   mc <- mtcars
   mc$k <- 1
-  tensorflow::set_random_seed(1)
+  keras3::set_random_seed(1)
   model <- tl_model(mc, mpg ~ wt + hp + k, method = "deep", epochs = 2,
                     verbose = 0)
   expect_equal(unname(model$fit$x_sds),
@@ -2047,7 +2048,7 @@ test_that("tl_tune_deep returns a model predict() can use", {
   # $model was the bare list tl_fit_deep() builds, so predict() on it
   # failed with "no applicable method"; and is_classification defaulted to
   # FALSE, so a factor response was fitted as a regression
-  tensorflow::set_random_seed(1)
+  keras3::set_random_seed(1)
   tuned <- tl_tune_deep(iris, Species ~ ., hidden_layers_options = list(8),
                         learning_rates = c(0.01, 0.001), batch_sizes = 32,
                         epochs = 2)
@@ -2059,7 +2060,7 @@ test_that("tl_tune_deep returns a model predict() can use", {
   expect_identical(levels(preds$.pred), levels(iris$Species))
   expect_s3_class(tl_plot_deep_history(tuned$model), "ggplot")
 
-  rate <- as.numeric(keras::k_get_value(
+  rate <- as.numeric(keras3::op_convert_to_numpy(
     tuned$model$fit$model$optimizer$learning_rate
   ))
   expect_equal(rate, tuned$best_learning_rate, tolerance = 1e-6)
@@ -2069,9 +2070,9 @@ test_that("tl_plot_deep_architecture hands the network to keras's plot()", {
   skip_on_cran()
   skip_if_no_tensorflow()
 
-  # It called keras::plot_model(), which keras 2.x does not have, so every
-  # call failed with "object 'plot_model' not found"
-  tensorflow::set_random_seed(1)
+  # keras3 draws through the plot() method on its model class and exports
+  # no plot_model()
+  keras3::set_random_seed(1)
   model <- tl_model(iris, Species ~ ., method = "deep", epochs = 1,
                     hidden_layers = 4, verbose = 0)
   result <- tryCatch(
@@ -2080,8 +2081,10 @@ test_that("tl_plot_deep_architecture hands the network to keras's plot()", {
   )
   if (inherits(result, "error")) {
     # keras draws through pydot, graphviz and png. Where one is missing,
-    # the error is keras saying so, not a failed lookup in tidylearn
-    expect_match(conditionMessage(result), "graphviz|pydot|png")
+    # the error is keras saying so, not a failed lookup in tidylearn. Without
+    # the graphviz binary, pydot reports that "dot" is not found.
+    expect_match(conditionMessage(result),
+                 "graphviz|pydot|png|\"dot\" not found")
   } else {
     expect_null(result)
   }

@@ -36,7 +36,7 @@ accepted by \code{\link[=tl_model]{tl_model()}}, supervised methods only) or a f
 advisor introspects its method and formula and advises on what a
 refit (or a fit on similar new data) would cost.}
 
-\item{...}{Unused, reserved for method-specific extensions.}
+\item{...}{Must be empty: a misspelt argument is an error.}
 
 \item{data}{A data frame. Required when \code{x} is a method name;
 optional when \code{x} is a fitted model (defaults to the model's
@@ -67,16 +67,18 @@ and \code{reasoning}. A \code{print()} method is provided.
 }
 \description{
 Estimates runtime and feasibility on local CPU, local GPU (when
-available and applicable), and cloud GPU (stubbed until cloud
-integration lands), then returns a structured recommendation. Useful
-before kicking off a long fit — call this first to see whether the
+available and applicable), and cloud (planning figures only, since cloud
+submission does not exist yet), then returns a structured recommendation.
+Useful before kicking off a long fit — call this first to see whether the
 problem is laptop-sized, GPU-sized, or cloud-sized.
 }
 \details{
-Estimates are deliberately rough — order-of-magnitude, not bills.
-Per-method scaling constants are calibrated against typical hardware
-and will be off by 2-3x in either direction for any individual job.
-Treat the recommendation as a starting point, not gospel.
+Estimates are deliberately rough. Each method's runtime constant comes
+from timing fits of three sizes on one laptop, where the estimates land
+within about a factor of 3 of those fits. Two runs on that laptop differed
+by up to 2.5x, and other hardware or differently shaped data can be further
+off, so treat the recommendation as a starting point. The memory multiples
+and GPU speedups are assumptions with no measurement behind them.
 }
 \examples{
 # Estimating from a method name needs neither a GPU nor the backend

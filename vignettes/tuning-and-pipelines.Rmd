@@ -75,7 +75,7 @@ tuning$best_params
 tuning$best_metric
 ```
 
-The winning values reach the underlying fit, not just the report:
+The winning values reach the underlying fit:
 
 ```{r}
 tuned_tree$fit$control$cp

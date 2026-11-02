@@ -13,7 +13,7 @@ fake_gpu_off <- structure(
     backends = list(
       xgboost    = list(installed = FALSE, gpu_likely_works = FALSE),
       tensorflow = list(installed = FALSE, gpu_likely_works = FALSE),
-      keras      = list(installed = FALSE, gpu_likely_works = FALSE)
+      keras3     = list(installed = FALSE, gpu_likely_works = FALSE)
     ),
     messages = character(0)
   ),
@@ -32,7 +32,7 @@ fake_gpu_xgb <- structure(
     backends = list(
       xgboost    = list(installed = TRUE,  gpu_likely_works = TRUE),
       tensorflow = list(installed = FALSE, gpu_likely_works = FALSE),
-      keras      = list(installed = FALSE, gpu_likely_works = FALSE)
+      keras3     = list(installed = FALSE, gpu_likely_works = FALSE)
     ),
     messages = character(0)
   ),
@@ -144,16 +144,13 @@ test_that("tl_resolve_compute('auto') consults advisor for GPU-capable", {
 })
 
 test_that("tl_resolve_compute('auto') picks gpu for long GPU-capable job", {
-  # Pin the CPU estimate rather than allocating a large matrix: the real
-  # estimate divides by detectCores(), so the expectation would flip on a
-  # machine with enough cores
+  # Pin the CPU estimate rather than allocating a large matrix
   testthat::local_mocked_bindings(
     tl_check_gpu = function(...) fake_gpu_xgb,
     tl_estimate_local_cpu_internal = function(method, n_rows, n_cols, hyp) {
       list(
         est_seconds     = 1200,
         est_peak_ram_mb = 400,
-        cores_used      = 4L,
         feasible        = TRUE,
         notes           = character(0)
       )

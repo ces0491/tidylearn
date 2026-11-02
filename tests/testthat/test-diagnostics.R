@@ -289,6 +289,182 @@ test_that("an undecided check is reported as unknown, not violated", {
   ))
 })
 
+test_that("a check the fit cannot support is undecided on any platform", {
+  # How rounding falls differs by platform: cor() gave NA, which stopped the
+  # function at if (), or a number that reported a verdict on nothing
+  checks <- function(model, ...) {
+    result <- tl_check_assumptions(model, verbose = FALSE, ...)
+    expect_false(anyNA(unlist(result$overall[c("n_checked", "n_violated",
+                                               "n_satisfied")])))
+    c(spread = result$homoscedasticity$check,
+      normal = result$normality$check)
+  }
+
+  # Constant fitted values, which lmtest also refused: "the auxiliary
+  # variance regression requires at least an intercept and a regressor"
+  intercept <- tl_model(mtcars, mpg ~ 1, method = "linear")
+  expect_true(is.na(checks(intercept)[["spread"]]))
+  expect_true(is.na(checks(intercept, test = FALSE)[["spread"]]))
+
+  # Residuals of one size
+  equal <- suppressMessages(tl_model(
+    data.frame(y = rep(c(1, 3), each = 10) + rep(c(-1, 1), 10),
+               x = rep(0:1, each = 10)),
+    y ~ x, method = "linear"
+  ))
+  expect_true(is.na(checks(equal)[["spread"]]))
+  expect_true(is.na(checks(equal, test = FALSE)[["spread"]]))
+
+  # A perfect fit leaves only rounding error in the residuals
+  line <- data.frame(x = 1:20, y = 2 * (1:20) + 1)
+  perfect <- suppressMessages(tl_model(line, y ~ x, method = "linear"))
+  expect_true(all(is.na(checks(perfect))))
+  expect_true(all(is.na(checks(perfect, test = FALSE))))
+
+  # shapiro.test() stopped on two rows: "sample size must be between 3 and
+  # 5000"
+  two_rows <- suppressMessages(tl_model(
+    data.frame(y = c(1, 3), x = c(1, 2)), y ~ x, method = "linear"
+  ))
+  expect_true(all(is.na(checks(two_rows))))
+  expect_true(all(is.na(checks(two_rows, test = FALSE))))
+
+  # Two residuals that differ are still too few for shapiro.test()
+  two_means <- suppressMessages(tl_model(
+    data.frame(y = c(1, 3)), y ~ 1, method = "linear"
+  ))
+  expect_true(is.na(checks(two_means)[["normal"]]))
+})
+
+test_that("a perfect fit leaves every check of its residuals undecided", {
+  # Linearity, independence and outliers read rounding error as well, so
+  # the overall status reported violations of nothing
+  x <- c(0.3, 1.7, 2.2, 3.9, 4.1, 5.6, 7.3, 8.8, 9.1, 11.4, 12.2, 13.9)
+  for (offset in c(0.7, 1.7e9)) {
+    model <- suppressMessages(tl_model(
+      data.frame(x = x, y = 0.1 * x + offset), y ~ x, method = "linear"
+    ))
+    result <- tl_check_assumptions(model, verbose = FALSE)
+    for (check in c("linearity", "independence", "homoscedasticity",
+                    "normality", "outliers")) {
+      expect_true(is.na(result[[check]]$check), info = check)
+    }
+    expect_equal(result$overall$n_violated, 0)
+    expect_match(result$overall$status, "could not be decided", fixed = TRUE)
+  }
+
+  # Rounding follows the largest term, and these responses are small next
+  # to terms in the thousands
+  years <- 2000:2020
+  model <- suppressMessages(tl_model(
+    data.frame(x = years, y = 3 * years - 6000), y ~ x, method = "linear"
+  ))
+  result <- tl_check_assumptions(model, verbose = FALSE)
+  expect_true(is.na(result$independence$check))
+  expect_true(is.na(result$normality$check))
+  expect_equal(result$overall$n_violated, 0)
+})
+
+test_that("a flat fitted line can still fail the Breusch-Pagan test", {
+  skip_if_not_installed("lmtest")
+  # bptest() reads the predictors, so it needs no spread in the fitted values
+  set.seed(7)
+  x <- rnorm(100)
+  y <- 1 + 2 * x + rnorm(100) * exp(x)
+  frame <- data.frame(x = x, e = residuals(lm(y ~ x)))
+  model <- tl_model(frame, e ~ x, method = "linear")
+  expect_false(
+    tl_check_assumptions(model, verbose = FALSE)$homoscedasticity$check
+  )
+})
+
+test_that("variation in a large response is not taken for rounding", {
+  # Residuals of a few units around 1.7e9, as in a timestamp, are real: a
+  # tolerance of sqrt(.Machine$double.eps) of the response swallowed them
+  set.seed(42)
+  x <- rnorm(100)
+  noise <- rnorm(100)
+  verdicts <- function(offset) {
+    frame <- data.frame(x = x, y = offset + 0.5 * x + noise * exp(x))
+    model <- suppressMessages(tl_model(frame, y ~ x, method = "linear"))
+    result <- tl_check_assumptions(model, verbose = FALSE)
+    c(result$homoscedasticity$check, result$normality$check)
+  }
+  expect_false(anyNA(verdicts(1.7e9)))
+  expect_identical(verdicts(1.7e9), verdicts(0))
+  expect_identical(verdicts(1e13), verdicts(0))
+})
+
+test_that("a design of one column is compared by correlation", {
+  # lmtest refuses y ~ 0 + x, although its residuals can be judged
+  model <- tl_model(mtcars, mpg ~ 0 + wt, method = "linear")
+  result <- tl_check_assumptions(model, verbose = FALSE)
+  expect_false(is.na(result$homoscedasticity$check))
+  expect_match(result$homoscedasticity$details, "Correlation", fixed = TRUE)
+
+  # An aliased column keeps the rank at one, and bptest() read it as a test
+  # on no degrees of freedom: p-value 0, and a violation of nothing
+  set.seed(3)
+  frame <- data.frame(x = rnorm(30))
+  frame$y <- 1.5 * frame$x + rnorm(30)
+  aliased <- tl_model(frame, y ~ 0 + x + I(2 * x), method = "linear")
+  result <- tl_check_assumptions(aliased, verbose = FALSE)
+  expect_match(result$homoscedasticity$details, "Correlation", fixed = TRUE)
+})
+
+test_that("a row of weight zero takes no part in the diagnostics", {
+  # hatvalues() leaves it out and residuals() keeps it, and the frame failed
+  # with "arguments imply differing number of rows: 20, 17"
+  frame <- data.frame(x = 1:20, y = 2 * (1:20) + sin(1:20))
+  frame$y[1:3] <- 1000
+  weighted <- tl_model(frame, y ~ x, method = "linear",
+                       weights = c(0, 0, 0, rep(1, 17)))
+  expect_identical(tl_influence_measures(weighted)$observation, 4:20)
+
+  # Its residual is not one of the fit's, so the tests match a fit without it
+  without <- tl_model(frame[-(1:3), ], y ~ x, method = "linear")
+  expect_identical(
+    tl_check_assumptions(weighted, verbose = FALSE)$normality$details,
+    tl_check_assumptions(without, verbose = FALSE)$normality$details
+  )
+  expect_no_error(tl_plot_diagnostics(weighted))
+
+  # bptest() keeps such a row in its sum of weights, which hid this pattern
+  # behind a p-value of 1
+  set.seed(11)
+  x <- rnorm(60)
+  y <- 1 + 2 * x + rnorm(60) * exp(1.2 * x)
+  frame <- data.frame(x = c(rnorm(5), x), y = c(rep(1e4, 5), y))
+  weighted <- tl_model(frame, y ~ x, method = "linear",
+                       weights = c(rep(0, 5), rep(1, 60)))
+  without <- tl_model(frame[-(1:5), ], y ~ x, method = "linear")
+  expect_false(
+    tl_check_assumptions(weighted, verbose = FALSE)$homoscedasticity$check
+  )
+  expect_false(
+    tl_check_assumptions(without, verbose = FALSE)$homoscedasticity$check
+  )
+})
+
+test_that("weights under na.exclude reach a homoscedasticity verdict", {
+  # lmtest::bptest() stopped with "incompatible dimensions"
+  frame <- mtcars
+  frame$wt[3] <- NA
+  model <- tl_model(frame, mpg ~ wt + hp, method = "linear",
+                    weights = rep(c(1, 2), 16), na.action = na.exclude)
+  result <- tl_check_assumptions(model, verbose = FALSE)
+  expect_false(is.na(result$homoscedasticity$check))
+})
+
+test_that("a fit with no row of weight is left undecided without warnings", {
+  frame <- data.frame(x = 1:20, y = 2 * (1:20) + sin(1:20))
+  empty <- tl_model(frame, y ~ x, method = "linear", weights = rep(0, 20))
+  expect_no_warning(
+    result <- tl_check_assumptions(empty, verbose = FALSE)
+  )
+  expect_true(is.na(result$normality$check))
+})
+
 test_that("the Durbin-Watson statistic is the one lmtest reports", {
   skip_if_not_installed("lmtest")
   model <- tl_model(mtcars, mpg ~ wt + hp, method = "linear")

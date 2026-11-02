@@ -51,10 +51,8 @@ Fit a gradient boosting model
 \details{
 The distribution follows the response: \code{"gaussian"} for
 regression, \code{"bernoulli"} for two classes and
-\code{"multinomial"} for more. gbm describes its multinomial
-distribution as currently broken, kept only for backwards
-compatibility, and warns to that effect on every multiclass fit. For
-three or more classes, \code{method = "forest"} or
-\code{method = "xgboost"} are the better supported choices.
+\code{"multinomial"} for more. gbm fixed its multinomial distribution
+in version 2.3.0. Earlier versions describe it as broken and warn on
+every multiclass fit.
 }
 \keyword{internal}

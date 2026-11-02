@@ -9,11 +9,10 @@ NULL
 # closed laptop -- none of them stop it, because the session was only
 # ever polling for a result, never keeping the work alive.
 #
-# That has a consequence worth stating plainly: every client-side
-# control here is best-effort. The only two things that bound spend when
-# the client dies are the timeout set on the job at submission, and the
-# spend budget the user sets on their own Modal workspace. So the
-# timeout is the primary control, not the fallback, and tidylearn never
+# So every client-side control here is best-effort. The only two things
+# that bound spend when the client dies are the timeout set on the job at
+# submission, and the spend budget the user sets on their own Modal
+# workspace. So the timeout is the primary control, and tidylearn never
 # submits without one.
 #
 # Modal's own default is 300s and its ceiling is 24h. tidylearn does not
@@ -87,9 +86,10 @@ tl_cloud_check_timeout_cap <- function(timeout_cap) {
 
 #' Worst-case cost of a cloud job
 #'
-#' What the call bills if it runs until the timeout kills it. This is the
-#' number the user is asked to accept, not the expected cost: the
-#' estimate is order-of-magnitude, the timeout is the actual bound.
+#' What the call bills if it runs until the timeout kills it, with the load
+#' time and idle window Modal also bills. This is the number the user is
+#' asked to accept, not the expected cost: the estimate is
+#' order-of-magnitude, the timeout is the actual bound.
 #'
 #' @param timeout_seconds Timeout that will be set on the job.
 #' @param tier_name Name of the Modal tier, as chosen by the advisor.
@@ -103,7 +103,7 @@ tl_cloud_worst_case_cost <- function(timeout_seconds, tier_name) {
     stop("Unknown Modal tier: '", tier_name, "'.", call. = FALSE)
   }
 
-  timeout_seconds * tier$rate_per_sec
+  (timeout_seconds + tl_modal_overhead()) * tier$rate_per_sec
 }
 
 #' Pre-flight cost check for a cloud submission

@@ -1,7 +1,7 @@
 #' Detect local GPU availability for tidylearn methods
 #'
 #' Reports whether the local machine has a CUDA-capable GPU and which
-#' tidylearn backends (`xgboost`, `keras`, `tensorflow`) are positioned
+#' tidylearn backends (`xgboost`, `keras3`, `tensorflow`) are positioned
 #' to use it. Detection is intentionally cheap: it parses `nvidia-smi`
 #' output, giving up with a warning if `nvidia-smi` has not answered
 #' within 10 seconds, and reads which R packages are installed from the
@@ -38,7 +38,7 @@ tl_check_gpu <- function(verbose = FALSE) {
   backends <- list(
     xgboost    = tl_check_backend_gpu("xgboost", cuda),
     tensorflow = tl_check_backend_gpu("tensorflow", cuda),
-    keras      = tl_check_backend_gpu("keras", cuda)
+    keras3     = tl_check_backend_gpu("keras3", cuda)
   )
 
   any_gpu <- isTRUE(cuda$driver_present) &&
@@ -191,8 +191,8 @@ tl_nvidia_smi_command <- function() {
 tl_check_backend_gpu <- function(pkg, cuda) {
   # Read from the library rather than by loading the namespace:
   # requireNamespace() would load the backend, which takes seconds for
-  # xgboost and runs keras's .onLoad, which sets TF_USE_LEGACY_KERAS for
-  # the rest of the session.
+  # xgboost and runs the .onLoad of keras3, which declares its Python
+  # requirements and picks a backend for the rest of the session.
   # Keep this function free of tidylearn internals: a test runs its source
   # in a fresh R session to check that it loads nothing.
   installed <- nzchar(system.file(package = pkg))
@@ -237,7 +237,7 @@ tl_check_backend_gpu <- function(pkg, cuda) {
       "GPU support requires a tensorflow build with CUDA + matching",
       "toolkit."
     ),
-    "keras"      = paste(
+    "keras3"     = paste(
       "GPU support requires the underlying TensorFlow backend with",
       "CUDA enabled."
     ),
@@ -266,7 +266,7 @@ tl_check_backend_gpu <- function(pkg, cuda) {
 tl_gpu_capable_methods <- function(gpu_check = NULL) {
   method_backend <- c(
     "xgboost" = "xgboost",
-    "deep"    = "keras"
+    "deep"    = "keras3"
   )
 
   if (is.null(gpu_check)) {

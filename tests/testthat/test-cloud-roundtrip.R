@@ -97,16 +97,15 @@ for (method_name in names(roundtrip_methods)) {
 
 # 'deep' is the one supervised method that does NOT round-trip through
 # base serialize(). A keras model is a reference to a Python object --
-# ?serialize_model puts it plainly: "Model objects are external references
-# to Keras objects which cannot be saved and restored across R sessions."
-# keras supplies serialize_model()/unserialize_model() for exactly this, so
-# the cloud path has to special-case the keras slot rather than serialise
-# the tidylearn object wholesale.
+# keras3 saves it to a .keras archive instead, so the cloud path has to
+# special-case the keras slot rather than serialise the tidylearn object
+# wholesale.
 #
 # These tests need a working TensorFlow backend, which CI does not provide.
 # They run wherever one is installed and skip everywhere else.
 skip_if_no_tensorflow <- function() {
-  testthat::skip_if_not_installed("keras")
+  testthat::skip_on_cran()
+  testthat::skip_if_not_installed("keras3")
   testthat::skip_if_not_installed("tensorflow")
   ok <- tryCatch(
     !is.null(tensorflow::tf_version()),
@@ -130,7 +129,7 @@ test_that("'deep' does not survive a plain serialise round trip", {
   expect_error(predict(restored, new_data = big_test))
 })
 
-test_that("'deep' round-trips via keras's own serialiser", {
+test_that("'deep' round-trips via a .keras archive", {
   skip_if_no_tensorflow()
 
   model <- tl_model(big_train, reg_formula, method = "deep",
@@ -139,12 +138,12 @@ test_that("'deep' round-trips via keras's own serialiser", {
 
   # The keras object lives at model$fit$model, surrounded by plain R
   # metadata. Swap just that slot.
-  keras_payload <- keras::serialize_model(model$fit$model)
+  keras_payload <- tl_keras_to_raw(model$fit$model)
   shell <- model
   shell$fit$model <- NULL
 
   restored <- unserialize(serialize(shell, connection = NULL))
-  restored$fit$model <- keras::unserialize_model(keras_payload)
+  restored$fit$model <- tl_keras_from_raw(keras_payload)
 
   expect_equal(
     as.data.frame(predict(restored, new_data = big_test)),

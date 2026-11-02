@@ -22,7 +22,9 @@ containing \code{assumption} (character label), \code{check} (logical,
 was run), \code{details} (character), and \code{recommendation}
 (character). An additional \code{overall} element summarises the
 number of assumptions checked, violated, and satisfied; an \code{NA} or
-\code{NULL} check counts as neither.
+\code{NULL} check counts as neither. A check is \code{NA} when the fit
+leaves it nothing to read: on a perfect fit the residuals are rounding
+error, so every check of them is.
 
 Logistic regression assumes neither normal residuals nor a constant
 variance, so for a logistic model \code{normality} and

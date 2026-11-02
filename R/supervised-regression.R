@@ -230,10 +230,13 @@ tl_plot_diagnostics <- function(model, which = 1:4, ...) {
     )
   }
 
-  # Get residuals and fitted values
-  fitted_vals <- fitted(model$fit)
-  residuals <- residuals(model$fit)
-  std_residuals <- rstandard(model$fit)
+  # Get residuals and fitted values, for the rows that carry weight: the
+  # influence functions leave out a row of weight zero
+  fit <- model$fit
+  carries_weight <- tl_has_weight(fit)
+  fitted_vals <- tl_drop_excluded(fitted(fit), fit)[carries_weight]
+  residuals <- tl_drop_excluded(residuals(fit), fit)[carries_weight]
+  std_residuals <- tl_drop_excluded(rstandard(fit), fit)
 
   # Create data frame for plotting
   plot_data <- tibble::tibble(
@@ -242,8 +245,8 @@ tl_plot_diagnostics <- function(model, which = 1:4, ...) {
     std_residuals = std_residuals,
     abs_residuals = abs(residuals),
     sqrt_abs_residuals = sqrt(abs(residuals)),
-    leverage = hatvalues(model$fit),
-    cooks_distance = cooks.distance(model$fit)
+    leverage = tl_drop_excluded(hatvalues(fit), fit),
+    cooks_distance = tl_drop_excluded(cooks.distance(fit), fit)
   )
 
   plots <- list()

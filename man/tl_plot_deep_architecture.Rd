@@ -25,7 +25,7 @@ Plot deep learning model architecture
 }
 \examples{
 \dontrun{
-if (requireNamespace("keras", quietly = TRUE)) {
+if (requireNamespace("keras3", quietly = TRUE)) {
   model <- tl_model(iris, Species ~ ., method = "deep", epochs = 5)
   tl_plot_deep_architecture(model)
 }

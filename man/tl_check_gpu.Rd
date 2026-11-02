@@ -18,7 +18,7 @@ and \code{messages} (character vector). A \code{print()} method is provided.
 }
 \description{
 Reports whether the local machine has a CUDA-capable GPU and which
-tidylearn backends (\code{xgboost}, \code{keras}, \code{tensorflow}) are positioned
+tidylearn backends (\code{xgboost}, \code{keras3}, \code{tensorflow}) are positioned
 to use it. Detection is intentionally cheap: it parses \code{nvidia-smi}
 output, giving up with a warning if \code{nvidia-smi} has not answered
 within 10 seconds, and reads which R packages are installed from the

@@ -1,7 +1,7 @@
 #' @title High-Level Workflows for Common Machine Learning Patterns
 #' @name tidylearn-workflows
-#' @description Functions providing end-to-end workflows that showcase
-#'   tidylearn's ability to seamlessly combine multiple learning paradigms
+#' @description End-to-end workflows that combine supervised and
+#'   unsupervised learning.
 NULL
 
 #' The full set of cluster labels a fitted clustering model can emit
@@ -803,7 +803,7 @@ print.tidylearn_automl <- function(x, ...) {
 
 #' Exploratory Data Analysis Workflow
 #'
-#' Comprehensive EDA combining unsupervised learning techniques
+#' EDA combining unsupervised learning techniques
 #' to understand data structure before modeling
 #'
 #' @param data A data frame

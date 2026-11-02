@@ -5,7 +5,7 @@
 
 #' Prepare Data for Machine Learning
 #'
-#' Comprehensive preprocessing pipeline including imputation, scaling,
+#' Preprocessing pipeline covering imputation, scaling,
 #' encoding, and feature engineering
 #'
 #' The statistics are learned from, and applied to, the data passed in.
@@ -126,9 +126,8 @@ tl_prepare_data <- function(data, formula = NULL,
   }
 
   # Separate predictors and response. Only the formula's predictors are
-  # processed: a column it excludes, such as `- id`, used to be one-hot
-  # encoded and scaled with the rest. Excluded columns are carried through
-  # unchanged, so the same formula still finds them downstream.
+  # processed: a column it excludes, such as `- id`, is carried through
+  # unchanged, so the same formula still finds it downstream.
   passthrough <- character(0)
   if (!is.null(response_var)) {
     response_data <- processed_data[[response_var]]
@@ -257,11 +256,9 @@ impute_missing <- function(data, method = "mean") {
   imputed_data <- data
   imputation_values <- list()
 
-  # "mode" and "knn" used to fall through to the mean while the message
-  # named the method asked for, and a categorical column was never filled
-  # -- its NA rows then broke one-hot encoding with a recycling error. A
-  # categorical column takes its most frequent value whatever the method,
-  # since a mean or median of categories does not exist.
+  # A categorical column takes its most frequent value whatever the
+  # method, since a mean or median of categories does not exist. Unfilled,
+  # its NA rows break one-hot encoding with a recycling error.
   for (col in names(data)) {
     values <- data[[col]]
     # An entirely missing column has nothing to impute from and is left
@@ -546,9 +543,9 @@ tl_split <- function(data, prop = 0.8, stratify = NULL, seed = NULL) {
 
 #' Strata for a stratified split
 #'
-#' Each distinct value used to be a stratum of its own. A continuous or ID
-#' column then made every row a stratum of one, and a stratum of one goes
-#' wholly to training, so the test set came back empty. A numeric column
+#' With each distinct value a stratum of its own, a continuous or ID column
+#' would make every row a stratum of one, and a stratum of one goes wholly
+#' to training, so the test set would come back empty. A numeric column
 #' with more than five distinct values is cut at its quartiles instead,
 #' which is the default of rsample's \code{make_strata()}.
 #'

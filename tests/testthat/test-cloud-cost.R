@@ -36,11 +36,12 @@ test_that("timeout arguments are validated", {
 
 test_that("worst-case cost is the timeout at the tier's rate", {
   # Not the estimate: the estimate is order-of-magnitude, the timeout is
-  # what actually bounds the bill.
+  # what actually bounds the bill. Modal also bills load and idle time, so
+  # the timeout alone understates the most a job can cost.
   rate <- .tl_modal_tiers[["cpu-large"]]$rate_per_sec
   expect_equal(
     tl_cloud_worst_case_cost(600, "cpu-large"),
-    600 * rate
+    (600 + tl_modal_overhead()) * rate
   )
 })
 
@@ -74,7 +75,7 @@ test_that("an affordable job passes and reports its bound", {
   expect_equal(budget$timeout_seconds, 360L)
   expect_equal(
     budget$worst_case_cost,
-    360 * .tl_modal_tiers[["cpu-large"]]$rate_per_sec
+    (360 + tl_modal_overhead()) * .tl_modal_tiers[["cpu-large"]]$rate_per_sec
   )
   expect_equal(budget$expected_cost, 0.10)
 })
