@@ -35,7 +35,7 @@ print(tl_check_gpu())
 #> Backends:
 #>   xgboost     CPU only
 #>   tensorflow  CPU only
-#>   keras       CPU only
+#>   keras3      CPU only
 #> 
 #> Notes:
 #>   - No NVIDIA CUDA driver detected. All GPU paths fall back to CPU.

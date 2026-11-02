@@ -17,7 +17,8 @@ plot(x, type = "auto", ...)
 
 - type:
 
-  Plot type (default: "auto")
+  Plot type (default: "auto"). An unsupervised model takes only
+  `"auto"`.
 
 - ...:
 

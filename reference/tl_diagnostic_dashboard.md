@@ -1,6 +1,6 @@
-# Create a comprehensive diagnostic dashboard
+# Create a diagnostic dashboard
 
-Create a comprehensive diagnostic dashboard
+Create a diagnostic dashboard
 
 ## Usage
 

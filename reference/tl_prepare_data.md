@@ -85,8 +85,8 @@ A list with components:
 
 ## Details
 
-Comprehensive preprocessing pipeline including imputation, scaling,
-encoding, and feature engineering
+Preprocessing pipeline covering imputation, scaling, encoding, and
+feature engineering
 
 The statistics are learned from, and applied to, the data passed in.
 Preparing a whole dataset and then splitting it lets the test rows shape

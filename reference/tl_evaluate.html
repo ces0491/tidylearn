@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -82,8 +82,8 @@ Classification supports <code>"accuracy"</code>, <code>"precision"</code>,
 and <code>value</code> (numeric), containing one row per requested metric,
 and for <code>"auc"</code> on more than two classes an <code>auc_&lt;class&gt;</code>
 row per class as well. An unsupervised model has no response to score
-against and returns the single row <code>metric = "completed"</code>,
-<code>value = 1</code>.</p>
+against, so it is an error: <code><a href="calc_validation_metrics.html">calc_validation_metrics</a></code> and
+<code><a href="tidy_silhouette.html">tidy_silhouette</a></code> assess a clustering.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>

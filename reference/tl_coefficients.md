@@ -4,9 +4,9 @@ Returns the coefficients of a fitted tidylearn model as a tibble, with
 standard errors, test statistics, p-values and – on request – confidence
 intervals. Available for `"linear"`, `"polynomial"`, `"logistic"`,
 `"ridge"`, `"lasso"` and `"elastic_net"`. Other methods have no
-coefficients; use
+coefficients.
 [`tl_table_importance`](https://tidylearn.sheetsolved.com/reference/tl_table_importance.md)
-for those.
+covers `"tree"`, `"forest"`, `"boost"` and `"xgboost"`.
 
 ## Usage
 

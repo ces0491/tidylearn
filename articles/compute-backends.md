@@ -32,7 +32,7 @@ library without loading them, so it does not start Python, import
 TensorFlow, or fit anything, and it gives `nvidia-smi` 10 seconds to
 answer before warning and reporting no GPU. It returns an object with a
 [`print()`](https://rdrr.io/r/base/print.html) method describing the
-CUDA driver, the devices found, and which of xgboost, keras and
+CUDA driver, the devices found, and which of xgboost, keras3 and
 tensorflow are installed.
 
 ## Only two methods have a GPU path
@@ -57,7 +57,8 @@ model <- tl_model(data, y ~ ., method = "xgboost", compute = "auto")
 ```
 
 For those eleven methods the question to ask is whether the job fits in
-memory, and how many cores you can throw at it.
+memory. Their fits ran on one core when timed for the advisor, so extra
+cores do not speed them up.
 
 ## Estimating before you commit
 
@@ -83,9 +84,9 @@ advice
 #> Problem:        xgboost on 150 rows x 4 cols (~0.0 MB)
 #> 
 #> Tier estimates (order-of-magnitude):
-#>   Local CPU:    0.0s   (peak RAM ~0 MB, 4 cores)
+#>   Local CPU:    0.0s   (peak RAM ~0 MB)
 #>   Local GPU:    --   [not applicable]
-#>   Cloud:        45.0s   (~$0.01) [T4 (16 GB VRAM / 16 GB RAM)]   [not configured]
+#>   Cloud:        45.0s   (~$0.04) [A10G (24 GB VRAM / 24 GB RAM)]   [not configured]
 #> 
 #> Recommendation: cpu
 #> 
@@ -103,9 +104,13 @@ such as random forest or SVM when the job is RAM-infeasible locally,
 which is the common case for large data. On a small dataset like `iris`
 it will tell you to stay local.
 
-Estimates are order-of-magnitude. Runtime constants are calibrated per
-method, and Modal pricing is approximate as of early 2026. Treat the
-output as a decision aid.
+Estimates are order-of-magnitude. Each method’s runtime constant comes
+from timing fits of three sizes on one laptop, where the estimates land
+within about a factor of 3 of those fits. Two runs on that laptop
+differed by up to 2.5x, and other hardware or data shapes can be further
+off. The memory multiples and GPU speedups are assumptions. Modal’s
+prices were read from <https://modal.com/pricing> on 2026-10-30. Treat
+the output as a decision aid.
 
 Unsupervised methods are not modelled. Calling the advisor on one
 errors.
@@ -114,11 +119,14 @@ errors.
 
 **Cloud execution is not available yet.** `compute = "cloud"` errors
 with a message saying so, and the advisor’s cloud tier is reported for
-planning only. What follows describes what is already in place, so that
-you can see the safety model before the feature that uses it.
+planning only. The consent gate, the host allowlist and the cost
+calculations below are in the package today, ahead of the submission
+path that will use them. The job timeout, the worker’s retry setting and
+cancelling a job are the design that path will follow, and have no code
+yet.
 
-A cloud fit uploads your training data to your own Modal account. That
-is a third party, and it may be something your organisation’s
+A cloud fit will upload your training data to your own Modal account.
+That is a third party, and it may be something your organisation’s
 data-handling rules forbid. tidylearn treats that transfer as the
 consequential step it is.
 
@@ -144,9 +152,11 @@ anywhere in the cloud path, so `Rscript`, CI and knitted documents
 behave exactly like an interactive session. A prompt that cannot be
 answered in batch would block them.
 
-Per call, the equivalent is `confirm_upload = TRUE`.
+Per call, the equivalent will be `confirm_upload = TRUE`, which
+[`tl_model()`](https://tidylearn.sheetsolved.com/reference/tl_model.md)
+does not take yet.
 
-### Destinations are checked, not trusted
+### Destinations are checked
 
 The endpoint is read from an environment variable:
 
@@ -200,21 +210,23 @@ No amount of care in the R client can guarantee anything against that,
 because a killed session runs no cleanup handlers. So the controls are
 layered by what survives:
 
-**What holds even if your session dies.** Every submission sets an
-explicit timeout, derived from the estimate with headroom and capped
-well below Modal’s 24-hour maximum. Modal’s inherited default is never
-used and neither is no timeout at all. The worker runs with retries
-disabled, because Modal applies timeouts per attempt and three retries
-would bill four full timeouts for one hung job. You should also set a
-spend budget on your Modal workspace, which is the only true hard cap
-and is not tidylearn’s to set.
+**What will hold even if your session dies.** Each submission will set
+an explicit timeout, derived from the estimate with headroom and capped
+well below Modal’s 24-hour maximum, so Modal’s default is never
+inherited. The worker will run with retries disabled, because Modal
+applies timeouts per attempt and three retries would bill four full
+timeouts for one hung job. You should also set a spend budget on your
+Modal workspace, which is the only true hard cap and is not tidylearn’s
+to set.
 
-**What is best-effort.** The pre-flight gates, the job registry and
-cancel-on-interrupt catch the ordinary cases, and none of them survive a
-killed session.
+**What will be best-effort.** The pre-flight gates, the job registry and
+cancel-on-interrupt will catch the ordinary cases, and none of them
+survive a killed session.
 
-Before a fit, the figure you are asked to accept is the **worst case** —
-the timeout at the tier’s rate — rather than the estimate:
+Before a fit, the figure you will be asked to accept is the **worst
+case** rather than the estimate: the timeout plus the load and idle time
+Modal also bills, at the tier’s rate. This is the planned call, which
+errors today:
 
 ``` r
 
@@ -222,12 +234,13 @@ model <- tl_model(data, y ~ ., method = "xgboost", compute = "cloud",
                   confirm_upload = TRUE, max_cost = 5)
 ```
 
-That refuses before anything is uploaded if the worst case exceeds
-`max_cost`. It also refuses a fit whose estimate is so large that the
-job would be killed by its own timeout before finishing — submitting
+That will refuse before anything is uploaded if the worst case exceeds
+`max_cost`. It will also refuse a fit whose estimate is so large that
+the job would be killed by its own timeout before finishing — submitting
 that would bill the full timeout and return nothing.
 
-Nothing in flight is invisible:
+[`tl_cloud_jobs()`](https://tidylearn.sheetsolved.com/reference/tl_cloud_jobs.md)
+lists the jobs in flight, which is none until submission exists:
 
 ``` r
 
@@ -237,8 +250,9 @@ tl_cloud_jobs()
 #> #   timeout_seconds <int>, worst_case_cost <dbl>
 ```
 
-A job leaves that list when its result is collected or it is cancelled.
-The list itself does not outlive the session; the timeout does.
+A job will leave that list when its result is collected or it is
+cancelled. The list itself does not outlive the session, and a job’s
+timeout does.
 
 ### The contract is written down
 
@@ -262,8 +276,8 @@ The remaining work is the submission path itself — building the
 authenticated request, uploading, polling for the result, and restoring
 the fitted model in your session. Models cross that boundary as bytes;
 twelve of the thirteen methods serialise natively, and `"deep"` carries
-its keras weights separately because a keras model is a reference to a
-Python object rather than an R one.
+its keras model as a separate `.keras` archive because a keras model is
+a reference to a Python object rather than an R one.
 
 Until that lands, use
 [`tl_compute_advisor()`](https://tidylearn.sheetsolved.com/reference/tl_compute_advisor.md)

@@ -20,7 +20,7 @@ suggest_eps(data, minPts = 5, method = "percentile", percentile = 0.95)
   [`tidy_dbscan`](https://tidylearn.sheetsolved.com/reference/tidy_dbscan.md)
   (default: 5). The k-NN distance is read at `k = minPts - 1`, the
   neighbours a core point needs besides itself, as
-  [`kNNdistplot`](http://michael.hahsler.net/dbscan/reference/kNNdist.md)
+  [`kNNdistplot`](https://michael.hahsler.net/dbscan/reference/kNNdist.html)
   does.
 
 - method:

@@ -1,7 +1,7 @@
 # Exploratory Data Analysis Workflow
 
-Comprehensive EDA combining unsupervised learning techniques to
-understand data structure before modeling
+EDA combining unsupervised learning techniques to understand data
+structure before modeling
 
 ## Usage
 

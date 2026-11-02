@@ -31,7 +31,8 @@ A named list with one element per assumption checked (`linearity`,
 was run), `details` (character), and `recommendation` (character). An
 additional `overall` element summarises the number of assumptions
 checked, violated, and satisfied; an `NA` or `NULL` check counts as
-neither.
+neither. A check is `NA` when the fit leaves it nothing to read: on a
+perfect fit the residuals are rounding error, so every check of them is.
 
 Logistic regression assumes neither normal residuals nor a constant
 variance, so for a logistic model `normality` and `homoscedasticity`

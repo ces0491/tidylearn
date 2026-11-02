@@ -126,7 +126,8 @@ model <- tl_model(iris[,1:4], method = "pca")
 
 ### Tidy Output
 
-All results come back as tibbles, ready for dplyr and ggplot2:
+Predictions, metrics and coefficients come back as tibbles, ready for
+dplyr and ggplot2:
 
 ``` r
 
@@ -190,7 +191,7 @@ tidylearn provides a unified interface to these established R packages:
 | `"xgboost"` | xgboost | `xgb.train()` |
 | `"svm"` | e1071 | `svm()` |
 | `"nn"` | nnet | `nnet()` |
-| `"deep"` | keras | `keras_model_sequential()` |
+| `"deep"` | keras3 | `keras_model_sequential()` |
 
 `"logistic"` requires a two-level response and errors on anything else.
 Every other classification method here handles more than two classes.
@@ -281,7 +282,10 @@ cloud tiers before you commit to a long fit:
 tl_compute_advisor("xgboost", data, y ~ ., hyperparams = list(nrounds = 5000))
 ```
 
-Estimates are order-of-magnitude. The advisor covers all 13 supervised
+Estimates are order-of-magnitude. The runtime constants come from timing
+fits on one laptop (`data-raw/` in the repository), where the estimates
+land within about a factor of 3 of those fits, and other hardware or
+data shapes can be further off. The advisor covers all 13 supervised
 methods, and it treats cloud as a “does not fit on my machine” tier, so
 it will recommend cloud for a CPU-only method like random forest if the
 job is RAM-infeasible locally.
@@ -320,23 +324,26 @@ session does afterwards. Ctrl-C, a closed IDE, a crashed session and a
 closed laptop all leave it running and billing, because the session was
 only polling for a result.
 
-The bound on spend therefore cannot live in R. Every submission carries
-an explicit timeout, derived from the estimate with headroom and capped
-well below Modal’s 24-hour maximum, and the worker runs with retries off
-so a hung job cannot bill several timeouts over.
+The bound on spend therefore cannot live in R. The submission path is
+not written yet, and this is the design it will follow: each submission
+will carry an explicit timeout, derived from the estimate with headroom
+and capped well below Modal’s 24-hour maximum, and the worker will run
+with retries off so a hung job cannot bill several timeouts over.
 
-What you are asked to accept before a fit is the **worst case** - the
-timeout at the tier’s rate. The estimate is order-of-magnitude, and the
-timeout is what actually binds:
+What you will be asked to accept before a fit is the **worst case**: the
+timeout plus the load and idle time Modal also bills, at the tier’s
+rate. The estimate is order-of-magnitude, and the timeout is what
+actually binds:
 
 ``` r
 
-# Refused before anything is uploaded if the worst case exceeds max_cost,
-# or if the estimate is so large the job would be killed before finishing
+# The planned call, which errors today. It will be refused before anything
+# is uploaded if the worst case exceeds max_cost, or if the estimate is so
+# large the job would be killed before finishing
 model <- tl_model(data, y ~ ., method = "xgboost", compute = "cloud",
                   confirm_upload = TRUE, max_cost = 5)
 
-# Anything currently running, so no job is invisible
+# Jobs in flight: none until submission exists
 tl_cloud_jobs()
 ```
 
@@ -481,7 +488,7 @@ tidylearn is a wrapper. The algorithms are implemented in:
 - **dbscan**: Density-based clustering
 - **MASS**: Sammon mapping, isoMDS
 - **smacof**: SMACOF MDS algorithm
-- **keras/tensorflow**: Deep learning (optional)
+- **keras3/tensorflow**: Deep learning (optional)
 
 Thanks to their maintainers.
 

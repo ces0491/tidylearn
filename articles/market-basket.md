@@ -151,7 +151,7 @@ grid
 
 Dropping the support floor by a factor of ten multiplies the rule count
 by more than a hundred. A high-confidence rule at very low support is
-usually a description of a handful of shoppers, not of the shop.
+usually a description of a handful of shoppers.
 
 ## Reading the Rules
 
@@ -455,10 +455,10 @@ Three cautions worth carrying:
 
 1.  **Lift is symmetric; the rule is not.** *A ⇒ B* and *B ⇒ A* have the
     same lift and usually different confidence. Which direction you act
-    on is a decision about the business, not a result from the data.
+    on is a business decision the data cannot make.
 2.  **A rule is not a cause.** Bread and butter co-occur because people
-    buy both, not because one drives the other. Moving butter next to
-    bread is a testable hypothesis, and the test is an experiment.
+    buy both, and neither drives the other. Moving butter next to bread
+    is a testable hypothesis, and the test is an experiment.
 3.  **Rules describe the period you mined.** A month of grocery data
     carries that month’s seasonality. Re-mine rather than reusing a
     stored rule set across a season boundary.

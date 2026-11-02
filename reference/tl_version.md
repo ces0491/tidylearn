@@ -16,5 +16,5 @@ A package_version object containing the version number
 
 ``` r
 tl_version()
-#> [1] ‘0.6.0.9000’
+#> [1] ‘0.7.0’
 ```

@@ -1,6 +1,6 @@
 # Calculate Cluster Validation Metrics
 
-Comprehensive validation metrics for a clustering result
+Validation metrics for a clustering result
 
 ## Usage
 

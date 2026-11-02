@@ -101,7 +101,7 @@ tuning$best_metric
 #> [1] 0.9666667
 ```
 
-The winning values reach the underlying fit, not just the report:
+The winning values reach the underlying fit:
 
 ``` r
 

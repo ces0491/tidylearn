@@ -1,10 +1,10 @@
 # Advise on the best compute tier for a tidylearn fit
 
 Estimates runtime and feasibility on local CPU, local GPU (when
-available and applicable), and cloud GPU (stubbed until cloud
-integration lands), then returns a structured recommendation. Useful
-before kicking off a long fit — call this first to see whether the
-problem is laptop-sized, GPU-sized, or cloud-sized.
+available and applicable), and cloud (planning figures only, since cloud
+submission does not exist yet), then returns a structured
+recommendation. Useful before kicking off a long fit — call this first
+to see whether the problem is laptop-sized, GPU-sized, or cloud-sized.
 
 ## Usage
 
@@ -48,7 +48,7 @@ tl_compute_advisor(x, ...)
 
 - ...:
 
-  Unused, reserved for method-specific extensions.
+  Must be empty: a misspelt argument is an error.
 
 - data:
 
@@ -89,10 +89,13 @@ An object of class `tidylearn_compute_advice` containing `problem`,
 
 ## Details
 
-Estimates are deliberately rough — order-of-magnitude, not bills.
-Per-method scaling constants are calibrated against typical hardware and
-will be off by 2-3x in either direction for any individual job. Treat
-the recommendation as a starting point, not gospel.
+Estimates are deliberately rough. Each method's runtime constant comes
+from timing fits of three sizes on one laptop, where the estimates land
+within about a factor of 3 of those fits. Two runs on that laptop
+differed by up to 2.5x, and other hardware or differently shaped data
+can be further off, so treat the recommendation as a starting point. The
+memory multiples and GPU speedups are assumptions with no measurement
+behind them.
 
 ## Examples
 
@@ -108,9 +111,9 @@ print(advice)
 #> Problem:        xgboost on 150 rows x 4 cols (~0.0 MB)
 #> 
 #> Tier estimates (order-of-magnitude):
-#>   Local CPU:    0.0s   (peak RAM ~0 MB, 4 cores)
+#>   Local CPU:    0.0s   (peak RAM ~0 MB)
 #>   Local GPU:    --   [not applicable]
-#>   Cloud:        45.0s   (~$0.01) [T4 (16 GB VRAM / 16 GB RAM)]   [not configured]
+#>   Cloud:        45.0s   (~$0.04) [A10G (24 GB VRAM / 24 GB RAM)]   [not configured]
 #> 
 #> Recommendation: cpu
 #> 
@@ -132,9 +135,9 @@ if (requireNamespace("xgboost", quietly = TRUE)) {
 #> Problem:        xgboost on 150 rows x 4 cols (~0.0 MB)
 #> 
 #> Tier estimates (order-of-magnitude):
-#>   Local CPU:    0.0s   (peak RAM ~0 MB, 4 cores)
+#>   Local CPU:    0.0s   (peak RAM ~0 MB)
 #>   Local GPU:    --   [not applicable]
-#>   Cloud:        45.0s   (~$0.01) [T4 (16 GB VRAM / 16 GB RAM)]   [not configured]
+#>   Cloud:        45.0s   (~$0.04) [A10G (24 GB VRAM / 24 GB RAM)]   [not configured]
 #> 
 #> Recommendation: cpu
 #> 

@@ -170,10 +170,10 @@ tl_model(iris_binary, Species ~ ., method = "logistic")$spec$method
 #> [1] "logistic"
 ```
 
-It is the folds, not the dataset. Seeing this on your own data means the
-classes are close to separable at that sample size — a reason to prefer
-a regularised method, which is what `ridge` and `lasso` are doing in
-phase 4 of the regression search.
+The folds cause this. Seeing it on your own data means the classes are
+close to separable at that sample size — a reason to prefer a
+regularised method, which is what `ridge` and `lasso` are doing in phase
+4 of the regression search.
 
 ### The evaluation column
 
@@ -225,7 +225,7 @@ do.call(rbind, sweep)
 #> 1      2     0.0      1         1 baseline_tree
 #> 2      5     0.0      1         1 baseline_tree
 #> 3     10     0.2      3         3 baseline_tree
-#> 4     30     0.8      8         8  advanced_svm
+#> 4     30     0.7      8         8  advanced_svm
 ```
 
 iris is 150 rows, so everything here is quick and the budget is barely

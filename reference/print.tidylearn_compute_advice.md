@@ -33,14 +33,14 @@ print(advice)
 #> Problem:        forest on 150 rows x 4 cols (~0.0 MB)
 #> 
 #> Tier estimates (order-of-magnitude):
-#>   Local CPU:    0.0s   (peak RAM ~0 MB, 4 cores)
+#>   Local CPU:    0.1s   (peak RAM ~0 MB)
 #>   Local GPU:    --   [not applicable]
-#>   Cloud:        45.1s   (~$0.01) [cpu-small (2 CPU / 8 GB)]   [not configured]
+#>   Cloud:        45.1s   (~$0.00) [cpu-small (2 CPU / 8 GB)]   [not configured]
 #> 
 #> Recommendation: cpu
 #> 
 #> Reasoning:
-#>   - Estimated local CPU runtime ~0.0s. Cloud cold-start (~45s) would dominate; just run it locally.
+#>   - Estimated local CPU runtime ~0.1s. Cloud cold-start (~45s) would dominate; just run it locally.
 #> 
 #> Notes:
 #>   - Method 'forest' has no upstream GPU path; local GPU does not apply.

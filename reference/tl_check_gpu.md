@@ -1,7 +1,7 @@
 # Detect local GPU availability for tidylearn methods
 
 Reports whether the local machine has a CUDA-capable GPU and which
-tidylearn backends (`xgboost`, `keras`, `tensorflow`) are positioned to
+tidylearn backends (`xgboost`, `keras3`, `tensorflow`) are positioned to
 use it. Detection is intentionally cheap: it parses `nvidia-smi` output,
 giving up with a warning if `nvidia-smi` has not answered within 10
 seconds, and reads which R packages are installed from the library

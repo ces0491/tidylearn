@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -45,7 +45,7 @@
 <div class="section level2">
 <h2 id="wrapped-packages">Wrapped Packages<a class="anchor" aria-label="anchor" href="#wrapped-packages"></a></h2>
 <p>The method-to-package mapping is maintained in one place, the <a href="https://tidylearn.sheetsolved.com/#wrapped-packages">README</a>, and repeated in <code><a href="articles/getting-started.html">vignette("getting-started")</a></code>. Three copies of the same table drift; this document links to it rather than adding a fourth.</p>
-<p><code><a href="reference/tl_model.html">tl_model()</a></code> dispatches on 20 methods: 13 supervised and 7 unsupervised. The authoritative list is <code>supervised_methods</code> and <code>unsupervised_methods</code> in <code>R/core.R</code>, which is what the error message for an unknown method prints.</p>
+<p><code><a href="reference/tl_model.html">tl_model()</a></code> dispatches on 20 methods: 13 supervised and 7 unsupervised. The authoritative lists are <code>tl_supervised_methods()</code> and <code>tl_unsupervised_methods()</code> in <code>R/utils.R</code>, which is what the error message for an unknown method prints.</p>
 </div>
 <div class="section level2">
 <h2 id="package-structure">Package Structure<a class="anchor" aria-label="anchor" href="#package-structure"></a></h2>
@@ -165,7 +165,7 @@
 <li>
 <code>supervised-neural-networks.R</code>: Wraps nnet</li>
 <li>
-<code>supervised-deep-learning.R</code>: Wraps keras (optional)</li>
+<code>supervised-deep-learning.R</code>: Wraps keras3 (optional)</li>
 <li>
 <code>supervised-xgboost.R</code>: Wraps xgboost (optional)</li>
 </ul></div>
@@ -203,7 +203,7 @@
 <ul><li>
 <code>compute-detection.R</code>: <code><a href="reference/tl_check_gpu.html">tl_check_gpu()</a></code> — parses <code>nvidia-smi</code> and checks which GPU-capable backends are installed, without loading Python or fitting anything</li>
 <li>
-<code>compute-advisor.R</code>: <code><a href="reference/tl_compute_advisor.html">tl_compute_advisor()</a></code> — estimates runtime, peak RAM and cost across local CPU, local GPU and cloud tiers. Holds the method profile table and the Modal instance tier table</li>
+<code>compute-advisor.R</code>: <code><a href="reference/tl_compute_advisor.html">tl_compute_advisor()</a></code> — estimates runtime, peak RAM and cost across local CPU, local GPU and cloud tiers. Holds the method profile table, Modal’s prices and the instance tier table built from them. <code>data-raw/calibrate-advisor.R</code> measures the runtime constants</li>
 <li>
 <code>compute-routing.R</code>: <code>tl_resolve_compute()</code> — validates the <code>compute</code> argument, consults the advisor for <code>"auto"</code>, and applies the fallback rules</li>
 </ul></div>
@@ -234,6 +234,8 @@
 <code>diagnostics.R</code>: Model diagnostics</li>
 <li>
 <code>metrics.R</code>: Evaluation metrics</li>
+<li>
+<code>coefficients.R</code>: <code><a href="reference/tl_coefficients.html">tl_coefficients()</a></code>, coefficients and confidence intervals as a tibble</li>
 <li>
 <code>utils.R</code>: Helper functions</li>
 </ul></div>
@@ -305,6 +307,7 @@
 ├── PACKAGE_ARCHITECTURE.md  # This file
 ├── .lintr                        # Lintr configuration
 ├── R/
+│   ├── tidylearn-package.R       # Package documentation
 │   ├── utils.R                   # Utilities
 │   ├── read.R                    # Data ingestion dispatcher
 │   ├── read-backends.R           # Database/cloud readers
@@ -327,8 +330,10 @@
 │   ├── interactions.R            # Interaction effects
 │   ├── diagnostics.R             # Model diagnostics
 │   ├── metrics.R                 # Evaluation metrics
+│   ├── coefficients.R            # Tidy coefficients
 │   ├── visualization.R           # Unified plotting
 │   └── tables.R                  # Formatted gt tables
+├── data-raw/                     # Advisor calibration script and results
 ├── inst/
 │   └── security/
 │       └── threat-model.md       # Cloud compute contract
@@ -359,7 +364,7 @@
 <li>
 <strong>Tables</strong>: gt</li>
 <li>
-<strong>Deep learning</strong>: keras, tensorflow</li>
+<strong>Deep learning</strong>: keras3, tensorflow</li>
 <li>
 <strong>Gradient boosting</strong>: xgboost</li>
 <li>

@@ -73,8 +73,8 @@ assumptions$overall
 ```
 
 Each entry carries the test that was run, the verdict, and what to do
-about it. Nothing here is a pass/fail gate — the recommendation is a
-prompt, not an instruction.
+about it. The recommendation is a prompt to look closer, and nothing
+here is a pass/fail gate.
 
 ``` r
 
@@ -433,11 +433,11 @@ effects <- tl_interaction_effects(model_int, var = "wt", by_var = "hp")
 
 effects$slopes
 #>      by_value by_label     slope     slope_se
-#> Q0       52.0       Q0 -6.768521 5.695734e-16
-#> Q25      96.5      Q25 -5.529278 4.387243e-16
-#> Q50     123.0      Q50 -4.791302 6.071491e-16
-#> Q75     180.0      Q75 -3.203958 4.018576e-16
-#> Q100    335.0     Q100  1.112505 4.116338e-16
+#> Q0       52.0       Q0 -6.768521 3.505829e-16
+#> Q25      96.5      Q25 -5.529278 4.039654e-16
+#> Q50     123.0      Q50 -4.791302 3.746703e-16
+#> Q75     180.0      Q75 -3.203958 4.635819e-16
+#> Q100    335.0     Q100  1.112505 2.313524e-16
 ```
 
 The slope of `mpg` on `wt` weakens as `hp` rises — extra weight costs
@@ -478,8 +478,8 @@ auto$spec$formula
 
 [`tl_explore()`](https://tidylearn.sheetsolved.com/reference/tl_explore.md)
 runs PCA, picks a cluster count, clusters, and computes a distance
-summary in one call. It is a first look at a dataset, not a diagnostic
-of a fit.
+summary in one call. It looks at the dataset and says nothing about a
+fit.
 
 ``` r
 

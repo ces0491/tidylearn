@@ -33,7 +33,7 @@
 
     <a class="navbar-brand me-2" href="index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -188,7 +188,7 @@
 <div class="section level3">
 <h3 id="tidy-output">Tidy Output<a class="anchor" aria-label="anchor" href="#tidy-output"></a>
 </h3>
-<p>All results come back as tibbles, ready for dplyr and ggplot2:</p>
+<p>Predictions, metrics and coefficients come back as tibbles, ready for dplyr and ggplot2:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Predictions come back as a tibble with a .pred column</span></span>
 <span><span class="va">predictions</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">model</span>, new_data <span class="op">=</span> <span class="va">test_data</span><span class="op">)</span></span>
@@ -294,7 +294,7 @@
 </tr>
 <tr>
 <td><code>"deep"</code></td>
-<td>keras</td>
+<td>keras3</td>
 <td><code>keras_model_sequential()</code></td>
 </tr>
 </tbody>
@@ -409,7 +409,7 @@
 <p><code><a href="reference/tl_compute_advisor.html">tl_compute_advisor()</a></code> estimates runtime, peak memory and cost across local CPU, local GPU and cloud tiers before you commit to a long fit:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/tl_compute_advisor.html">tl_compute_advisor</a></span><span class="op">(</span><span class="st">"xgboost"</span>, <span class="va">data</span>, <span class="va">y</span> <span class="op">~</span> <span class="va">.</span>, hyperparams <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>nrounds <span class="op">=</span> <span class="fl">5000</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p>Estimates are order-of-magnitude. The advisor covers all 13 supervised methods, and it treats cloud as a “does not fit on my machine” tier, so it will recommend cloud for a CPU-only method like random forest if the job is RAM-infeasible locally.</p>
+<p>Estimates are order-of-magnitude. The runtime constants come from timing fits on one laptop (<code>data-raw/</code> in the repository), where the estimates land within about a factor of 3 of those fits, and other hardware or data shapes can be further off. The advisor covers all 13 supervised methods, and it treats cloud as a “does not fit on my machine” tier, so it will recommend cloud for a CPU-only method like random forest if the job is RAM-infeasible locally.</p>
 <div class="section level3">
 <h3 id="cloud-compute">Cloud compute<a class="anchor" aria-label="anchor" href="#cloud-compute"></a>
 </h3>
@@ -433,15 +433,16 @@
 <h3 id="cost-controls">Cost controls<a class="anchor" aria-label="anchor" href="#cost-controls"></a>
 </h3>
 <p>A job submitted to Modal runs to completion there whatever your R session does afterwards. Ctrl-C, a closed IDE, a crashed session and a closed laptop all leave it running and billing, because the session was only polling for a result.</p>
-<p>The bound on spend therefore cannot live in R. Every submission carries an explicit timeout, derived from the estimate with headroom and capped well below Modal’s 24-hour maximum, and the worker runs with retries off so a hung job cannot bill several timeouts over.</p>
-<p>What you are asked to accept before a fit is the <strong>worst case</strong> - the timeout at the tier’s rate. The estimate is order-of-magnitude, and the timeout is what actually binds:</p>
+<p>The bound on spend therefore cannot live in R. The submission path is not written yet, and this is the design it will follow: each submission will carry an explicit timeout, derived from the estimate with headroom and capped well below Modal’s 24-hour maximum, and the worker will run with retries off so a hung job cannot bill several timeouts over.</p>
+<p>What you will be asked to accept before a fit is the <strong>worst case</strong>: the timeout plus the load and idle time Modal also bills, at the tier’s rate. The estimate is order-of-magnitude, and the timeout is what actually binds:</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Refused before anything is uploaded if the worst case exceeds max_cost,</span></span>
-<span><span class="co"># or if the estimate is so large the job would be killed before finishing</span></span>
+<code class="sourceCode R"><span><span class="co"># The planned call, which errors today. It will be refused before anything</span></span>
+<span><span class="co"># is uploaded if the worst case exceeds max_cost, or if the estimate is so</span></span>
+<span><span class="co"># large the job would be killed before finishing</span></span>
 <span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/tl_model.html">tl_model</a></span><span class="op">(</span><span class="va">data</span>, <span class="va">y</span> <span class="op">~</span> <span class="va">.</span>, method <span class="op">=</span> <span class="st">"xgboost"</span>, compute <span class="op">=</span> <span class="st">"cloud"</span>,</span>
 <span>                  confirm_upload <span class="op">=</span> <span class="cn">TRUE</span>, max_cost <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Anything currently running, so no job is invisible</span></span>
+<span><span class="co"># Jobs in flight: none until submission exists</span></span>
 <span><span class="fu"><a href="reference/tl_cloud_jobs.html">tl_cloud_jobs</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p>Set a spend budget on your Modal workspace as well. That is the only true hard cap, and it is not tidylearn’s to set.</p>
 <p>The full contract - what cloud compute will and will not do, with an audit checklist - ships with the package:</p>
@@ -620,7 +621,7 @@
 <li>
 <strong>smacof</strong>: SMACOF MDS algorithm</li>
 <li>
-<strong>keras/tensorflow</strong>: Deep learning (optional)</li>
+<strong>keras3/tensorflow</strong>: Deep learning (optional)</li>
 </ul>
 <p>Thanks to their maintainers.</p>
 <hr>

@@ -28,7 +28,7 @@ tl_model(data, formula = NULL, method = "linear", ..., compute = "cpu")
   (stats::lm on polynomial terms), "logistic" (stats::glm), "tree"
   (rpart), "forest" (randomForest), "boost" (gbm),
   "ridge"/"lasso"/"elastic_net" (glmnet), "svm" (e1071), "nn" (nnet),
-  "deep" (keras), "xgboost" (xgboost). The method and the response have
+  "deep" (keras3), "xgboost" (xgboost). The method and the response have
   to agree, and a mismatch is an error rather than a meaningless fit:
   `"linear"` and `"polynomial"` need a numeric response, `"logistic"`
   needs exactly two classes, and every other supervised method takes
@@ -123,7 +123,7 @@ for these, which tidylearn takes itself:
 
   `alpha`, glmnet's mixing parameter (by default 0, 1 and 0.5);
   `lambda`, a single penalty to fit at, a sequence of penalties for
-  [`glmnet::cv.glmnet()`](https://glmnet.stanford.edu/reference/cv.glmnet.html)
+  [`glmnet::cv.glmnet()`](https://rdrr.io/pkg/glmnet/man/cv.glmnet.html)
   to choose from, or `NULL` (the default) to let it choose its own; and
   `cv_folds` (default 5), the number of folds for that cross-validation,
   which takes the place of glmnet's `nfolds`.

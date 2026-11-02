@@ -41,7 +41,7 @@ tl_read_db(conn, "SELECT mpg, cyl, hp FROM cars WHERE cyl = 6")
 #> -- tidylearn data ---------
 #> Source: SQLiteConnection: SELECT mpg, cyl, hp FROM cars WHERE cyl = 6 
 #> Format: database 
-#> Read at: 2026-10-09 07:12:08 
+#> Read at: 2026-11-02 13:35:49 
 #> 
 #> # A tibble: 7 × 3
 #>     mpg   cyl    hp

@@ -11,7 +11,7 @@ to the appropriate underlying package based on the method."><meta property="og:i
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,7 +75,7 @@ names columns, and <code>~ . - x</code> means every numeric column but
 "logistic" (stats::glm), "tree" (rpart),
 "forest" (randomForest), "boost" (gbm),
 "ridge"/"lasso"/"elastic_net" (glmnet), "svm" (e1071),
-"nn" (nnet), "deep" (keras), "xgboost" (xgboost).
+"nn" (nnet), "deep" (keras3), "xgboost" (xgboost).
 The method and the response have to agree, and a mismatch is an
 error rather than a meaningless fit: <code>"linear"</code> and
 <code>"polynomial"</code> need a numeric response, <code>"logistic"</code>
@@ -163,7 +163,7 @@ such as <code><a href="https://rdrr.io/r/stats/poly.html" class="external-link">
 <dt><code>"ridge"</code>, <code>"lasso"</code>, <code>"elastic_net"</code></dt>
 <dd><p><code>alpha</code>, glmnet's mixing parameter (by default 0, 1 and 0.5);
 <code>lambda</code>, a single penalty to fit at, a sequence of penalties for
-<code><a href="https://glmnet.stanford.edu/reference/cv.glmnet.html" class="external-link">glmnet::cv.glmnet()</a></code> to choose from, or <code>NULL</code> (the
+<code><a href="https://rdrr.io/pkg/glmnet/man/cv.glmnet.html" class="external-link">glmnet::cv.glmnet()</a></code> to choose from, or <code>NULL</code> (the
 default) to let it choose its own; and <code>cv_folds</code> (default 5),
 the number of folds for that cross-validation, which takes the place
 of glmnet's <code>nfolds</code>. <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> uses the <code>lambda.1se</code>

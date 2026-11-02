@@ -17,8 +17,8 @@ tl_plot_unsupervised(model, type = "auto", ...)
 
 - type:
 
-  Plot type (default: "auto"). Currently unused; reserved for future
-  sub-type selection.
+  Plot type. Each unsupervised method has one plot, so `"auto"` is the
+  only value, and anything else is an error.
 
 - ...:
 

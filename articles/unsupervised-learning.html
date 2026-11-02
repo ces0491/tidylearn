@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -447,8 +447,8 @@ distances:</p>
 <span><span class="co">#&gt;       98       64       72       64</span></span></code></pre></div>
 <p>Single linkage chains: its largest cluster takes 98 of the 150 rows,
 all of <em>versicolor</em> and nearly all of <em>virginica</em>, and
-leaves two rows as a cluster of their own. That is a property of the
-linkage, not a finding about irises.</p>
+leaves two rows as a cluster of their own. The linkage causes that, and
+it says nothing about irises.</p>
 </div>
 <div class="section level2">
 <h2 id="dbscan">DBSCAN<a class="anchor" aria-label="anchor" href="#dbscan"></a>
@@ -482,7 +482,7 @@ which is the radius you want.</p>
 <span><span class="co">#&gt;       0      0          0         3</span></span>
 <span><span class="co">#&gt;       1     50          0         0</span></span>
 <span><span class="co">#&gt;       2      0         50        47</span></span></code></pre></div>
-<p>Cluster 0 is noise, not a cluster.</p>
+<p>Cluster 0 holds the noise points.</p>
 <p><code><a href="../reference/explore_dbscan_params.html">explore_dbscan_params()</a></code> sweeps the two parameters
 together, which is more informative than tuning either alone:</p>
 <div class="sourceCode" id="cb41"><pre class="downlit sourceCode r">

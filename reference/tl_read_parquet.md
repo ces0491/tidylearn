@@ -33,9 +33,9 @@ path <- tempfile(fileext = ".parquet")
 nanoparquet::write_parquet(mtcars, path)
 tl_read_parquet(path)
 #> -- tidylearn data ---------
-#> Source: /tmp/Rtmp5pHJ7J/file1ab36a198407.parquet 
+#> Source: /tmp/RtmpMbko42/file1e16535cae39.parquet 
 #> Format: parquet 
-#> Read at: 2026-10-09 07:12:11 
+#> Read at: 2026-11-02 13:35:52 
 #> 
 #> # A tibble: 32 × 11
 #>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb

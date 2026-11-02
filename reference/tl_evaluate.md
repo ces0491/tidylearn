@@ -39,8 +39,11 @@ A [tibble](https://tibble.tidyverse.org/reference/tibble.html) with
 columns `metric` (character) and `value` (numeric), containing one row
 per requested metric, and for `"auc"` on more than two classes an
 `auc_<class>` row per class as well. An unsupervised model has no
-response to score against and returns the single row
-`metric = "completed"`, `value = 1`.
+response to score against, so it is an error:
+[`calc_validation_metrics`](https://tidylearn.sheetsolved.com/reference/calc_validation_metrics.md)
+and
+[`tidy_silhouette`](https://tidylearn.sheetsolved.com/reference/tidy_silhouette.md)
+assess a clustering.
 
 ## Details
 

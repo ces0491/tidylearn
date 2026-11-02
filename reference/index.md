@@ -121,7 +121,7 @@ What the model got wrong, and which observations drove it.
 - [`tl_check_assumptions()`](https://tidylearn.sheetsolved.com/reference/tl_check_assumptions.md)
   : Check model assumptions
 - [`tl_diagnostic_dashboard()`](https://tidylearn.sheetsolved.com/reference/tl_diagnostic_dashboard.md)
-  : Create a comprehensive diagnostic dashboard
+  : Create a diagnostic dashboard
 - [`tl_influence_measures()`](https://tidylearn.sheetsolved.com/reference/tl_influence_measures.md)
   : Calculate influence measures for a linear model
 - [`tl_detect_outliers()`](https://tidylearn.sheetsolved.com/reference/tl_detect_outliers.md)

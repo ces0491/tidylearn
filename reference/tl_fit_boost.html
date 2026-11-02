@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">tidylearn</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -113,11 +113,9 @@ refused: predict.gbm() does not add it back.</p></dd>
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>The distribution follows the response: <code>"gaussian"</code> for
 regression, <code>"bernoulli"</code> for two classes and
-<code>"multinomial"</code> for more. gbm describes its multinomial
-distribution as currently broken, kept only for backwards
-compatibility, and warns to that effect on every multiclass fit. For
-three or more classes, <code>method = "forest"</code> or
-<code>method = "xgboost"</code> are the better supported choices.</p>
+<code>"multinomial"</code> for more. gbm fixed its multinomial distribution
+in version 2.3.0. Earlier versions describe it as broken and warn on
+every multiclass fit.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
