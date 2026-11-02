@@ -51,6 +51,8 @@ Each run below used the source of the 0.7.0 tarball submitted here.
   vignettes skipped, 2026-11-02: Status OK.
 * win-builder: R-release (4.6.2, 2026-10-29 ucrt), 2026-11-02: Status OK.
 * win-builder: R-devel (2026-11-01 r90825 ucrt), 2026-11-02: Status OK.
+* GitHub Actions, `--as-cran`, 2026-11-02: ubuntu-latest (R-release and
+  R-devel), macos-latest and windows-latest (R-release): Status OK on each.
 * Docker: rocker/r-ver:4.1.3, the minimum R version, with packages from a
   2022-12-01 snapshot (ggplot2 3.4.0, rlang 1.0.6), 2026-11-02: installs, and
   a script exercising fitting, prediction, cross-validation, plotting and
