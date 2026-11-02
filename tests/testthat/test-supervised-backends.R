@@ -2081,8 +2081,10 @@ test_that("tl_plot_deep_architecture hands the network to keras's plot()", {
   )
   if (inherits(result, "error")) {
     # keras draws through pydot, graphviz and png. Where one is missing,
-    # the error is keras saying so, not a failed lookup in tidylearn
-    expect_match(conditionMessage(result), "graphviz|pydot|png")
+    # the error is keras saying so, not a failed lookup in tidylearn. Without
+    # the graphviz binary, pydot reports that "dot" is not found.
+    expect_match(conditionMessage(result),
+                 "graphviz|pydot|png|\"dot\" not found")
   } else {
     expect_null(result)
   }
