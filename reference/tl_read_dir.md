@@ -63,13 +63,13 @@ write.csv(mtcars[17:32, ], file.path(dir, "2024", "feb.csv"),
 
 # Only the top level unless asked to recurse
 tl_read_dir(dir, format = "csv")
-#> Found 1 file(s) in /tmp/RtmpMbko42/sales_1e163a98b40d
+#> Found 1 file(s) in /tmp/RtmpNpMOQJ/sales_1acd7c321980
 #> Reading 1 files...
 #> Combined: 16 rows x 12 columns from 1 files
 #> -- tidylearn data ---------
 #> Source: 1 files 
 #> Format: csv 
-#> Read at: 2026-11-02 13:35:50 
+#> Read at: 2026-11-02 16:44:27 
 #> 
 #> # A tibble: 16 × 12
 #>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb source_file
@@ -103,7 +103,7 @@ tl_read_dir(dir, pattern = "^jan", .quiet = TRUE)
 #> -- tidylearn data ---------
 #> Source: 1 files 
 #> Format: multi 
-#> Read at: 2026-11-02 13:35:50 
+#> Read at: 2026-11-02 16:44:27 
 #> 
 #> # A tibble: 16 × 12
 #>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb source_file

@@ -123,7 +123,7 @@ for these, which tidylearn takes itself:
 
   `alpha`, glmnet's mixing parameter (by default 0, 1 and 0.5);
   `lambda`, a single penalty to fit at, a sequence of penalties for
-  [`glmnet::cv.glmnet()`](https://rdrr.io/pkg/glmnet/man/cv.glmnet.html)
+  [`glmnet::cv.glmnet()`](https://glmnet.stanford.edu/reference/cv.glmnet.html)
   to choose from, or `NULL` (the default) to let it choose its own; and
   `cv_folds` (default 5), the number of folds for that cross-validation,
   which takes the place of glmnet's `nfolds`.

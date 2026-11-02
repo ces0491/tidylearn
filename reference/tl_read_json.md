@@ -43,9 +43,9 @@ path <- tempfile(fileext = ".json")
 jsonlite::write_json(mtcars, path)
 tl_read_json(path)
 #> -- tidylearn data ---------
-#> Source: /tmp/RtmpMbko42/file1e1664782777.json 
+#> Source: /tmp/RtmpNpMOQJ/file1acd62debbf7.json 
 #> Format: json 
-#> Read at: 2026-11-02 13:35:51 
+#> Read at: 2026-11-02 16:44:28 
 #> 
 #> # A tibble: 32 × 11
 #>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb
@@ -67,9 +67,9 @@ lines <- tempfile(fileext = ".ndjson")
 jsonlite::stream_out(mtcars, file(lines), verbose = FALSE)
 tl_read_json(lines)
 #> -- tidylearn data ---------
-#> Source: /tmp/RtmpMbko42/file1e163d25e7b8.ndjson 
+#> Source: /tmp/RtmpNpMOQJ/file1acd1e9e1ce6.ndjson 
 #> Format: json 
-#> Read at: 2026-11-02 13:35:51 
+#> Read at: 2026-11-02 16:44:28 
 #> 
 #> # A tibble: 32 × 11
 #>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb

@@ -62,12 +62,12 @@ component – is refused before anything is extracted.
 # readr ships a zip archive holding one CSV
 archive <- readr::readr_example("mtcars.csv.zip")
 tl_read_zip(archive)
-#> Reading csv data from: /tmp/RtmpMbko42/tl_zip_1e1667cf5388/mtcars.csv
+#> Reading csv data from: /tmp/RtmpNpMOQJ/tl_zip_1acd29e0904f/mtcars.csv
 #> Returned: 32 rows x 11 columns
 #> -- tidylearn data ---------
 #> Source: /home/runner/work/_temp/Library/readr/extdata/mtcars.csv.zip//mtcars.csv 
 #> Format: zip+csv 
-#> Read at: 2026-11-02 13:35:54 
+#> Read at: 2026-11-02 16:44:31 
 #> 
 #> # A tibble: 32 × 11
 #>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb
@@ -89,7 +89,7 @@ tl_read_zip(archive, file = "mtcars.csv", .quiet = TRUE)
 #> -- tidylearn data ---------
 #> Source: /home/runner/work/_temp/Library/readr/extdata/mtcars.csv.zip//mtcars.csv 
 #> Format: zip+csv 
-#> Read at: 2026-11-02 13:35:54 
+#> Read at: 2026-11-02 16:44:31 
 #> 
 #> # A tibble: 32 × 11
 #>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb

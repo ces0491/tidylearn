@@ -34,9 +34,9 @@ path <- tempfile(fileext = ".csv")
 write.csv(mtcars, path, row.names = FALSE)
 tl_read_csv(path)
 #> -- tidylearn data ---------
-#> Source: /tmp/RtmpMbko42/file1e169fb4c88.csv 
+#> Source: /tmp/RtmpNpMOQJ/file1acd51d51b95.csv 
 #> Format: csv 
-#> Read at: 2026-11-02 13:35:48 
+#> Read at: 2026-11-02 16:44:26 
 #> 
 #> # A tibble: 32 × 11
 #>      mpg   cyl  disp    hp  drat    wt  qsec    vs    am  gear  carb
