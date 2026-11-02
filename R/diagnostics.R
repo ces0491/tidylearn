@@ -67,8 +67,8 @@ tl_influence_measures <- function(model, threshold_cook = NULL,
   # was handed: lm() drops incomplete cases, so one missing predictor left
   # every influence measure an observation shorter than model$data and the
   # data frame below failed with "arguments imply differing number of
-  # rows: 60, 59".
-  fitted_rows <- tl_fitted_rows(model)
+  # rows: 60, 59". The influence functions leave out a row of weight zero.
+  fitted_rows <- tl_fitted_rows(model)[tl_has_weight(fit)]
   n <- length(fitted_rows)
   # Predictors excluding the intercept, counted from the rank: an aliased
   # coefficient is NA in coef() and was counted as a parameter
@@ -155,6 +155,20 @@ tl_drop_excluded <- function(x, fit) {
   }
   dropped <- as.integer(omitted)
   if (is.matrix(x)) x[-dropped, , drop = FALSE] else x[-dropped]
+}
+
+#' Which of a fit's rows carry weight
+#'
+#' A row of weight zero takes no part in the fit, but \code{residuals()} and
+#' \code{fitted()} still report it, which the influence functions do not.
+#'
+#' @param fit An lm or glm fit
+#' @return A logical index over the rows the fit used
+#' @keywords internal
+#' @noRd
+tl_has_weight <- function(fit) {
+  weights <- tl_drop_excluded(stats::weights(fit), fit)
+  if (is.null(weights)) TRUE else weights > 0
 }
 
 #' Plot influence diagnostics
@@ -359,6 +373,64 @@ tl_plot_influence <- function(model,
   p
 }
 
+#' Whether a vector from a fit varies by more than rounding error
+#'
+#' The fitted values of \code{y ~ 1} are constant, and the residuals of a
+#' perfect fit are zero, up to rounding. How that rounding falls differs by
+#' platform: a test or \code{cor()} gave NA, which stopped the caller at
+#' \code{if}, or a number built from the last bits, which reported a verdict
+#' on nothing.
+#'
+#' On exact fits of up to 5000 rows, the range of the residuals reached 565
+#' times the machine epsilon of the largest response, growing with the row
+#' count. The tolerance leaves several times that, and stays well below real
+#' variation in a large response such as a timestamp, which a tolerance
+#' of \code{sqrt(.Machine$double.eps)} swallowed.
+#'
+#' @param x The values to judge
+#' @param magnitude The largest value in the arithmetic behind \code{x}
+#' @return TRUE when \code{x} varies by more than rounding error
+#' @keywords internal
+#' @noRd
+tl_varies <- function(x, magnitude) {
+  length(x) > 1L &&
+    diff(range(x)) > .Machine$double.eps * (100 + length(x)) * magnitude
+}
+
+#' The largest value in a fit's arithmetic
+#'
+#' Rounding follows the largest term, not the response: 3 * year - 6000 is
+#' small, and its residuals are rounding error on terms in the thousands.
+#'
+#' @param fit An lm or glm fit
+#' @param response_values The values the fit was on
+#' @return A single number
+#' @keywords internal
+#' @noRd
+tl_fit_magnitude <- function(fit, response_values) {
+  coefficients <- stats::coef(fit)
+  coefficients[is.na(coefficients)] <- 0
+  terms <- sweep(stats::model.matrix(fit), 2L, coefficients, "*")
+  max(abs(response_values), abs(terms))
+}
+
+#' An assumption check the residuals cannot support
+#'
+#' @param assumption The assumption's name
+#' @param recommendation What to do instead
+#' @return A list with \code{assumption}, \code{check}, \code{details} and
+#'   \code{recommendation}
+#' @keywords internal
+#' @noRd
+tl_undecided_assumption <- function(assumption, recommendation) {
+  list(
+    assumption = assumption,
+    check = NA,
+    details = "The residuals do not vary beyond rounding error",
+    recommendation = recommendation
+  )
+}
+
 #' Test the linearity assumption
 #'
 #' A RESET-style specification test: regress the residuals on powers of
@@ -558,7 +630,9 @@ tl_check_multicollinearity <- function(fit, verbose) {
 #'   was run), \code{details} (character), and \code{recommendation}
 #'   (character). An additional \code{overall} element summarises the
 #'   number of assumptions checked, violated, and satisfied; an \code{NA} or
-#'   \code{NULL} check counts as neither.
+#'   \code{NULL} check counts as neither. A check is \code{NA} when the fit
+#'   leaves it nothing to read: on a perfect fit the residuals are rounding
+#'   error, so every check of them is.
 #'
 #'   Logistic regression assumes neither normal residuals nor a constant
 #'   variance, so for a logistic model \code{normality} and
@@ -607,8 +681,11 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
   # padded back to every row of the data, so the padding is dropped to
   # leave the rows the fit used.
   fit <- model$fit
-  residuals <- tl_drop_excluded(residuals(fit), fit)
-  fitted_values <- tl_drop_excluded(fitted(fit), fit)
+  carries_weight <- tl_has_weight(fit)
+  residuals <- tl_drop_excluded(residuals(fit), fit)[carries_weight]
+  fitted_values <- tl_drop_excluded(fitted(fit), fit)[carries_weight]
+  magnitude <- tl_fit_magnitude(fit, fitted_values + residuals)
+  residuals_vary <- tl_varies(residuals, magnitude)
 
   # A logistic model assumes neither normal residuals nor a constant
   # variance: the variance of a binary outcome is set by its mean. Testing
@@ -620,13 +697,23 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
   assumptions <- list()
 
   # 1. Linearity
-  assumptions$linearity <- tl_check_linearity(fitted_values, residuals)
+  assumptions$linearity <- if (residuals_vary) {
+    tl_check_linearity(fitted_values, residuals)
+  } else {
+    tl_undecided_assumption(
+      "Linearity", "Inspect a residuals-versus-fitted plot directly"
+    )
+  }
 
   # 2. Independence
   # Durbin-Watson statistic for autocorrelation. It is computed directly:
   # car::durbinWatsonTest() also bootstraps a p-value, which drew from the
   # caller's random stream though only the statistic was read.
-  if (test) {
+  if (test && !residuals_vary) {
+    assumptions$independence <- tl_undecided_assumption(
+      "Independence", "Inspect the residuals in observation order directly"
+    )
+  } else if (test) {
     dw_statistic <- sum(diff(residuals)^2) / sum(residuals^2)
     dw_check <- if (is.finite(dw_statistic)) {
       dw_statistic >= 1.5 && dw_statistic <= 2.5
@@ -662,13 +749,33 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
   }
 
   # 3. Homoscedasticity (Equal Variance)
-  # Breusch-Pagan test
+  # Breusch-Pagan test. bptest() refuses a design of one column, such as
+  # y ~ 0 + x, and reads an aliased second column as a test on no degrees
+  # of freedom. It keeps a row of weight zero in its sum of weights, which
+  # hides the pattern, and stops on weights under na.exclude. The correlation
+  # below reads the fit's own rows.
+  can_bptest <- test && requireNamespace("lmtest", quietly = TRUE) &&
+    fit$rank >= 2L && all(carries_weight) &&
+    (is.null(stats::weights(fit)) ||
+       !inherits(stats::na.action(fit), "exclude"))
+
   if (is_logistic) {
     assumptions$homoscedasticity <- tl_not_logistic_assumption(
       "Homoscedasticity",
       "the variance of a binary outcome is set by its mean, p(1 - p)"
     )
-  } else if (test && requireNamespace("lmtest", quietly = TRUE)) {
+  } else if (!tl_varies(abs(residuals), magnitude) ||
+               !(can_bptest || tl_varies(fitted_values, magnitude))) {
+    # bptest() reads the predictors, so only the correlation needs the
+    # fitted values to vary
+    assumptions$homoscedasticity <- list(
+      assumption = "Homoscedasticity",
+      check = NA,
+      details = "Fitted values or residual sizes do not vary enough to compare",
+      recommendation =
+        "Inspect a plot of residuals against fitted values directly"
+    )
+  } else if (can_bptest) {
     bp_test <- lmtest::bptest(fit)
     bp_p_value <- unname(bp_test$p.value)
     bp_recommendation <- if (is.na(bp_p_value)) {
@@ -717,6 +824,15 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
     assumptions$normality <- tl_not_logistic_assumption(
       "Normality of Residuals",
       "the residuals of a binary outcome are not expected to be normal"
+    )
+  } else if (length(residuals) < 3L || !residuals_vary) {
+    # shapiro.test() needs three values that differ, and the fallbacks
+    # below turn identical residuals into NA
+    assumptions$normality <- list(
+      assumption = "Normality of Residuals",
+      check = NA,
+      details = "Too few residuals, or too little variation, to test",
+      recommendation = "Inspect a Q-Q plot of the residuals directly"
     )
   } else if (test && length(residuals) <= 5000) {
     sw_test <- shapiro.test(residuals)
@@ -785,28 +901,35 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
 
   # 6. Outliers and Influential Points. which() leaves out a flag that a
   # NaN measure made NA; sum() would count it as NA.
-  influence_df <- tl_influence_measures(model)
-  influential_obs <- influence_df$observation[
-    which(influence_df$is_influential)
-  ]
-  n_influential <- length(influential_obs)
+  if (residuals_vary) {
+    influence_df <- tl_influence_measures(model)
+    influential_obs <- influence_df$observation[
+      which(influence_df$is_influential)
+    ]
+    n_influential <- length(influential_obs)
 
-  outlier_recommendation <- if (n_influential > 0) {
-    obs_to_show <- utils::head(influential_obs, 5)
-    paste(
-      "Consider inspecting observations:",
-      paste(obs_to_show, collapse = ", "),
-      "... (and potentially others)"
+    outlier_recommendation <- if (n_influential > 0) {
+      obs_to_show <- utils::head(influential_obs, 5)
+      paste(
+        "Consider inspecting observations:",
+        paste(obs_to_show, collapse = ", "),
+        "... (and potentially others)"
+      )
+    } else {
+      "No influential outliers detected"
+    }
+    assumptions$outliers <- list(
+      assumption = "No Influential Outliers",
+      check = n_influential == 0,
+      details = paste(n_influential, "influential observations detected"),
+      recommendation = outlier_recommendation
     )
   } else {
-    "No influential outliers detected"
+    assumptions$outliers <- tl_undecided_assumption(
+      "No Influential Outliers",
+      "Influence is measured against the residuals, so there is none to read"
+    )
   }
-  assumptions$outliers <- list(
-    assumption = "No Influential Outliers",
-    check = n_influential == 0,
-    details = paste(n_influential, "influential observations detected"),
-    recommendation = outlier_recommendation
-  )
 
   # Print summary if verbose. A check is NA when its test could not decide,
   # and `if (NA)` stopped the summary partway through.
@@ -838,6 +961,7 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
     lapply(assumptions, function(x) x$check)
   )
   checks <- unlist(checks)
+  n_undecided <- sum(is.na(checks))
   checks <- checks[!is.na(checks)]
 
   if (length(checks) > 0) {
@@ -848,6 +972,11 @@ tl_check_assumptions <- function(model, test = TRUE, verbose = TRUE) {
       paste(
         n_violated,
         "assumption(s) appear to be violated. See details."
+      )
+    }
+    if (n_undecided > 0) {
+      overall_status <- paste(
+        overall_status, n_undecided, "could not be decided."
       )
     }
   } else {

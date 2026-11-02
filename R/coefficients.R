@@ -11,8 +11,9 @@ NULL
 #' standard errors, test statistics, p-values and -- on request -- confidence
 #' intervals. Available for \code{"linear"}, \code{"polynomial"},
 #' \code{"logistic"}, \code{"ridge"}, \code{"lasso"} and
-#' \code{"elastic_net"}. Other methods have no coefficients; use
-#' \code{\link{tl_table_importance}} for those.
+#' \code{"elastic_net"}. Other methods have no coefficients.
+#' \code{\link{tl_table_importance}} covers \code{"tree"}, \code{"forest"},
+#' \code{"boost"} and \code{"xgboost"}.
 #'
 #' Intervals are Wald intervals, computed from the same standard errors as
 #' the \code{statistic} and \code{p_value} columns beside them, so the
@@ -134,9 +135,16 @@ tl_coefficients <- function(model, conf_int = FALSE, level = 0.95,
     }
     tl_coef_regularized(model, lambda, exponentiate)
   } else {
+    # tl_table_importance() refuses svm, nn and deep, so it is no pointer
+    # for them
     stop(
-      "'", method, "' has no coefficients. Use tl_table_importance() for ",
-      "variable importance,\nor reach the fitted object through model$fit.",
+      "'", method, "' has no coefficients. ",
+      if (method %in% c("tree", "forest", "boost", "xgboost")) {
+        "Use tl_table_importance() for variable importance,\nor reach "
+      } else {
+        "Reach "
+      },
+      "the fitted object through model$fit.",
       call. = FALSE
     )
   }

@@ -120,6 +120,31 @@ test_that("a model with no coefficients still has a term column", {
   expect_type(coefs$term, "character")
 })
 
+test_that("a method with no coefficients names only what it does offer", {
+  fit <- function(method, ...) {
+    tl_model(mtcars, mpg ~ wt + hp, method = method, ...)
+  }
+  for (model in list(fit("tree"), fit("forest", ntree = 10),
+                     fit("boost", n.trees = 10, n.minobsinnode = 2))) {
+    expect_error(tl_coefficients(model), "tl_table_importance")
+  }
+
+  # tl_table_importance() refuses these, so it was a pointer to another error
+  for (model in list(fit("svm"),
+                     fit("nn", size = 2, trace = FALSE, maxit = 10))) {
+    msg <- tryCatch(tl_coefficients(model), error = conditionMessage)
+    expect_match(msg, "has no coefficients", fixed = TRUE)
+    expect_match(msg, "model$fit", fixed = TRUE)
+    expect_false(grepl("tl_table_importance", msg, fixed = TRUE))
+  }
+})
+
+test_that("xgboost is pointed to its importance table", {
+  skip_if_not_installed("xgboost")
+  model <- tl_model(mtcars, mpg ~ wt + hp, method = "xgboost", nrounds = 2)
+  expect_error(tl_coefficients(model), "tl_table_importance")
+})
+
 test_that("two terms with the same name keep their own statistics", {
   # A factor `a` with level "b" makes the term ab, which is also the name of
   # a numeric column. The statistics were matched to terms by name, so both

@@ -1,6 +1,4 @@
-# tidylearn 0.6.0.9000
-
-(Development version.)
+# tidylearn 0.7.0
 
 ## Breaking Changes
 
@@ -25,27 +23,69 @@
 * **`tl_compute_advisor()` gives different runtimes.** It divided every
   estimate by the machine's physical cores, although timing the fits found
   only xgboost and `"deep"` using more than one. On a 16-core laptop that
-  left forest and tree estimates 19x and 21x under the fit's measured time.
+  left forest and tree estimates 14x to 26x under the fits' measured times.
   The division is gone, the `cores_used` field and the core count in the
   printout with it, and each method's runtime constant comes from fits timed
-  by `data-raw/calibrate-advisor.R`. The estimates land within a factor of 3
-  of those fits on that one machine, and other hardware or data shapes can be
-  further off.
+  by `data-raw/calibrate-advisor.R`. The estimates land within about a factor
+  of 3 of those fits on that one machine, and other hardware or data shapes
+  can be further off.
 
 * **`tl_compute_advisor()` gives different cloud costs.** Modal's rates are
   its list prices of 2026-10-30, built from the CPU, memory and GPU each
-  tier uses. The CPU and A100 tiers were 1.4x to 2.3x over list. The T4 and
+  tier uses. The CPU and A100 tiers were 1.3x to 1.8x over list. The T4 and
   A10G tiers matched the GPU price alone, leaving out the CPU and memory a
   GPU container also bills. Expected cost covers the load time and idle
   window Modal bills, in place of a flat $0.01.
 
-* The worst-case cost that the cloud budget check gates on adds that load
-  and idle time to the timeout, since it stated less than a job can bill.
+* **`tl_check_assumptions()` reports a check the fit cannot support as
+  undecided.** Residuals or fitted values that differ only by rounding gave
+  a verdict built from that rounding: a perfect line reported three violated
+  assumptions, and on some platforms the call stopped with "missing value
+  where TRUE/FALSE needed". Those checks now hold `NA`, which counts as
+  neither violated nor satisfied, as does normality on fewer than three
+  residuals, which stopped inside `shapiro.test()`. `y ~ 1` failed inside
+  lmtest with "the auxiliary variance regression requires at least an
+  intercept and a regressor" and now holds `NA` for homoscedasticity.
+  `y ~ 0 + x` failed the same way, and an aliased column as in
+  `y ~ 0 + x + I(2 * x)` reported a violation at a p-value of 0. Both now
+  use the correlation check. The overall status counts the checks left
+  undecided.
 
-* A CPU tier on Modal is no longer assumed to run a fit faster for having
-  more cores. Only the memory of a CPU tier now affects which one is chosen.
+* **`tl_plot_tuning_results(plot_type = "importance")` gives a score that
+  does not vary an importance of 0.** For a categorical parameter it gave a
+  ratio of rounding error, such as 0.333. Importance is otherwise unchanged,
+  but it no longer goes through `summary()` of an `aov()`, which from R 4.6
+  warns of an "essentially perfect fit" when a parameter explains the score
+  exactly. A set scored `Inf` now counts as having no score, and an `Inf`
+  parameter value is left out, where both stopped the plot with "NA/NaN/Inf
+  in 'y'" or "missing value where TRUE/FALSE needed".
+
+* **The worst-case cost that the cloud budget check gates on changes.** It
+  uses the corrected rates and adds that load and idle time to the timeout,
+  which it left out. At a timeout of an hour, five of the seven tiers fall
+  and the T4 and A10G tiers rise.
+
+* **A CPU tier on Modal is no longer assumed to run a fit faster for having
+  more cores.** Only the memory of a CPU tier now affects which one is
+  chosen, and the advisor's cloud runtime for that tier changes with it.
+
+* `tl_influence_measures()`, `tl_check_assumptions()` and the diagnostic
+  plots accept a fit with weights of zero, which stopped with "arguments
+  imply differing number of rows". Those rows took no part in the fit, so
+  the results leave them out, and homoscedasticity uses the correlation
+  check because `lmtest::bptest()` counts them. The influence measures still
+  stop on zero weights under `na.exclude`, inside base R.
+  `tl_check_assumptions()` also reads weights under `na.exclude`, which
+  stopped with "incompatible dimensions".
+
+* The message and help page of `tl_coefficients()`, and the message of
+  `tl_table_coefficients()`, no longer send `"svm"`, `"nn"` or `"deep"` to
+  `tl_table_importance()`, which refuses those methods.
 
 ## Documentation
+
+* `tl_fit_boost()`'s page no longer calls gbm's multinomial distribution
+  broken or advises against it, since gbm 2.3.0 fixed it.
 
 * The README and `vignette("compute-backends")` described the job timeout,
   the worker's retry setting and cancel-on-interrupt as being in place. They

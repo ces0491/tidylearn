@@ -1802,8 +1802,9 @@ tl_plot_tuning_results <- function(model,
   } else if (plot_type == "importance") {
     # Parameter importance plot
     # A set that failed every fold has no score, so it says nothing about
-    # its parameters' effect
-    scored <- !is.na(results_df$mean_metric)
+    # its parameters' effect. Nor does an infinite one, which has no size to
+    # compare.
+    scored <- is.finite(results_df$mean_metric)
 
     param_importance <- lapply(
       param_names,
@@ -1816,7 +1817,7 @@ tl_plot_tuning_results <- function(model,
           # parameter explained none of the score, so say that instead.
           # Spread is judged on the pairs cor() uses.
           values <- results_df[[param]]
-          pairs <- scored & !is.na(values)
+          pairs <- scored & is.finite(values)
           has_spread <- function(x) {
             length(x) > 1L && stats::sd(x) > 0
           }
@@ -1837,10 +1838,8 @@ tl_plot_tuning_results <- function(model,
             results_df[[param]]
           )
 
-          # aov() needs two levels among the scored sets, and stopped on a
-          # parameter held at one value -- or one whose other value failed
-          # every fold -- with "contrasts can be applied only to factors
-          # with 2 or more levels". One value explains none of the score.
+          # An ANOVA needs two levels among the scored sets. One value, or
+          # another that failed every fold, explains none of the score.
           observed <- unique(results_df[[param]][scored])
           if (length(observed[!is.na(observed)]) < 2L) {
             return(data.frame(
@@ -1848,21 +1847,21 @@ tl_plot_tuning_results <- function(model,
             ))
           }
 
-          # Run ANOVA. The formula is built with stats::reformulate --
-          # the .data pronoun is a tidy-eval construct and is not
-          # understood by aov(), which evaluates in a plain data frame.
-          anova_result <- summary(stats::aov(
-            stats::reformulate(param, response = "mean_metric"),
-            data = results_df
-          ))
-
-          # Calculate eta squared
-          ss_total <- sum(
-            anova_result[[1]]$"Sum Sq"
-          )
-          ss_param <- anova_result[[1]]$"Sum Sq"[1]
-          # A constant metric makes ss_total zero and eta squared NaN
-          eta_squared <- if (isTRUE(ss_total > 0)) ss_param / ss_total else 0
+          # Eta squared of a one-way ANOVA, from the group means. From R 4.6,
+          # summary() of an aov() warns of a perfect fit when the parameter
+          # explains the score exactly, which is a result here.
+          rows <- scored & !is.na(results_df[[param]])
+          score <- results_df$mean_metric[rows]
+          group_means <- stats::ave(score, results_df[[param]][rows])
+          ss_total <- sum((score - mean(score))^2)
+          ss_param <- sum((group_means - mean(score))^2)
+          # A constant metric has nothing to explain: ss_total is zero, or
+          # rounding error that can make the ratio exceed 1
+          eta_squared <- if (tl_varies(score, max(abs(score)))) {
+            ss_param / ss_total
+          } else {
+            0
+          }
 
           data.frame(
             parameter = param,

@@ -259,8 +259,8 @@ tl_compute_advisor("xgboost", data, y ~ ., hyperparams = list(nrounds = 5000))
 
 Estimates are order-of-magnitude. The runtime constants come from timing
 fits on one laptop (`data-raw/` in the repository), where the estimates land
-within a factor of 3 of those fits, and other hardware or data shapes can be
-further off.
+within about a factor of 3 of those fits, and other hardware or data shapes
+can be further off.
 The advisor covers all 13 supervised methods, and it treats cloud as a "does
 not fit on my machine" tier, so it will recommend cloud for a CPU-only method
 like random forest if the job is RAM-infeasible locally.

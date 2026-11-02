@@ -144,9 +144,7 @@ test_that("tl_resolve_compute('auto') consults advisor for GPU-capable", {
 })
 
 test_that("tl_resolve_compute('auto') picks gpu for long GPU-capable job", {
-  # Pin the CPU estimate rather than allocating a large matrix: the real
-  # estimate divides by detectCores(), so the expectation would flip on a
-  # machine with enough cores
+  # Pin the CPU estimate rather than allocating a large matrix
   testthat::local_mocked_bindings(
     tl_check_gpu = function(...) fake_gpu_xgb,
     tl_estimate_local_cpu_internal = function(method, n_rows, n_cols, hyp) {

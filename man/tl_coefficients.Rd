@@ -50,8 +50,9 @@ Returns the coefficients of a fitted tidylearn model as a tibble, with
 standard errors, test statistics, p-values and -- on request -- confidence
 intervals. Available for \code{"linear"}, \code{"polynomial"},
 \code{"logistic"}, \code{"ridge"}, \code{"lasso"} and
-\code{"elastic_net"}. Other methods have no coefficients; use
-\code{\link{tl_table_importance}} for those.
+\code{"elastic_net"}. Other methods have no coefficients.
+\code{\link{tl_table_importance}} covers \code{"tree"}, \code{"forest"},
+\code{"boost"} and \code{"xgboost"}.
 }
 \details{
 Intervals are Wald intervals, computed from the same standard errors as

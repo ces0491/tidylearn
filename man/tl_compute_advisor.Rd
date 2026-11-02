@@ -75,8 +75,8 @@ problem is laptop-sized, GPU-sized, or cloud-sized.
 \details{
 Estimates are deliberately rough. Each method's runtime constant comes
 from timing fits of three sizes on one laptop, where the estimates land
-within a factor of 3 of those fits. Two runs on that laptop differed by up
-to 2.5x, and other hardware or differently shaped data can be further
+within about a factor of 3 of those fits. Two runs on that laptop differed
+by up to 2.5x, and other hardware or differently shaped data can be further
 off, so treat the recommendation as a starting point. The memory multiples
 and GPU speedups are assumptions with no measurement behind them.
 }
